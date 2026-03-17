@@ -2,8 +2,8 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Admin = require('./models/Admin');
 
-const USERNAME = 'admin';      // change this
-const PASSWORD = 'Admin@1234'; // change this
+const USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@1234';
 
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {

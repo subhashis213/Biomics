@@ -97,6 +97,8 @@ Create `backend/.env`:
 MONGO_URI=mongodb://localhost:27017/biomicshub
 PORT=5002
 JWT_SECRET=replace_with_a_long_random_secret
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=replace_with_a_strong_admin_password
 ```
 
 ## Installation
@@ -122,11 +124,12 @@ If using another MongoDB setup, ensure `MONGO_URI` is valid and reachable.
 npm --prefix backend run seed:admin
 ```
 
-Default credentials in seed script:
+The seed script uses `ADMIN_USERNAME` and `ADMIN_PASSWORD` from `backend/.env` when present.
+If those variables are not set, it falls back to:
 - Username: `admin`
 - Password: `Admin@1234`
 
-You can change these values in `backend/createAdmin.js` before running the seed command.
+In production, the backend also auto-creates the admin account on startup when `ADMIN_USERNAME` and `ADMIN_PASSWORD` are set in the hosting environment.
 
 ## Run in Development (Recommended)
 

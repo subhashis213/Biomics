@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const Admin = require('./models/Admin');
 const videoRoutes = require('./routes/videoRoutes');
 const authRoutes = require('./routes/authRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
@@ -81,11 +82,35 @@ async function migrateQuizIndexes() {
   }
 }
 
+async function ensureAdminAccount() {
+  const username = String(process.env.ADMIN_USERNAME || '').trim();
+  const password = String(process.env.ADMIN_PASSWORD || '').trim();
+
+  if (!username || !password) {
+    return;
+  }
+
+  try {
+    const existing = await Admin.findOne({ username }).lean();
+    if (existing) {
+      console.log(`✓ Admin account ready for ${username}`);
+      return;
+    }
+
+    const admin = new Admin({ username, password });
+    await admin.save();
+    console.log(`✓ Created admin account for ${username}`);
+  } catch (err) {
+    console.error('Admin bootstrap error:', err.message);
+  }
+}
+
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     console.log('✓ Connected to MongoDB');
     await migrateVideos();
     await migrateQuizIndexes();
+    await ensureAdminAccount();
     app.listen(PORT, () => console.log(`✓ Server running on port ${PORT}`));
   })
   .catch(err => console.error('MongoDB connection error:', err));
