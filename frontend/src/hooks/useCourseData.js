@@ -1,0 +1,93 @@
+import { useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchCourseQuizzes,
+  fetchRecentQuizAttempts,
+  requestJson,
+  toggleFavorite as apiFavorite,
+  updateVideoProgress as apiProgress
+} from '../api';
+
+const normalizeId = (v) => String(v || '');
+
+/**
+ * Fetches and caches all course data for the student:
+ * videos, quizzes, quiz attempts, favorites, completedVideos.
+ *
+ * Provides optimistic mutations for toggling favorites and completion.
+ * Uses React Query so data is cached, deduplicated and auto-stale.
+ */
+export function useCourseData() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['courseData'],
+    queryFn: async () => {
+      const [videoData, quizData, attemptData] = await Promise.all([
+        requestJson('/videos/my-course'),
+        fetchCourseQuizzes(),
+        fetchRecentQuizAttempts()
+      ]);
+      return { videoData, quizData, attemptData };
+    },
+    staleTime: 2 * 60 * 1000,
+    retry: (failureCount, err) => {
+      if (/authentication|unauthorized/i.test(err?.message || '')) return false;
+      return failureCount < 1;
+    }
+  });
+
+  const favMutation = useMutation({
+    mutationFn: apiFavorite,
+    onSuccess: (result) => {
+      queryClient.setQueryData(['courseData'], (old) =>
+        old ? { ...old, videoData: { ...old.videoData, favorites: result.favorites || [] } } : old
+      );
+    }
+  });
+
+  const progressMutation = useMutation({
+    mutationFn: ({ videoId, completed }) => apiProgress(videoId, completed),
+    onSuccess: (result) => {
+      queryClient.setQueryData(['courseData'], (old) =>
+        old ? { ...old, videoData: { ...old.videoData, completedVideos: result.completedVideos || [] } } : old
+      );
+    }
+  });
+
+  /** Re-fetches quiz attempts (called after a quiz submission). */
+  async function refreshAttempts() {
+    try {
+      const attemptData = await fetchRecentQuizAttempts();
+      queryClient.setQueryData(['courseData'], (old) =>
+        old ? { ...old, attemptData } : old
+      );
+    } catch {
+      // Best-effort; ignore failures.
+    }
+  }
+
+  const rawFavorites = data?.videoData?.favorites || [];
+  const rawCompleted = data?.videoData?.completedVideos || [];
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const favoriteIds = useMemo(() => new Set(rawFavorites.map(normalizeId)), [rawFavorites]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const completedIds = useMemo(() => new Set(rawCompleted.map(normalizeId)), [rawCompleted]);
+
+  return {
+    videos: data?.videoData?.videos || [],
+    course: data?.videoData?.course || '',
+    favoriteIds,
+    completedIds,
+    quizzes: data?.quizData?.quizzes || [],
+    quizAttempts: data?.attemptData?.attempts || [],
+    isLoading,
+    loadError: error,
+    toggleFavorite: (videoId) => favMutation.mutate(videoId),
+    toggleCompleted: (videoId, completed) => progressMutation.mutate({ videoId, completed }),
+    favMutError: favMutation.error,
+    progressMutError: progressMutation.error,
+    refreshAttempts
+  };
+}

@@ -1,0 +1,16 @@
+node_modules
+dist
+.vite
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+coverage
+.vitest
+
+# Logs
+*.log
+npm-debug.log*

@@ -1,0 +1,17 @@
+{
+  "name": "Biomics Hub",
+  "short_name": "BiomicsHub",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d140d",
+  "theme_color": "#7f9f5b",
+  "description": "Biology learning portal with admin publishing and student course access.",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

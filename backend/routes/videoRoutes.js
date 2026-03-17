@@ -1,0 +1,242 @@
+const express = require('express');
+const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const Video = require('../models/Video');
+const User = require('../models/User');
+const { logAdminAction } = require('../utils/auditLog');
+const { authenticateToken } = require('../middleware/auth');
+
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const ALLOWED_CATEGORIES = [
+  '11th',
+  '12th',
+  'NEET',
+  'IIT-JAM',
+  'CSIR-NET Life Science',
+  'GATE'
+];
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${Date.now()}-${safe}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.mimetype === 'application/pdf' && ext === '.pdf') cb(null, true);
+    else cb(new Error('Only PDF files are allowed'));
+  }
+});
+
+function sanitizeIdList(items = []) {
+  return items.map((item) => String(item));
+}
+
+// Get all videos
+router.get('/', async (req, res) => {
+  try {
+    const requestedCategory = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+    const filter = requestedCategory ? { category: requestedCategory } : {};
+    const videos = await Video.find(filter).sort({ uploadedAt: -1 });
+    res.json(videos);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch videos' });
+  }
+});
+
+// Student-only: fetch lectures for the student's registered course
+router.get('/my-course', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne(
+      { username: req.user.username },
+      { class: 1, favorites: 1, completedVideos: 1, _id: 0 }
+    ).lean();
+    if (!user || !user.class) {
+      return res.status(404).json({ error: 'Student profile not found' });
+    }
+
+    const videos = await Video.find({ category: user.class }).sort({ uploadedAt: -1 });
+    return res.json({
+      course: user.class,
+      videos,
+      favorites: sanitizeIdList(user.favorites || []),
+      completedVideos: sanitizeIdList(user.completedVideos || [])
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch course videos' });
+  }
+});
+
+// Student-only: toggle favorite for quick access
+router.post('/:id/favorite', authenticateToken('user'), async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id, { _id: 1, category: 1 }).lean();
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+
+    const user = await User.findOne({ username: req.user.username });
+    if (!user || user.class !== video.category) {
+      return res.status(403).json({ error: 'You are not authorized for this video.' });
+    }
+
+    const videoId = String(video._id);
+    const currentFavorites = new Set(sanitizeIdList(user.favorites || []));
+    let isFavorite;
+
+    if (currentFavorites.has(videoId)) {
+      user.favorites = (user.favorites || []).filter((id) => String(id) !== videoId);
+      isFavorite = false;
+    } else {
+      user.favorites = [...(user.favorites || []), video._id];
+      isFavorite = true;
+    }
+
+    await user.save();
+    return res.json({ isFavorite, favorites: sanitizeIdList(user.favorites || []) });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update favorites.' });
+  }
+});
+
+// Student-only: mark lecture progress complete/incomplete
+router.post('/:id/progress', authenticateToken('user'), async (req, res) => {
+  try {
+    const { completed } = req.body || {};
+    const shouldComplete = Boolean(completed);
+
+    const video = await Video.findById(req.params.id, { _id: 1, category: 1 }).lean();
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+
+    const user = await User.findOne({ username: req.user.username });
+    if (!user || user.class !== video.category) {
+      return res.status(403).json({ error: 'You are not authorized for this video.' });
+    }
+
+    const videoId = String(video._id);
+    const completedSet = new Set(sanitizeIdList(user.completedVideos || []));
+
+    if (shouldComplete) {
+      completedSet.add(videoId);
+    } else {
+      completedSet.delete(videoId);
+    }
+
+    user.completedVideos = Array.from(completedSet);
+    await user.save();
+
+    return res.json({ completed: shouldComplete, completedVideos: sanitizeIdList(user.completedVideos || []) });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update progress.' });
+  }
+});
+
+// Upload a new video — admin only
+router.post('/', authenticateToken('admin'), async (req, res) => {
+  const { title, description, url, category, module } = req.body;
+  if (!title || !url) return res.status(400).json({ error: 'Title and URL required' });
+  if (!category || !ALLOWED_CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: 'Valid course category is required' });
+  }
+  try {
+    const video = new Video({ title, description, url, category, module: module || 'General' });
+    await video.save();
+    await logAdminAction(req, {
+      action: 'video.create',
+      targetType: 'video',
+      targetId: String(video._id),
+      details: { title: video.title, category: video.category, module: video.module }
+    });
+    res.status(201).json(video);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload video' });
+  }
+});
+
+// Delete a video by ID — admin only
+router.delete('/:id', authenticateToken('admin'), async (req, res) => {
+  try {
+    const video = await Video.findByIdAndDelete(req.params.id);
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+    // Remove any associated material files from disk
+    if (video.materials && video.materials.length) {
+      video.materials.forEach(m => {
+        const fp = path.join(uploadsDir, path.basename(m.filename));
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      });
+    }
+    await logAdminAction(req, {
+      action: 'video.delete',
+      targetType: 'video',
+      targetId: String(video._id),
+      details: { title: video.title, category: video.category, materialCount: video.materials?.length || 0 }
+    });
+    res.json({ message: 'Video deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete video' });
+  }
+});
+
+// Add a PDF material to a video — admin only
+router.post('/:id/materials', authenticateToken('admin'), upload.single('material'), async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!video.materials) video.materials = [];
+    video.materials.push({ name: req.file.originalname, filename: req.file.filename });
+    await video.save();
+    await logAdminAction(req, {
+      action: 'material.add',
+      targetType: 'video',
+      targetId: String(video._id),
+      details: { name: req.file.originalname, filename: req.file.filename }
+    });
+    res.json(video);
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to add material' });
+  }
+});
+
+// Remove a PDF material from a video — admin only
+router.delete('/:id/materials/:filename', authenticateToken('admin'), async (req, res) => {
+  try {
+    // Prevent path traversal
+    const filename = path.basename(req.params.filename);
+    const video = await Video.findById(req.params.id);
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+    const mat = video.materials.find(m => m.filename === filename);
+    if (!mat) return res.status(404).json({ error: 'Material not found' });
+    const fp = path.join(uploadsDir, filename);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    video.materials = video.materials.filter(m => m.filename !== filename);
+    await video.save();
+    await logAdminAction(req, {
+      action: 'material.remove',
+      targetType: 'video',
+      targetId: String(video._id),
+      details: { name: mat.name, filename: mat.filename }
+    });
+    res.json({ message: 'Material removed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to remove material' });
+  }
+});
+
+router.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: err.message || 'Upload failed' });
+  }
+  return res.status(400).json({ error: err.message || 'Upload failed' });
+});
+
+module.exports = router;
