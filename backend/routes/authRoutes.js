@@ -78,7 +78,7 @@ async function sendOtpSms(phone, otp) {
 const registerSchema = z.object({
   phone: z.string().min(1).max(20),
   username: z.string().min(1).max(50),
-  class: z.string().min(1).max(20),
+  class: z.string().min(1).max(50),
   city: z.string().min(1).max(50),
   password: z.string().min(6, 'Password must be at least 6 characters')
 });
