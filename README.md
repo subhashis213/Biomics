@@ -99,6 +99,16 @@ PORT=5002
 JWT_SECRET=replace_with_a_long_random_secret
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=replace_with_a_strong_admin_password
+OTP_EXPIRY_MINUTES=5
+OTP_COOLDOWN_SECONDS=45
+OTP_MAX_ATTEMPTS=5
+OTP_SECRET=replace_with_another_long_random_secret
+SMS_PROVIDER=none
+SMS_DRY_RUN=true
+SMS_COUNTRY_CODE=+91
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_FROM_NUMBER=+1xxxxxxxxxx
 ```
 
 ## Installation
@@ -227,6 +237,8 @@ In this mode, backend serves the built frontend from `frontend/dist` on port `50
 
 - `POST /auth/register`
 - `POST /auth/login`
+- `POST /auth/send-otp` (student mobile OTP request)
+- `POST /auth/verify-otp` (student OTP verification login)
 - `POST /auth/admin-login`
 - `GET /auth/users` (admin)
 - `DELETE /auth/users/:username` (admin)

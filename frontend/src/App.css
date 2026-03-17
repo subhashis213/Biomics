@@ -576,6 +576,40 @@ input[type='checkbox'] {
   color: var(--text-soft);
 }
 
+.auth-login-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.auth-login-method-btn {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--secondary-bg);
+  color: var(--text-soft);
+  padding: 9px 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.auth-login-method-btn.is-active {
+  background: linear-gradient(120deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
+  color: var(--btn-primary-fg);
+  border-color: color-mix(in srgb, var(--btn-primary-start) 65%, transparent);
+}
+
+.otp-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.otp-send-btn {
+  white-space: nowrap;
+  padding-inline: 12px;
+}
+
 .form-actions {
   display: flex;
   flex-direction: column;

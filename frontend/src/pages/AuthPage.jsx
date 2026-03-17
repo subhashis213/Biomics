@@ -16,7 +16,9 @@ export default function AuthPage() {
   const { theme, toggleTheme } = useThemeStore();
   const isLightTheme = theme === 'light';
   const [loginRole, setLoginRole] = useState('user');
+  const [loginMethod, setLoginMethod] = useState('password');
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [otpForm, setOtpForm] = useState({ phone: '', otp: '' });
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginMessage, setLoginMessage] = useState(null);
   const [registerMessage, setRegisterMessage] = useState(null);
@@ -24,7 +26,10 @@ export default function AuthPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPasswords, setShowRegisterPasswords] = useState(false);
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isSubmittingRegister, setIsSubmittingRegister] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
   const [toast, setToast] = useState(null);
   const [introVisible, setIntroVisible] = useState(true);
   const registerFlipTimerRef = useRef(null);
@@ -56,7 +61,25 @@ export default function AuthPage() {
     };
   }, []);
 
-  const canLogin = loginForm.username.trim().length >= 3 && loginForm.password.length >= 6;
+  useEffect(() => {
+    if (loginRole === 'admin') {
+      setLoginMethod('password');
+    }
+  }, [loginRole]);
+
+  useEffect(() => {
+    if (otpCooldown <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setOtpCooldown((seconds) => (seconds > 0 ? seconds - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [otpCooldown]);
+
+  const isOtpMode = loginRole === 'user' && loginMethod === 'otp';
+  const canLogin = isOtpMode
+    ? /^\d{10}$/.test(otpForm.phone.trim()) && /^\d{6}$/.test(otpForm.otp.trim())
+    : loginForm.username.trim().length >= 3 && loginForm.password.length >= 6;
+  const canSendOtp = /^\d{10}$/.test(otpForm.phone.trim()) && otpCooldown === 0;
   const canRegister =
     /^\d{10}$/.test(registerForm.phone.trim()) &&
     registerForm.username.trim().length >= 3 &&
@@ -71,6 +94,16 @@ export default function AuthPage() {
   const loginPasswordHint =
     loginForm.password.length > 0 && loginForm.password.length < 6
       ? 'Password is too short — must be at least 6 characters.'
+      : null;
+
+  const otpPhoneHint =
+    otpForm.phone.length > 0 && !/^\d{10}$/.test(otpForm.phone.trim())
+      ? 'Must be exactly 10 digits (numbers only).'
+      : null;
+
+  const otpHint =
+    otpForm.otp.length > 0 && !/^\d{6}$/.test(otpForm.otp.trim())
+      ? 'OTP must be exactly 6 digits.'
       : null;
 
   const regPhoneHint =
@@ -118,15 +151,20 @@ export default function AuthPage() {
     setIsSubmittingLogin(true);
     setLoginMessage(null);
     try {
-      const endpoint = loginRole === 'admin' ? '/auth/admin-login' : '/auth/login';
+      const endpoint = loginRole === 'admin'
+        ? '/auth/admin-login'
+        : (isOtpMode ? '/auth/verify-otp' : '/auth/login');
+      const body = loginRole === 'admin' || !isOtpMode
+        ? loginForm
+        : { phone: otpForm.phone.trim(), otp: otpForm.otp.trim() };
       const response = await requestJson(endpoint, {
         method: 'POST',
-        body: JSON.stringify(loginForm),
+        body: JSON.stringify(body),
       });
       const identity = loginRole === 'admin' ? response.admin : response.user;
       const session = {
         role: loginRole === 'admin' ? 'admin' : 'user',
-        username: identity?.username || loginForm.username.trim(),
+        username: identity?.username || (isOtpMode ? otpForm.phone.trim() : loginForm.username.trim()),
         token: response.token,
       };
       login(session);
@@ -135,6 +173,30 @@ export default function AuthPage() {
       setLoginMessage({ type: 'error', text: error.message });
     } finally {
       setIsSubmittingLogin(false);
+    }
+  }
+
+  async function handleSendOtp() {
+    if (!canSendOtp) return;
+    setIsSendingOtp(true);
+    setLoginMessage(null);
+    try {
+      const response = await requestJson('/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone: otpForm.phone.trim() })
+      });
+      setOtpSent(true);
+      setOtpCooldown(Number(response.cooldownSeconds || 45));
+      setLoginMessage({
+        type: 'success',
+        text: response.devOtp
+          ? `OTP sent. Dev OTP: ${response.devOtp}`
+          : 'OTP sent to your mobile number.'
+      });
+    } catch (error) {
+      setLoginMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsSendingOtp(false);
     }
   }
 
@@ -245,54 +307,130 @@ export default function AuthPage() {
                 Role
                 <select
                   value={loginRole}
-                  onChange={(e) => setLoginRole(e.target.value)}
+                  onChange={(e) => {
+                    const role = e.target.value;
+                    setLoginRole(role);
+                    setLoginMessage(null);
+                    if (role === 'admin') {
+                      setOtpSent(false);
+                      setOtpCooldown(0);
+                    }
+                  }}
                 >
                   <option value="user">Student</option>
                   <option value="admin">Admin</option>
                 </select>
               </label>
 
-              <label>
-                Username
-                <input
-                  type="text"
-                  value={loginForm.username}
-                  onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
-                  placeholder="Enter username"
-                  autoComplete="username"
-                />
-              </label>
-
-              <label>
-                Password
-                <div className="password-input-wrap">
-                  <input
-                    type={showLoginPassword ? 'text' : 'password'}
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
-                    placeholder="Enter password"
-                    autoComplete="current-password"
-                  />
+              {loginRole === 'user' ? (
+                <div className="auth-login-methods" role="group" aria-label="Student sign in method">
                   <button
                     type="button"
-                    className="toggle-password-btn"
-                    onClick={() => setShowLoginPassword((current) => !current)}
-                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                    className={`auth-login-method-btn ${loginMethod === 'password' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setLoginMethod('password');
+                      setLoginMessage(null);
+                    }}
                   >
-                    {showLoginPassword ? 'Hide' : 'Show'}
+                    Username + Password
+                  </button>
+                  <button
+                    type="button"
+                    className={`auth-login-method-btn ${loginMethod === 'otp' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setLoginMethod('otp');
+                      setLoginMessage(null);
+                    }}
+                  >
+                    Mobile + OTP
                   </button>
                 </div>
-                {loginPasswordHint ? <small className="field-hint">⚠ {loginPasswordHint}</small> : null}
-              </label>
+              ) : null}
 
-              <label className="password-toggle">
-                <input
-                  type="checkbox"
-                  checked={showLoginPassword}
-                  onChange={(e) => setShowLoginPassword(e.target.checked)}
-                />
-                <span>Show password</span>
-              </label>
+              {isOtpMode ? (
+                <>
+                  <label>
+                    Mobile Number
+                    <div className="otp-input-row">
+                      <input
+                        type="text"
+                        value={otpForm.phone}
+                        onChange={(e) => setOtpForm((f) => ({ ...f, phone: e.target.value }))}
+                        placeholder="Enter 10-digit mobile"
+                        inputMode="numeric"
+                        maxLength={10}
+                      />
+                      <button
+                        type="button"
+                        className="secondary-btn otp-send-btn"
+                        onClick={handleSendOtp}
+                        disabled={!canSendOtp || isSendingOtp}
+                      >
+                        {isSendingOtp ? 'Sending...' : (otpCooldown > 0 ? `Resend ${otpCooldown}s` : 'Send OTP')}
+                      </button>
+                    </div>
+                    {otpPhoneHint ? <small className="field-hint">⚠ {otpPhoneHint}</small> : null}
+                  </label>
+
+                  <label>
+                    OTP
+                    <input
+                      type="text"
+                      value={otpForm.otp}
+                      onChange={(e) => setOtpForm((f) => ({ ...f, otp: e.target.value }))}
+                      placeholder="Enter 6-digit OTP"
+                      inputMode="numeric"
+                      maxLength={6}
+                    />
+                    {otpHint ? <small className="field-hint">⚠ {otpHint}</small> : null}
+                    {otpSent ? <small className="field-hint">OTP sent. Enter it to continue.</small> : null}
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label>
+                    Username
+                    <input
+                      type="text"
+                      value={loginForm.username}
+                      onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
+                      placeholder="Enter username"
+                      autoComplete="username"
+                    />
+                  </label>
+
+                  <label>
+                    Password
+                    <div className="password-input-wrap">
+                      <input
+                        type={showLoginPassword ? 'text' : 'password'}
+                        value={loginForm.password}
+                        onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder="Enter password"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="toggle-password-btn"
+                        onClick={() => setShowLoginPassword((current) => !current)}
+                        aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showLoginPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                    {loginPasswordHint ? <small className="field-hint">⚠ {loginPasswordHint}</small> : null}
+                  </label>
+
+                  <label className="password-toggle">
+                    <input
+                      type="checkbox"
+                      checked={showLoginPassword}
+                      onChange={(e) => setShowLoginPassword(e.target.checked)}
+                    />
+                    <span>Show password</span>
+                  </label>
+                </>
+              )}
 
               <div className="form-actions">
                 <button
@@ -300,7 +438,7 @@ export default function AuthPage() {
                   type="submit"
                   disabled={!canLogin || isSubmittingLogin}
                 >
-                  {isSubmittingLogin ? 'Signing in…' : 'Login'}
+                  {isSubmittingLogin ? 'Signing in…' : (isOtpMode ? 'Verify OTP & Login' : 'Login')}
                 </button>
                 {loginMessage && (
                   <p className={`inline-message ${loginMessage.type}`}>{loginMessage.text}</p>
