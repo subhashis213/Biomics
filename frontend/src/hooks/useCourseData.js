@@ -23,12 +23,13 @@ export function useCourseData() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['courseData'],
     queryFn: async () => {
-      const [videoData, quizData, attemptData] = await Promise.all([
+      const [allVideos, profileData, quizData, attemptData] = await Promise.all([
+        requestJson('/videos'),
         requestJson('/videos/my-course'),
         fetchCourseQuizzes(),
         fetchRecentQuizAttempts()
       ]);
-      return { videoData, quizData, attemptData };
+      return { allVideos, profileData, quizData, attemptData };
     },
     staleTime: 2 * 60 * 1000,
     retry: (failureCount, err) => {
@@ -41,7 +42,7 @@ export function useCourseData() {
     mutationFn: apiFavorite,
     onSuccess: (result) => {
       queryClient.setQueryData(['courseData'], (old) =>
-        old ? { ...old, videoData: { ...old.videoData, favorites: result.favorites || [] } } : old
+        old ? { ...old, profileData: { ...old.profileData, favorites: result.favorites || [] } } : old
       );
     }
   });
@@ -50,7 +51,7 @@ export function useCourseData() {
     mutationFn: ({ videoId, completed }) => apiProgress(videoId, completed),
     onSuccess: (result) => {
       queryClient.setQueryData(['courseData'], (old) =>
-        old ? { ...old, videoData: { ...old.videoData, completedVideos: result.completedVideos || [] } } : old
+        old ? { ...old, profileData: { ...old.profileData, completedVideos: result.completedVideos || [] } } : old
       );
     }
   });
@@ -67,8 +68,8 @@ export function useCourseData() {
     }
   }
 
-  const rawFavorites = data?.videoData?.favorites || [];
-  const rawCompleted = data?.videoData?.completedVideos || [];
+  const rawFavorites = data?.profileData?.favorites || [];
+  const rawCompleted = data?.profileData?.completedVideos || [];
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const favoriteIds = useMemo(() => new Set(rawFavorites.map(normalizeId)), [rawFavorites]);
@@ -76,8 +77,8 @@ export function useCourseData() {
   const completedIds = useMemo(() => new Set(rawCompleted.map(normalizeId)), [rawCompleted]);
 
   return {
-    videos: data?.videoData?.videos || [],
-    course: data?.videoData?.course || '',
+    videos: data?.allVideos || [],
+    course: data?.profileData?.course || '',
     favoriteIds,
     completedIds,
     quizzes: data?.quizData?.quizzes || [],

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { downloadMaterial } from '../api';
+import { downloadMaterial, requestJson } from '../api';
 import AppShell from '../components/AppShell';
 import { QuizModal } from '../components/QuizModal';
 import StatCard from '../components/StatCard';
@@ -12,7 +12,7 @@ import { useSessionStore } from '../stores/sessionStore';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
-  const { session, logout } = useSessionStore();
+  const { session, logout, login } = useSessionStore();
 
   const {
     videos, course, favoriteIds, completedIds, quizzes, quizAttempts,
@@ -21,6 +21,7 @@ export default function StudentDashboard() {
   } = useCourseData();
 
   const [selectedModule, setSelectedModule] = useState(null);
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('latest');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
@@ -28,6 +29,22 @@ export default function StudentDashboard() {
   const [downloadProgress, setDownloadProgress] = useState({});
   const [quizModalOpen, setQuizModalOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [profileForm, setProfileForm] = useState({ username: '', phone: '', city: '', password: '' });
+  const [profileMessage, setProfileMessage] = useState(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const profilePasswordHint =
+    profileForm.password.length > 0 && profileForm.password.length < 8
+      ? 'Password must be at least 8 characters.'
+      : null;
+
+  const selectedModuleName = selectedModule?.name || '';
+  const selectedModuleCourse = selectedModule?.category || '';
+  const quizEnabledForSelection = Boolean(selectedModuleName) && selectedModuleCourse === course;
 
   const {
     moduleQuiz, moduleQuizList, quizAnswers, quizResult, quizReview,
@@ -36,7 +53,7 @@ export default function StudentDashboard() {
     handleSelectQuizFromList, handleBackToQuizList, handleRetakeQuiz,
     handleSubmitQuiz, handleLoadQuizForModule
   } = useQuizSession({
-    selectedModule,
+    selectedModule: quizEnabledForSelection ? selectedModuleName : null,
     quizzes,
     onError: (msg) => setBanner({ type: 'error', text: msg }),
     onAttemptsRefresh: refreshAttempts
@@ -72,6 +89,15 @@ export default function StudentDashboard() {
     return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
+  function normalizeCourseName(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ');
+  }
+
+  function resolveModuleKey(categoryName, moduleName) {
+    const safeCategory = normalizeCourseName(categoryName || 'General');
+    return `${safeCategory}::${normalizeModuleName(moduleName || 'General')}`;
+  }
+
   function getQuestionCount(quiz) {
     return Math.max(
       Number(quiz?.questionCount) || 0,
@@ -83,14 +109,17 @@ export default function StudentDashboard() {
     return String(value || '');
   }
 
-  const moduleDisplayByKey = {};
+  const moduleMetaByKey = {};
+  const availableCourses = Array.from(new Set(videos.map((video) => normalizeCourseName(video.category || '')).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const activeCourseFilter = selectedCourseFilter === 'all' ? '' : selectedCourseFilter;
 
-  // Group videos by normalized module key.
+  // Group videos by course+module key.
   const videosByModule = videos.reduce((acc, video) => {
+    const category = normalizeCourseName(video.category || 'General');
     const displayModule = String(video.module || 'General').trim() || 'General';
-    const moduleKey = normalizeModuleName(displayModule);
-    if (!moduleDisplayByKey[moduleKey]) {
-      moduleDisplayByKey[moduleKey] = displayModule;
+    const moduleKey = resolveModuleKey(category, displayModule);
+    if (!moduleMetaByKey[moduleKey]) {
+      moduleMetaByKey[moduleKey] = { module: displayModule, category };
     }
     if (!acc[moduleKey]) {
       acc[moduleKey] = [];
@@ -100,10 +129,11 @@ export default function StudentDashboard() {
   }, {});
 
   const quizzesByModule = quizzes.reduce((acc, quiz) => {
+    const category = normalizeCourseName(quiz.category || course || 'General');
     const displayModule = String(quiz.module || 'General').trim() || 'General';
-    const moduleKey = normalizeModuleName(displayModule);
-    if (!moduleDisplayByKey[moduleKey]) {
-      moduleDisplayByKey[moduleKey] = displayModule;
+    const moduleKey = resolveModuleKey(category, displayModule);
+    if (!moduleMetaByKey[moduleKey]) {
+      moduleMetaByKey[moduleKey] = { module: displayModule, category };
     }
     if (!acc[moduleKey]) {
       acc[moduleKey] = [];
@@ -113,20 +143,33 @@ export default function StudentDashboard() {
   }, {});
 
   quizAttempts.forEach((attempt) => {
+    const category = normalizeCourseName(attempt.category || course || 'General');
     const displayModule = String(attempt.module || 'General').trim() || 'General';
-    const moduleKey = normalizeModuleName(displayModule);
-    if (!moduleDisplayByKey[moduleKey]) {
-      moduleDisplayByKey[moduleKey] = displayModule;
+    const moduleKey = resolveModuleKey(category, displayModule);
+    if (!moduleMetaByKey[moduleKey]) {
+      moduleMetaByKey[moduleKey] = { module: displayModule, category };
     }
   });
 
-  const modules = Object.keys(moduleDisplayByKey)
-    .sort((a, b) => moduleDisplayByKey[a].localeCompare(moduleDisplayByKey[b]));
+  const modules = Object.keys(moduleMetaByKey)
+    .filter((moduleKey) => {
+      if (!activeCourseFilter) return true;
+      return moduleMetaByKey[moduleKey].category === activeCourseFilter;
+    })
+    .sort((a, b) => {
+      const aMeta = moduleMetaByKey[a];
+      const bMeta = moduleMetaByKey[b];
+      if (aMeta.category !== bMeta.category) return aMeta.category.localeCompare(bMeta.category);
+      return aMeta.module.localeCompare(bMeta.module);
+    });
 
   const visibleModules = modules.filter((moduleKey) => {
-    const moduleName = moduleDisplayByKey[moduleKey];
+    const moduleMeta = moduleMetaByKey[moduleKey];
+    const moduleName = moduleMeta.module;
+    const courseName = moduleMeta.category;
     if (!query) return true;
     if (moduleName.toLowerCase().includes(query)) return true;
+    if (courseName.toLowerCase().includes(query)) return true;
 
     const videoMatch = (videosByModule[moduleKey] || []).some((video) => {
       const haystack = `${video.title || ''} ${video.description || ''}`.toLowerCase();
@@ -141,7 +184,9 @@ export default function StudentDashboard() {
     return videoMatch || quizMatch;
   });
 
-  const selectedModuleKey = normalizeModuleName(selectedModule || '');
+  const selectedModuleKey = selectedModule
+    ? resolveModuleKey(selectedModuleCourse, selectedModuleName)
+    : '';
   const selectedModuleVideos = selectedModule ? (videosByModule[selectedModuleKey] || []) : [];
 
   const displayedVideos = selectedModuleVideos
@@ -158,10 +203,23 @@ export default function StudentDashboard() {
     });
 
   const favoriteVideos = videos.filter((video) => favoriteIds.has(normalizeId(video._id)));
-  const completedCount = videos.filter((video) => completedIds.has(normalizeId(video._id))).length;
-  const progressPercent = videos.length ? Math.round((completedCount / videos.length) * 100) : 0;
+  const videosForActiveFilter = activeCourseFilter
+    ? videos.filter((video) => normalizeCourseName(video.category || 'General') === activeCourseFilter)
+    : videos;
+  const progressScopeVideos = selectedModule ? selectedModuleVideos : videosForActiveFilter;
+  const progressScopeCompletedCount = progressScopeVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
+  const progressScopePercent = progressScopeVideos.length
+    ? Math.round((progressScopeCompletedCount / progressScopeVideos.length) * 100)
+    : 0;
+  const progressScopeLabel = selectedModule
+    ? `${selectedModuleCourse} • ${selectedModuleName}`
+    : (activeCourseFilter || 'All Courses');
   const selectedModuleAttempts = selectedModule
-    ? quizAttempts.filter((attempt) => normalizeModuleName(attempt.module) === selectedModuleKey)
+    ? quizAttempts.filter((attempt) => {
+      const sameModule = normalizeModuleName(attempt.module) === normalizeModuleName(selectedModuleName);
+      const sameCategory = normalizeCourseName(attempt.category || course || '') === normalizeCourseName(selectedModuleCourse || '');
+      return sameModule && sameCategory;
+    })
     : [];
   const fallbackReviewFromLocalQuiz = (
     moduleQuiz?.questions?.length
@@ -191,7 +249,7 @@ export default function StudentDashboard() {
       : fallbackReviewFromLocalQuiz);
 
   const latestAttemptByModule = quizAttempts.reduce((acc, attempt) => {
-    const moduleKey = normalizeModuleName(attempt.module || 'General');
+    const moduleKey = resolveModuleKey(attempt.category || course || 'General', attempt.module || 'General');
     if (!acc[moduleKey]) acc[moduleKey] = attempt;
     return acc;
   }, {});
@@ -213,6 +271,48 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (progressMutError) setBanner({ type: 'error', text: progressMutError.message });
   }, [progressMutError]);
+
+  useEffect(() => {
+    if (!profileMessage) return undefined;
+    const timer = window.setTimeout(() => setProfileMessage(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [profileMessage]);
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [profileOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsProfileLoading(true);
+    requestJson('/auth/me')
+      .then((data) => {
+        if (cancelled) return;
+        const user = data?.user || null;
+        setProfile(user);
+        setProfileForm({
+          username: user?.username || '',
+          phone: user?.phone || '',
+          city: user?.city || '',
+          password: ''
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) setBanner({ type: 'error', text: error.message });
+      })
+      .finally(() => {
+        if (!cancelled) setIsProfileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Open modal when a quiz becomes active; close when quiz is cleared.
   useEffect(() => {
@@ -255,14 +355,117 @@ export default function StudentDashboard() {
     navigate('/', { replace: true });
   }
 
+  async function handleSaveProfile(event) {
+    event.preventDefault();
+    setIsSavingProfile(true);
+    setProfileMessage(null);
+    try {
+      const payload = {
+        username: profileForm.username.trim(),
+        phone: profileForm.phone.trim(),
+        city: profileForm.city.trim()
+      };
+      if (profileForm.password.trim()) {
+        payload.password = profileForm.password;
+      }
+
+      const response = await requestJson('/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+
+      setProfile(response.user);
+      setProfileForm((current) => ({
+        ...current,
+        username: response.user.username,
+        phone: response.user.phone,
+        city: response.user.city,
+        password: ''
+      }));
+      login({
+        role: 'user',
+        username: response.user.username,
+        token: response.token
+      });
+      setProfileMessage({ type: 'success', text: response.message || 'Profile updated successfully.' });
+    } catch (error) {
+      setProfileMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  async function handleAvatarChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('avatar', file);
+    setIsUploadingAvatar(true);
+    setProfileMessage(null);
+    try {
+      const response = await requestJson('/auth/me/avatar', {
+        method: 'POST',
+        body: formData
+      });
+      setProfile(response.user);
+      setProfileMessage({ type: 'success', text: response.message || 'Profile photo updated successfully.' });
+    } catch (error) {
+      setProfileMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = '';
+    }
+  }
+
+  async function handleDeleteAvatar() {
+    setIsUploadingAvatar(true);
+    setProfileMessage(null);
+    try {
+      const response = await requestJson('/auth/me/avatar', {
+        method: 'DELETE'
+      });
+      setProfile(response.user);
+      setProfileMessage({ type: 'success', text: response.message || 'Profile photo removed successfully.' });
+    } catch (error) {
+      setProfileMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
+
+  const profileAvatarUrl = profile?.avatarUrl
+    ? `${import.meta.env.VITE_API_URL || ''}${profile.avatarUrl}`
+    : '';
+  const profileInitial = (profile?.username || session?.username || 'S').trim().charAt(0).toUpperCase();
+
   return (
     <>
     <AppShell
       title="Student Dashboard"
       subtitle={`Welcome${session?.username ? `, ${session.username}` : ''}. ${course ? `You are enrolled in ${course}.` : ''} Watch lessons and download lecture materials.`}
       roleLabel="Student"
-      onLogout={handleLogout}
-      actions={<StatCard label="Course Progress" value={`${progressPercent}%`} />}
+      actions={(
+        <div className="profile-trigger-wrap">
+          <button
+            type="button"
+            className="profile-icon-btn"
+            onClick={() => setProfileOpen(true)}
+            aria-label="Open profile settings"
+            title="Profile settings"
+          >
+            {profileAvatarUrl ? (
+              <img src={profileAvatarUrl} alt="Student profile" className="profile-icon-image" />
+            ) : (
+              <span className="profile-icon-fallback">{profileInitial}</span>
+            )}
+          </button>
+          <div className="profile-hover-card" aria-hidden="true">
+            <strong>{profile?.username || session?.username || 'Student'}</strong>
+            <span>{profile?.class || course || 'Course unavailable'}</span>
+            <span>{profile?.city || 'City unavailable'}</span>
+          </div>
+        </div>
+      )}
     >
       <div className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
@@ -275,6 +478,21 @@ export default function StudentDashboard() {
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search by module name, lecture title, or description"
           />
+        </label>
+        <label>
+          Filter by course
+          <select
+            value={selectedCourseFilter}
+            onChange={(event) => {
+              setSelectedCourseFilter(event.target.value);
+              setSelectedModule(null);
+            }}
+          >
+            <option value="all">All Courses</option>
+            {availableCourses.map((courseName) => (
+              <option key={courseName} value={courseName}>{courseName}</option>
+            ))}
+          </select>
         </label>
         {selectedModule ? (
           <>
@@ -290,12 +508,12 @@ export default function StudentDashboard() {
               {showSavedOnly ? 'Showing Saved Only' : 'Filter Saved Only'}
             </button>
           </>
-        ) : (
-          <div className="progress-summary-box">
-            <strong>{completedCount}/{videos.length} complete</strong>
-            <span>Keep going to increase your score</span>
-          </div>
-        )}
+        ) : null}
+
+        <div className="progress-summary-box">
+          <strong>{progressScopeCompletedCount}/{progressScopeVideos.length} complete</strong>
+          <span>{progressScopeLabel} progress: {progressScopePercent}%</span>
+        </div>
       </section>
 
       {!selectedModule && favoriteVideos.length ? (
@@ -309,7 +527,15 @@ export default function StudentDashboard() {
           </div>
           <div className="favorite-chip-row">
             {favoriteVideos.slice(0, 8).map((video) => (
-              <button key={video._id} type="button" className="favorite-chip" onClick={() => setSelectedModule(video.module || 'General')}>
+              <button
+                key={video._id}
+                type="button"
+                className="favorite-chip"
+                onClick={() => setSelectedModule({
+                  name: String(video.module || 'General').trim() || 'General',
+                  category: normalizeCourseName(video.category || 'General')
+                })}
+              >
                 <span>★</span>
                 {video.title}
               </button>
@@ -323,7 +549,7 @@ export default function StudentDashboard() {
           <p className="eyebrow">Learning Content</p>
           {selectedModule ? (
             <>
-              <h2>{course} - {selectedModule}</h2>
+              <h2>{selectedModuleCourse} - {selectedModuleName}</h2>
               <button
                 className="back-btn small"
                 onClick={() => setSelectedModule(null)}
@@ -333,11 +559,11 @@ export default function StudentDashboard() {
               </button>
             </>
           ) : (
-            <h2>{course ? `${course} Modules` : 'Course Modules'}</h2>
+            <h2>{activeCourseFilter ? `${activeCourseFilter} Modules` : 'All Course Modules'}</h2>
           )}
         </div>
         {selectedModule && <StatCard label="Lectures in Module" value={displayedVideos.length} />}
-        {!selectedModule && <StatCard label="Total Modules" value={modules.length} />}
+        {!selectedModule && <StatCard label="Total Modules" value={visibleModules.length} />}
       </section>
 
       {isLoading ? (
@@ -359,7 +585,9 @@ export default function StudentDashboard() {
           <div className="modules-grid-student">
             {visibleModules.map((moduleKey) => (
               (() => {
-                const module = moduleDisplayByKey[moduleKey];
+                const moduleMeta = moduleMetaByKey[moduleKey];
+                const module = moduleMeta.module;
+                const moduleCourse = moduleMeta.category;
                 const moduleVideos = videosByModule[moduleKey] || [];
                 const completedInModule = moduleVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
                 const moduleQuizCount = (quizzesByModule[moduleKey] || []).length;
@@ -377,7 +605,7 @@ export default function StudentDashboard() {
                   <button
                     key={moduleKey}
                     className="module-card-btn"
-                    onClick={() => setSelectedModule(module)}
+                    onClick={() => setSelectedModule({ name: module, category: moduleCourse })}
                   >
                     <div className="module-card-header">
                       <span className="module-card-icon">📚</span>
@@ -385,6 +613,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="module-card-body">
                       <h3 className="module-card-title">{module}</h3>
+                      {selectedCourseFilter === 'all' ? <p className="module-card-course">{moduleCourse}</p> : null}
                       <p className="module-card-subtitle">
                         {moduleVideos.length} {moduleVideos.length === 1 ? 'lecture' : 'lectures'}
                         {moduleQuizCount ? ` • ${moduleQuizCount} ${moduleQuizCount === 1 ? 'quiz' : 'quizzes'}` : ''}
@@ -425,12 +654,12 @@ export default function StudentDashboard() {
       ) : (
         <p className="empty-state">
           {selectedModule 
-            ? `No lectures available in ${selectedModule}.` 
-            : 'No modules available for your course yet.'}
+            ? `No lectures available in ${selectedModuleName}.`
+            : (activeCourseFilter ? `No modules available for ${activeCourseFilter}.` : 'No modules available yet.')}
         </p>
       )}
 
-      {!selectedModule && modules.length ? (
+      {!selectedModule && visibleModules.length ? (
         <section className="card quiz-history-panel">
           <div className="section-header compact">
             <div>
@@ -439,12 +668,15 @@ export default function StudentDashboard() {
             </div>
           </div>
           <div className="quiz-history-grid">
-            {modules.map((moduleKey) => {
-              const module = moduleDisplayByKey[moduleKey];
+            {visibleModules.map((moduleKey) => {
+              const moduleMeta = moduleMetaByKey[moduleKey];
+              const module = moduleMeta.module;
+              const moduleCourse = moduleMeta.category;
               const attempt = latestAttemptByModule[moduleKey];
               return (
-                <article key={`history-${module}`} className="quiz-history-item">
+                <article key={`history-${moduleKey}`} className="quiz-history-item">
                   <strong>{module}</strong>
+                  {selectedCourseFilter === 'all' ? <small>{moduleCourse}</small> : null}
                   {attempt ? (
                     <>
                       <span>Last: {attempt.score}/{attempt.total} ({Math.round((attempt.score / attempt.total) * 100)}%)</span>
@@ -465,12 +697,14 @@ export default function StudentDashboard() {
           <div className="section-header compact">
             <div>
               <p className="eyebrow">Chapter Quiz</p>
-              <h2>{selectedModule} Assessment</h2>
+              <h2>{selectedModuleName} Assessment</h2>
             </div>
             <StatCard label="Attempts" value={selectedModuleAttempts.length} />
           </div>
 
-          {!moduleHasQuiz ? (
+          {!quizEnabledForSelection ? (
+            <p className="empty-note">Quizzes are currently enabled only for your enrolled course ({course || 'your profile course'}).</p>
+          ) : !moduleHasQuiz ? (
             <p className="empty-note">No quiz available for this module yet.</p>
           ) : loadingQuiz && !moduleQuizList.length ? (
             <p className="empty-note">Loading quizzes...</p>
@@ -616,7 +850,7 @@ export default function StudentDashboard() {
         ) : moduleQuiz && quizResult ? (
           <section className="quiz-thankyou-pop" role="status" aria-live="polite">
             <h3>Thank you for submitting!</h3>
-            <p>You have completed the quiz for {selectedModule}.</p>
+            <p>You have completed the quiz for {selectedModuleName}.</p>
             <div className="quiz-result-box">
               <strong>Your Score: {quizResult.score}/{quizResult.total}</strong>
               <span>Percentage: {quizResult.percentage}%</span>
@@ -682,6 +916,114 @@ export default function StudentDashboard() {
           </section>
         ) : null}
       </QuizModal>
+
+      {profileOpen ? (
+        <div className="profile-modal-backdrop" onClick={() => setProfileOpen(false)}>
+          <section className="profile-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="profile-modal-header">
+              <div>
+                <p className="eyebrow">Student Profile</p>
+                <h2>Profile Settings</h2>
+              </div>
+              <button type="button" className="quiz-modal-close-btn" onClick={() => setProfileOpen(false)} aria-label="Close profile settings">
+                ×
+              </button>
+            </div>
+
+            {isProfileLoading ? (
+              <p className="empty-note">Loading profile...</p>
+            ) : (
+              <div className="profile-modal-body">
+                <aside className="profile-summary-card">
+                  <div className="profile-avatar-large">
+                    {profileAvatarUrl ? (
+                      <img src={profileAvatarUrl} alt="Student profile" className="profile-avatar-large-image" />
+                    ) : (
+                      <span>{profileInitial}</span>
+                    )}
+                  </div>
+                  <label className="profile-photo-upload">
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} disabled={isUploadingAvatar} />
+                    <span>{isUploadingAvatar ? 'Uploading...' : 'Change Photo'}</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="secondary-btn profile-delete-photo-btn"
+                    onClick={handleDeleteAvatar}
+                    disabled={!profileAvatarUrl || isUploadingAvatar}
+                  >
+                    Delete Photo
+                  </button>
+                  <div className="profile-summary-list">
+                    <div><span>Username</span><strong>{profile?.username || '-'}</strong></div>
+                    <div><span>Phone</span><strong>{profile?.phone || '-'}</strong></div>
+                    <div><span>Course</span><strong>{profile?.class || '-'}</strong></div>
+                    <div><span>City</span><strong>{profile?.city || '-'}</strong></div>
+                  </div>
+                </aside>
+
+                <form className="profile-edit-form" onSubmit={handleSaveProfile}>
+                  <label>
+                    Username
+                    <input
+                      type="text"
+                      value={profileForm.username}
+                      onChange={(event) => setProfileForm((current) => ({ ...current, username: event.target.value }))}
+                      placeholder="Update username"
+                    />
+                  </label>
+                  <label>
+                    Phone Number
+                    <input
+                      type="text"
+                      value={profileForm.phone}
+                      onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))}
+                      placeholder="10-digit phone"
+                      inputMode="numeric"
+                    />
+                  </label>
+                  <label>
+                    City
+                    <input
+                      type="text"
+                      value={profileForm.city}
+                      onChange={(event) => setProfileForm((current) => ({ ...current, city: event.target.value }))}
+                      placeholder="Update city"
+                    />
+                  </label>
+                  <label>
+                    New Password
+                    <input
+                      type="password"
+                      value={profileForm.password}
+                      onChange={(event) => setProfileForm((current) => ({ ...current, password: event.target.value }))}
+                      placeholder="Minimum 8 characters"
+                    />
+                    {profilePasswordHint ? <small className="field-hint">⚠ {profilePasswordHint}</small> : null}
+                  </label>
+                  <label>
+                    Enrolled Course
+                    <input type="text" value={profile?.class || ''} disabled />
+                  </label>
+
+                  <div className="profile-edit-actions">
+                    <button type="submit" className="primary-btn" disabled={isSavingProfile}>
+                      {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button type="button" className="secondary-btn" onClick={handleLogout}>
+                      Logout
+                    </button>
+                    <button type="button" className="secondary-btn" onClick={() => setProfileOpen(false)}>
+                      Close
+                    </button>
+                  </div>
+                  {profileMessage ? <p className={`inline-message ${profileMessage.type}`}>{profileMessage.text}</p> : null}
+                </form>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }

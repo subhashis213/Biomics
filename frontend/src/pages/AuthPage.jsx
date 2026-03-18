@@ -5,7 +5,7 @@ import { emptyRegisterForm } from '../constants';
 import { getSession } from '../session';
 import { useSessionStore } from '../stores/sessionStore';
 import { useThemeStore } from '../stores/themeStore';
-import promoBanner from '../../background.jpg';
+import promoBanner from '../assets/biomics-hero-banner.jpeg';
 
 export default function AuthPage() {
   const INTRO_DURATION_MS = 2300;
@@ -19,15 +19,23 @@ export default function AuthPage() {
   const [loginMethod, setLoginMethod] = useState('password');
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [otpForm, setOtpForm] = useState({ phone: '', otp: '' });
+  const [forgotForm, setForgotForm] = useState({ username: '', birthDate: '', password: '', confirmPassword: '' });
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginMessage, setLoginMessage] = useState(null);
   const [registerMessage, setRegisterMessage] = useState(null);
+  const [forgotMessage, setForgotMessage] = useState(null);
+  const [forgotSuccessModal, setForgotSuccessModal] = useState(false);
+  const [forgotUsernameValid, setForgotUsernameValid] = useState(null);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPasswords, setShowRegisterPasswords] = useState(false);
+  const [showForgotPasswords, setShowForgotPasswords] = useState(false);
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isSubmittingRegister, setIsSubmittingRegister] = useState(false);
+  const [isSubmittingForgot, setIsSubmittingForgot] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [toast, setToast] = useState(null);
@@ -88,7 +96,14 @@ export default function AuthPage() {
     registerForm.password.length >= 8 &&
     /[A-Za-z]/.test(registerForm.password) &&
     /\d/.test(registerForm.password) &&
+    Boolean(registerForm.birthDate) &&
     registerForm.confirmPassword === registerForm.password;
+
+  const canForgotReset =
+    forgotForm.username.trim().length >= 3 &&
+    Boolean(forgotForm.birthDate) &&
+    forgotForm.password.length >= 8 &&
+    forgotForm.confirmPassword === forgotForm.password;
 
   // ── Live validation hints (shown only when field has content but fails)
   const loginPasswordHint =
@@ -119,6 +134,12 @@ export default function AuthPage() {
   const regCityHint =
     registerForm.city.length > 0 && registerForm.city.trim().length < 2
       ? 'City name must be at least 2 characters.'
+      : null;
+
+  const forgotPasswordHint = getPasswordHint(forgotForm.password);
+  const forgotConfirmHint =
+    forgotForm.confirmPassword.length > 0 && forgotForm.confirmPassword !== forgotForm.password
+      ? 'Passwords do not match.'
       : null;
 
   function getPasswordHint(pw) {
@@ -213,6 +234,7 @@ export default function AuthPage() {
           username: registerForm.username.trim(),
           class: registerForm.class,
           city: registerForm.city.trim(),
+          birthDate: registerForm.birthDate,
           password: registerForm.password,
         }),
       });
@@ -230,6 +252,64 @@ export default function AuthPage() {
       setRegisterMessage({ type: 'error', text: error.message });
     } finally {
       setIsSubmittingRegister(false);
+    }
+  }
+
+  async function checkForgotUsername() {
+    const username = forgotForm.username.trim();
+    if (username.length < 3) {
+      setForgotUsernameValid(false);
+      return;
+    }
+    setIsCheckingUsername(true);
+    try {
+      const data = await requestJson('/auth/check-username', {
+        method: 'POST',
+        body: JSON.stringify({ username })
+      });
+      setForgotUsernameValid(data.exists);
+    } catch (error) {
+      setForgotUsernameValid(false);
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  }
+
+  async function handleForgotPassword(event) {
+    event.preventDefault();
+    if (!canForgotReset) return;
+    if (forgotUsernameValid === false) {
+      setForgotMessage({ type: 'error', text: 'Username not found. Please check and try again.' });
+      return;
+    }
+    setIsSubmittingForgot(true);
+    setForgotMessage(null);
+    try {
+      const response = await requestJson('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: forgotForm.username.trim(),
+          birthDate: forgotForm.birthDate,
+          password: forgotForm.password
+        })
+      });
+      console.log('Password reset response:', response);
+      setForgotSuccessModal(true);
+      setForgotMessage(null);
+      
+      setTimeout(() => {
+        setForgotSuccessModal(false);
+        setForgotForm({ username: '', birthDate: '', password: '', confirmPassword: '' });
+        setForgotOpen(false);
+        setForgotUsernameValid(null);
+        setLoginForm({ username: '', password: '' });
+      }, 2500);
+    } catch (error) {
+      console.error('Password reset error:', error);
+      setForgotMessage({ type: 'error', text: error.message || 'Password reset failed' });
+      setForgotSuccessModal(false);
+    } finally {
+      setIsSubmittingForgot(false);
     }
   }
 
@@ -271,12 +351,7 @@ export default function AuthPage() {
             className="auth-hero-image"
             loading="eager"
           />
-          <div className="auth-hero-media-overlay">
-            <strong>Recorded Classes</strong>
-            <strong>PDF Notes</strong>
-            <strong>PYQ Session</strong>
-            <strong>Detailed Explanation</strong>
-          </div>
+          <p className="auth-hero-media-badge">Trusted by life science aspirants across India</p>
         </div>
       </section>
 
@@ -421,14 +496,6 @@ export default function AuthPage() {
                     {loginPasswordHint ? <small className="field-hint">⚠ {loginPasswordHint}</small> : null}
                   </label>
 
-                  <label className="password-toggle">
-                    <input
-                      type="checkbox"
-                      checked={showLoginPassword}
-                      onChange={(e) => setShowLoginPassword(e.target.checked)}
-                    />
-                    <span>Show password</span>
-                  </label>
                 </>
               )}
 
@@ -440,10 +507,23 @@ export default function AuthPage() {
                 >
                   {isSubmittingLogin ? 'Signing in…' : (isOtpMode ? 'Verify OTP & Login' : 'Login')}
                 </button>
+                {!isOtpMode && loginRole === 'user' ? (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => {
+                      setForgotOpen((current) => !current);
+                      setForgotMessage(null);
+                    }}
+                  >
+                    {forgotOpen ? 'Close Forgot Password' : 'Forgot Password?'}
+                  </button>
+                ) : null}
                 {loginMessage && (
                   <p className={`inline-message ${loginMessage.type}`}>{loginMessage.text}</p>
                 )}
               </div>
+
             </form>
 
             <div className="register-toggle">
@@ -515,6 +595,20 @@ export default function AuthPage() {
               </label>
 
               <label>
+                Security Question
+                <input type="text" value="What is your birth date?" disabled />
+              </label>
+
+              <label>
+                Answer (Birth Date)
+                <input
+                  type="date"
+                  value={registerForm.birthDate}
+                  onChange={(e) => setRegisterForm((f) => ({ ...f, birthDate: e.target.value }))}
+                />
+              </label>
+
+              <label>
                 Password
                 <div className="password-input-wrap">
                   <input
@@ -565,15 +659,6 @@ export default function AuthPage() {
               </label>
             </div>
 
-            <label className="password-toggle">
-              <input
-                type="checkbox"
-                checked={showRegisterPasswords}
-                onChange={(e) => setShowRegisterPasswords(e.target.checked)}
-              />
-              <span>Show passwords</span>
-            </label>
-
             <div className="form-actions">
               <button
                 className="primary-btn"
@@ -599,6 +684,121 @@ export default function AuthPage() {
             </div>
           </section>
         </div>
+
+      {forgotOpen ? (
+        <div className="modal-overlay forgot-password-overlay" onClick={() => setForgotOpen(false)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Reset Password</h3>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setForgotOpen(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="subtitle">Security question: What is your birth date?</p>
+            {forgotMessage ? (
+              <div className={`forgot-error-banner ${forgotMessage.type === 'success' ? 'success' : 'error'}`} role="alert" aria-live="assertive">
+                {forgotMessage.text}
+              </div>
+            ) : null}
+            <form className="auth-forgot-form" onSubmit={handleForgotPassword}>
+              <label>
+                Username
+                <input
+                  type="text"
+                  value={forgotForm.username}
+                  onChange={(e) => {
+                    setForgotForm((f) => ({ ...f, username: e.target.value }));
+                    setForgotUsernameValid(null);
+                  }}
+                  onBlur={checkForgotUsername}
+                  placeholder="Enter username"
+                  autoComplete="username"
+                />
+                {isCheckingUsername ? (
+                  <small className="field-hint">Checking username...</small>
+                ) : forgotUsernameValid === false ? (
+                  <small className="field-hint error">⚠ Username not found</small>
+                ) : forgotUsernameValid === true ? (
+                  <small className="field-hint success">✓ Username found</small>
+                ) : null}
+              </label>
+              <label>
+                Birth Date
+                <input
+                  type="date"
+                  value={forgotForm.birthDate}
+                  onChange={(e) => setForgotForm((f) => ({ ...f, birthDate: e.target.value }))}
+                />
+              </label>
+              <label>
+                New Password
+                <div className="password-input-wrap">
+                  <input
+                    type={showForgotPasswords ? 'text' : 'password'}
+                    value={forgotForm.password}
+                    onChange={(e) => setForgotForm((f) => ({ ...f, password: e.target.value }))}
+                    placeholder="Min 8 chars, letters + numbers"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password-btn"
+                    onClick={() => setShowForgotPasswords((current) => !current)}
+                    aria-label={showForgotPasswords ? 'Hide password' : 'Show password'}
+                  >
+                    {showForgotPasswords ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {forgotPasswordHint ? <small className="field-hint">⚠ {forgotPasswordHint}</small> : null}
+              </label>
+              <label>
+                Confirm New Password
+                <div className="password-input-wrap">
+                  <input
+                    type={showForgotPasswords ? 'text' : 'password'}
+                    value={forgotForm.confirmPassword}
+                    onChange={(e) => setForgotForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                    placeholder="Re-enter new password"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password-btn"
+                    onClick={() => setShowForgotPasswords((current) => !current)}
+                    aria-label={showForgotPasswords ? 'Hide password' : 'Show password'}
+                  >
+                    {showForgotPasswords ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {forgotConfirmHint ? <small className="field-hint">⚠ {forgotConfirmHint}</small> : null}
+              </label>
+              <div className="form-actions">
+                <button className="primary-btn" type="submit" disabled={!canForgotReset || isSubmittingForgot}>
+                  {isSubmittingForgot ? 'Updating...' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {forgotSuccessModal ? (
+        <div className="modal-overlay success-modal-overlay">
+          <div className="modal-dialog success-modal-dialog">
+            <div className="success-icon">✓</div>
+            <h2>Password Reset Successful!</h2>
+            <p>Your password has been updated. Please sign in with your new password.</p>
+            <div className="success-progress">
+              <div className="progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       </section>
     </div>

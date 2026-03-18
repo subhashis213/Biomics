@@ -6,6 +6,14 @@ const userSchema = new mongoose.Schema({
 	username: { type: String, required: true, unique: true },
 	class: { type: String, required: true },
 	city: { type: String, required: true },
+	security: {
+		question: { type: String, default: 'What is your birth date?' },
+		birthDate: { type: Date }
+	},
+	avatar: {
+		filename: { type: String, default: '' },
+		originalName: { type: String, default: '' }
+	},
 	password: { type: String, required: true },
 	favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Video' }],
 	completedVideos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Video' }],
@@ -13,6 +21,8 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre('save', async function(next) {
 	if (!this.isModified('password')) return next();
+	// Avoid double-hashing when password was already hashed in route handlers.
+	if (/^\$2[aby]\$\d{2}\$.{53}$/.test(this.password)) return next();
 	this.password = await bcrypt.hash(this.password, 10);
 	next();
 });

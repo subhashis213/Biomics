@@ -80,13 +80,11 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
 // Student-only: toggle favorite for quick access
 router.post('/:id/favorite', authenticateToken('user'), async (req, res) => {
   try {
-    const video = await Video.findById(req.params.id, { _id: 1, category: 1 }).lean();
+    const video = await Video.findById(req.params.id, { _id: 1 }).lean();
     if (!video) return res.status(404).json({ error: 'Video not found' });
 
     const user = await User.findOne({ username: req.user.username });
-    if (!user || user.class !== video.category) {
-      return res.status(403).json({ error: 'You are not authorized for this video.' });
-    }
+    if (!user) return res.status(404).json({ error: 'Student profile not found.' });
 
     const videoId = String(video._id);
     const currentFavorites = new Set(sanitizeIdList(user.favorites || []));
@@ -113,13 +111,11 @@ router.post('/:id/progress', authenticateToken('user'), async (req, res) => {
     const { completed } = req.body || {};
     const shouldComplete = Boolean(completed);
 
-    const video = await Video.findById(req.params.id, { _id: 1, category: 1 }).lean();
+    const video = await Video.findById(req.params.id, { _id: 1 }).lean();
     if (!video) return res.status(404).json({ error: 'Video not found' });
 
     const user = await User.findOne({ username: req.user.username });
-    if (!user || user.class !== video.category) {
-      return res.status(403).json({ error: 'You are not authorized for this video.' });
-    }
+    if (!user) return res.status(404).json({ error: 'Student profile not found.' });
 
     const videoId = String(video._id);
     const completedSet = new Set(sanitizeIdList(user.completedVideos || []));

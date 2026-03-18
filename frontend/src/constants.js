@@ -5,6 +5,7 @@ export const emptyRegisterForm = {
   username: '',
   class: '',
   city: '',
+  birthDate: '',
   password: '',
   confirmPassword: ''
 };

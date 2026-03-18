@@ -1,7 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
 const { z } = require('zod');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
@@ -14,9 +17,55 @@ const router = express.Router();
 const OTP_EXPIRY_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES || 5);
 const OTP_COOLDOWN_SECONDS = Number(process.env.OTP_COOLDOWN_SECONDS || 45);
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
+const uploadsDir = path.join(__dirname, '../uploads');
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeBase = path.basename(file.originalname || 'avatar', ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    cb(null, `avatar-${Date.now()}-${safeBase}${ext || '.jpg'}`);
+  }
+});
+
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if ((file.mimetype || '').startsWith('image/')) return cb(null, true);
+    return cb(new Error('Only image files are allowed for profile photo'));
+  }
+});
 
 function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+function normalizeBirthDate(value) {
+  if (!value) return '';
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+function isBcryptHash(value) {
+  return typeof value === 'string' && /^\$2[aby]\$\d{2}\$.{53}$/.test(value);
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildAvatarUrl(user) {
+  const filename = user?.avatar?.filename;
+  return filename ? `/uploads/${encodeURIComponent(filename)}` : '';
 }
 
 function generateOtp() {
@@ -80,6 +129,7 @@ const registerSchema = z.object({
   username: z.string().min(1).max(50),
   class: z.string().min(1).max(50),
   city: z.string().min(1).max(50),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Birth date is required'),
   password: z.string().min(6, 'Password must be at least 6 characters')
 });
 
@@ -97,24 +147,67 @@ const verifyOtpSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits')
 });
 
+const forgotPasswordSchema = z.object({
+  username: z.string().min(1, 'Username is required'),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Birth date is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters')
+});
+
+const updateProfileSchema = z.object({
+  username: z.string().min(3, 'Username must be at least 3 characters').max(50).optional(),
+  phone: z.string().regex(/^\d{10}$/, 'Phone number must be exactly 10 digits').optional(),
+  city: z.string().min(2, 'City must be at least 2 characters').max(50).optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional()
+});
+
+// Check if username exists
+router.post('/check-username', async (req, res) => {
+  const { username } = req.body;
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  try {
+    const normalizedUsername = String(username).trim();
+    const user = await User.findOne({ username: new RegExp(`^${escapeRegex(normalizedUsername)}$`, 'i') }).lean();
+    res.json({ exists: !!user });
+  } catch (err) {
+    res.status(500).json({ error: 'Check failed' });
+  }
+});
+
 // User Registration
 router.post('/register', validate(registerSchema), async (req, res) => {
-  const { phone, username, class: userClass, city, password } = req.body;
-  if (!phone || !username || !userClass || !city || !password) return res.status(400).json({ error: 'All fields required' });
+  const { phone, username, class: userClass, city, birthDate, password } = req.body;
+  if (!phone || !username || !userClass || !city || !birthDate || !password) return res.status(400).json({ error: 'All fields required' });
   try {
     const normalizedPhone = String(phone).trim();
     const normalizedUsername = String(username).trim();
     const normalizedClass = String(userClass).trim();
     const normalizedCity = String(city).trim();
+    const normalizedBirthDate = normalizeBirthDate(birthDate);
+
+    if (!normalizedBirthDate) {
+      return res.status(400).json({ error: 'Invalid birth date' });
+    }
 
     const exists = await User.findOne({ $or: [{ phone: normalizedPhone }, { username: normalizedUsername }] }).lean();
     if (exists) return res.status(400).json({ error: 'User already exists' });
+    
+    const normalizedPassword = String(password).trim();
+    if (normalizedPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
     const user = new User({
       phone: normalizedPhone,
       username: normalizedUsername,
       class: normalizedClass,
       city: normalizedCity,
-      password
+      security: {
+        question: 'What is your birth date?',
+        birthDate: new Date(`${normalizedBirthDate}T00:00:00.000Z`)
+      },
+      password: normalizedPassword
     });
     await user.save();
     res.status(201).json({
@@ -127,7 +220,43 @@ router.post('/register', validate(registerSchema), async (req, res) => {
       }
     });
   } catch (err) {
+    console.error('Registration error:', err.message);
     res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res) => {
+  const { username, birthDate, password } = req.body;
+  try {
+    const normalizedUsername = String(username).trim();
+    const user = await User.findOne({ username: new RegExp(`^${escapeRegex(normalizedUsername)}$`, 'i') });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const storedBirthDate = normalizeBirthDate(user.security?.birthDate);
+    const incomingBirthDate = normalizeBirthDate(birthDate);
+    if (!storedBirthDate || !incomingBirthDate || storedBirthDate !== incomingBirthDate) {
+      return res.status(400).json({ error: 'Security answer is incorrect' });
+    }
+
+    const normalizedPassword = String(password).trim();
+    if (normalizedPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    user.password = normalizedPassword;
+    await user.save();
+
+    // Defensive check: ensure stored password matches what user just set.
+    const reloaded = await User.findById(user._id).select('password').lean();
+    const verifyOk = reloaded?.password && await bcrypt.compare(normalizedPassword, String(reloaded.password));
+    if (!verifyOk) {
+      return res.status(500).json({ error: 'Password reset failed. Please try again.' });
+    }
+
+    return res.json({ message: 'Password reset successful. Please sign in with your new password.' });
+  } catch (err) {
+    console.error('Forgot password error:', err.message);
+    return res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
@@ -138,6 +267,149 @@ router.get('/users', authenticateToken('admin'), async (req, res) => {
     res.json({ total: users.length, users });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+router.get('/me', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne(
+      { username: req.user.username },
+      { username: 1, phone: 1, class: 1, city: 1, avatar: 1, _id: 0 }
+    ).lean();
+
+    if (!user) return res.status(404).json({ error: 'Student profile not found' });
+
+    return res.json({
+      user: {
+        username: user.username,
+        phone: user.phone,
+        class: user.class,
+        city: user.city,
+        avatarUrl: buildAvatarUrl(user)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+router.patch('/me', authenticateToken('user'), validate(updateProfileSchema), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username });
+    if (!user) return res.status(404).json({ error: 'Student profile not found' });
+
+    const nextUsername = req.body.username ? String(req.body.username).trim() : user.username;
+    const nextPhone = req.body.phone ? normalizePhone(req.body.phone) : user.phone;
+    const nextCity = req.body.city ? String(req.body.city).trim() : user.city;
+    const nextPassword = req.body.password ? String(req.body.password).trim() : '';
+
+    if (nextUsername !== user.username) {
+      const existingByUsername = await User.findOne({ username: nextUsername }).lean();
+      if (existingByUsername) return res.status(400).json({ error: 'Username already in use' });
+      user.username = nextUsername;
+    }
+
+    if (nextPhone !== user.phone) {
+      const existingByPhone = await User.findOne({ phone: nextPhone }).lean();
+      if (existingByPhone) return res.status(400).json({ error: 'Phone number already in use' });
+      user.phone = nextPhone;
+    }
+
+    user.city = nextCity;
+    if (nextPassword) {
+      if (nextPassword.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+      user.password = nextPassword;
+    }
+
+    await user.save();
+
+    const token = jwt.sign(
+      { username: user.username, role: 'user' },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    return res.json({
+      message: 'Profile updated successfully',
+      token,
+      user: {
+        username: user.username,
+        phone: user.phone,
+        class: user.class,
+        city: user.city,
+        avatarUrl: buildAvatarUrl(user)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+router.post('/me/avatar', authenticateToken('user'), avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username });
+    if (!user) return res.status(404).json({ error: 'Student profile not found' });
+    if (!req.file) return res.status(400).json({ error: 'Profile image is required' });
+
+    const previousFilename = user.avatar?.filename;
+    user.avatar = {
+      filename: req.file.filename,
+      originalName: req.file.originalname || req.file.filename
+    };
+    await user.save();
+
+    if (previousFilename && previousFilename !== req.file.filename) {
+      const previousPath = path.join(uploadsDir, path.basename(previousFilename));
+      if (fs.existsSync(previousPath)) {
+        fs.unlinkSync(previousPath);
+      }
+    }
+
+    return res.json({
+      message: 'Profile photo updated successfully',
+      user: {
+        username: user.username,
+        phone: user.phone,
+        class: user.class,
+        city: user.city,
+        avatarUrl: buildAvatarUrl(user)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to update profile photo' });
+  }
+});
+
+router.delete('/me/avatar', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username });
+    if (!user) return res.status(404).json({ error: 'Student profile not found' });
+
+    const previousFilename = user.avatar?.filename;
+    user.avatar = { filename: '', originalName: '' };
+    await user.save();
+
+    if (previousFilename) {
+      const previousPath = path.join(uploadsDir, path.basename(previousFilename));
+      if (fs.existsSync(previousPath)) {
+        fs.unlinkSync(previousPath);
+      }
+    }
+
+    return res.json({
+      message: 'Profile photo removed successfully',
+      user: {
+        username: user.username,
+        phone: user.phone,
+        class: user.class,
+        city: user.city,
+        avatarUrl: ''
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to remove profile photo' });
   }
 });
 
@@ -166,9 +438,30 @@ router.post('/login', validate(loginSchema), async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'All fields required' });
   try {
-    const user = await User.findOne({ username: String(username).trim() });
+    const normalizedUsername = String(username).trim();
+    const user = await User.findOne({ username: new RegExp(`^${escapeRegex(normalizedUsername)}$`, 'i') });
     if (!user) return res.status(400).json({ error: 'User not found' });
-    const valid = await bcrypt.compare(password, user.password);
+
+    const inputPassword = String(password);
+    const storedPassword = String(user.password || '');
+    const storedPasswordTrimmed = storedPassword.trim();
+    const storedIsHash = isBcryptHash(storedPasswordTrimmed);
+
+    let valid = false;
+    if (storedIsHash) {
+      valid = await bcrypt.compare(inputPassword, storedPasswordTrimmed);
+      if (!valid && inputPassword !== inputPassword.trim()) {
+        valid = await bcrypt.compare(inputPassword.trim(), storedPasswordTrimmed);
+      }
+    } else {
+      valid = storedPasswordTrimmed === inputPassword.trim();
+    }
+
+    if (valid && !storedIsHash) {
+      user.password = await bcrypt.hash(inputPassword.trim(), 10);
+      await user.save();
+    }
+
     if (!valid) return res.status(400).json({ error: 'Invalid password' });
     const token = jwt.sign(
       { username: user.username, role: 'user' },
@@ -319,6 +612,14 @@ router.post('/admin-login', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Admin login failed' });
   }
+});
+
+router.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: err.message || 'Profile upload failed' });
+  }
+  return res.status(400).json({ error: err.message || 'Profile upload failed' });
 });
 
 module.exports = router;

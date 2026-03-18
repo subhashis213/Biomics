@@ -1,9 +1,15 @@
 import { getToken } from './session';
 
-const API_BASE = import.meta.env.VITE_API_URL
-  || (typeof window !== 'undefined' && window.location.port !== '5002'
-    ? `${window.location.protocol}//${window.location.hostname}:5002`
-    : '');
+const isLocalhostClient = typeof window !== 'undefined'
+  && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+// In local development, always use local backend to avoid stale remote env mismatch.
+const API_BASE = isLocalhostClient
+  ? `${window.location.protocol}//${window.location.hostname}:5002`
+  : (import.meta.env.VITE_API_URL
+    || (typeof window !== 'undefined' && window.location.port !== '5002'
+      ? `${window.location.protocol}//${window.location.hostname}:5002`
+      : ''));
 
 function buildUrl(path) {
   return `${API_BASE}${path}`;
