@@ -137,7 +137,13 @@ export default function VideoCard({
       .then((YT) => {
         if (cancelled || !YT?.Player || !playerDivRef.current) return;
 
-        playerRef.current = new YT.Player(playerDivRef.current, {
+        // Create a fresh inner div for YouTube to replace with its iframe.
+        // playerDivRef.current stays as a stable React-owned container — never
+        // touched by YouTube — so React's virtual DOM stays in sync with the real DOM.
+        const ytTarget = document.createElement('div');
+        playerDivRef.current.appendChild(ytTarget);
+
+        playerRef.current = new YT.Player(ytTarget, {
           videoId,
           playerVars: { rel: 0, modestbranding: 1, autoplay: 0 },
           events: {
@@ -190,6 +196,10 @@ export default function VideoCard({
         try { playerRef.current.destroy(); } catch { /* ignore */ }
         playerRef.current = null;
       }
+      // Wipe the container so no stale iframe node remains for the next mount.
+      if (playerDivRef.current) {
+        try { playerDivRef.current.innerHTML = ''; } catch { /* ignore */ }
+      }
       setIsPlayerReady(false);
       setIsPlayerLoading(false);
     };
@@ -205,6 +215,9 @@ export default function VideoCard({
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch { /* ignore */ }
         playerRef.current = null;
+      }
+      if (playerDivRef.current) {
+        try { playerDivRef.current.innerHTML = ''; } catch { /* ignore */ }
       }
     };
   }, []);
