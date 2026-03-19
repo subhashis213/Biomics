@@ -17,6 +17,15 @@ const COURSE_CATEGORIES = [
   'GATE'
 ];
 
+const COURSE_META = {
+  '11th':                  { icon: '📖', color: '#3b82f6' },
+  '12th':                  { icon: '🎓', color: '#8b5cf6' },
+  'NEET':                  { icon: '🧬', color: '#10b981' },
+  'IIT-JAM':               { icon: '⚗️',  color: '#f59e0b' },
+  'CSIR-NET Life Science': { icon: '🔬', color: '#06b6d4' },
+  'GATE':                  { icon: '💻', color: '#ef4444' },
+};
+
 export default function AdminDashboard() {
   const UNDO_DURATION_MS = 5000;
   const BANNER_VISIBLE_MS = 3000;
@@ -1063,66 +1072,70 @@ export default function AdminDashboard() {
 
         <section id="section-course-manager" className="card compose-card course-manager-card">
           <h2>Course categories</h2>
-          <p className="subtitle">Select a course to open the quick publish popup for lecture and notes.</p>
+          <p className="subtitle">Tap a course to add lectures &amp; notes.</p>
           <div className="course-grid">
-            {COURSE_CATEGORIES.map((course) => (
-              <button key={course} type="button" className="course-tile" onClick={() => openCourseModal(course)}>
-                <span className="course-tile-label">{course}</span>
-                <span className="course-tile-action" aria-hidden="true">→</span>
-              </button>
-            ))}
+            {COURSE_CATEGORIES.map((course) => {
+              const meta = COURSE_META[course] || { icon: '\ud83d\udcda', color: '#6b7280' };
+              const count = videos.filter((v) => (v.category || 'General') === course).length;
+              return (
+                <button
+                  key={course}
+                  type="button"
+                  className="course-tile"
+                  style={{ '--tile-accent': meta.color }}
+                  onClick={() => openCourseModal(course)}
+                >
+                  <span className="course-tile-icon">{meta.icon}</span>
+                  <span className="course-tile-body">
+                    <span className="course-tile-label">{course}</span>
+                    <span className="course-tile-count">{count} {count === 1 ? 'lecture' : 'lectures'}</span>
+                  </span>
+                  <span className="course-tile-plus" aria-hidden="true">+</span>
+                </button>
+              );
+            })}
           </div>
         </section>
 
         <section id="section-registered-users" className="card table-card registered-learners-card">
-          <div className="section-header">
+          <div className="section-header" style={{ marginTop: 0 }}>
             <div>
               <p className="eyebrow">Students</p>
               <h2>Registered learners</h2>
             </div>
             <StatCard label="Total Students" value={students.length} />
           </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Course</th>
-                  <th>Phone</th>
-                  <th>City</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.length ? (
-                  students.map((student) => (
-                    <tr key={`${student.username}-${student.phone}`}>
-                      <td>{student.username}</td>
-                      <td>{student.class}</td>
-                      <td>{student.phone}</td>
-                      <td>{student.city || '-'}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="user-delete-btn"
-                          onClick={() => handleRemoveUser(student.username)}
-                          disabled={Boolean(undoPopup)}
-                          aria-label={`Remove ${student.username}`}
-                          title="Remove user"
-                        >
-                          <span className="user-delete-dot" aria-hidden="true" />
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5">No students registered yet.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="student-cards-scroll">
+            <div className="student-cards-grid">
+              {students.length ? students.map((student) => {
+                const initial = (student.username || '?')[0].toUpperCase();
+                return (
+                  <div key={`${student.username}-${student.phone}`} className="student-card">
+                    <div className="student-card-avatar">{initial}</div>
+                    <div className="student-card-info">
+                      <span className="student-card-name">{student.username}</span>
+                      <div className="student-card-meta">
+                        {student.class ? <span className="student-course-badge">{student.class}</span> : null}
+                        {student.city ? <span className="student-city">📍 {student.city}</span> : null}
+                      </div>
+                      {student.phone ? <span className="student-card-phone">📞 {student.phone}</span> : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="student-remove-btn"
+                      onClick={() => handleRemoveUser(student.username)}
+                      disabled={Boolean(undoPopup)}
+                      aria-label={`Remove ${student.username}`}
+                      title="Remove user"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              }) : (
+                <p className="empty-state">No students registered yet.</p>
+              )}
+            </div>
           </div>
         </section>
       </section>
