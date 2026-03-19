@@ -50,6 +50,7 @@ export default function AdminDashboard() {
   const [liveClassMeetUrl, setLiveClassMeetUrl] = useState('');
   const [isStartingClass, setIsStartingClass] = useState(false);
   const [isEndingClass, setIsEndingClass] = useState(false);
+  const [activeSection, setActiveSection] = useState('section-live-class');
   const [quizCategory, setQuizCategory] = useState(COURSE_CATEGORIES[0]);
   const [quizModule, setQuizModule] = useState('');
   const [quizTitle, setQuizTitle] = useState('');
@@ -675,6 +676,39 @@ export default function AdminDashboard() {
     navigate('/', { replace: true });
   }
 
+  useEffect(() => {
+    const sectionIds = [
+      'section-live-class',
+      'section-course-manager',
+      'section-registered-users',
+      'section-content-library',
+      'section-quiz-builder',
+      'section-feedback'
+    ];
+    const observers = [];
+    const ratios = {};
+    sectionIds.forEach((id) => { ratios[id] = 0; });
+
+    function pickActive() {
+      let best = sectionIds[0];
+      let bestRatio = -1;
+      sectionIds.forEach((id) => { if (ratios[id] > bestRatio) { bestRatio = ratios[id]; best = id; } });
+      setActiveSection(best);
+    }
+
+    sectionIds.forEach((id) => {
+      const node = document.getElementById(id);
+      if (!node) return;
+      const obs = new IntersectionObserver(
+        ([entry]) => { ratios[id] = entry.intersectionRatio; pickActive(); },
+        { threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] }
+      );
+      obs.observe(node);
+      observers.push(obs);
+    });
+    return () => observers.forEach((obs) => obs.disconnect());
+  }, [loading]);
+
   function scrollToSection(sectionId) {
     const node = document.getElementById(sectionId);
     if (node) {
@@ -901,14 +935,26 @@ export default function AdminDashboard() {
     >
       {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
-      <nav className="admin-section-nav card" aria-label="Admin sections">
-        <strong className="three-bar-icon" aria-hidden="true">☰</strong>
-        <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-live-class')}>🔴 Live Class</button>
-        <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-course-manager')}>Course Manager</button>
-        <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-registered-users')}>Registered Users</button>
-        <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-content-library')}>Content Library</button>
-        <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-quiz-builder')}>Quiz Builder</button>
-        <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-feedback')}>Student Feedback</button>
+      <nav className="admin-nav-bar" aria-label="Jump to section">
+        {[
+          { id: 'section-live-class',        icon: '🔴', label: 'Live Class'    },
+          { id: 'section-course-manager',    icon: '📚', label: 'Courses'       },
+          { id: 'section-registered-users',  icon: '👥', label: 'Users'         },
+          { id: 'section-content-library',   icon: '🎬', label: 'Library'       },
+          { id: 'section-quiz-builder',      icon: '📝', label: 'Quiz Builder'  },
+          { id: 'section-feedback',          icon: '💬', label: 'Feedback'      },
+        ].map(({ id, icon, label }) => (
+          <button
+            key={id}
+            type="button"
+            className={`admin-nav-pill${activeSection === id ? ' active' : ''}`}
+            onClick={() => scrollToSection(id)}
+          >
+            <span className="admin-nav-pill-icon">{icon}</span>
+            <span className="admin-nav-pill-label">{label}</span>
+            {activeSection === id && <span className="admin-nav-pill-dot" aria-hidden="true" />}
+          </button>
+        ))}
       </nav>
 
       <section className="dashboard-grid admin-grid">
