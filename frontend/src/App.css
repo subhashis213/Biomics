@@ -1278,8 +1278,8 @@ html[data-theme='light'] .field-hint {
 }
 
 @media (max-width: 480px) {
-  .topbar-logout-label { display: none; }
-  .topbar-logout-btn { padding: 9px 12px; gap: 0; }
+  .topbar-logout-label { display: inline; }
+  .topbar-logout-btn { width: 100%; justify-content: center; }
 }
 
 /* ── Topbar logo ─────────────────────────────────── */
@@ -4263,15 +4263,43 @@ html[data-theme='light'] .empty-note {
   .profile-modal-backdrop {
     padding: 0;
     align-items: flex-end;
+    overflow: hidden;
   }
 
   .profile-modal {
-    padding: 18px 16px 24px;
-    border-radius: 22px 22px 0 0;
-    max-height: 92dvh;
+    padding: 0 0 env(safe-area-inset-bottom, 16px);
+    border-radius: 24px 24px 0 0;
+    max-height: 94dvh;
     width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.28);
+    display: flex;
+    flex-direction: column;
+    animation: profile-sheet-up 320ms cubic-bezier(0.32, 0.72, 0.28, 1) both;
+  }
+
+  @keyframes profile-sheet-up {
+    from { transform: translateY(100%); opacity: 0.6; }
+    to   { transform: translateY(0);    opacity: 1;   }
+  }
+
+  /* Drag handle bar */
+  .profile-modal::before {
+    content: '';
+    display: block;
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--line-strong);
+    margin: 12px auto 0;
+    flex-shrink: 0;
+  }
+
+  .profile-modal-header {
+    padding: 14px 18px 0;
+    margin-bottom: 14px;
+    flex-shrink: 0;
   }
 
   .profile-hover-card {
@@ -4279,8 +4307,75 @@ html[data-theme='light'] .empty-note {
   }
 
   .profile-modal-body {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     overflow: hidden;
+    padding: 0 18px 18px;
+    flex: 1;
+  }
+
+  /* Compact hero: avatar + text side by side */
+  .profile-summary-card {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+
+  .profile-avatar-large {
+    width: 72px;
+    height: 72px;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  /* Stack: photo buttons + summary list to the right of avatar */
+  .profile-summary-card > :not(.profile-avatar-large) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .profile-photo-upload {
+    width: auto;
+  }
+
+  .profile-photo-upload span {
+    padding: 7px 12px;
+    font-size: 0.82rem;
+  }
+
+  .profile-delete-photo-btn {
+    width: auto;
+    font-size: 0.82rem;
+    padding: 7px 12px;
+  }
+
+  .profile-summary-list {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .profile-summary-list div {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 6px;
+  }
+
+  .profile-summary-list strong {
+    text-align: right;
+    font-size: 0.88rem;
+  }
+
+  .profile-edit-form {
+    border-radius: 16px;
+    padding: 14px;
+    gap: 10px;
   }
 
   .video-thumb {
