@@ -36,6 +36,7 @@ export default function StudentDashboard() {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [liveClass, setLiveClass] = useState(null); // { active, title, meetUrl, startedAt }
 
   const profilePasswordHint =
     profileForm.password.length > 0 && profileForm.password.length < 8
@@ -325,6 +326,31 @@ export default function StudentDashboard() {
     }
   }, [moduleQuiz]);
 
+  // Poll for live class status every 5 seconds
+  useEffect(() => {
+    let cancelled = false;
+    async function checkLive() {
+      try {
+        const data = await requestJson('/live/status');
+        if (!cancelled) {
+          if (data.active) {
+            setLiveClass(data);
+          } else {
+            setLiveClass(null);
+          }
+        }
+      } catch {
+        // silently ignore — non-critical
+      }
+    }
+    checkLive();
+    const interval = window.setInterval(checkLive, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   function handleCloseQuizModal() {
     if (moduleQuiz && !quizResult) {
       setShowExitConfirm(true);
@@ -469,6 +495,27 @@ export default function StudentDashboard() {
     >
       <div className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
+
+        {/* ── Live Class Banner ──────────────────────────── */}
+        {liveClass ? (
+          <section className="live-class-student-banner card">
+            <div className="live-class-banner-info">
+              <span className="live-badge pulsing">LIVE NOW</span>
+              <div>
+                <strong className="live-class-title-display">{liveClass.title}</strong>
+                <span className="live-class-since">⏰ Live since {new Date(liveClass.startedAt).toLocaleTimeString()}</span>
+              </div>
+            </div>
+            <a
+              href={liveClass.meetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="primary-btn live-join-btn"
+            >
+              📹 Join Google Meet
+            </a>
+          </section>
+        ) : null}
 
       <section className="student-tools-row card">
         <label>

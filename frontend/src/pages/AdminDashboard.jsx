@@ -45,6 +45,11 @@ export default function AdminDashboard() {
   const [uploadProgress, setUploadProgress] = useState({});
   const [materialMessages, setMaterialMessages] = useState({});
   const [loading, setLoading] = useState(true);
+  const [liveClass, setLiveClass] = useState(null); // { active, title, meetUrl, startedAt }
+  const [liveClassTitle, setLiveClassTitle] = useState('');
+  const [liveClassMeetUrl, setLiveClassMeetUrl] = useState('');
+  const [isStartingClass, setIsStartingClass] = useState(false);
+  const [isEndingClass, setIsEndingClass] = useState(false);
   const [quizCategory, setQuizCategory] = useState(COURSE_CATEGORIES[0]);
   const [quizModule, setQuizModule] = useState('');
   const [quizTitle, setQuizTitle] = useState('');
@@ -126,6 +131,57 @@ export default function AdminDashboard() {
   useEffect(() => {
     refreshData();
   }, []);
+
+  async function fetchLiveStatus() {
+    try {
+      const data = await requestJson('/live/status');
+      setLiveClass(data.active ? data : null);
+    } catch {
+      // silently ignore — non-critical
+    }
+  }
+
+  useEffect(() => {
+    fetchLiveStatus();
+  }, []);
+
+  async function handleStartClass() {
+    if (isStartingClass) return;
+    const trimmedUrl = liveClassMeetUrl.trim();
+    if (!trimmedUrl.startsWith('https://meet.google.com/')) {
+      setBanner({ type: 'error', text: 'Please enter a valid Google Meet link (https://meet.google.com/...)' });
+      return;
+    }
+    setIsStartingClass(true);
+    try {
+      const data = await requestJson('/live/start', {
+        method: 'POST',
+        body: JSON.stringify({ title: liveClassTitle.trim() || 'Live Class', meetUrl: trimmedUrl })
+      });
+      setLiveClass(data);
+      setBanner({ type: 'success', text: `Live class “${data.title}” started! Students can now join.` });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message });
+    } finally {
+      setIsStartingClass(false);
+    }
+  }
+
+  async function handleEndClass() {
+    if (isEndingClass) return;
+    setIsEndingClass(true);
+    try {
+      await requestJson('/live/end', { method: 'POST' });
+      setLiveClass(null);
+      setLiveClassTitle('');
+      setLiveClassMeetUrl('');
+      setBanner({ type: 'success', text: 'Live class ended.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message });
+    } finally {
+      setIsEndingClass(false);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -847,6 +903,7 @@ export default function AdminDashboard() {
 
       <nav className="admin-section-nav card" aria-label="Admin sections">
         <strong className="three-bar-icon" aria-hidden="true">☰</strong>
+        <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-live-class')}>🔴 Live Class</button>
         <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-course-manager')}>Course Manager</button>
         <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-registered-users')}>Registered Users</button>
         <button className="secondary-btn" type="button" onClick={() => scrollToSection('section-content-library')}>Content Library</button>
@@ -855,6 +912,109 @@ export default function AdminDashboard() {
       </nav>
 
       <section className="dashboard-grid admin-grid">
+        {/* ── Live Class Section ──────────────────────────── */}
+        <section id="section-live-class" className="card live-class-admin-card">
+          <div className="live-class-header">
+            <h2>🔴 Live Class</h2>
+            {liveClass ? (
+              <span className="live-badge pulsing">LIVE NOW</span>
+            ) : (
+              <span className="live-badge offline">OFFLINE</span>
+            )}
+          </div>
+
+          {!liveClass ? (
+            <div className="live-class-start-panel">
+              <p className="subtitle">Create a Google Meet, paste the link below, then start the session. Students see a join button within 5 seconds.</p>
+              <div className="live-class-form">
+                <div className="live-class-form-row">
+                  <label className="live-field-label">
+                    Class title
+                    <input
+                      type="text"
+                      className="live-class-title-input"
+                      placeholder="e.g. Cell Biology – Chapter 3"
+                      value={liveClassTitle}
+                      onChange={(e) => setLiveClassTitle(e.target.value)}
+                      maxLength={100}
+                    />
+                  </label>
+                  <label className="live-field-label">
+                    Google Meet link
+                    <input
+                      type="url"
+                      className="live-class-title-input meet-url-input"
+                      placeholder="https://meet.google.com/abc-defg-hij"
+                      value={liveClassMeetUrl}
+                      onChange={(e) => setLiveClassMeetUrl(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="live-class-form-actions">
+                  <button
+                    type="button"
+                    className="primary-btn live-start-btn"
+                    onClick={handleStartClass}
+                    disabled={isStartingClass || !liveClassMeetUrl.trim()}
+                  >
+                    {isStartingClass ? 'Starting…' : '🟢 Go Live'}
+                  </button>
+                  <a
+                    href="https://meet.google.com/new"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="secondary-btn meet-new-link"
+                  >
+                    📹 Create Google Meet
+                  </a>
+                </div>
+                <p className="live-help-text">
+                  Don’t have a link yet?
+                  Click “Create Google Meet” → copy the link → paste it above.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="live-class-active-panel">
+              <div className="live-class-info-bar">
+                <div className="live-class-info-text">
+                  <strong className="live-class-title-display">{liveClass.title}</strong>
+                  <span className="live-class-since">⏰ Started at {new Date(liveClass.startedAt).toLocaleTimeString()}</span>
+                </div>
+                <div className="live-class-controls">
+                  <a
+                    href={liveClass.meetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="primary-btn meet-open-btn"
+                  >
+                    📹 Open Google Meet
+                  </a>
+                  <button
+                    type="button"
+                    className="danger-btn"
+                    onClick={handleEndClass}
+                    disabled={isEndingClass}
+                  >
+                    {isEndingClass ? 'Ending…' : '⏹️ End Class'}
+                  </button>
+                </div>
+              </div>
+              <div className="live-meet-info-box">
+                <span className="live-meet-url-label">Meet link shared with students:</span>
+                <a
+                  href={liveClass.meetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="live-meet-url-text"
+                >
+                  {liveClass.meetUrl}
+                </a>
+              </div>
+            </div>
+          )}
+        </section>
+
         <section id="section-course-manager" className="card compose-card course-manager-card">
           <h2>Course categories</h2>
           <p className="subtitle">Select a course to open the quick publish popup for lecture and notes.</p>

@@ -11,6 +11,7 @@ const videoRoutes = require('./routes/videoRoutes');
 const authRoutes = require('./routes/authRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const quizRoutes = require('./routes/quizRoutes');
+const liveClassRoutes = require('./routes/liveClassRoutes');
 
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || true;
@@ -23,7 +24,15 @@ const authLimiter = rateLimit({
 });
 
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      // Allow Jitsi Meet to be embedded as an iframe for live classes
+      'frame-src': ["'self'", 'https://meet.jit.si'],
+      'img-src': ["'self'", 'data:', 'https:'],
+    }
+  }
 }));
 app.use(cors({ origin: corsOrigin }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -36,13 +45,14 @@ app.use('/videos', videoRoutes);
 app.use('/auth', authLimiter, authRoutes);
 app.use('/feedback', feedbackRoutes);
 app.use('/quizzes', quizRoutes);
+app.use('/live', liveClassRoutes);
 
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes')) {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live')) {
       return next();
     }
     return res.sendFile(path.join(frontendDistPath, 'index.html'));
