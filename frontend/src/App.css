@@ -345,7 +345,11 @@ th,
   border: 1px solid var(--line);
   background: linear-gradient(160deg, var(--surface-start) 0%, var(--surface-end) 100%);
   box-shadow: var(--shadow-md);
-  transition: background var(--theme-transition), border-color var(--theme-transition), box-shadow var(--theme-transition), color var(--theme-transition);
+  transition: background var(--theme-transition), border-color var(--theme-transition), box-shadow var(--theme-transition), color var(--theme-transition), transform 0.2s ease;
+}
+.card:not(.compose-card):not(.live-class-admin-card):not(.quiz-panel):not(.registered-learners-card):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(15,23,42,0.16));
 }
 
 .hero-panel {
@@ -1210,6 +1214,12 @@ html[data-theme='light'] .field-hint {
 .app-shell {
   max-width: 1440px;
   margin: 0 auto;
+  animation: page-enter 0.42s cubic-bezier(0.22, 0.9, 0.2, 1) both;
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .topbar {
@@ -1227,6 +1237,51 @@ html[data-theme='light'] .field-hint {
   gap: 10px;
 }
 
+/* ── Topbar logout button (modern, classy) ──────────── */
+.topbar-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, #ef4444 14%, var(--bg-card)),
+    color-mix(in srgb, #dc2626 8%, var(--bg-card)));
+  border-color: color-mix(in srgb, #ef4444 30%, var(--line));
+  color: #ef4444;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 40px;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+              box-shadow 0.2s ease, transform 0.18s ease;
+}
+.topbar-logout-btn:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(239,68,68,0.35);
+  transform: translateY(-1px);
+}
+.topbar-logout-btn:active {
+  transform: translateY(0);
+}
+.topbar-logout-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+.topbar-logout-label {
+  line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .topbar-logout-label { display: none; }
+  .topbar-logout-btn { padding: 9px 12px; gap: 0; }
+}
+
 /* ── Topbar logo ─────────────────────────────────── */
 .topbar-brand {
   display: flex;
@@ -1241,6 +1296,7 @@ html[data-theme='light'] .field-hint {
   border: 2px solid var(--line-strong);
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transform: rotate(90deg);
 }
 
 /* ── Student footer ──────────────────────────────── */
@@ -1268,6 +1324,7 @@ html[data-theme='light'] .field-hint {
   object-fit: cover;
   border: 2px solid var(--line-strong);
   box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transform: rotate(90deg);
 }
 .footer-tagline {
   font-size: 0.8rem;
@@ -2106,28 +2163,57 @@ html[data-theme='light'] .field-hint {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(6, 11, 8, 0.48);
-  backdrop-filter: blur(10px);
+  background: rgba(6, 11, 8, 0.52);
+  backdrop-filter: blur(12px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .profile-modal {
   width: min(960px, 100%);
   max-height: min(88vh, 860px);
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   border-radius: 24px;
   border: 1px solid var(--line-strong);
   background: linear-gradient(160deg, var(--surface-start), var(--surface-end));
   box-shadow: var(--shadow-lg);
-  padding: 22px;
-  animation: modal-slide-in 240ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  padding: 24px;
+  animation: modal-slide-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  box-sizing: border-box;
 }
 
 .profile-modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: flex-start;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
+}
+
+/* Dedicated circular close button for profile modal */
+.profile-close-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: color-mix(in srgb, var(--bg-card) 80%, transparent);
+  color: var(--text-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  padding: 0;
+}
+.profile-close-btn:hover {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+  transform: rotate(90deg) scale(1.08);
 }
 
 .profile-modal-body {
@@ -2419,25 +2505,26 @@ html[data-theme='light'] .field-hint {
   border-radius: 10px;
   border: 1.5px solid transparent;
   background: transparent;
-  color: var(--muted, #6b7280);
+  color: var(--text-soft);
   font-size: 0.83rem;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background 0.18s, color 0.18s, border-color 0.18s, box-shadow 0.18s;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   outline: none;
 }
 .admin-nav-pill:hover {
-  background: var(--bg, #f3f4f6);
-  color: var(--text, #111827);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  transform: translateY(-1px);
 }
 .admin-nav-pill.active {
-  background: var(--accent, #16a34a);
+  background: var(--accent);
   color: #fff;
-  border-color: var(--accent, #16a34a);
+  border-color: var(--accent);
   font-weight: 600;
-  box-shadow: 0 3px 10px rgba(22,163,74,0.25);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .admin-nav-pill-icon {
   font-size: 1rem;
@@ -2677,7 +2764,7 @@ th {
 @keyframes student-card-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.985);
+    transform: translateY(16px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -2702,7 +2789,7 @@ th {
 .student-dashboard-view .quiz-question-card,
 .student-dashboard-view .quiz-review-item,
 .student-dashboard-view .feedback-item {
-  animation: student-card-in 180ms cubic-bezier(0.22, 0.9, 0.3, 1) both;
+  animation: student-card-in 0.32s cubic-bezier(0.22, 0.9, 0.3, 1) both;
   will-change: transform, opacity;
 }
 
@@ -2899,22 +2986,39 @@ th {
   border: 2px solid var(--line);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 200ms ease;
+  transition: background 0.22s ease, border-color 0.22s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.22s ease, opacity 0.22s ease;
   text-align: left;
   align-items: flex-start;
   position: relative;
   overflow: hidden;
+  opacity: 0;
+  animation: module-card-enter 0.38s cubic-bezier(0.22, 0.9, 0.2, 1) forwards;
+}
+
+.module-card-btn:nth-child(1)  { animation-delay: 0.02s; }
+.module-card-btn:nth-child(2)  { animation-delay: 0.06s; }
+.module-card-btn:nth-child(3)  { animation-delay: 0.10s; }
+.module-card-btn:nth-child(4)  { animation-delay: 0.14s; }
+.module-card-btn:nth-child(5)  { animation-delay: 0.18s; }
+.module-card-btn:nth-child(6)  { animation-delay: 0.22s; }
+.module-card-btn:nth-child(7)  { animation-delay: 0.26s; }
+.module-card-btn:nth-child(8)  { animation-delay: 0.30s; }
+.module-card-btn:nth-child(n+9) { animation-delay: 0.34s; }
+
+@keyframes module-card-enter {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .module-card-btn:hover {
   background: var(--bg-card-soft);
   border-color: var(--accent);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(99, 102, 241, 0.15);
+  transform: translateY(-5px) scale(1.01);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .module-card-btn:active {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(0.99);
 }
 
 .module-card-header {
@@ -4157,20 +4261,26 @@ html[data-theme='light'] .empty-note {
   }
 
   .profile-modal-backdrop {
-    padding: 12px;
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .profile-modal {
+    padding: 18px 16px 24px;
+    border-radius: 22px 22px 0 0;
+    max-height: 92dvh;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .profile-hover-card {
     display: none;
   }
 
-  .profile-modal {
-    padding: 16px;
-    border-radius: 18px;
-  }
-
   .profile-modal-body {
     grid-template-columns: 1fr;
+    overflow: hidden;
   }
 
   .video-thumb {

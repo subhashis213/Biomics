@@ -32,8 +32,9 @@ export default function AppShell({ title, subtitle, roleLabel, onLogout, childre
             <span>{isLightTheme ? 'Light' : 'Dark'}</span>
           </button>
           {typeof onLogout === 'function' ? (
-            <button className="secondary-btn" type="button" onClick={onLogout}>
-              Logout {roleLabel ? `(${roleLabel})` : ''}
+            <button className="topbar-logout-btn" type="button" onClick={onLogout}>
+              <span className="topbar-logout-icon">⏻</span>
+              <span className="topbar-logout-label">Logout {roleLabel ? `(${roleLabel})` : ''}</span>
             </button>
           ) : null}
         </div>

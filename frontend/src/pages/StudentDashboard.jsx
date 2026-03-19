@@ -46,7 +46,8 @@ export default function StudentDashboard() {
 
   const selectedModuleName = selectedModule?.name || '';
   const selectedModuleCourse = selectedModule?.category || '';
-  const quizEnabledForSelection = Boolean(selectedModuleName) && selectedModuleCourse === course;
+  const quizEnabledForSelection = Boolean(selectedModuleName) &&
+    normalizeCourseName(selectedModuleCourse).toLowerCase() === normalizeCourseName(course || '').toLowerCase();
 
   const {
     moduleQuiz, moduleQuizList, quizAnswers, quizResult, quizReview,
@@ -252,7 +253,10 @@ export default function StudentDashboard() {
 
   const latestAttemptByModule = quizAttempts.reduce((acc, attempt) => {
     const moduleKey = resolveModuleKey(attempt.category || course || 'General', attempt.module || 'General');
-    if (!acc[moduleKey]) acc[moduleKey] = attempt;
+    const existing = acc[moduleKey];
+    if (!existing || new Date(attempt.submittedAt) > new Date(existing.submittedAt)) {
+      acc[moduleKey] = attempt;
+    }
     return acc;
   }, {});
 
@@ -1003,7 +1007,7 @@ export default function StudentDashboard() {
                 <p className="eyebrow">Student Profile</p>
                 <h2>Profile Settings</h2>
               </div>
-              <button type="button" className="quiz-modal-close-btn" onClick={() => setProfileOpen(false)} aria-label="Close profile settings">
+              <button type="button" className="profile-close-btn" onClick={() => setProfileOpen(false)} aria-label="Close profile settings">
                 ×
               </button>
             </div>
