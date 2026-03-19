@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { downloadMaterial, requestJson } from '../api';
+import logoImg from '../assets/biomics-logo.jpeg';
 import AppShell from '../components/AppShell';
 import { QuizModal } from '../components/QuizModal';
 import StatCard from '../components/StatCard';
@@ -630,55 +631,53 @@ export default function StudentDashboard() {
         // Module Selection View
         <div className="modules-view-container">
           <div className="modules-grid-student">
-            {visibleModules.map((moduleKey) => (
-              (() => {
-                const moduleMeta = moduleMetaByKey[moduleKey];
-                const module = moduleMeta.module;
-                const moduleCourse = moduleMeta.category;
-                const moduleVideos = videosByModule[moduleKey] || [];
-                const completedInModule = moduleVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
-                const moduleQuizCount = (quizzesByModule[moduleKey] || []).length;
-                const hasQuizAttempt = Boolean(latestAttemptByModule[moduleKey]);
-                const lectureProgress = moduleVideos.length
-                  ? Math.round((completedInModule / moduleVideos.length) * 100)
-                  : 0;
-                let moduleProgressPercent = lectureProgress;
-                if (!moduleVideos.length && moduleQuizCount) {
-                  moduleProgressPercent = hasQuizAttempt ? 100 : 0;
-                } else if (moduleVideos.length && moduleQuizCount) {
-                  moduleProgressPercent = Math.round((lectureProgress + (hasQuizAttempt ? 100 : 0)) / 2);
-                }
-                return (
-                  <button
-                    key={moduleKey}
-                    className="module-card-btn"
-                    onClick={() => setSelectedModule({ name: module, category: moduleCourse })}
-                  >
-                    <div className="module-card-header">
-                      <span className="module-card-icon">📚</span>
-                      <span className="module-card-count">{moduleVideos.length}</span>
-                    </div>
-                    <div className="module-card-body">
-                      <h3 className="module-card-title">{module}</h3>
-                      {selectedCourseFilter === 'all' ? <p className="module-card-course">{moduleCourse}</p> : null}
-                      <p className="module-card-subtitle">
-                        {moduleVideos.length} {moduleVideos.length === 1 ? 'lecture' : 'lectures'}
-                        {moduleQuizCount ? ` • ${moduleQuizCount} ${moduleQuizCount === 1 ? 'quiz' : 'quizzes'}` : ''}
+            {visibleModules.map((moduleKey) => {
+              const moduleMeta = moduleMetaByKey[moduleKey];
+              const module = moduleMeta.module;
+              const moduleCourse = moduleMeta.category;
+              const moduleVideos = videosByModule[moduleKey] || [];
+              const completedInModule = moduleVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
+              const moduleQuizCount = (quizzesByModule[moduleKey] || []).length;
+              const hasQuizAttempt = Boolean(latestAttemptByModule[moduleKey]);
+              const lectureProgress = moduleVideos.length
+                ? Math.round((completedInModule / moduleVideos.length) * 100)
+                : 0;
+              let moduleProgressPercent = lectureProgress;
+              if (!moduleVideos.length && moduleQuizCount) {
+                moduleProgressPercent = hasQuizAttempt ? 100 : 0;
+              } else if (moduleVideos.length && moduleQuizCount) {
+                moduleProgressPercent = Math.round((lectureProgress + (hasQuizAttempt ? 100 : 0)) / 2);
+              }
+              return (
+                <button
+                  key={moduleKey}
+                  className="module-card-btn"
+                  onClick={() => setSelectedModule({ name: module, category: moduleCourse })}
+                >
+                  <div className="module-card-header">
+                    <span className="module-card-icon">📚</span>
+                    <span className="module-card-count">{moduleVideos.length}</span>
+                  </div>
+                  <div className="module-card-body">
+                    <h3 className="module-card-title">{module}</h3>
+                    {selectedCourseFilter === 'all' ? <p className="module-card-course">{moduleCourse}</p> : null}
+                    <p className="module-card-subtitle">
+                      {moduleVideos.length} {moduleVideos.length === 1 ? 'lecture' : 'lectures'}
+                      {moduleQuizCount ? ` • ${moduleQuizCount} ${moduleQuizCount === 1 ? 'quiz' : 'quizzes'}` : ''}
+                    </p>
+                    <p className="module-card-progress">
+                      Progress: {moduleProgressPercent}%
+                    </p>
+                    {latestAttemptByModule[moduleKey] ? (
+                      <p className="module-card-quiz-score">
+                        Quiz: {latestAttemptByModule[moduleKey].score}/{latestAttemptByModule[moduleKey].total}
                       </p>
-                      <p className="module-card-progress">
-                        Progress: {moduleProgressPercent}%
-                      </p>
-                      {latestAttemptByModule[moduleKey] ? (
-                        <p className="module-card-quiz-score">
-                          Quiz: {latestAttemptByModule[moduleKey].score}/{latestAttemptByModule[moduleKey].total}
-                        </p>
-                      ) : null}
-                    </div>
-                    <span className="module-card-arrow">→</span>
-                  </button>
-                );
-              })()
-            ))}
+                    ) : null}
+                  </div>
+                  <span className="module-card-arrow">→</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : selectedModule && displayedVideos.length ? (
@@ -843,6 +842,38 @@ export default function StudentDashboard() {
           </button>
         </aside>
       ) : null}
+
+      {/* ── Footer ──────────────────────────────────── */}
+      <footer className="student-footer">
+        <div className="footer-grid">
+          <div className="footer-brand-col">
+            <img src={logoImg} alt="Biomics Hub" className="footer-logo" />
+            <p className="footer-tagline">Empowering students with quality science education</p>
+          </div>
+          <div className="footer-col">
+            <h4>About Us</h4>
+            <p>Biomics Hub is a premier online learning platform for Biology, Chemistry and Life Sciences. We help students excel in NEET, IIT-JAM, CSIR-NET, GATE and school board examinations.</p>
+          </div>
+          <div className="footer-col">
+            <h4>Contact</h4>
+            <p>&#x1F4CD; 123 Science Park, Sector 15<br/>Bhubaneswar, Odisha – 751024</p>
+            <p>&#x1F4DE; +91 98765 43210</p>
+            <p>&#x2709;&#xFE0F; support@biomicshub.in</p>
+          </div>
+          <div className="footer-col">
+            <h4>Quick Links</h4>
+            <ul className="footer-links">
+              <li>Courses</li>
+              <li>Live Classes</li>
+              <li>Study Material</li>
+              <li>Quiz Builder</li>
+            </ul>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© {new Date().getFullYear()} Biomics Hub. All rights reserved.</span>
+        </div>
+      </footer>
 
       </AppShell>
 
