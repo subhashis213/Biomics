@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { deleteQuiz, fetchAdminQuizzes, requestJson, saveModuleQuiz, uploadMaterial } from '../api';
 import { MAX_MATERIAL_MB } from '../constants';
@@ -59,6 +60,11 @@ export default function AdminDashboard() {
   const [liveClassMeetUrl, setLiveClassMeetUrl] = useState('');
   const [isStartingClass, setIsStartingClass] = useState(false);
   const [isEndingClass, setIsEndingClass] = useState(false);
+  const [scheduledClass, setScheduledClass] = useState(null); // { _id, title, scheduledAt, meetUrl }
+  const [scheduleForm, setScheduleForm] = useState({ title: '', meetUrl: '', date: '', time: '' });
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [isCancellingSchedule, setIsCancellingSchedule] = useState(false);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [activeSection, setActiveSection] = useState('section-live-class');
   const [quizCategory, setQuizCategory] = useState(COURSE_CATEGORIES[0]);
   const [quizModule, setQuizModule] = useState('');
@@ -124,7 +130,6 @@ export default function AdminDashboard() {
           m: item.message || ''
         })}`
       })));
-      setBanner(null);
     } catch (error) {
       const message = error?.message || 'Failed to load admin data.';
       if (message.toLowerCase().includes('authentication') || message.toLowerCase().includes('forbidden')) {
@@ -146,6 +151,7 @@ export default function AdminDashboard() {
     try {
       const data = await requestJson('/live/status');
       setLiveClass(data.active ? data : null);
+      setScheduledClass(data.upcoming || null);
     } catch {
       // silently ignore — non-critical
     }
@@ -190,6 +196,54 @@ export default function AdminDashboard() {
       setBanner({ type: 'error', text: error.message });
     } finally {
       setIsEndingClass(false);
+    }
+  }
+
+  async function handleScheduleClass(event) {
+    event.preventDefault();
+    if (isScheduling) return;
+    const { title, meetUrl, date, time } = scheduleForm;
+    if (!date || !time) {
+      setBanner({ type: 'error', text: 'Please select a date and time for the class.' });
+      return;
+    }
+    const scheduledAt = new Date(`${date}T${time}`);
+    if (isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+      setBanner({ type: 'error', text: 'Scheduled time must be in the future.' });
+      return;
+    }
+    setIsScheduling(true);
+    try {
+      const data = await requestJson('/live/schedule', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: title.trim() || 'Live Class',
+          meetUrl: meetUrl.trim(),
+          scheduledAt: scheduledAt.toISOString()
+        })
+      });
+      setScheduledClass(data);
+      setScheduleForm({ title: '', meetUrl: '', date: '', time: '' });
+      setShowScheduleForm(false);
+      setBanner({ type: 'success', text: `Class scheduled for ${scheduledAt.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}.` });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message });
+    } finally {
+      setIsScheduling(false);
+    }
+  }
+
+  async function handleCancelSchedule() {
+    if (isCancellingSchedule) return;
+    setIsCancellingSchedule(true);
+    try {
+      await requestJson('/live/schedule', { method: 'DELETE' });
+      setScheduledClass(null);
+      setBanner({ type: 'success', text: 'Scheduled class cancelled.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message });
+    } finally {
+      setIsCancellingSchedule(false);
     }
   }
 
@@ -430,16 +484,17 @@ export default function AdminDashboard() {
         });
       }
 
+      const successText = `Lecture added to ${selectedModule} in ${selectedCourse}${modalNoteFile ? ' with notes.' : '.'}`;
       setVideoForm({ title: '', description: '', url: '' });
       setModalNoteFile(null);
+      setPublishingForCourse(false);
       setCourseModalOpen(false);
       setModalStep('module');
       setSelectedModule(null);
-      setBanner({ type: 'success', text: `Lecture added to ${selectedModule} in ${selectedCourse}${modalNoteFile ? ' with notes.' : '.'}` });
       await refreshData();
+      setBanner({ type: 'success', text: successText });
     } catch (error) {
       setModalMessage({ type: 'error', text: error.message });
-    } finally {
       setPublishingForCourse(false);
     }
   }
@@ -493,6 +548,7 @@ export default function AdminDashboard() {
     setModalMessage(null);
     setModalUploadProgress(0);
     setModalNoteFile(null);
+    setPublishingForCourse(false);
     setVideoForm({ title: '', description: '', url: '' });
   }
 
@@ -504,6 +560,7 @@ export default function AdminDashboard() {
     setModalUploadProgress(0);
     setModalNoteFile(null);
     setVideoForm({ title: '', description: '', url: '' });
+    setPublishingForCourse(false);
   }
 
   function handleDeleteVideo(videoId) {
@@ -1028,6 +1085,107 @@ export default function AdminDashboard() {
                   Click “Create Google Meet” → copy the link → paste it above.
                 </p>
               </div>
+
+              {/* ── Schedule a class ── */}
+{/* ── Schedule a class ── */}
+              <div className="schedule-class-section">
+                <div className="schedule-section-header">
+                  <div>
+                    <h3 className="schedule-section-title">📅 Schedule a Class</h3>
+                    <p className="schedule-section-sub">Students see a countdown banner before the class starts.</p>
+                  </div>
+                  {!showScheduleForm && !scheduledClass && (
+                    <button type="button" className="secondary-btn schedule-toggle-btn" onClick={() => setShowScheduleForm(true)}>
+                      + Schedule
+                    </button>
+                  )}
+                </div>
+
+                {scheduledClass ? (
+                  <div className="scheduled-class-card">
+                    <div className="scheduled-card-icon">📅</div>
+                    <div className="scheduled-card-info">
+                      <strong className="scheduled-card-title">{scheduledClass.title}</strong>
+                      <span className="scheduled-card-time">
+                        {new Date(scheduledClass.scheduledAt).toLocaleString([], {
+                          weekday: 'short', month: 'short', day: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </span>
+                      {scheduledClass.meetUrl && (
+                        <a href={scheduledClass.meetUrl} target="_blank" rel="noopener noreferrer" className="scheduled-card-url">
+                          {scheduledClass.meetUrl}
+                        </a>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="danger-btn schedule-cancel-btn"
+                      onClick={handleCancelSchedule}
+                      disabled={isCancellingSchedule}
+                    >
+                      {isCancellingSchedule ? 'Cancelling…' : '✕ Cancel'}
+                    </button>
+                  </div>
+                ) : showScheduleForm ? (
+                  <form className="schedule-form" onSubmit={handleScheduleClass}>
+                    <div className="schedule-form-row">
+                      <label className="live-field-label">
+                        Class title
+                        <input
+                          type="text"
+                          className="live-class-title-input"
+                          placeholder="e.g. Cell Biology – Chapter 3"
+                          value={scheduleForm.title}
+                          onChange={(e) => setScheduleForm((p) => ({ ...p, title: e.target.value }))}
+                          maxLength={100}
+                        />
+                      </label>
+                      <label className="live-field-label">
+                        Google Meet link <span className="schedule-optional-label">(optional — can add later)</span>
+                        <input
+                          type="url"
+                          className="live-class-title-input"
+                          placeholder="https://meet.google.com/abc-defg-hij"
+                          value={scheduleForm.meetUrl}
+                          onChange={(e) => setScheduleForm((p) => ({ ...p, meetUrl: e.target.value }))}
+                        />
+                      </label>
+                    </div>
+                    <div className="schedule-form-row">
+                      <label className="live-field-label">
+                        Date
+                        <input
+                          type="date"
+                          className="live-class-title-input"
+                          value={scheduleForm.date}
+                          min={new Date().toISOString().split('T')[0]}
+                          onChange={(e) => setScheduleForm((p) => ({ ...p, date: e.target.value }))}
+                          required
+                        />
+                      </label>
+                      <label className="live-field-label">
+                        Time
+                        <input
+                          type="time"
+                          className="live-class-title-input"
+                          value={scheduleForm.time}
+                          onChange={(e) => setScheduleForm((p) => ({ ...p, time: e.target.value }))}
+                          required
+                        />
+                      </label>
+                    </div>
+                    <div className="live-class-form-actions">
+                      <button type="submit" className="primary-btn" disabled={isScheduling || !scheduleForm.date || !scheduleForm.time}>
+                        {isScheduling ? 'Scheduling…' : '📅 Set Schedule'}
+                      </button>
+                      <button type="button" className="secondary-btn" onClick={() => { setShowScheduleForm(false); setScheduleForm({ title: '', meetUrl: '', date: '', time: '' }); }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+              </div>
             </div>
           ) : (
             <div className="live-class-active-panel">
@@ -1437,7 +1595,7 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      {courseModalOpen ? (
+      {courseModalOpen ? createPortal(
         <div className="course-modal-backdrop" role="presentation" onClick={(event) => {
           if (event.target === event.currentTarget) closeCourseModal();
         }}>
@@ -1509,9 +1667,9 @@ export default function AdminDashboard() {
             )}
           </section>
         </div>
-      ) : null}
+      , document.body) : null}
 
-      {confirmDialog.open ? (
+      {confirmDialog.open ? createPortal(
         <div className="confirm-modal-backdrop" role="presentation" onClick={(event) => {
           if (event.target === event.currentTarget) closeConfirmDialog();
         }}>
@@ -1546,7 +1704,7 @@ export default function AdminDashboard() {
             </div>
           </section>
         </div>
-      ) : null}
+      , document.body) : null}
 
       {undoPopup ? (
         <aside className="undo-popup" role="status" aria-live="polite">

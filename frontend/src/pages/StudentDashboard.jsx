@@ -38,6 +38,8 @@ export default function StudentDashboard() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [liveClass, setLiveClass] = useState(null); // { active, title, meetUrl, startedAt }
+  const [upcomingClass, setUpcomingClass] = useState(null); // { _id, title, scheduledAt, meetUrl }
+  const [upcomingCountdown, setUpcomingCountdown] = useState('');
 
   const profilePasswordHint =
     profileForm.password.length > 0 && profileForm.password.length < 8
@@ -340,8 +342,10 @@ export default function StudentDashboard() {
         if (!cancelled) {
           if (data.active) {
             setLiveClass(data);
+            setUpcomingClass(null);
           } else {
             setLiveClass(null);
+            setUpcomingClass(data.upcoming || null);
           }
         }
       } catch {
@@ -355,6 +359,25 @@ export default function StudentDashboard() {
       window.clearInterval(interval);
     };
   }, []);
+
+  // Live countdown for upcoming class
+  useEffect(() => {
+    if (!upcomingClass) { setUpcomingCountdown(''); return; }
+    function computeCountdown() {
+      const diff = new Date(upcomingClass.scheduledAt).getTime() - Date.now();
+      if (diff <= 0) { setUpcomingCountdown('Starting soon'); return; }
+      const totalMins = Math.floor(diff / 60000);
+      const days = Math.floor(totalMins / 1440);
+      const hours = Math.floor((totalMins % 1440) / 60);
+      const mins = totalMins % 60;
+      if (days > 0) setUpcomingCountdown(`in ${days}d ${hours}h`);
+      else if (hours > 0) setUpcomingCountdown(`in ${hours}h ${mins}m`);
+      else setUpcomingCountdown(`in ${mins}m`);
+    }
+    computeCountdown();
+    const t = window.setInterval(computeCountdown, 30000);
+    return () => window.clearInterval(t);
+  }, [upcomingClass]);
 
   function handleCloseQuizModal() {
     if (moduleQuiz && !quizResult) {
@@ -522,6 +545,45 @@ export default function StudentDashboard() {
           </section>
         ) : null}
 
+        {/* ── Upcoming Class Banner ──────────────────────── */}
+        {!liveClass && upcomingClass ? (
+          <section className="upcoming-class-banner">
+            <div className="upcoming-banner-glow" aria-hidden="true" />
+            <div className="upcoming-banner-left">
+              <div className="upcoming-banner-icon">📅</div>
+              <div className="upcoming-banner-text">
+                <span className="upcoming-banner-label">Upcoming Class</span>
+                <strong className="upcoming-banner-title">{upcomingClass.title}</strong>
+                <span className="upcoming-banner-time">
+                  {(() => {
+                    const d = new Date(upcomingClass.scheduledAt);
+                    const now = new Date();
+                    const isToday = d.toDateString() === now.toDateString();
+                    const isTomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString();
+                    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    if (isToday) return `Today at ${timeStr}`;
+                    if (isTomorrow) return `Tomorrow at ${timeStr}`;
+                    return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ` at ${timeStr}`;
+                  })()}
+                </span>
+              </div>
+            </div>
+            <div className="upcoming-banner-right">
+              <div className="upcoming-countdown-chip">
+                <span className="upcoming-countdown-dot" />
+                <span className="upcoming-countdown-text">{upcomingCountdown}</span>
+              </div>
+              {upcomingClass.meetUrl ? (
+                <a href={upcomingClass.meetUrl} target="_blank" rel="noopener noreferrer" className="upcoming-join-btn">
+                  Set Reminder &rarr;
+                </a>
+              ) : (
+                <span className="upcoming-link-pending">Link coming soon</span>
+              )}
+            </div>
+          </section>
+        ) : null}
+
       <section className="student-tools-row card">
         <label>
           Search modules or lectures
@@ -596,7 +658,7 @@ export default function StudentDashboard() {
         </section>
       ) : null}
 
-      <section className="section-header standalone student-lecture-header">
+      <section id="section-learning" className="section-header standalone student-lecture-header">
         <div>
           <p className="eyebrow">Learning Content</p>
           {selectedModule ? (
@@ -799,7 +861,7 @@ export default function StudentDashboard() {
         </section>
       ) : null}
 
-        <section className="card feedback-form-card">
+        <section id="section-feedback" className="card feedback-form-card">
         <div className="section-header">
           <div>
             <p className="eyebrow">Feedback</p>
@@ -847,35 +909,94 @@ export default function StudentDashboard() {
         </aside>
       ) : null}
 
-      {/* ── Footer ──────────────────────────────────── */}
-      <footer className="student-footer">
-        <div className="footer-grid">
-          <div className="footer-brand-col">
-            <img src={logoImg} alt="Biomics Hub" className="footer-logo" />
-            <p className="footer-tagline">Empowering students with quality science education</p>
+      {/* ── Connect With Us ─────────────────────────── */}
+      <section id="section-connect" className="connect-section">
+        <div className="connect-inner">
+          <div className="connect-text">
+            <p className="connect-eyebrow">Stay Connected</p>
+            <h2 className="connect-heading">Connect With Us</h2>
+            <p className="connect-sub">Follow us for daily biology tips, live class alerts, and exam prep resources.</p>
           </div>
-          <div className="footer-col">
-            <h4>About Us</h4>
-            <p>Biomics Hub is a premier online learning platform for Biology, Chemistry and Life Sciences. We help students excel in NEET, IIT-JAM, CSIR-NET, GATE and school board examinations.</p>
-          </div>
-          <div className="footer-col">
-            <h4>Contact</h4>
-            <p>&#x1F4CD; 123 Science Park, Sector 15<br/>Bhubaneswar, Odisha – 751024</p>
-            <p>&#x1F4DE; +91 98765 43210</p>
-            <p>&#x2709;&#xFE0F; support@biomicshub.in</p>
-          </div>
-          <div className="footer-col">
-            <h4>Quick Links</h4>
-            <ul className="footer-links">
-              <li>Courses</li>
-              <li>Live Classes</li>
-              <li>Study Material</li>
-              <li>Quiz Builder</li>
-            </ul>
+          <div className="connect-cards">
+            <a
+              href="https://www.instagram.com/biomics_hub?igsh=aGJyNzhrOWZkeWV5"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="social-card social-card--instagram"
+            >
+              <span className="social-card-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 1.366.062 2.633.334 3.608 1.31.975.975 1.247 2.242 1.31 3.608.058 1.265.07 1.645.07 4.849s-.012 3.584-.07 4.85c-.062 1.366-.334 2.633-1.31 3.608-.975.975-2.242 1.247-3.608 1.31-1.265.058-1.645.07-4.85.07s-3.584-.012-4.85-.07c-1.366-.062-2.633-.334-3.608-1.31-.975-.975-1.247-2.242-1.31-3.608C2.175 15.584 2.163 15.204 2.163 12s.012-3.584.07-4.85c.062-1.366.334-2.633 1.31-3.608.975-.975 2.242-1.247 3.608-1.31C8.416 2.175 8.796 2.163 12 2.163zm0-2.163C8.741 0 8.332.014 7.052.072 5.197.157 3.355.673 2.014 2.014.673 3.355.157 5.197.072 7.052.014 8.332 0 8.741 0 12c0 3.259.014 3.668.072 4.948.085 1.855.601 3.697 1.942 5.038 1.341 1.341 3.183 1.857 5.038 1.942C8.332 23.986 8.741 24 12 24s3.668-.014 4.948-.072c1.855-.085 3.697-.601 5.038-1.942 1.341-1.341 1.857-3.183 1.942-5.038C23.986 15.668 24 15.259 24 12s-.014-3.668-.072-4.948c-.085-1.855-.601-3.697-1.942-5.038C20.645.673 18.803.157 16.948.072 15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zm0 10.162a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+                </svg>
+              </span>
+              <span className="social-card-label">Instagram</span>
+              <span className="social-card-handle">@biomics_hub</span>
+              <span className="social-card-arrow">↗</span>
+            </a>
+
+            <a
+              href="https://t.me/+WVyK_obKmJ8BbxG6"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="social-card social-card--telegram"
+            >
+              <span className="social-card-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                </svg>
+              </span>
+              <span className="social-card-label">Telegram</span>
+              <span className="social-card-handle">Join our channel</span>
+              <span className="social-card-arrow">↗</span>
+            </a>
+
+            <a
+              href="https://www.youtube.com/@biomicshub5733"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="social-card social-card--youtube"
+            >
+              <span className="social-card-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/>
+                </svg>
+              </span>
+              <span className="social-card-label">YouTube</span>
+              <span className="social-card-handle">@biomicshub5733</span>
+              <span className="social-card-arrow">↗</span>
+            </a>
           </div>
         </div>
-        <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Biomics Hub. All rights reserved.</span>
+      </section>
+
+      {/* ── Footer ──────────────────────────────────── */}
+      <footer className="student-footer">
+        <div className="footer-inner">
+          <div className="footer-brand">
+            <img src={logoImg} alt="Biomics Hub" className="footer-logo" />
+            <div>
+              <p className="footer-brand-name">Biomics Hub</p>
+              <p className="footer-tagline">Empowering students with quality biology &amp; science education.</p>
+            </div>
+          </div>
+
+          <div className="footer-cols">
+            <nav className="footer-col" aria-label="Learn section links">
+              <p className="footer-col-label">Learn</p>
+              <button type="button" className="footer-nav-link" onClick={() => document.getElementById('section-learning')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Learning Content</button>
+              <button type="button" className="footer-nav-link" onClick={() => document.getElementById('section-feedback')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Feedback</button>
+              <button type="button" className="footer-nav-link" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Back to Top ↑</button>
+            </nav>
+            <nav className="footer-col" aria-label="Community section links">
+              <p className="footer-col-label">Community</p>
+              <button type="button" className="footer-nav-link" onClick={() => document.getElementById('section-connect')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Connect with Us</button>
+              <a href="https://www.instagram.com/biomics_hub?igsh=aGJyNzhrOWZkeWV5" target="_blank" rel="noopener noreferrer" className="footer-nav-link footer-nav-link--external">Instagram ↗</a>
+              <a href="https://t.me/+WVyK_obKmJ8BbxG6" target="_blank" rel="noopener noreferrer" className="footer-nav-link footer-nav-link--external">Telegram ↗</a>
+              <a href="https://www.youtube.com/@biomicshub5733" target="_blank" rel="noopener noreferrer" className="footer-nav-link footer-nav-link--external">YouTube ↗</a>
+            </nav>
+          </div>
+
+          <p className="footer-copy">© {new Date().getFullYear()} Biomics Hub. All rights reserved.</p>
         </div>
       </footer>
 

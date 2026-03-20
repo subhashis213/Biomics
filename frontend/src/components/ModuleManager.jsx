@@ -9,7 +9,8 @@ export default function ModuleManager({
   isProcessing = false 
 }) {
   const [newModuleName, setNewModuleName] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  // Auto-open the create form when the course has no modules yet
+  const [showCreateForm, setShowCreateForm] = useState(modules.length === 0);
   const [createError, setCreateError] = useState(null);
 
   function handleCreateModule(e) {

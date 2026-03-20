@@ -10,9 +10,9 @@ export default function AppShell({ title, subtitle, roleLabel, onLogout, childre
       <header className="topbar">
         <div className="topbar-brand">
           <img src={logoImg} alt="Biomics Hub logo" className="topbar-logo" />
-          <div>
-            <p className="eyebrow">Biomics Hub</p>
-            <h1>{title}</h1>
+          <div className="topbar-brand-text">
+            <span className="topbar-site-name">Biomics Hub</span>
+            <h1 className="topbar-title">{title}</h1>
             {subtitle ? <p className="subtitle">{subtitle}</p> : null}
           </div>
         </div>
