@@ -115,10 +115,11 @@ export default function AdminDashboard() {
   async function refreshData() {
     setLoading(true);
     try {
-      const [videoData, studentData, feedbackData] = await Promise.all([
+      const [videoData, studentData, feedbackData, moduleData] = await Promise.all([
         requestJson('/videos'),
         requestJson('/auth/users'),
-        requestJson('/feedback')
+        requestJson('/feedback'),
+        requestJson('/modules')
       ]);
       setVideos(videoData);
       setStudents(studentData.users || []);
@@ -130,6 +131,21 @@ export default function AdminDashboard() {
           m: item.message || ''
         })}`
       })));
+      const modulesByCourse = {};
+      (moduleData.modules || []).forEach((entry) => {
+        const category = String(entry.category || '').trim();
+        const name = String(entry.name || '').trim();
+        if (!category || !name) return;
+        if (!modulesByCourse[category]) modulesByCourse[category] = [];
+        modulesByCourse[category].push(name);
+      });
+      setCourseModules((prev) => {
+        const next = { ...prev };
+        Object.keys(modulesByCourse).forEach((course) => {
+          next[course] = Array.from(new Set(modulesByCourse[course])).sort((a, b) => a.localeCompare(b));
+        });
+        return next;
+      });
     } catch (error) {
       const message = error?.message || 'Failed to load admin data.';
       if (message.toLowerCase().includes('authentication') || message.toLowerCase().includes('forbidden')) {
@@ -499,13 +515,24 @@ export default function AdminDashboard() {
     }
   }
 
-  function handleModuleCreate(moduleName) {
-    setCourseModules((prev) => ({
-      ...prev,
-      [selectedCourse]: Array.from(new Set([...(prev[selectedCourse] || []), moduleName]))
-    }));
-    setSelectedModule(moduleName);
-    setModalStep('upload');
+  async function handleModuleCreate(moduleName) {
+    if (!selectedCourse || !moduleName) return;
+    try {
+      await requestJson('/modules', {
+        method: 'POST',
+        body: JSON.stringify({ category: selectedCourse, name: moduleName })
+      });
+      setCourseModules((prev) => ({
+        ...prev,
+        [selectedCourse]: Array.from(new Set([...(prev[selectedCourse] || []), moduleName]))
+      }));
+      setSelectedModule(moduleName);
+      setModalStep('upload');
+      setModalMessage(null);
+    } catch (error) {
+      setModalMessage({ type: 'error', text: error.message || 'Failed to create module.' });
+      throw error;
+    }
   }
 
   function handleModuleSelect(moduleName) {
@@ -519,6 +546,49 @@ export default function AdminDashboard() {
     setVideoForm({ title: '', description: '', url: '' });
     setModalNoteFile(null);
     setModalMessage(null);
+  }
+
+  async function handleModuleDelete(moduleName) {
+    if (!selectedCourse || !moduleName) return;
+    try {
+      await Promise.all([
+        requestJson('/videos/module', {
+          method: 'DELETE',
+          body: JSON.stringify({ category: selectedCourse, module: moduleName })
+        }),
+        requestJson('/quizzes/module', {
+          method: 'DELETE',
+          body: JSON.stringify({ category: selectedCourse, module: moduleName })
+        }),
+        requestJson('/modules', {
+          method: 'DELETE',
+          body: JSON.stringify({ category: selectedCourse, name: moduleName })
+        })
+      ]);
+      // Remove from local module list
+      setCourseModules((prev) => ({
+        ...prev,
+        [selectedCourse]: (prev[selectedCourse] || []).filter((m) => m !== moduleName)
+      }));
+      // Keep quiz caches in sync immediately so deleted modules do not reappear.
+      setAllAdminQuizzes((current) => current.filter((quiz) => {
+        const sameCategory = (quiz.category || 'General') === selectedCourse;
+        const quizModule = String(quiz.module || '').trim() || 'General';
+        return !(sameCategory && quizModule === moduleName);
+      }));
+      setAdminQuizzes((current) => current.filter((quiz) => {
+        const sameCategory = (quiz.category || 'General') === selectedCourse;
+        const quizModule = String(quiz.module || '').trim() || 'General';
+        return !(sameCategory && quizModule === moduleName);
+      }));
+      await refreshData();
+      await loadAdminQuizzes(quizCategory);
+      setModalMessage({ type: 'success', text: `Module "${moduleName}" and all its content deleted.` });
+      setTimeout(() => setModalMessage(null), 3000);
+    } catch (err) {
+      setModalMessage({ type: 'error', text: err.message || 'Failed to delete module.' });
+      setTimeout(() => setModalMessage(null), 3000);
+    }
   }
 
   function getModulesForCourse(courseName) {
@@ -1234,7 +1304,8 @@ export default function AdminDashboard() {
           <div className="course-grid">
             {COURSE_CATEGORIES.map((course) => {
               const meta = COURSE_META[course] || { icon: '\ud83d\udcda', color: '#6b7280' };
-              const count = videos.filter((v) => (v.category || 'General') === course).length;
+              const lectureCount = videos.filter((v) => (v.category || 'General') === course).length;
+              const moduleCount = getModulesForCourse(course).length;
               return (
                 <button
                   key={course}
@@ -1246,7 +1317,9 @@ export default function AdminDashboard() {
                   <span className="course-tile-icon">{meta.icon}</span>
                   <span className="course-tile-body">
                     <span className="course-tile-label">{course}</span>
-                    <span className="course-tile-count">{count} {count === 1 ? 'lecture' : 'lectures'}</span>
+                    <span className="course-tile-count">
+                      {moduleCount} {moduleCount === 1 ? 'module' : 'modules'} · {lectureCount} {lectureCount === 1 ? 'lecture' : 'lectures'}
+                    </span>
                   </span>
                   <span className="course-tile-plus" aria-hidden="true">+</span>
                 </button>
@@ -1618,7 +1691,10 @@ export default function AdminDashboard() {
                 selectedModule={selectedModule}
                 onModuleSelect={handleModuleSelect}
                 onModuleCreate={handleModuleCreate}
+                onModuleDelete={handleModuleDelete}
                 isProcessing={publishingForCourse}
+                modalMessage={modalMessage}
+                onClearMessage={() => setModalMessage(null)}
               />
             ) : (
               <form className="course-modal-form" onSubmit={handleCreateVideo}>

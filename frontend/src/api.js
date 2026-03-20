@@ -11,6 +11,10 @@ const API_BASE = isLocalhostClient
       ? `${window.location.protocol}//${window.location.hostname}:5002`
       : ''));
 
+export function getApiBase() {
+  return API_BASE;
+}
+
 function buildUrl(path) {
   return `${API_BASE}${path}`;
 }

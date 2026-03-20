@@ -135,6 +135,29 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
   }
 });
 
+// Admin: bulk-delete all quizzes for a category+module
+router.delete('/module', authenticateToken('admin'), async (req, res) => {
+  const { category, module: moduleName } = req.body;
+  if (!category || !moduleName) {
+    return res.status(400).json({ error: 'category and module are required' });
+  }
+  try {
+    const normalizedModule = String(moduleName).trim();
+    const isGeneralModule = normalizedModule.toLowerCase() === 'general';
+    const moduleFilter = isGeneralModule
+      ? { $or: [{ module: 'General' }, { module: '' }, { module: null }, { module: { $exists: false } }] }
+      : { module: normalizedModule };
+    const quizzes = await Quiz.find({ category, ...moduleFilter });
+    const ids = quizzes.map(q => q._id);
+    await Quiz.deleteMany({ _id: { $in: ids } });
+    await QuizAttempt.deleteMany({ quizId: { $in: ids } });
+    return res.json({ message: 'Module quizzes deleted', deletedCount: ids.length });
+  } catch (err) {
+    console.error('[module-quiz-delete]', err.message);
+    return res.status(500).json({ error: 'Failed to delete module quizzes' });
+  }
+});
+
 // Admin: delete quiz
 router.delete('/:id', authenticateToken('admin'), async (req, res) => {
   try {

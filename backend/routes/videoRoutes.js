@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const Video = require('../models/Video');
+const Module = require('../models/Module');
 const User = require('../models/User');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken } = require('../middleware/auth');
@@ -143,8 +144,14 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     return res.status(400).json({ error: 'Valid course category is required' });
   }
   try {
-    const video = new Video({ title, description, url, category, module: module || 'General' });
+    const normalizedModule = String(module || 'General').trim() || 'General';
+    const video = new Video({ title, description, url, category, module: normalizedModule });
     await video.save();
+    await Module.findOneAndUpdate(
+      { category, name: normalizedModule },
+      { $setOnInsert: { category, name: normalizedModule, createdBy: req.user?.username || '' } },
+      { upsert: true }
+    );
     await logAdminAction(req, {
       action: 'video.create',
       targetType: 'video',
@@ -154,6 +161,43 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     res.status(201).json(video);
   } catch (err) {
     res.status(500).json({ error: 'Failed to upload video' });
+  }
+});
+
+// Bulk-delete all videos for a category+module — admin only
+router.delete('/module', authenticateToken('admin'), async (req, res) => {
+  const { category, module: moduleName } = req.body;
+  if (!category || !moduleName) {
+    return res.status(400).json({ error: 'category and module are required' });
+  }
+  try {
+    const normalizedModule = String(moduleName).trim();
+    const isGeneralModule = normalizedModule.toLowerCase() === 'general';
+    const moduleFilter = isGeneralModule
+      ? { $or: [{ module: 'General' }, { module: '' }, { module: null }, { module: { $exists: false } }] }
+      : { module: normalizedModule };
+    const videos = await Video.find({ category, ...moduleFilter });
+    let deletedCount = 0;
+    for (const video of videos) {
+      if (video.materials && video.materials.length) {
+        video.materials.forEach(m => {
+          const fp = path.join(uploadsDir, path.basename(m.filename));
+          if (fs.existsSync(fp)) fs.unlinkSync(fp);
+        });
+      }
+      await video.deleteOne();
+      deletedCount++;
+    }
+    await logAdminAction(req, {
+      action: 'module.delete',
+      targetType: 'module',
+      targetId: `${category}::${normalizedModule}`,
+      details: { category, module: normalizedModule, videosDeleted: deletedCount }
+    });
+    return res.json({ message: `Module deleted`, deletedCount });
+  } catch (err) {
+    console.error('[module-delete]', err.message);
+    return res.status(500).json({ error: 'Failed to delete module' });
   }
 });
 

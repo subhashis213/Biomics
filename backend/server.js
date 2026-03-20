@@ -12,6 +12,7 @@ const authRoutes = require('./routes/authRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const liveClassRoutes = require('./routes/liveClassRoutes');
+const moduleRoutes = require('./routes/moduleRoutes');
 
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || true;
@@ -46,13 +47,14 @@ app.use('/auth', authLimiter, authRoutes);
 app.use('/feedback', feedbackRoutes);
 app.use('/quizzes', quizRoutes);
 app.use('/live', liveClassRoutes);
+app.use('/modules', moduleRoutes);
 
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live')) {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/modules')) {
       return next();
     }
     return res.sendFile(path.join(frontendDistPath, 'index.html'));

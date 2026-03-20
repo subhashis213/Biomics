@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { downloadMaterial, requestJson } from '../api';
+import { downloadMaterial, getApiBase, requestJson } from '../api';
 import logoImg from '../assets/biomics-logo.jpeg';
 import AppShell from '../components/AppShell';
 import { QuizModal } from '../components/QuizModal';
@@ -488,7 +488,7 @@ export default function StudentDashboard() {
   }
 
   const profileAvatarUrl = profile?.avatarUrl
-    ? `${import.meta.env.VITE_API_URL || ''}${profile.avatarUrl}`
+    ? `${getApiBase()}${profile.avatarUrl}`
     : '';
   const profileInitial = (profile?.username || session?.username || 'S').trim().charAt(0).toUpperCase();
 
@@ -1213,7 +1213,12 @@ export default function StudentDashboard() {
                     <button type="submit" className="primary-btn" disabled={isSavingProfile}>
                       {isSavingProfile ? 'Saving...' : 'Save Changes'}
                     </button>
-                    <button type="button" className="secondary-btn" onClick={handleLogout}>
+                    <button type="button" className="profile-logout-btn" onClick={handleLogout}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
                       Logout
                     </button>
                     <button type="button" className="secondary-btn" onClick={() => setProfileOpen(false)}>

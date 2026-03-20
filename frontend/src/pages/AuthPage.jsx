@@ -362,14 +362,14 @@ export default function AuthPage() {
             type="button"
             className="theme-switch"
             onClick={toggleTheme}
-            aria-label={`Switch to ${isLightTheme ? 'Forest Dark' : 'Sage Light'} theme`}
+            aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
             aria-pressed={isLightTheme}
-            title={isLightTheme ? 'Sage Light active' : 'Forest Dark active'}
+            title={isLightTheme ? 'Light theme active' : 'Dark theme active'}
           >
             <span className="theme-switch-track" aria-hidden="true">
               <span className="theme-switch-thumb" />
             </span>
-            <span>{isLightTheme ? 'Sage Light' : 'Forest Dark'}</span>
+            <span>{isLightTheme ? 'Light' : 'Dark'}</span>
           </button>
         </div>
 
