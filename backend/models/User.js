@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema({
 		birthDate: { type: Date }
 	},
 	avatar: {
+		url: { type: String, default: '' },
+		publicId: { type: String, default: '' },
 		filename: { type: String, default: '' },
 		originalName: { type: String, default: '' }
 	},

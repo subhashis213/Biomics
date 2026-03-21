@@ -5,6 +5,7 @@ const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
+const { v2: cloudinary } = require('cloudinary');
 const { z } = require('zod');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
@@ -18,6 +19,20 @@ const OTP_EXPIRY_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES || 5);
 const OTP_COOLDOWN_SECONDS = Number(process.env.OTP_COOLDOWN_SECONDS || 45);
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
 const uploadsDir = path.join(__dirname, '../uploads');
+
+const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+const cloudinaryApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
+const cloudinaryApiSecret = String(process.env.CLOUDINARY_API_SECRET || '').trim();
+const hasCloudinaryConfig = !!(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret);
+
+if (hasCloudinaryConfig) {
+  cloudinary.config({
+    cloud_name: cloudinaryCloudName,
+    api_key: cloudinaryApiKey,
+    api_secret: cloudinaryApiSecret,
+    secure: true
+  });
+}
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -64,8 +79,73 @@ function escapeRegex(value) {
 }
 
 function buildAvatarUrl(user) {
-  const filename = user?.avatar?.filename;
+  const cloudAvatarUrl = String(user?.avatar?.url || '').trim();
+  if (cloudAvatarUrl) return cloudAvatarUrl;
+
+  const rawFilename = user?.avatar?.filename;
+  if (!rawFilename) return '';
+  const filename = path.basename(String(rawFilename));
   return filename ? `/uploads/${encodeURIComponent(filename)}` : '';
+}
+
+function resolveAvatarState(user) {
+  const cloudAvatarUrl = String(user?.avatar?.url || '').trim();
+  if (cloudAvatarUrl) {
+    return { avatarUrl: cloudAvatarUrl, stale: false };
+  }
+
+  const rawFilename = user?.avatar?.filename;
+  if (!rawFilename) {
+    return { avatarUrl: '', stale: false };
+  }
+
+  const filename = path.basename(String(rawFilename));
+  const avatarPath = path.join(uploadsDir, filename);
+  if (!fs.existsSync(avatarPath)) {
+    return { avatarUrl: '', stale: true };
+  }
+
+  return {
+    avatarUrl: `/uploads/${encodeURIComponent(filename)}`,
+    stale: false
+  };
+}
+
+function safelyRemoveFile(filePath) {
+  if (!filePath) return;
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (_) {
+    // Non-fatal cleanup error.
+  }
+}
+
+async function uploadAvatarToCloudinary(localPath) {
+  if (!hasCloudinaryConfig) return null;
+  if (!localPath) throw new Error('Avatar upload path is missing');
+
+  const uploadResult = await cloudinary.uploader.upload(localPath, {
+    folder: 'biomicshub/avatars',
+    resource_type: 'image',
+    overwrite: true
+  });
+
+  return {
+    url: String(uploadResult?.secure_url || '').trim(),
+    publicId: String(uploadResult?.public_id || '').trim()
+  };
+}
+
+async function deleteAvatarFromCloudinary(publicId) {
+  const normalizedPublicId = String(publicId || '').trim();
+  if (!hasCloudinaryConfig || !normalizedPublicId) return;
+  try {
+    await cloudinary.uploader.destroy(normalizedPublicId, { resource_type: 'image' });
+  } catch (_) {
+    // Non-fatal cleanup error.
+  }
 }
 
 function generateOtp() {
@@ -279,13 +359,21 @@ router.get('/me', authenticateToken('user'), async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'Student profile not found' });
 
+    const avatarState = resolveAvatarState(user);
+    if (avatarState.stale) {
+      await User.updateOne(
+        { username: user.username },
+        { $set: { avatar: { url: '', publicId: '', filename: '', originalName: '' } } }
+      );
+    }
+
     return res.json({
       user: {
         username: user.username,
         phone: user.phone,
         class: user.class,
         city: user.city,
-        avatarUrl: buildAvatarUrl(user)
+        avatarUrl: avatarState.avatarUrl
       }
     });
   } catch (err) {
@@ -354,17 +442,39 @@ router.post('/me/avatar', authenticateToken('user'), avatarUpload.single('avatar
     if (!req.file) return res.status(400).json({ error: 'Profile image is required' });
 
     const previousFilename = user.avatar?.filename;
-    user.avatar = {
+    const previousPublicId = user.avatar?.publicId;
+
+    let nextAvatar = {
+      url: '',
+      publicId: '',
       filename: req.file.filename,
       originalName: req.file.originalname || req.file.filename
     };
+
+    if (hasCloudinaryConfig) {
+      const uploadedToCloudinary = await uploadAvatarToCloudinary(req.file.path);
+      if (!uploadedToCloudinary?.url) {
+        return res.status(500).json({ error: 'Cloud avatar upload failed' });
+      }
+      nextAvatar = {
+        url: uploadedToCloudinary.url,
+        publicId: uploadedToCloudinary.publicId,
+        filename: '',
+        originalName: req.file.originalname || req.file.filename
+      };
+    }
+
+    user.avatar = nextAvatar;
     await user.save();
+
+    if (hasCloudinaryConfig) {
+      safelyRemoveFile(req.file.path);
+      await deleteAvatarFromCloudinary(previousPublicId);
+    }
 
     if (previousFilename && previousFilename !== req.file.filename) {
       const previousPath = path.join(uploadsDir, path.basename(previousFilename));
-      if (fs.existsSync(previousPath)) {
-        fs.unlinkSync(previousPath);
-      }
+      safelyRemoveFile(previousPath);
     }
 
     return res.json({
@@ -388,14 +498,15 @@ router.delete('/me/avatar', authenticateToken('user'), async (req, res) => {
     if (!user) return res.status(404).json({ error: 'Student profile not found' });
 
     const previousFilename = user.avatar?.filename;
-    user.avatar = { filename: '', originalName: '' };
+    const previousPublicId = user.avatar?.publicId;
+    user.avatar = { url: '', publicId: '', filename: '', originalName: '' };
     await user.save();
+
+    await deleteAvatarFromCloudinary(previousPublicId);
 
     if (previousFilename) {
       const previousPath = path.join(uploadsDir, path.basename(previousFilename));
-      if (fs.existsSync(previousPath)) {
-        fs.unlinkSync(previousPath);
-      }
+      safelyRemoveFile(previousPath);
     }
 
     return res.json({

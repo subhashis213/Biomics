@@ -109,6 +109,9 @@ SMS_COUNTRY_CODE=+91
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_FROM_NUMBER=+1xxxxxxxxxx
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 ## Installation
@@ -140,6 +143,20 @@ If those variables are not set, it falls back to:
 - Password: `Admin@1234`
 
 In production, the backend also auto-creates the admin account on startup when `ADMIN_USERNAME` and `ADMIN_PASSWORD` are set in the hosting environment.
+
+## Migrate Existing Avatars to Cloudinary (One-Time)
+
+After configuring `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`, run:
+
+```bash
+npm --prefix backend run migrate:avatars
+```
+
+Optional: remove local files after successful upload by setting:
+
+```env
+AVATAR_MIGRATION_DELETE_LOCAL=true
+```
 
 ## Run in Development (Recommended)
 
