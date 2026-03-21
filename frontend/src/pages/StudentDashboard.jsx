@@ -487,8 +487,9 @@ export default function StudentDashboard() {
     }
   }
 
-  const profileAvatarUrl = profile?.avatarUrl
-    ? `${getApiBase()}${profile.avatarUrl}`
+  const rawProfileAvatarUrl = String(profile?.avatarUrl || '').trim();
+  const profileAvatarUrl = rawProfileAvatarUrl
+    ? (/^https?:\/\//i.test(rawProfileAvatarUrl) ? rawProfileAvatarUrl : `${getApiBase()}${rawProfileAvatarUrl}`)
     : '';
   const profileInitial = (profile?.username || session?.username || 'S').trim().charAt(0).toUpperCase();
 
