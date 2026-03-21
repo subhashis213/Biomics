@@ -1,4 +1,4 @@
-import logoImg from '../assets/biomics-logo.jpeg';
+import logoImg from '../assets/biomics-mark.png';
 import { useThemeStore } from '../stores/themeStore';
 
 export default function AppShell({ title, subtitle, roleLabel, onLogout, children, actions }) {
