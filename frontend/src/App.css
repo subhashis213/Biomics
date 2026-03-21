@@ -1294,10 +1294,12 @@ html[data-theme='light'] .field-hint {
   height: 46px;
   border-radius: 50%;
   object-fit: cover;
+  object-position: 50% 22%;
+  background: #ffffff;
   border: 2px solid var(--line-strong);
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-  transform: rotate(90deg);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.45) inset;
+  transform: rotate(0deg);
 }
 .topbar-brand-text {
   display: flex;
@@ -1539,9 +1541,11 @@ html[data-theme='light'] .field-hint {
   height: 46px;
   border-radius: 50%;
   object-fit: cover;
+  object-position: 50% 22%;
+  background: #ffffff;
   border: 2px solid var(--line-strong);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.32);
-  transform: rotate(90deg);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.4) inset;
+  transform: rotate(0deg);
   flex-shrink: 0;
 }
 
