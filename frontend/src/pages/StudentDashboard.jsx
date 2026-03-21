@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { downloadMaterial, getApiBase, requestJson } from '../api';
-import logoImg from '../assets/biomics-mark.png';
+import logoImg from '../assets/biomics-logo.jpeg';
 import AppShell from '../components/AppShell';
 import { QuizModal } from '../components/QuizModal';
 import StatCard from '../components/StatCard';
