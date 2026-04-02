@@ -1067,31 +1067,20 @@ export default function AdminDashboard() {
       subtitle="Publish lectures, attach PDF materials, and review registered student records."
       roleLabel="Admin"
       onLogout={handleLogout}
+      navTitle="Admin Menu"
+      activeNavItemId={activeSection}
+      onNavItemClick={scrollToSection}
+      navItems={[
+        { id: 'section-live-class', icon: '🔴', label: 'Live Class' },
+        { id: 'section-course-manager', icon: '📚', label: 'Courses' },
+        { id: 'section-registered-users', icon: '👥', label: 'Users' },
+        { id: 'section-content-library', icon: '🎬', label: 'Library' },
+        { id: 'section-quiz-builder', icon: '📝', label: 'Quiz Builder' },
+        { id: 'section-feedback', icon: '💬', label: 'Feedback' }
+      ]}
       actions={<StatCard label="Students" value={students.length} />}
     >
       {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
-
-      <nav className="admin-nav-bar" aria-label="Jump to section">
-        {[
-          { id: 'section-live-class',        icon: '🔴', label: 'Live Class'    },
-          { id: 'section-course-manager',    icon: '📚', label: 'Courses'       },
-          { id: 'section-registered-users',  icon: '👥', label: 'Users'         },
-          { id: 'section-content-library',   icon: '🎬', label: 'Library'       },
-          { id: 'section-quiz-builder',      icon: '📝', label: 'Quiz Builder'  },
-          { id: 'section-feedback',          icon: '💬', label: 'Feedback'      },
-        ].map(({ id, icon, label }) => (
-          <button
-            key={id}
-            type="button"
-            className={`admin-nav-pill${activeSection === id ? ' active' : ''}`}
-            onClick={() => scrollToSection(id)}
-          >
-            <span className="admin-nav-pill-icon">{icon}</span>
-            <span className="admin-nav-pill-label">{label}</span>
-            {activeSection === id && <span className="admin-nav-pill-dot" aria-hidden="true" />}
-          </button>
-        ))}
-      </nav>
 
       <section className="dashboard-grid admin-grid">
         {/* ── Live Class Section ──────────────────────────── */}

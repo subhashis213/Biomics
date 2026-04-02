@@ -1,4 +1,5 @@
 require('dotenv').config();
+// Auto-restart trigger
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +14,7 @@ const feedbackRoutes = require('./routes/feedbackRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const liveClassRoutes = require('./routes/liveClassRoutes');
 const moduleRoutes = require('./routes/moduleRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || true;
@@ -48,13 +50,14 @@ app.use('/feedback', feedbackRoutes);
 app.use('/quizzes', quizRoutes);
 app.use('/live', liveClassRoutes);
 app.use('/modules', moduleRoutes);
+app.use('/chat', chatRoutes);
 
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/modules')) {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/modules') || req.path.startsWith('/chat')) {
       return next();
     }
     return res.sendFile(path.join(frontendDistPath, 'index.html'));
@@ -62,6 +65,13 @@ if (fs.existsSync(frontendDistPath)) {
 }
 
 const PORT = process.env.PORT || 5002;
+let serverStarted = false;
+
+function startServer() {
+  if (serverStarted) return;
+  serverStarted = true;
+  app.listen(PORT, () => console.log(`✓ Server running on port ${PORT}`));
+}
 
 // Migration function to ensure all videos have a module field
 async function migrateVideos() {
@@ -117,12 +127,16 @@ async function ensureAdminAccount() {
   }
 }
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 5000 })
   .then(async () => {
     console.log('✓ Connected to MongoDB');
     await migrateVideos();
     await migrateQuizIndexes();
     await ensureAdminAccount();
-    app.listen(PORT, () => console.log(`✓ Server running on port ${PORT}`));
+    startServer();
   })
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => {
+    console.error('MongoDB connection error:', err.message || err);
+    console.warn('⚠ Starting server without database connection. DB-backed endpoints may fail until MongoDB is available.');
+    startServer();
+  });

@@ -704,7 +704,8 @@ router.post('/admin-login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'All fields required' });
   try {
-    const admin = await Admin.findOne({ username: String(username).trim() });
+    const normalizedUsername = String(username).trim();
+    const admin = await Admin.findOne({ username: new RegExp(`^${escapeRegex(normalizedUsername)}$`, 'i') });
     if (!admin) return res.status(400).json({ error: 'Admin not found' });
     const valid = await bcrypt.compare(password, admin.password);
     if (!valid) return res.status(400).json({ error: 'Invalid password' });

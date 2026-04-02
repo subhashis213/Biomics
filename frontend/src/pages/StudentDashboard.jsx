@@ -5,15 +5,19 @@ import logoImg from '../assets/biomics-logo.jpeg';
 import AppShell from '../components/AppShell';
 import { QuizModal } from '../components/QuizModal';
 import StatCard from '../components/StatCard';
-import VideoCard from '../components/VideoCard';
+import FinalWorkingVideoCard from '../components/FinalWorkingVideoCard';
+import StudentChatAgent from '../components/StudentChatAgent';
 import { useCourseData } from '../hooks/useCourseData';
 import { useFeedback } from '../hooks/useFeedback';
 import { useQuizSession } from '../hooks/useQuizSession';
 import { useSessionStore } from '../stores/sessionStore';
+import { useThemeStore } from '../stores/themeStore';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const { session, logout, login } = useSessionStore();
+  const { theme, toggleTheme } = useThemeStore();
+  const isLightTheme = theme === 'light';
 
   const {
     videos, course, favoriteIds, completedIds, quizzes, quizAttempts,
@@ -492,6 +496,12 @@ export default function StudentDashboard() {
     ? (/^https?:\/\//i.test(rawProfileAvatarUrl) ? rawProfileAvatarUrl : `${getApiBase()}${rawProfileAvatarUrl}`)
     : '';
   const profileInitial = (profile?.username || session?.username || 'S').trim().charAt(0).toUpperCase();
+  const studentNavItems = [
+    { id: 'section-overview', icon: '🏠', label: 'Overview' },
+    { id: 'section-learning', icon: '📚', label: 'Learning' },
+    { id: 'section-feedback', icon: '💬', label: 'Feedback' },
+    { id: 'section-connect', icon: '🌐', label: 'Connect' }
+  ];
 
   return (
     <>
@@ -499,6 +509,9 @@ export default function StudentDashboard() {
       title="Student Dashboard"
       subtitle={`Welcome${session?.username ? `, ${session.username}` : ''}. ${course ? `You are enrolled in ${course}.` : ''} Watch lessons and download lecture materials.`}
       roleLabel="Student"
+      navTitle="Student Menu"
+      navItems={studentNavItems}
+      showThemeSwitch={false}
       actions={(
         <div className="profile-trigger-wrap">
           <button
@@ -518,11 +531,19 @@ export default function StudentDashboard() {
             <strong>{profile?.username || session?.username || 'Student'}</strong>
             <span>{profile?.class || course || 'Course unavailable'}</span>
             <span>{profile?.city || 'City unavailable'}</span>
+            <button
+              type="button"
+              className="profile-theme-btn"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
+            >
+              {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+            </button>
           </div>
         </div>
       )}
     >
-      <div className="student-dashboard-view">
+      <div id="section-overview" className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
         {/* ── Live Class Banner ──────────────────────────── */}
@@ -749,9 +770,9 @@ export default function StudentDashboard() {
         </div>
       ) : selectedModule && displayedVideos.length ? (
         // Video Grid View (within selected module)
-        <div className="video-grid">
+        <div className="compact-premium-video-grid">
           {displayedVideos.map((video) => (
-            <VideoCard
+            <FinalWorkingVideoCard
               key={video._id}
               video={video}
               adminMode={false}
@@ -1164,6 +1185,13 @@ export default function StudentDashboard() {
                     <div><span>Course</span><strong>{profile?.class || '-'}</strong></div>
                     <div><span>City</span><strong>{profile?.city || '-'}</strong></div>
                   </div>
+                  <button
+                    type="button"
+                    className="secondary-btn profile-theme-modal-btn"
+                    onClick={toggleTheme}
+                  >
+                    {isLightTheme ? 'Use Dark Theme' : 'Use Light Theme'}
+                  </button>
                 </aside>
 
                 <form className="profile-edit-form" onSubmit={handleSaveProfile}>
@@ -1233,6 +1261,9 @@ export default function StudentDashboard() {
           </section>
         </div>
       ) : null}
+      
+      {/* Student Chat Agent */}
+      <StudentChatAgent />
     </>
   );
 }
