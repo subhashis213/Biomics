@@ -62,6 +62,21 @@ function addMonths(date, months) {
   return next;
 }
 
+function sanitizeReceiptPart(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 12);
+}
+
+function buildRazorpayReceipt(course, moduleName) {
+  // Razorpay receipt must be <= 40 chars and should avoid special chars/spaces.
+  const c = sanitizeReceiptPart(course) || 'course';
+  const m = sanitizeReceiptPart(moduleName) || 'module';
+  return `bh_${c}_${m}_${Date.now()}`.slice(0, 40);
+}
+
 function computeDiscountInPaise(baseAmountInPaise, voucher) {
   if (!voucher) return 0;
   const base = Math.max(0, Number(baseAmountInPaise || 0));
@@ -316,7 +331,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
     const order = await razorpay.orders.create({
       amount: amountInPaise,
       currency: String(pricing.currency || 'INR'),
-      receipt: `course_${course}_${Date.now()}`,
+      receipt: buildRazorpayReceipt(course, targetModuleName),
       notes: {
         username: req.user.username,
         course,
@@ -365,7 +380,19 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       razorpayKeyId
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to create payment order.' });
+    const razorpayDescription = err?.error?.description || err?.description || err?.message || '';
+    if (razorpayDescription) {
+      console.error('[payments/create-order]', razorpayDescription);
+    } else {
+      console.error('[payments/create-order] unknown error');
+    }
+
+    // Return actionable provider error to help diagnose deployment env issues.
+    return res.status(500).json({
+      error: razorpayDescription
+        ? `Failed to create payment order: ${razorpayDescription}`
+        : 'Failed to create payment order.'
+    });
   }
 });
 
