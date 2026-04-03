@@ -3104,12 +3104,12 @@ html[data-theme='light'] .field-hint {
 .course-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 3600;
   background: var(--bg-overlay);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: clamp(96px, 12vh, 132px) 20px 20px;
+  padding: clamp(108px, 13vh, 148px) 20px 20px;
   overflow: hidden;
   overscroll-behavior: none;
   animation: backdrop-fade-in 220ms ease both;
@@ -3123,6 +3123,24 @@ html[data-theme='light'] .field-hint {
   -webkit-overflow-scrolling: touch;
   padding: 20px 22px;
   animation: modal-slide-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (max-width: 1024px) {
+  .course-modal-backdrop {
+    padding: clamp(96px, 11vh, 128px) 16px 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .course-modal-backdrop {
+    padding: clamp(88px, 10vh, 112px) 12px 12px;
+  }
+
+  .course-modal {
+    width: min(680px, 100%);
+    max-height: min(84vh, 780px);
+    padding: 16px 14px;
+  }
 }
 
 .course-modal .modal-header {
