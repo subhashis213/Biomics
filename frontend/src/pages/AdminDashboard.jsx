@@ -1031,12 +1031,32 @@ export default function AdminDashboard() {
     }
     setIsSavingModulePrice(true);
     try {
-      await saveModulePricingAdmin(courseName, moduleName, {
+      const payload = {
         proPriceInPaise: Math.round(proRupees * 100),
         elitePriceInPaise: Math.round(eliteRupees * 100),
         currency: 'INR',
         active: form.active !== false
+      };
+      await saveModulePricingAdmin(courseName, moduleName, payload);
+      // Immediately update form state with saved values to show confirmation
+      setModulePricingByCourse((prev) => {
+        const courseData = prev[courseName] || { modules: [], priceFormByModule: {} };
+        return {
+          ...prev,
+          [courseName]: {
+            ...courseData,
+            priceFormByModule: {
+              ...courseData.priceFormByModule,
+              [moduleName]: {
+                proAmountRupees: String(payload.proPriceInPaise / 100),
+                eliteAmountRupees: String(payload.elitePriceInPaise / 100),
+                active: payload.active
+              }
+            }
+          }
+        };
       });
+      // Refresh full list to catch any normalization or new module additions
       await loadModulePricing(courseName);
       setPricingInlineStatus(statusKey, 'success', 'Saved');
       setBanner({ type: 'success', text: `Pricing saved for ${moduleName}.` });

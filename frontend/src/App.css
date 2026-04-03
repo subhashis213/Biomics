@@ -2540,8 +2540,9 @@ html[data-theme='light'] .field-hint {
 .pricing-input-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-end;
+  margin: 8px 0;
 }
 
 .pricing-input-label {
@@ -2553,16 +2554,19 @@ html[data-theme='light'] .field-hint {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  min-width: 100px;
 }
 
 .pricing-input-label input[type='number'] {
-  width: 110px;
-  padding: 6px 8px;
+  width: 100%;
+  max-width: 130px;
+  padding: 8px 10px;
   border-radius: 7px;
   border: 1px solid var(--border);
   background: var(--bg-input, var(--bg-card-soft));
   color: var(--text-primary);
   font-size: 0.9rem;
+  box-sizing: border-box;
 }
 
 .pricing-active-label {
@@ -2571,7 +2575,14 @@ html[data-theme='light'] .field-hint {
   gap: 6px;
   font-size: 0.82rem;
   color: var(--text-secondary);
-  padding-bottom: 4px;
+  padding-bottom: 6px;
+  min-width: 80px;
+}
+
+.pricing-active-label input[type='checkbox'] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
 }
 
 .pricing-actions-col {
@@ -2607,13 +2618,15 @@ html[data-theme='light'] .field-hint {
 
 .module-pricing-panel {
   border-top: 1px solid var(--border);
-  padding: 14px 4px 4px;
+  padding: 14px 0 4px;
   margin-top: 10px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .module-pricing-table {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -2661,13 +2674,15 @@ html[data-theme='light'] .field-hint {
 }
 
 .module-pricing-input {
-  width: 90px;
-  padding: 5px 7px;
+  width: 80px;
+  max-width: 100%;
+  padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--bg-input, var(--bg-card-soft));
   color: var(--text-primary);
   font-size: 0.85rem;
+  box-sizing: border-box;
 }
 
 .small-btn {
@@ -6530,6 +6545,47 @@ html[data-theme='light'] .empty-note {
   .quiz-exit-actions .danger-btn {
     width: 100%;
   }
+
+  .pricing-input-row {
+    gap: 8px;
+  }
+
+  .pricing-input-label {
+    min-width: 90px;
+  }
+
+  .pricing-input-label input[type='number'] {
+    max-width: 115px;
+  }
+
+  .pricing-active-label {
+    min-width: 70px;
+  }
+
+  .module-pricing-table {
+    font-size: 0.82rem;
+    min-width: 100%;
+  }
+
+  .module-pricing-table th,
+  .module-pricing-table td {
+    padding: 6px 8px;
+  }
+
+  .module-pricing-input {
+    width: 75px;
+    padding: 5px 7px;
+  }
+
+  .module-pricing-action-cell {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .small-btn {
+    padding: 4px 10px;
+    font-size: 0.72rem;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -9585,6 +9641,59 @@ html[data-theme='light'] .premium-materials-panel {
     min-height: 34px;
     font-size: 0.74rem;
     padding: 6px 8px;
+  }
+
+  .pricing-input-row {
+    gap: 6px;
+  }
+
+  .pricing-input-label {
+    min-width: 75px;
+    font-size: 0.68rem;
+  }
+
+  .pricing-input-label input[type='number'] {
+    max-width: 85px;
+    padding: 6px 6px;
+    font-size: 0.85rem;
+  }
+
+  .pricing-active-label {
+    min-width: auto;
+    font-size: 0.75rem;
+    padding-bottom: 2px;
+  }
+
+  .pricing-active-label input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+  }
+
+  .module-pricing-table {
+    font-size: 0.75rem;
+    min-width: 100%;
+  }
+
+  .module-pricing-table th,
+  .module-pricing-table td {
+    padding: 5px 6px;
+  }
+
+  .module-pricing-input {
+    width: 60px;
+    padding: 4px 5px;
+    font-size: 0.75rem;
+  }
+
+  .module-pricing-action-cell {
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .small-btn {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    width: 100%;
   }
 
   .app-side-nav-mobile {
