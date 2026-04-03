@@ -15,6 +15,7 @@ const quizRoutes = require('./routes/quizRoutes');
 const liveClassRoutes = require('./routes/liveClassRoutes');
 const moduleRoutes = require('./routes/moduleRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
 const corsOrigin = process.env.CORS_ORIGIN || true;
@@ -40,7 +41,7 @@ app.use(helmet({
 app.use(cors({ origin: corsOrigin }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   next();
 });
 app.use(express.json());
@@ -51,13 +52,14 @@ app.use('/quizzes', quizRoutes);
 app.use('/live', liveClassRoutes);
 app.use('/modules', moduleRoutes);
 app.use('/chat', chatRoutes);
+app.use('/payments', paymentRoutes);
 
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/modules') || req.path.startsWith('/chat')) {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/modules') || req.path.startsWith('/chat') || req.path.startsWith('/payments')) {
       return next();
     }
     return res.sendFile(path.join(frontendDistPath, 'index.html'));

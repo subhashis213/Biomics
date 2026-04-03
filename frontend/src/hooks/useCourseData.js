@@ -79,6 +79,15 @@ export function useCourseData() {
   return {
     videos: data?.allVideos || [],
     course: data?.profileData?.course || '',
+    access: data?.profileData?.access || {
+      unlocked: true,
+      purchaseRequired: false,
+      allModulesUnlocked: true,
+      unlockedModules: [],
+      bundlePricing: { currency: 'INR', plans: [] },
+      moduleAccess: {},
+      activeMembership: null
+    },
     favoriteIds,
     completedIds,
     quizzes: data?.quizData?.quizzes || [],

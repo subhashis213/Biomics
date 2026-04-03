@@ -344,7 +344,7 @@ export default function VideoCard({
             {video.materials?.length ? (
               video.materials.map((material) => (
                 <div className="download-item" key={material.filename}>
-                  <button type="button" className="download-btn" onClick={() => onDownloadMaterial(material)}>
+                  <button type="button" className="download-btn" onClick={() => onDownloadMaterial({ ...material, _videoId: video._id })}>
                     Download {material.name}
                   </button>
                   {typeof downloadProgress?.[material.filename] === 'number' ? (

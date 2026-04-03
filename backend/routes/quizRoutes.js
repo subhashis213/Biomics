@@ -3,6 +3,7 @@ const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
+const { hasCourseAccess, hasModuleAccess } = require('../utils/courseAccess');
 
 const router = express.Router();
 
@@ -185,7 +186,7 @@ router.get('/', authenticateToken('admin'), async (req, res) => {
 // Student: list available module quizzes for their course
 router.get('/my-course', authenticateToken('user'), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username }, { class: 1, _id: 0 }).lean();
+    const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
 
     const quizzes = await Quiz.find(
@@ -195,9 +196,15 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
       .sort({ module: 1 })
       .lean();
 
+    const accessibleQuizzes = [];
+    for (const quiz of quizzes) {
+      const canAccessModule = await hasModuleAccess(user, quiz.category, quiz.module || 'General');
+      if (canAccessModule) accessibleQuizzes.push(quiz);
+    }
+
     return res.json({
       course: user.class,
-      quizzes: quizzes.map((quiz) => ({
+      quizzes: accessibleQuizzes.map((quiz) => ({
         _id: quiz._id,
         category: quiz.category,
         module: quiz.module,
@@ -221,9 +228,13 @@ router.get('/my-course/quiz/:id', authenticateToken('user'), async (req, res) =>
     const quiz = await Quiz.findById(req.params.id).lean();
     if (!quiz) return res.status(404).json({ error: 'Quiz not found.' });
 
-    const user = await User.findOne({ username: req.user.username }, { class: 1, _id: 0 }).lean();
+    const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
     if (!user?.class || user.class !== quiz.category) {
       return res.status(403).json({ error: 'You are not authorized for this quiz.' });
+    }
+    const canAccess = await hasModuleAccess(user, quiz.category, quiz.module || 'General');
+    if (!canAccess) {
+      return res.status(402).json({ error: 'Please unlock this module to access quizzes.' });
     }
 
     return res.json({
@@ -249,8 +260,12 @@ router.get('/my-course/:module', authenticateToken('user'), async (req, res) => 
     const moduleName = String(req.params.module || '').trim();
     if (!moduleName) return res.status(400).json({ error: 'Module is required.' });
 
-    const user = await User.findOne({ username: req.user.username }, { class: 1, _id: 0 }).lean();
+    const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const canAccess = await hasModuleAccess(user, user.class, moduleName);
+    if (!canAccess) {
+      return res.status(402).json({ error: 'Please unlock this module to access quizzes.' });
+    }
 
     const quizList = await Quiz.find({ category: user.class, module: moduleName }).lean();
     if (!quizList.length) return res.status(404).json({ error: 'Quiz not found for this module.' });
@@ -281,9 +296,13 @@ router.post('/:id/submit', authenticateToken('user'), async (req, res) => {
     const quiz = await Quiz.findById(req.params.id).lean();
     if (!quiz) return res.status(404).json({ error: 'Quiz not found.' });
 
-    const user = await User.findOne({ username: req.user.username }, { class: 1, _id: 0 }).lean();
+    const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
     if (!user?.class || user.class !== quiz.category) {
       return res.status(403).json({ error: 'You are not authorized for this quiz.' });
+    }
+    const canAccess = await hasModuleAccess(user, quiz.category, quiz.module || 'General');
+    if (!canAccess) {
+      return res.status(402).json({ error: 'Please unlock this module to submit quizzes.' });
     }
 
     const normalizedAnswers = quiz.questions.map((_, idx) => {
@@ -339,11 +358,21 @@ router.post('/:id/submit', authenticateToken('user'), async (req, res) => {
 // Student: get recent quiz attempts for score tracking
 router.get('/my-attempts/recent', authenticateToken('user'), async (req, res) => {
   try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const canAccess = await hasCourseAccess(user, user.class);
+    if (!canAccess) return res.json({ attempts: [] });
+
     const attempts = await QuizAttempt.find({ username: req.user.username })
       .sort({ submittedAt: -1 })
       .limit(20)
       .lean();
-    return res.json({ attempts });
+    const filteredAttempts = [];
+    for (const attempt of attempts) {
+      const canAccessModule = await hasModuleAccess(user, attempt.category || user.class, attempt.module || 'General');
+      if (canAccessModule) filteredAttempts.push(attempt);
+    }
+    return res.json({ attempts: filteredAttempts });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch quiz attempts.' });
   }
@@ -352,10 +381,16 @@ router.get('/my-attempts/recent', authenticateToken('user'), async (req, res) =>
 // Student: leaderboard based on each user's best attempt in their course
 router.get('/leaderboard', authenticateToken('user'), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username }, { class: 1, _id: 0 }).lean();
+    const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const canAccess = await hasCourseAccess(user, user.class);
+    if (!canAccess) return res.json({ leaderboard: [], modules: [] });
 
     const moduleFilter = String(req.query.module || '').trim();
+    if (moduleFilter) {
+      const canAccessModule = await hasModuleAccess(user, user.class, moduleFilter);
+      if (!canAccessModule) return res.json({ leaderboard: [], modules: [] });
+    }
     const matchFilter = { category: user.class };
     if (moduleFilter) {
       matchFilter.module = moduleFilter;

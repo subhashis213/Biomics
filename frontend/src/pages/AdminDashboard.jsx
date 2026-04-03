@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { deleteQuiz, fetchAdminQuizzes, requestJson, saveModuleQuiz, uploadMaterial } from '../api';
+import {
+  createVoucherAdmin,
+  deleteQuiz,
+  fetchAdminQuizzes,
+  fetchCoursePricingAdmin,
+  fetchModulePricingAdmin,
+  fetchVouchersAdmin,
+  requestJson,
+  saveCoursePricingAdmin,
+  saveModulePricingAdmin,
+  saveModuleQuiz,
+  updateVoucherAdmin,
+  uploadMaterial
+} from '../api';
 import { MAX_MATERIAL_MB } from '../constants';
 import { clearSession } from '../session';
 import AppShell from '../components/AppShell';
@@ -90,9 +103,30 @@ export default function AdminDashboard() {
     errorText: ''
   });
   const [isConfirmingAction, setIsConfirmingAction] = useState(false);
+  const [coursePricing, setCoursePricing] = useState([]);
+  const [voucherList, setVoucherList] = useState([]);
+  const [priceFormByCourse, setPriceFormByCourse] = useState({});
+  // module-level pricing: { 'GATE': { modules: [...], priceFormByModule: { 'MODULE_A': {...} } } }
+  const [modulePricingByCourse, setModulePricingByCourse] = useState({});
+  const [isSavingModulePrice, setIsSavingModulePrice] = useState(false);
+  const [expandedPricingCourse, setExpandedPricingCourse] = useState(null);
+  const [pricingSaveStatus, setPricingSaveStatus] = useState({});
+  const [voucherForm, setVoucherForm] = useState({
+    code: '',
+    description: '',
+    discountType: 'percent',
+    discountValue: '',
+    maxDiscountInPaise: '',
+    usageLimit: '',
+    validUntil: '',
+    applicableCourses: []
+  });
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+  const [isSavingVoucher, setIsSavingVoucher] = useState(false);
   const [undoItems, setUndoItems] = useState({});
   const undoTimeoutsRef = useRef({});
   const undoIntervalsRef = useRef({});
+  const pricingSaveTimeoutsRef = useRef({});
   const undoActiveRef = useRef(false);
   const confirmActionRef = useRef(null);
   const bannerTimeoutRef = useRef(null);
@@ -110,33 +144,92 @@ export default function AdminDashboard() {
     }
   }
 
+  function getPricingStatusKey(courseName, moduleName = 'ALL_MODULES') {
+    return `${courseName}::${moduleName}`;
+  }
+
+  function clearPricingSaveStatus(key) {
+    if (pricingSaveTimeoutsRef.current[key]) {
+      clearTimeout(pricingSaveTimeoutsRef.current[key]);
+      delete pricingSaveTimeoutsRef.current[key];
+    }
+    setPricingSaveStatus((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function setPricingInlineStatus(key, type, text) {
+    if (pricingSaveTimeoutsRef.current[key]) {
+      clearTimeout(pricingSaveTimeoutsRef.current[key]);
+      delete pricingSaveTimeoutsRef.current[key];
+    }
+
+    setPricingSaveStatus((current) => ({
+      ...current,
+      [key]: { type, text }
+    }));
+
+    if (type === 'success') {
+      pricingSaveTimeoutsRef.current[key] = setTimeout(() => {
+        clearPricingSaveStatus(key);
+      }, 2200);
+    }
+  }
+
   async function refreshData() {
     setLoading(true);
     try {
-      const [videoData, studentData, feedbackData, moduleData] = await Promise.all([
+      const [videoResult, studentResult, feedbackResult, moduleResult] = await Promise.allSettled([
         requestJson('/videos'),
         requestJson('/auth/users'),
         requestJson('/feedback'),
         requestJson('/modules')
       ]);
-      setVideos(videoData);
-      setStudents(studentData.users || []);
-      setFeedback((feedbackData.feedback || []).map((item) => ({
-        ...item,
-        _id: item._id || item.id || `meta:${JSON.stringify({
-          u: item.username,
-          c: item.createdAt,
-          m: item.message || ''
-        })}`
-      })));
+
+      const authError = [videoResult, studentResult, feedbackResult, moduleResult]
+        .filter((result) => result.status === 'rejected')
+        .map((result) => result.reason?.message || '')
+        .find((message) => /authentication|forbidden/i.test(message));
+
+      if (authError) {
+        clearSession();
+        navigate('/', { replace: true });
+        return;
+      }
+
+      if (videoResult.status === 'fulfilled') {
+        setVideos(Array.isArray(videoResult.value) ? videoResult.value : []);
+      }
+
+      if (studentResult.status === 'fulfilled') {
+        setStudents(studentResult.value?.users || []);
+      }
+
+      if (feedbackResult.status === 'fulfilled') {
+        setFeedback((feedbackResult.value?.feedback || []).map((item) => ({
+          ...item,
+          _id: item._id || item.id || `meta:${JSON.stringify({
+            u: item.username,
+            c: item.createdAt,
+            m: item.message || ''
+          })}`
+        })));
+      }
+
       const modulesByCourse = {};
-      (moduleData.modules || []).forEach((entry) => {
-        const category = String(entry.category || '').trim();
-        const name = String(entry.name || '').trim();
-        if (!category || !name) return;
-        if (!modulesByCourse[category]) modulesByCourse[category] = [];
-        modulesByCourse[category].push(name);
-      });
+      if (moduleResult.status === 'fulfilled') {
+        (moduleResult.value?.modules || []).forEach((entry) => {
+          const category = String(entry.category || '').trim();
+          const name = String(entry.name || '').trim();
+          if (!category || !name) return;
+          if (!modulesByCourse[category]) modulesByCourse[category] = [];
+          modulesByCourse[category].push(name);
+        });
+      }
+
       setCourseModules((prev) => {
         const next = { ...prev };
         Object.keys(modulesByCourse).forEach((course) => {
@@ -144,6 +237,14 @@ export default function AdminDashboard() {
         });
         return next;
       });
+
+      const failures = [videoResult, studentResult, feedbackResult, moduleResult]
+        .filter((result) => result.status === 'rejected')
+        .map((result) => result.reason?.message || 'Request failed');
+
+      if (failures.length) {
+        setBanner({ type: 'error', text: failures[0] });
+      }
     } catch (error) {
       const message = error?.message || 'Failed to load admin data.';
       if (message.toLowerCase().includes('authentication') || message.toLowerCase().includes('forbidden')) {
@@ -159,6 +260,39 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     refreshData();
+  }, []);
+
+  async function loadPaymentSettings() {
+    try {
+      const [pricingRes, voucherRes] = await Promise.all([
+        fetchCoursePricingAdmin(),
+        fetchVouchersAdmin()
+      ]);
+      const pricing = pricingRes?.pricing || [];
+      setCoursePricing(pricing);
+      setVoucherList(voucherRes?.vouchers || []);
+
+      const nextPriceForm = {};
+      COURSE_CATEGORIES.forEach((category) => {
+        // Find the ALL_MODULES (bundle) doc for this course
+        const matched = pricing.find(
+          (entry) => String(entry.category || '').trim() === category
+            && String(entry.moduleName || '').trim() === 'ALL_MODULES'
+        );
+        nextPriceForm[category] = {
+          proAmountRupees: matched ? String(Number(matched.proPriceInPaise || 0) / 100) : '0',
+          eliteAmountRupees: matched ? String(Number(matched.elitePriceInPaise || 0) / 100) : '0',
+          active: matched ? matched.active !== false : true
+        };
+      });
+      setPriceFormByCourse(nextPriceForm);
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load payment settings.' });
+    }
+  }
+
+  useEffect(() => {
+    loadPaymentSettings();
   }, []);
 
   async function fetchLiveStatus() {
@@ -268,6 +402,7 @@ export default function AdminDashboard() {
       }
       Object.values(undoTimeoutsRef.current).forEach(timeoutId => clearTimeout(timeoutId));
       Object.values(undoIntervalsRef.current).forEach(intervalId => clearInterval(intervalId));
+      Object.values(pricingSaveTimeoutsRef.current).forEach(timeoutId => clearTimeout(timeoutId));
       clearQuizMessageTimers();
     };
   }, []);
@@ -530,6 +665,7 @@ export default function AdminDashboard() {
         method: 'POST',
         body: JSON.stringify({ category: selectedCourse, name: moduleName })
       });
+      await refreshData();
       setCourseModules((prev) => ({
         ...prev,
         [selectedCourse]: Array.from(new Set([...(prev[selectedCourse] || []), moduleName]))
@@ -537,6 +673,9 @@ export default function AdminDashboard() {
       setSelectedModule(moduleName);
       setModalStep('upload');
       setModalMessage(null);
+      if (expandedPricingCourse === selectedCourse) {
+        await loadModulePricing(selectedCourse);
+      }
     } catch (error) {
       setModalMessage({ type: 'error', text: error.message || 'Failed to create module.' });
       throw error;
@@ -590,6 +729,9 @@ export default function AdminDashboard() {
         return !(sameCategory && quizModule === moduleName);
       }));
       await refreshData();
+      if (expandedPricingCourse === selectedCourse) {
+        await loadModulePricing(selectedCourse);
+      }
       await loadAdminQuizzes(quizCategory);
       setModalMessage({ type: 'success', text: `Module "${moduleName}" and all its content deleted.` });
       setTimeout(() => setModalMessage(null), 3000);
@@ -823,6 +965,162 @@ export default function AdminDashboard() {
     navigate('/', { replace: true });
   }
 
+  async function handleSaveCoursePrice(courseName) {
+    const statusKey = getPricingStatusKey(courseName);
+    const form = priceFormByCourse[courseName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+    const proRupees = Number(form.proAmountRupees || 0);
+    const eliteRupees = Number(form.eliteAmountRupees || 0);
+    if (!Number.isFinite(proRupees) || proRupees < 0 || !Number.isFinite(eliteRupees) || eliteRupees < 0) {
+      setPricingInlineStatus(statusKey, 'error', 'Invalid amount');
+      setBanner({ type: 'error', text: `Invalid price for ${courseName}.` });
+      return;
+    }
+    setIsSavingPricing(true);
+    try {
+      await saveCoursePricingAdmin(courseName, {
+        proPriceInPaise: Math.round(proRupees * 100),
+        elitePriceInPaise: Math.round(eliteRupees * 100),
+        currency: 'INR',
+        active: form.active !== false
+      });
+      await loadPaymentSettings();
+      if (expandedPricingCourse === courseName) {
+        await loadModulePricing(courseName);
+      }
+      setPricingInlineStatus(statusKey, 'success', 'Saved');
+      setBanner({ type: 'success', text: `Bundle pricing saved for ${courseName}.` });
+    } catch (error) {
+      setPricingInlineStatus(statusKey, 'error', error.message || 'Save failed');
+      setBanner({ type: 'error', text: error.message || 'Failed to save pricing.' });
+    } finally {
+      setIsSavingPricing(false);
+    }
+  }
+
+  async function loadModulePricing(courseName) {
+    try {
+      const res = await fetchModulePricingAdmin(courseName);
+      const modules = res?.modules || [];
+      const priceFormByModule = {};
+      modules.forEach((m) => {
+        priceFormByModule[m.moduleName] = {
+          proAmountRupees: String(Number(m.proPriceInPaise || 0) / 100),
+          eliteAmountRupees: String(Number(m.elitePriceInPaise || 0) / 100),
+          active: m.active !== false
+        };
+      });
+      setModulePricingByCourse((prev) => ({
+        ...prev,
+        [courseName]: { modules, priceFormByModule }
+      }));
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load module pricing.' });
+    }
+  }
+
+  async function handleSaveModulePrice(courseName, moduleName) {
+    const statusKey = getPricingStatusKey(courseName, moduleName);
+    const courseData = modulePricingByCourse[courseName];
+    const form = courseData?.priceFormByModule?.[moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+    const proRupees = Number(form.proAmountRupees || 0);
+    const eliteRupees = Number(form.eliteAmountRupees || 0);
+    if (!Number.isFinite(proRupees) || proRupees < 0 || !Number.isFinite(eliteRupees) || eliteRupees < 0) {
+      setPricingInlineStatus(statusKey, 'error', 'Invalid amount');
+      setBanner({ type: 'error', text: `Invalid price for module ${moduleName}.` });
+      return;
+    }
+    setIsSavingModulePrice(true);
+    try {
+      await saveModulePricingAdmin(courseName, moduleName, {
+        proPriceInPaise: Math.round(proRupees * 100),
+        elitePriceInPaise: Math.round(eliteRupees * 100),
+        currency: 'INR',
+        active: form.active !== false
+      });
+      await loadModulePricing(courseName);
+      setPricingInlineStatus(statusKey, 'success', 'Saved');
+      setBanner({ type: 'success', text: `Pricing saved for ${moduleName}.` });
+    } catch (error) {
+      setPricingInlineStatus(statusKey, 'error', error.message || 'Save failed');
+      setBanner({ type: 'error', text: error.message || 'Failed to save module pricing.' });
+    } finally {
+      setIsSavingModulePrice(false);
+    }
+  }
+
+  function updateModulePriceForm(courseName, moduleName, field, value) {
+    clearPricingSaveStatus(getPricingStatusKey(courseName, moduleName));
+    setModulePricingByCourse((prev) => {
+      const courseData = prev[courseName] || { modules: [], priceFormByModule: {} };
+      return {
+        ...prev,
+        [courseName]: {
+          ...courseData,
+          priceFormByModule: {
+            ...courseData.priceFormByModule,
+            [moduleName]: {
+              ...(courseData.priceFormByModule[moduleName] || {}),
+              [field]: value
+            }
+          }
+        }
+      };
+    });
+  }
+
+  async function handleCreateVoucher(event) {
+    event.preventDefault();
+    const code = String(voucherForm.code || '').trim().toUpperCase();
+    const rawDiscountValue = Number(voucherForm.discountValue || 0);
+    const discountValue = voucherForm.discountType === 'fixed'
+      ? Math.round(rawDiscountValue * 100)
+      : rawDiscountValue;
+    if (!code || !discountValue) {
+      setBanner({ type: 'error', text: 'Voucher code and discount value are required.' });
+      return;
+    }
+
+    setIsSavingVoucher(true);
+    try {
+      await createVoucherAdmin({
+        code,
+        description: voucherForm.description,
+        discountType: voucherForm.discountType,
+        discountValue,
+        maxDiscountInPaise: voucherForm.maxDiscountInPaise ? Math.round(Number(voucherForm.maxDiscountInPaise) * 100) : null,
+        usageLimit: voucherForm.usageLimit ? Number(voucherForm.usageLimit) : null,
+        validUntil: voucherForm.validUntil || null,
+        applicableCourses: voucherForm.applicableCourses
+      });
+      setVoucherForm({
+        code: '',
+        description: '',
+        discountType: 'percent',
+        discountValue: '',
+        maxDiscountInPaise: '',
+        usageLimit: '',
+        validUntil: '',
+        applicableCourses: []
+      });
+      await loadPaymentSettings();
+      setBanner({ type: 'success', text: 'Voucher created successfully.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to create voucher.' });
+    } finally {
+      setIsSavingVoucher(false);
+    }
+  }
+
+  async function handleToggleVoucher(voucherId, active) {
+    try {
+      await updateVoucherAdmin(voucherId, { active });
+      await loadPaymentSettings();
+      setBanner({ type: 'success', text: active ? 'Voucher activated.' : 'Voucher disabled.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to update voucher.' });
+    }
+  }
+
   function scrollToSection(sectionId) {
     const node = document.getElementById(sectionId);
     if (node) {
@@ -1048,13 +1346,13 @@ export default function AdminDashboard() {
     { id: 'section-registered-users', label: 'Learners', icon: '👥' },
     { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
     { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
+    { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-feedback', label: 'Feedback', icon: '💬' }
   ];
 
   return (
     <AppShell
       title="Admin Dashboard"
-      subtitle="Publish lectures, attach PDF materials, and review registered student records."
       roleLabel="Admin"
       onLogout={handleLogout}
       navTitle="Admin Sections"
@@ -1637,6 +1935,367 @@ export default function AdminDashboard() {
             <p className="empty-note">No quizzes created for this course yet.</p>
           )}
         </section>
+      </section>
+
+      <section id="section-payment-settings" className="card payment-settings-panel">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Monetization</p>
+            <h2>Course Pricing and Vouchers</h2>
+          </div>
+          <StatCard label="Active Vouchers" value={voucherList.filter((voucher) => voucher.active).length} />
+        </div>
+
+        <div className="dashboard-grid admin-grid">
+          <section className="card">
+            <div className="section-header compact">
+              <div>
+                <p className="eyebrow">Course & Module Pricing</p>
+                <h3>Set Pro &amp; Elite prices per course or module</h3>
+              </div>
+            </div>
+            <p className="empty-note" style={{ marginBottom: '1rem' }}>
+              <strong>Bundle (All Modules)</strong> — unlocks the whole course for Pro (1 month) or Elite (3 months).<br />
+              <strong>Per-Module</strong> — students can also buy access to individual modules. Click "Set Module Prices" to expand.
+            </p>
+            <div className="quiz-admin-items">
+              {COURSE_CATEGORIES.map((courseName) => {
+                const meta = COURSE_META[courseName] || {};
+                const form = priceFormByCourse[courseName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+                const isExpanded = expandedPricingCourse === courseName;
+                const courseModuleData = modulePricingByCourse[courseName];
+                const bundleStatus = pricingSaveStatus[getPricingStatusKey(courseName)] || null;
+
+                return (
+                  <article key={courseName} className="quiz-admin-item pricing-course-item">
+                    {/* ── Bundle row ── */}
+                    <div className="quiz-admin-item-body">
+                      <div className="pricing-course-header">
+                        <span className="pricing-course-icon">{meta.icon || '📚'}</span>
+                        <div>
+                          <strong>{courseName}</strong>
+                          <p className="pricing-course-sub">All Modules Bundle — Pro&nbsp;(1 mo) &amp; Elite&nbsp;(3 mo)</p>
+                        </div>
+                      </div>
+                      <div className="quiz-admin-meta pricing-input-row" aria-label="Bundle pricing">
+                        <label className="pricing-input-label">
+                          <span>Pro (₹/mo)</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={form.proAmountRupees}
+                            onChange={(event) => {
+                              const proAmountRupees = event.target.value;
+                              setPriceFormByCourse((current) => ({
+                                ...current,
+                                [courseName]: { ...(current[courseName] || {}), proAmountRupees }
+                              }));
+                              clearPricingSaveStatus(getPricingStatusKey(courseName));
+                            }}
+                            placeholder="0.00"
+                          />
+                        </label>
+                        <label className="pricing-input-label">
+                          <span>Elite (₹/3 mo)</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={form.eliteAmountRupees}
+                            onChange={(event) => {
+                              const eliteAmountRupees = event.target.value;
+                              setPriceFormByCourse((current) => ({
+                                ...current,
+                                [courseName]: { ...(current[courseName] || {}), eliteAmountRupees }
+                              }));
+                              clearPricingSaveStatus(getPricingStatusKey(courseName));
+                            }}
+                            placeholder="0.00"
+                          />
+                        </label>
+                        <label className="pricing-active-label">
+                          <input
+                            type="checkbox"
+                            checked={form.active !== false}
+                            onChange={(event) => {
+                              const active = event.target.checked;
+                              setPriceFormByCourse((current) => ({
+                                ...current,
+                                [courseName]: { ...(current[courseName] || {}), active }
+                              }));
+                              clearPricingSaveStatus(getPricingStatusKey(courseName));
+                            }}
+                          />
+                          Active
+                        </label>
+                      </div>
+                    </div>
+                    <div className="quiz-admin-item-actions pricing-actions-col">
+                      {bundleStatus ? (
+                        <span className={`pricing-inline-status pricing-inline-status-${bundleStatus.type}`}>{bundleStatus.text}</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="primary-btn"
+                        disabled={isSavingPricing}
+                        onClick={() => handleSaveCoursePrice(courseName)}
+                      >
+                        {isSavingPricing ? 'Saving...' : 'Save Bundle'}
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => {
+                          if (isExpanded) {
+                            setExpandedPricingCourse(null);
+                          } else {
+                            setExpandedPricingCourse(courseName);
+                            if (!modulePricingByCourse[courseName]) {
+                              loadModulePricing(courseName);
+                            }
+                          }
+                        }}
+                      >
+                        {isExpanded ? '▲ Hide Modules' : '▼ Set Module Prices'}
+                      </button>
+                    </div>
+
+                    {/* ── Per-module pricing panel ── */}
+                    {isExpanded && (
+                      <div className="module-pricing-panel">
+                        {!courseModuleData ? (
+                          <p className="empty-note">Loading modules…</p>
+                        ) : courseModuleData.modules.length === 0 ? (
+                          <p className="empty-note">No modules found for {courseName}. Upload videos with module names first.</p>
+                        ) : (
+                          <table className="module-pricing-table">
+                            <thead>
+                              <tr>
+                                <th>Module</th>
+                                <th>Pro Price (₹/1 mo)</th>
+                                <th>Elite Price (₹/3 mo)</th>
+                                <th>Active</th>
+                                <th></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {courseModuleData.modules.filter((mod) => !mod.isBundle).map((mod) => {
+                                const mf = courseModuleData.priceFormByModule[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+                                const moduleStatus = pricingSaveStatus[getPricingStatusKey(courseName, mod.moduleName)] || null;
+                                return (
+                                  <tr key={mod.moduleName}>
+                                    <td>
+                                      <span className="module-pricing-name">
+                                        {mod.label}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        className="module-pricing-input"
+                                        value={mf.proAmountRupees}
+                                        onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'proAmountRupees', e.target.value)}
+                                        placeholder="0.00"
+                                      />
+                                    </td>
+                                    <td>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        className="module-pricing-input"
+                                        value={mf.eliteAmountRupees}
+                                        onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'eliteAmountRupees', e.target.value)}
+                                        placeholder="0.00"
+                                      />
+                                    </td>
+                                    <td>
+                                      <input
+                                        type="checkbox"
+                                        checked={mf.active !== false}
+                                        onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'active', e.target.checked)}
+                                      />
+                                    </td>
+                                    <td>
+                                      <div className="module-pricing-action-cell">
+                                        {moduleStatus ? (
+                                          <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
+                                        ) : null}
+                                        <button
+                                          type="button"
+                                          className="primary-btn small-btn"
+                                          disabled={isSavingModulePrice}
+                                          onClick={() => handleSaveModulePrice(courseName, mod.moduleName)}
+                                        >
+                                          {isSavingModulePrice ? '…' : 'Save'}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="section-header compact">
+              <div>
+                <p className="eyebrow">Vouchers</p>
+                <h3>Create special voucher</h3>
+              </div>
+            </div>
+            <form className="quiz-builder-form" onSubmit={handleCreateVoucher}>
+              <label>
+                Voucher code
+                <input
+                  value={voucherForm.code}
+                  onChange={(event) => setVoucherForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
+                  placeholder="BIO10"
+                  maxLength={20}
+                  required
+                />
+              </label>
+              <label>
+                Description
+                <input
+                  value={voucherForm.description}
+                  onChange={(event) => setVoucherForm((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Optional internal note"
+                />
+              </label>
+              <label>
+                Discount type
+                <select
+                  value={voucherForm.discountType}
+                  onChange={(event) => setVoucherForm((current) => ({ ...current, discountType: event.target.value }))}
+                >
+                  <option value="percent">Percent (%)</option>
+                  <option value="fixed">Fixed (INR)</option>
+                </select>
+              </label>
+              <label>
+                Discount value
+                <input
+                  type="number"
+                  min="1"
+                  step={voucherForm.discountType === 'percent' ? '1' : '0.01'}
+                  value={voucherForm.discountValue}
+                  onChange={(event) => setVoucherForm((current) => ({ ...current, discountValue: event.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Max discount in INR (optional)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={voucherForm.maxDiscountInPaise}
+                  onChange={(event) => setVoucherForm((current) => ({ ...current, maxDiscountInPaise: event.target.value }))}
+                />
+              </label>
+              <label>
+                Usage limit (optional)
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={voucherForm.usageLimit}
+                  onChange={(event) => setVoucherForm((current) => ({ ...current, usageLimit: event.target.value }))}
+                />
+              </label>
+              <label>
+                Valid until (optional)
+                <input
+                  type="datetime-local"
+                  value={voucherForm.validUntil}
+                  onChange={(event) => setVoucherForm((current) => ({ ...current, validUntil: event.target.value }))}
+                />
+              </label>
+
+              <div className="quiz-builder-header-checkbox">
+                <span>Applicable courses</span>
+                {COURSE_CATEGORIES.map((courseName) => {
+                  const selected = voucherForm.applicableCourses.includes(courseName);
+                  return (
+                    <label key={`voucher-course-${courseName}`} className="quiz-inline-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setVoucherForm((current) => ({
+                            ...current,
+                            applicableCourses: checked
+                              ? [...current.applicableCourses, courseName]
+                              : current.applicableCourses.filter((entry) => entry !== courseName)
+                          }));
+                        }}
+                      />
+                      <span>{courseName}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <button className="primary-btn" type="submit" disabled={isSavingVoucher}>
+                {isSavingVoucher ? 'Creating...' : 'Create Voucher'}
+              </button>
+            </form>
+
+            <div className="quiz-admin-list">
+              <div className="section-header compact">
+                <div>
+                  <p className="eyebrow">Voucher List</p>
+                  <h3>Manage special offers</h3>
+                </div>
+              </div>
+              {voucherList.length ? (
+                <div className="quiz-admin-items">
+                  {voucherList.map((voucher) => (
+                    <article key={voucher._id} className="quiz-admin-item">
+                      <div className="quiz-admin-item-body">
+                        <strong>{voucher.code}</strong>
+                        <p>{voucher.description || 'No description'}</p>
+                        <div className="quiz-admin-meta">
+                          <span className="quiz-admin-meta-chip">
+                            {voucher.discountType === 'percent'
+                              ? `${voucher.discountValue}%`
+                              : `Rs ${(Number(voucher.discountValue || 0) / 100).toFixed(2)}`}
+                          </span>
+                          <span className="quiz-admin-meta-chip">Used: {voucher.usedCount || 0}</span>
+                          <span className="quiz-admin-meta-chip">Status: {voucher.active ? 'Active' : 'Disabled'}</span>
+                        </div>
+                      </div>
+                      <div className="quiz-admin-item-actions">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => handleToggleVoucher(voucher._id, !voucher.active)}
+                        >
+                          {voucher.active ? 'Disable' : 'Enable'}
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty-note">No vouchers created yet.</p>
+              )}
+            </div>
+          </section>
+        </div>
       </section>
 
       <section id="section-feedback" className="card feedback-list-card">

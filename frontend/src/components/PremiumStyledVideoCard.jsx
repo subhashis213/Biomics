@@ -609,7 +609,7 @@ export default function PremiumStyledVideoCard({
                     </div>
                     <button 
                       className="compact-premium-download-btn"
-                      onClick={() => onDownloadMaterial(material)}
+                      onClick={() => onDownloadMaterial({ ...material, _videoId: video._id })}
                     >
                       <svg viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19 9h-4V3H9v6h4l7 7 7-7z"/>

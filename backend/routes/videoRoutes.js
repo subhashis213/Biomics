@@ -8,6 +8,17 @@ const Module = require('../models/Module');
 const User = require('../models/User');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken } = require('../middleware/auth');
+const {
+  ALL_MODULES,
+  getActiveCourseMembership,
+  getActiveModuleMembership,
+  getCoursePricingDocs,
+  getPlanPriceInPaise,
+  hasModuleAccess,
+  MEMBERSHIP_PLANS,
+  normalizeCourseName,
+  normalizeModuleName
+} = require('../utils/courseAccess');
 
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -43,6 +54,74 @@ function sanitizeIdList(items = []) {
   return items.map((item) => String(item));
 }
 
+async function getUserCourseAccessSnapshot(user) {
+  const course = normalizeCourseName(user?.class);
+  const [pricingDocs, modules] = await Promise.all([
+    getCoursePricingDocs(course),
+    Module.find({ category: course }).sort({ name: 1 }).lean()
+  ]);
+  const pricingByModule = new Map(pricingDocs.map((entry) => [normalizeModuleName(entry.moduleName), entry]));
+  const bundlePricing = pricingByModule.get(ALL_MODULES) || null;
+  const buildPlans = (pricing) => Object.values(MEMBERSHIP_PLANS).map((plan) => ({
+    type: plan.type,
+    label: plan.label,
+    durationMonths: plan.durationMonths,
+    amountInPaise: getPlanPriceInPaise(pricing, plan.type)
+  }));
+  const moduleNames = Array.from(new Set([
+    ...modules.map((entry) => normalizeModuleName(entry.name)),
+    ...pricingDocs.map((entry) => normalizeModuleName(entry.moduleName)).filter((moduleName) => moduleName !== ALL_MODULES)
+  ])).sort((left, right) => left.localeCompare(right));
+  const moduleAccess = {};
+  moduleNames.forEach((moduleName) => {
+    const pricing = pricingByModule.get(moduleName) || null;
+    const activeMembership = getActiveModuleMembership(user, course, moduleName);
+    const purchaseRequired = Boolean(pricing && buildPlans(pricing).some((plan) => plan.amountInPaise > 0));
+    moduleAccess[moduleName] = {
+      unlocked: !purchaseRequired || Boolean(activeMembership),
+      purchaseRequired,
+      pricing: {
+        currency: String(pricing?.currency || bundlePricing?.currency || 'INR'),
+        plans: buildPlans(pricing)
+      },
+      activeMembership: activeMembership
+        ? {
+            moduleName: normalizeModuleName(activeMembership.moduleName) || moduleName,
+            planType: activeMembership.planType || 'pro',
+            expiresAt: activeMembership.expiresAt || null,
+            unlockedAt: activeMembership.unlockedAt || null
+          }
+        : null
+    };
+  });
+  const purchaseRequired = Boolean(
+    (bundlePricing && buildPlans(bundlePricing).some((plan) => plan.amountInPaise > 0))
+    || Object.values(moduleAccess).some((entry) => entry.purchaseRequired)
+  );
+  const unlocked = Boolean(getActiveModuleMembership(user, course, ALL_MODULES));
+  const activeMembership = getActiveCourseMembership(user, course);
+  return {
+    course,
+    unlocked,
+    purchaseRequired,
+    allModulesUnlocked: unlocked,
+    unlockedModules: unlocked ? moduleNames : moduleNames.filter((moduleName) => moduleAccess[moduleName]?.unlocked),
+    bundlePricing: {
+      currency: String(bundlePricing?.currency || 'INR'),
+      plans: buildPlans(bundlePricing)
+    },
+    moduleAccess,
+    activeMembership: activeMembership
+      ? {
+          moduleName: normalizeModuleName(activeMembership.moduleName) || ALL_MODULES,
+          planType: activeMembership.planType || 'pro',
+          expiresAt: activeMembership.expiresAt || null,
+          unlockedAt: activeMembership.unlockedAt || null
+        }
+      : null
+  };
+}
+
 // Get all videos
 router.get('/', async (req, res) => {
   try {
@@ -60,18 +139,20 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
   try {
     const user = await User.findOne(
       { username: req.user.username },
-      { class: 1, favorites: 1, completedVideos: 1, _id: 0 }
+      { class: 1, favorites: 1, completedVideos: 1, purchasedCourses: 1, _id: 0 }
     ).lean();
     if (!user || !user.class) {
       return res.status(404).json({ error: 'Student profile not found' });
     }
 
+    const access = await getUserCourseAccessSnapshot(user);
     const videos = await Video.find({ category: user.class }).sort({ uploadedAt: -1 });
     return res.json({
       course: user.class,
       videos,
       favorites: sanitizeIdList(user.favorites || []),
-      completedVideos: sanitizeIdList(user.completedVideos || [])
+      completedVideos: sanitizeIdList(user.completedVideos || []),
+      access
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch course videos' });
@@ -81,11 +162,13 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
 // Student-only: toggle favorite for quick access
 router.post('/:id/favorite', authenticateToken('user'), async (req, res) => {
   try {
-    const video = await Video.findById(req.params.id, { _id: 1 }).lean();
+    const video = await Video.findById(req.params.id, { _id: 1, category: 1 }).lean();
     if (!video) return res.status(404).json({ error: 'Video not found' });
 
     const user = await User.findOne({ username: req.user.username });
     if (!user) return res.status(404).json({ error: 'Student profile not found.' });
+    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General');
+    if (!canAccess) return res.status(402).json({ error: 'Please unlock this module to access lectures.' });
 
     const videoId = String(video._id);
     const currentFavorites = new Set(sanitizeIdList(user.favorites || []));
@@ -112,11 +195,13 @@ router.post('/:id/progress', authenticateToken('user'), async (req, res) => {
     const { completed } = req.body || {};
     const shouldComplete = Boolean(completed);
 
-    const video = await Video.findById(req.params.id, { _id: 1 }).lean();
+    const video = await Video.findById(req.params.id, { _id: 1, category: 1 }).lean();
     if (!video) return res.status(404).json({ error: 'Video not found' });
 
     const user = await User.findOne({ username: req.user.username });
     if (!user) return res.status(404).json({ error: 'Student profile not found.' });
+    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General');
+    if (!canAccess) return res.status(402).json({ error: 'Please unlock this module to track progress.' });
 
     const videoId = String(video._id);
     const completedSet = new Set(sanitizeIdList(user.completedVideos || []));
@@ -243,6 +328,35 @@ router.post('/:id/materials', authenticateToken('admin'), upload.single('materia
     res.json(video);
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to add material' });
+  }
+});
+
+// Student-only: protected material download
+router.get('/:id/materials/:filename/download', authenticateToken('user'), async (req, res) => {
+  try {
+    const filename = path.basename(String(req.params.filename || ''));
+    if (!filename) return res.status(400).json({ error: 'Material filename is required.' });
+
+    const [video, user] = await Promise.all([
+      Video.findById(req.params.id, { category: 1, materials: 1 }).lean(),
+      User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1 }).lean()
+    ]);
+
+    if (!video) return res.status(404).json({ error: 'Video not found.' });
+    if (!user) return res.status(404).json({ error: 'Student profile not found.' });
+
+    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General');
+    if (!canAccess) return res.status(402).json({ error: 'Please unlock this module to access study materials.' });
+
+    const material = (video.materials || []).find((entry) => String(entry.filename || '') === filename);
+    if (!material) return res.status(404).json({ error: 'Material not found for this lecture.' });
+
+    const filePath = path.join(uploadsDir, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Material file missing on server.' });
+
+    return res.download(filePath, material.name || filename);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to download material.' });
   }
 });
 

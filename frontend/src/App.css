@@ -2470,6 +2470,373 @@ html[data-theme='light'] .field-hint {
   font-size: 0.78rem;
 }
 
+.quiz-admin-meta input {
+  min-width: 110px;
+  max-width: 148px;
+}
+
+.membership-status-banner {
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 88%, transparent), color-mix(in srgb, #10b981 12%, var(--bg-card-soft)));
+}
+
+.membership-lock-panel {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #f59e0b 32%, var(--line));
+  background:
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(79, 70, 229, 0.18), transparent 36%),
+    linear-gradient(155deg, color-mix(in srgb, var(--bg-card) 96%, transparent), color-mix(in srgb, var(--bg-card-soft) 92%, transparent));
+}
+
+.module-membership-lock-panel {
+  margin-top: 6px;
+}
+
+.membership-target-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.membership-target-switch .secondary-btn.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-card-soft));
+  color: var(--text-main);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* ── Module Pricing Table (Admin) ───────────────────── */
+.pricing-course-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.pricing-course-item .quiz-admin-item-body,
+.pricing-course-item .quiz-admin-item-actions {
+  width: 100%;
+}
+
+.pricing-course-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pricing-course-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.pricing-course-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.pricing-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.pricing-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pricing-input-label input[type='number'] {
+  width: 110px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-input, var(--bg-card-soft));
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.pricing-active-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding-bottom: 4px;
+}
+
+.pricing-actions-col {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 0 4px;
+}
+
+.pricing-inline-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.pricing-inline-status-success {
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+
+.pricing-inline-status-error {
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.24);
+}
+
+.module-pricing-panel {
+  border-top: 1px solid var(--border);
+  padding: 14px 4px 4px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.module-pricing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.module-pricing-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.module-pricing-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  vertical-align: middle;
+}
+
+.module-pricing-action-cell {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.module-pricing-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.module-pricing-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--bg-card-soft) 60%, transparent);
+}
+
+.module-pricing-bundle-row td {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-weight: 600;
+}
+
+.module-pricing-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.module-pricing-input {
+  width: 90px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-input, var(--bg-card-soft));
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.small-btn {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+}
+
+.membership-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.membership-plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, var(--bg-card-soft) 92%, transparent));
+  color: var(--text-main);
+  text-align: left;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.membership-plan-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  pointer-events: none;
+}
+
+.membership-plan-card:hover {
+  transform: translateY(-2px);
+}
+
+.membership-plan-card.pro {
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.12);
+}
+
+.membership-plan-card.elite {
+  border: 2px solid rgba(251, 191, 36, 0.72);
+  box-shadow: 0 26px 50px rgba(245, 158, 11, 0.34), 0 0 0 1px rgba(251, 191, 36, 0.24) inset;
+  background:
+    radial-gradient(circle at top right, rgba(251, 191, 36, 0.34), transparent 36%),
+    radial-gradient(circle at 14% 10%, rgba(254, 240, 138, 0.22), transparent 26%),
+    linear-gradient(152deg, rgba(60, 40, 10, 0.96), rgba(35, 26, 10, 0.98));
+}
+
+.membership-plan-card.elite .membership-plan-price {
+  color: #fef3c7;
+  text-shadow: 0 6px 18px rgba(245, 158, 11, 0.28);
+}
+
+.membership-plan-card.elite .membership-plan-badge {
+  border-color: rgba(251, 191, 36, 0.72);
+  background: rgba(251, 191, 36, 0.14);
+  color: #fef3c7;
+}
+
+.membership-plan-card.elite .membership-plan-kicker,
+.membership-plan-card.elite .membership-plan-duration,
+.membership-plan-card.elite .membership-plan-points li {
+  color: rgba(255, 247, 215, 0.92);
+}
+
+.membership-plan-card.selected {
+  border-color: color-mix(in srgb, #f8fafc 18%, var(--accent));
+  box-shadow: 0 24px 48px color-mix(in srgb, var(--accent) 24%, transparent);
+  transform: translateY(-4px) scale(1.01);
+}
+
+.membership-plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.membership-plan-kicker {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-soft);
+}
+
+.membership-plan-badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #ffffff 16%, transparent);
+  background: color-mix(in srgb, #ffffff 10%, transparent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.membership-plan-elite-flag {
+  margin-left: auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.6);
+  background: linear-gradient(120deg, rgba(250, 204, 21, 0.22), rgba(251, 191, 36, 0.12));
+  color: #fff4ca;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.membership-plan-price {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.membership-plan-duration {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+.membership-plan-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.membership-plan-points li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+.membership-plan-points li::before {
+  content: '✦';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: color-mix(in srgb, #f59e0b 72%, var(--accent));
+}
+
+.membership-actions-row {
+  align-items: center;
+}
+
+.membership-actions-row input {
+  flex: 1 1 220px;
+}
+
+@media (max-width: 720px) {
+  .membership-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .membership-plan-card {
+    padding: 16px;
+  }
+}
+
 /* ── Course manager grid ────────────────────────────── */
 .course-grid {
   display: grid;
@@ -4075,6 +4442,18 @@ th {
   border-color: var(--accent);
   transform: translateY(-5px) scale(1.01);
   box-shadow: 0 16px 32px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.module-card-btn.module-card-btn-locked {
+  border-color: color-mix(in srgb, #f59e0b 42%, var(--line));
+  background:
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.14), transparent 30%),
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, #f59e0b 7%, var(--bg-card-soft)));
+}
+
+.module-card-btn.module-card-btn-locked:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 16px 32px rgba(245, 158, 11, 0.18);
 }
 
 .module-card-btn:active {

@@ -95,11 +95,13 @@ export function uploadMaterial(videoId, file, onProgress) {
   });
 }
 
-export function downloadMaterial(filename, displayName, onProgress) {
+export function downloadMaterial(videoId, filename, displayName, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', buildUrl(`/uploads/${encodeURIComponent(filename)}`), true);
+    xhr.open('GET', buildUrl(`/videos/${encodeURIComponent(videoId)}/materials/${encodeURIComponent(filename)}/download`), true);
     xhr.responseType = 'blob';
+    const token = getToken();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
     xhr.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -185,4 +187,62 @@ export function fetchAdminQuizzes(category) {
 
 export function deleteQuiz(quizId) {
   return requestJson(`/quizzes/${quizId}`, { method: 'DELETE' });
+}
+
+export function fetchMyCoursePaymentInfo() {
+  return requestJson('/payments/my-course');
+}
+
+export function createCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES') {
+  return requestJson('/payments/create-order', {
+    method: 'POST',
+    body: JSON.stringify({ planType, voucherCode, moduleName })
+  });
+}
+
+export function verifyCoursePayment(payload) {
+  return requestJson('/payments/verify', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchCoursePricingAdmin() {
+  return requestJson('/payments/admin/pricing');
+}
+
+export function saveCoursePricingAdmin(course, payload) {
+  return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchModulePricingAdmin(course) {
+  return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}/modules`);
+}
+
+export function saveModulePricingAdmin(course, moduleName, payload) {
+  return requestJson(
+    `/payments/admin/pricing/${encodeURIComponent(course)}/${encodeURIComponent(moduleName)}`,
+    { method: 'PUT', body: JSON.stringify(payload) }
+  );
+}
+
+export function fetchVouchersAdmin() {
+  return requestJson('/payments/admin/vouchers');
+}
+
+export function createVoucherAdmin(payload) {
+  return requestJson('/payments/admin/vouchers', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateVoucherAdmin(voucherId, payload) {
+  return requestJson(`/payments/admin/vouchers/${encodeURIComponent(voucherId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
 }

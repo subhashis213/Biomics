@@ -19,6 +19,14 @@ const userSchema = new mongoose.Schema({
 	password: { type: String, required: true },
 	favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Video' }],
 	completedVideos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Video' }],
+	purchasedCourses: [{
+		course: { type: String, required: true, trim: true },
+		moduleName: { type: String, trim: true, default: 'ALL_MODULES' },
+		planType: { type: String, enum: ['pro', 'elite'], default: 'pro' },
+		unlockedAt: { type: Date, default: Date.now },
+		expiresAt: { type: Date, default: null },
+		paymentId: { type: String, default: '' }
+	}],
 });
 
 userSchema.pre('save', async function(next) {
