@@ -7,6 +7,7 @@ const Voucher = require('../models/Voucher');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const Module = require('../models/Module');
+const { logAdminAction } = require('../utils/auditLog');
 const {
   ALL_MODULES,
   getActiveCourseMembership,
@@ -629,6 +630,46 @@ router.get('/admin/vouchers', authenticateToken('admin'), async (req, res) => {
   }
 });
 
+// Admin: paginated payment history
+router.get('/admin/history', authenticateToken('admin'), async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+    const filter = {};
+    if (req.query.course) filter.course = String(req.query.course).trim();
+    if (req.query.status) filter.status = String(req.query.status).trim();
+    if (req.query.username) filter.username = new RegExp(String(req.query.username).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const [payments, total] = await Promise.all([
+      Payment.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Payment.countDocuments(filter)
+    ]);
+
+    return res.json({
+      payments: payments.map((p) => ({
+        _id: p._id,
+        username: p.username,
+        course: p.course,
+        moduleName: p.moduleName || null,
+        planType: p.planType || null,
+        status: p.status,
+        amountInPaise: p.amountInPaise || 0,
+        voucherCode: p.voucherCode || null,
+        razorpayOrderId: p.razorpayOrderId || null,
+        createdAt: p.createdAt
+      })),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch payment history.' });
+  }
+});
+
 router.post('/admin/vouchers', authenticateToken('admin'), async (req, res) => {
   try {
     const code = String(req.body?.code || '').trim().toUpperCase();
@@ -671,6 +712,7 @@ router.post('/admin/vouchers', authenticateToken('admin'), async (req, res) => {
       createdBy: req.user.username
     });
 
+    await logAdminAction(req, { action: 'CREATE_VOUCHER', targetType: 'Voucher', targetId: voucher._id.toString(), details: { code: voucher.code } });
     return res.status(201).json({ voucher });
   } catch (err) {
     if (String(err?.message || '').includes('duplicate key')) {
@@ -705,6 +747,7 @@ router.patch('/admin/vouchers/:id', authenticateToken('admin'), async (req, res)
 
     const voucher = await Voucher.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true }).lean();
     if (!voucher) return res.status(404).json({ error: 'Voucher not found.' });
+    await logAdminAction(req, { action: 'UPDATE_VOUCHER', targetType: 'Voucher', targetId: String(req.params.id), details: { updates } });
     return res.json({ voucher });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update voucher.' });
@@ -715,6 +758,7 @@ router.delete('/admin/vouchers/:id', authenticateToken('admin'), async (req, res
   try {
     const voucher = await Voucher.findByIdAndDelete(req.params.id).lean();
     if (!voucher) return res.status(404).json({ error: 'Voucher not found.' });
+    await logAdminAction(req, { action: 'DELETE_VOUCHER', targetType: 'Voucher', targetId: String(req.params.id), details: { code: voucher.code } });
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete voucher.' });

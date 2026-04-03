@@ -4,6 +4,7 @@ const QuizAttempt = require('../models/QuizAttempt');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 const { hasCourseAccess, hasModuleAccess } = require('../utils/courseAccess');
+const { logAdminAction } = require('../utils/auditLog');
 
 const router = express.Router();
 
@@ -136,6 +137,63 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
   }
 });
 
+// Admin: quiz analytics — per-quiz attempt statistics
+router.get('/admin/analytics', authenticateToken('admin'), async (req, res) => {
+  try {
+    const category = String(req.query.category || '').trim();
+    const quizFilter = category ? { category } : {};
+    const quizzes = await Quiz.find(quizFilter, { _id: 1, title: 1, category: 1, module: 1, difficulty: 1 }).lean();
+    const quizIds = quizzes.map((q) => q._id);
+
+    const attempts = await QuizAttempt.find({ quizId: { $in: quizIds } }, {
+      quizId: 1, score: 1, total: 1, username: 1, submittedAt: 1
+    }).lean();
+
+    // Build per-quiz stats
+    const statsMap = {};
+    for (const q of quizzes) {
+      statsMap[q._id.toString()] = {
+        quizId: q._id,
+        title: q.title,
+        category: q.category,
+        module: q.module,
+        difficulty: q.difficulty,
+        totalAttempts: 0,
+        totalScore: 0,
+        totalQuestions: 0,
+        passCount: 0
+      };
+    }
+
+    for (const a of attempts) {
+      const key = String(a.quizId);
+      if (!statsMap[key]) continue;
+      const stat = statsMap[key];
+      stat.totalAttempts += 1;
+      stat.totalScore += Number(a.score || 0);
+      stat.totalQuestions += Number(a.total || 0);
+      if (Number(a.total) > 0 && Number(a.score) / Number(a.total) >= 0.6) {
+        stat.passCount += 1;
+      }
+    }
+
+    const analytics = Object.values(statsMap).map((s) => ({
+      ...s,
+      avgScore: s.totalAttempts > 0 ? (s.totalScore / s.totalAttempts).toFixed(1) : '0.0',
+      avgPct: s.totalAttempts > 0 && s.totalQuestions > 0
+        ? ((s.totalScore / s.totalQuestions) * 100).toFixed(0)
+        : '0',
+      passRate: s.totalAttempts > 0
+        ? ((s.passCount / s.totalAttempts) * 100).toFixed(0)
+        : '0'
+    }));
+
+    return res.json({ analytics });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch quiz analytics.' });
+  }
+});
+
 // Admin: bulk-delete all quizzes for a category+module
 router.delete('/module', authenticateToken('admin'), async (req, res) => {
   const { category, module: moduleName } = req.body;
@@ -165,6 +223,7 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
     const deleted = await Quiz.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Quiz not found.' });
     await QuizAttempt.deleteMany({ quizId: deleted._id });
+    await logAdminAction(req, { action: 'DELETE_QUIZ', targetType: 'Quiz', targetId: String(deleted._id), details: { title: deleted.title, category: deleted.category, module: deleted.module } });
     return res.json({ message: 'Quiz deleted.' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete quiz.' });

@@ -252,3 +252,27 @@ export function deleteVoucherAdmin(voucherId) {
     method: 'DELETE'
   });
 }
+
+export function fetchPaymentHistoryAdmin(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+  if (params.course) qs.set('course', params.course);
+  if (params.status) qs.set('status', params.status);
+  if (params.username) qs.set('username', params.username);
+  return requestJson(`/payments/admin/history${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+export function fetchQuizAnalyticsAdmin(category = '') {
+  const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+  return requestJson(`/quizzes/admin/analytics${qs}`);
+}
+
+export function fetchAuditLogsAdmin(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+  if (params.action) qs.set('action', params.action);
+  if (params.actor) qs.set('actor', params.actor);
+  return requestJson(`/auth/admin/audit-logs${qs.toString() ? '?' + qs.toString() : ''}`);
+}

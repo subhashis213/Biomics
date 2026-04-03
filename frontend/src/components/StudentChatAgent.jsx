@@ -172,7 +172,7 @@ export default function StudentChatAgent() {
       setIsTyping(true);
       setApiError(null);
 
-      const historyForApi = messages.slice(-10).map((m) => ({
+      const historyForApi = messages.slice(-20).map((m) => ({
         role: m.type === 'user' ? 'user' : 'assistant',
         content: m.content
       }));

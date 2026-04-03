@@ -10,6 +10,7 @@ const { z } = require('zod');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const LoginOtp = require('../models/LoginOtp');
+const AuditLog = require('../models/AuditLog');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken, JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -343,10 +344,49 @@ router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res)
 // Student list for admin panel — admin only
 router.get('/users', authenticateToken('admin'), async (req, res) => {
   try {
-    const users = await User.find({}, { username: 1, class: 1, phone: 1, city: 1, _id: 0 }).sort({ username: 1 }).lean();
-    res.json({ total: users.length, users });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+    const search = String(req.query.search || '').trim();
+    const filter = search
+      ? { $or: [
+          { username: new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+          { city: new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+        ] }
+      : {};
+
+    const [users, total] = await Promise.all([
+      User.find(filter, { username: 1, class: 1, phone: 1, city: 1, createdAt: 1, _id: 0 })
+        .sort({ username: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      User.countDocuments(filter)
+    ]);
+    res.json({ total, users, pagination: { page, limit, totalPages: Math.ceil(total / limit) } });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Audit log viewer — admin only
+router.get('/admin/audit-logs', authenticateToken('admin'), async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+    const filter = {};
+    if (req.query.action) filter.action = new RegExp(String(req.query.action).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    if (req.query.actor) filter.actorUsername = new RegExp(String(req.query.actor).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const [logs, total] = await Promise.all([
+      AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      AuditLog.countDocuments(filter)
+    ]);
+
+    return res.json({ logs, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch audit logs.' });
   }
 });
 

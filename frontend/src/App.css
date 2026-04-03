@@ -9916,7 +9916,500 @@ html[data-theme='light'] .premium-materials-panel {
 
   .app-side-nav-mobile {
     width: 92vw;
+
+    /* ════════════════════════════════════════════════════════════
+       ANALYTICS CARD — shared wrapper for Pay History / Quiz Analytics / Audit Log
+       ════════════════════════════════════════════════════════════ */
+    .analytics-card {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-height: 80vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) transparent;
+    }
+    .analytics-card::-webkit-scrollbar { width: 6px; }
+    .analytics-card::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+
+    /* ── Filter bar ────────────────────────────────────────── */
+    .analytics-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--bg-secondary, rgba(255,255,255,0.04));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .analytics-filter-input,
+    .analytics-filter-select {
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 0.875rem;
+      min-width: 170px;
+      flex: 1 1 160px;
+      transition: border-color 0.2s;
+    }
+    .analytics-filter-input:focus,
+    .analytics-filter-select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+
+    /* ── Data table ─────────────────────────────────────────── */
+    .analytics-table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) transparent;
+    }
+    .analytics-table-wrap::-webkit-scrollbar { height: 5px; }
+    .analytics-table-wrap::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+
+    .analytics-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      min-width: 680px;
+    }
+    .analytics-table thead tr {
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #7c3aed));
+      color: #fff;
+    }
+    .analytics-table thead th {
+      padding: 11px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .analytics-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .analytics-table tbody tr:hover {
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
+    }
+    .analytics-table tbody td {
+      padding: 10px 14px;
+      vertical-align: middle;
+      color: var(--fg);
+    }
+    .analytics-table tbody tr:last-child { border-bottom: none; }
+
+    .amount-cell { font-weight: 700; color: #10b981; }
+    .date-cell { font-size: 0.78rem; color: var(--fg-muted); white-space: nowrap; }
+    .muted-text { color: var(--fg-muted); font-style: italic; }
+
+    /* ── Status badges ──────────────────────────────────────── */
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .status-paid  { background: #d1fae5; color: #065f46; }
+    .status-created { background: #fef3c7; color: #92400e; }
+    .status-failed { background: #fee2e2; color: #991b1b; }
+
+    /* Action badge for audit log */
+    .action-badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 6px;
+      font-size: 0.71rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      color: var(--accent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+
+    /* Details cell chips */
+    .details-cell { display: flex; flex-wrap: wrap; gap: 5px; }
+    .detail-chip {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 0.71rem;
+      background: var(--bg-secondary, rgba(255,255,255,0.06));
+      border: 1px solid var(--border);
+      color: var(--fg-muted);
+    }
+
+    /* ── Pagination bar ─────────────────────────────────────── */
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 10px 0 4px;
+    }
+    .pagination-info {
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+      font-weight: 500;
+    }
+    .pagination-btn {
+      min-width: 90px;
+      font-size: 0.82rem;
+      padding: 6px 14px;
+    }
+
+    /* ── Quiz analytics cards grid ──────────────────────────── */
+    .analytics-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .quiz-stat-card {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 16px 18px;
+      background: var(--bg-secondary, rgba(255,255,255,0.03));
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.18s, box-shadow 0.18s;
+    }
+    .quiz-stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .quiz-stat-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .quiz-stat-module {
+      font-size: 0.72rem;
+      color: var(--fg-muted);
+      margin-left: auto;
+    }
+    .quiz-stat-title {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--fg);
+    }
+
+    .difficulty-badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .diff-easy   { background: #d1fae5; color: #065f46; }
+    .diff-medium { background: #fef3c7; color: #92400e; }
+    .diff-hard   { background: #fee2e2; color: #991b1b; }
+
+    .quiz-stat-metrics {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .quiz-stat-metric {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      flex: 1;
+    }
+    .metric-value {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .metric-value.metric-pass { color: #10b981; }
+    .metric-value.metric-fail { color: #ef4444; }
+    .metric-label {
+      font-size: 0.68rem;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .quiz-stat-bar-wrap {
+      position: relative;
+      height: 7px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .quiz-stat-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #7c3aed));
+      border-radius: 4px;
+      transition: width 0.6s cubic-bezier(.4,0,.2,1);
+    }
+    .quiz-stat-bar-label {
+      font-size: 0.7rem;
+      color: var(--fg-muted);
+      margin-top: 3px;
+      display: block;
+    }
+
+    /* ── Voucher enhancements ───────────────────────────────── */
+    .voucher-code-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 2px;
+    }
+    .voucher-code-label {
+      font-size: 1rem;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .voucher-desc {
+      font-size: 0.82rem;
+      color: var(--fg-muted);
+      margin: 2px 0 6px;
+    }
+    .chip-discount {
+      background: color-mix(in srgb, #10b981 18%, transparent);
+      color: #10b981;
+      font-weight: 700;
+      border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+    }
+    .chip-courses {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent);
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .voucher-usage-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .voucher-usage-text {
+      font-size: 0.78rem;
+      color: var(--fg-muted);
+    }
+    .voucher-usage-bar-wrap {
+      height: 5px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      max-width: 180px;
+    }
+    .voucher-usage-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #3b82f6);
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    /* ── Dark mode overrides for new badges ─────────────────── */
+    @media (prefers-color-scheme: dark) {
+      .status-paid   { background: rgba(16,185,129,0.18); color: #6ee7b7; }
+      .status-created { background: rgba(251,191,36,0.18); color: #fcd34d; }
+      .status-failed { background: rgba(239,68,68,0.18); color: #fca5a5; }
+      .diff-easy     { background: rgba(16,185,129,0.18); color: #6ee7b7; }
+      .diff-medium   { background: rgba(251,191,36,0.18); color: #fcd34d; }
+      .diff-hard     { background: rgba(239,68,68,0.18); color: #fca5a5; }
+    }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .analytics-filters {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .analytics-filter-input,
+      .analytics-filter-select {
+        min-width: unset;
+        width: 100%;
+      }
+      .analytics-cards-grid {
+        grid-template-columns: 1fr;
+      }
+      .pagination-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+    }
     padding: 10px;
+  }
+}
+
+/* Admin analytics section separation + compact scroll bodies */
+#section-payment-history,
+#section-quiz-analytics,
+#section-audit-log,
+#section-feedback {
+  margin-top: 18px;
+}
+
+.analytics-section-scroll {
+  max-height: 46vh;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.analytics-section-scroll::-webkit-scrollbar,
+.feedback-list-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.analytics-section-scroll::-webkit-scrollbar-track,
+.feedback-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.analytics-section-scroll::-webkit-scrollbar-thumb,
+.feedback-list-scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+.analytics-section-scroll::-webkit-scrollbar-thumb:hover,
+.feedback-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.feedback-list-scroll {
+  max-height: 44vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+@media (max-width: 768px) {
+  .analytics-section-scroll {
+    max-height: 50vh;
+  }
+
+  .feedback-list-scroll {
+    max-height: 48vh;
+  }
+}
+
+/* Analytics section layout polish */
+#section-payment-history.analytics-card,
+#section-quiz-analytics.analytics-card,
+#section-audit-log.analytics-card {
+  gap: 14px;
+}
+
+#section-payment-history .analytics-filters,
+#section-quiz-analytics .analytics-filters,
+#section-audit-log .analytics-filters {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin: 4px 0 2px;
+}
+
+#section-payment-history .analytics-filter-input,
+#section-payment-history .analytics-filter-select,
+#section-quiz-analytics .analytics-filter-select,
+#section-audit-log .analytics-filter-input,
+#section-audit-log .analytics-filter-select {
+  grid-column: span 3;
+  min-height: 40px;
+}
+
+#section-payment-history .analytics-filters .primary-btn,
+#section-payment-history .analytics-filters .secondary-btn,
+#section-quiz-analytics .analytics-filters .primary-btn,
+#section-audit-log .analytics-filters .primary-btn,
+#section-audit-log .analytics-filters .secondary-btn {
+  grid-column: span 2;
+  min-height: 40px;
+  padding: 0 16px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+#section-payment-history .analytics-table th,
+#section-payment-history .analytics-table td,
+#section-audit-log .analytics-table th,
+#section-audit-log .analytics-table td {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+#section-audit-log .details-cell {
+  gap: 6px;
+  padding-right: 4px;
+}
+
+@media (max-width: 1100px) {
+  #section-payment-history .analytics-filters,
+  #section-quiz-analytics .analytics-filters,
+  #section-audit-log .analytics-filters {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  #section-payment-history .analytics-filter-input,
+  #section-payment-history .analytics-filter-select,
+  #section-quiz-analytics .analytics-filter-select,
+  #section-audit-log .analytics-filter-input,
+  #section-audit-log .analytics-filter-select {
+    grid-column: span 3;
+  }
+
+  #section-payment-history .analytics-filters .primary-btn,
+  #section-payment-history .analytics-filters .secondary-btn,
+  #section-quiz-analytics .analytics-filters .primary-btn,
+  #section-audit-log .analytics-filters .primary-btn,
+  #section-audit-log .analytics-filters .secondary-btn {
+    grid-column: span 3;
+  }
+}
+
+@media (max-width: 680px) {
+  #section-payment-history .analytics-filters,
+  #section-quiz-analytics .analytics-filters,
+  #section-audit-log .analytics-filters {
+    grid-template-columns: 1fr;
+  }
+
+  #section-payment-history .analytics-filter-input,
+  #section-payment-history .analytics-filter-select,
+  #section-quiz-analytics .analytics-filter-select,
+  #section-audit-log .analytics-filter-input,
+  #section-audit-log .analytics-filter-select,
+  #section-payment-history .analytics-filters .primary-btn,
+  #section-payment-history .analytics-filters .secondary-btn,
+  #section-quiz-analytics .analytics-filters .primary-btn,
+  #section-audit-log .analytics-filters .primary-btn,
+  #section-audit-log .analytics-filters .secondary-btn {
+    grid-column: auto;
+    width: 100%;
   }
 }
 

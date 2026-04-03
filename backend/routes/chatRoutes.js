@@ -4,7 +4,27 @@ const { authenticateToken } = require('../middleware/auth');
 const ChatHistory = require('../models/ChatHistory');
 
 const MAX_HISTORY_MESSAGES = 200;
-const CONTEXT_WINDOW = 10; // how many recent messages to send as context
+const CONTEXT_WINDOW = 20; // how many recent messages to send as context
+const DEFAULT_MAX_OUTPUT_TOKENS = 1200;
+
+function estimateAnswerProfile(question = '') {
+  const text = String(question || '').trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  const lower = text.toLowerCase();
+  const deepIntent = /(explain in detail|detailed|step by step|full|complete|elaborate|deeply|why|how|strategy|plan|roadmap|compare)/.test(lower);
+  const shortIntent = /(short answer|brief|in short|one line|summarize|tl;dr)/.test(lower);
+
+  if (shortIntent) {
+    return { maxOutputTokens: 700, temperature: 0.45 };
+  }
+  if (deepIntent || words > 28) {
+    return { maxOutputTokens: 1800, temperature: 0.6 };
+  }
+  if (words > 16) {
+    return { maxOutputTokens: 1400, temperature: 0.55 };
+  }
+  return { maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS, temperature: 0.5 };
+}
 
 function normalizeLanguage(language) {
   return ['en', 'hi', 'or'].includes(language) ? language : 'en';
@@ -24,8 +44,9 @@ async function callGemini(apiKey, systemPrompt, contents, generationConfig = {})
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: {
-          maxOutputTokens: 700,
-          temperature: 0.65,
+          maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
+          temperature: 0.5,
+          topP: 0.9,
           ...generationConfig
         }
       })
@@ -94,7 +115,7 @@ function buildSystemPrompt(language) {
     'Teach with depth but in simple language, like a supportive personal tutor.',
     'Be clear, structured, accurate, and outcome-focused.',
     'Use numbered lists and clear headings where helpful.',
-    'Keep answers between 150–400 words unless more detail is explicitly requested.',
+    'Default to concise answers, but provide full depth whenever the user asks for detail or when the topic requires it.',
     'You are strong in Botany, Biology, and Life Sciences for learners at any stage, with primary focus on CSIR-NET Life Science preparation.',
     'Support concept explanation, revision planning, problem-solving, and exam strategy for any study-related topic.',
     'When asked for exam dates, notification windows, syllabus updates, or application deadlines: provide the latest known timeline clearly, mention the exam year, and advise checking the official website for final confirmation.',
@@ -123,6 +144,7 @@ router.post('/ask', authenticateToken('user'), async (req, res) => {
     }
 
     const systemPrompt = buildSystemPrompt(selectedLanguage);
+    const answerProfile = estimateAnswerProfile(question);
 
     // Build Gemini contents array from recent conversation history
     const contents = [];
@@ -137,7 +159,7 @@ router.post('/ask', authenticateToken('user'), async (req, res) => {
     }
     contents.push({ role: 'user', parts: [{ text: question.trim() }] });
 
-    const { geminiRes, data } = await callGemini(apiKey, systemPrompt, contents);
+    const { geminiRes, data } = await callGemini(apiKey, systemPrompt, contents, answerProfile);
 
     if (!geminiRes.ok) {
       const errMsg = data?.error?.message || 'AI service returned an error';
@@ -147,6 +169,35 @@ router.post('/ask', authenticateToken('user'), async (req, res) => {
     let answer =
       data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
       'Sorry, I could not generate a response. Please try again.';
+
+    const finishReason = String(data.candidates?.[0]?.finishReason || '').toUpperCase();
+    if (finishReason === 'MAX_TOKENS') {
+      const continuationContents = [
+        ...contents,
+        { role: 'model', parts: [{ text: answer }] },
+        {
+          role: 'user',
+          parts: [{ text: 'Continue from exactly where you stopped. Do not repeat prior lines.' }]
+        }
+      ];
+
+      const { geminiRes: continuationRes, data: continuationData } = await callGemini(
+        apiKey,
+        systemPrompt,
+        continuationContents,
+        {
+          maxOutputTokens: Math.min(1200, answerProfile.maxOutputTokens),
+          temperature: Math.max(0.35, answerProfile.temperature - 0.1)
+        }
+      );
+
+      if (continuationRes.ok) {
+        const continuation = continuationData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (continuation) {
+          answer = `${answer}\n\n${continuation}`.trim();
+        }
+      }
+    }
 
     // Odia mode: enforce Odia output even if the first generation is not in Odia.
     if (selectedLanguage === 'or') {

@@ -4,6 +4,7 @@ const { z } = require('zod');
 const Feedback = require('../models/Feedback');
 const { authenticateToken } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { logAdminAction } = require('../utils/auditLog');
 
 const feedbackSchema = z.object({
   message: z.string().min(1, 'Feedback message is required').max(1000),
@@ -50,11 +51,20 @@ router.post('/', authenticateToken('user'), validate(feedbackSchema), async (req
 // Admin reads feedback list
 router.get('/', authenticateToken('admin'), async (req, res) => {
   try {
-    const feedback = await Feedback.find({}, { _id: 1, username: 1, rating: 1, message: 1, createdAt: 1 })
-      .sort({ createdAt: -1 })
-      .lean();
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
 
-    return res.json({ total: feedback.length, feedback });
+    const [feedback, total] = await Promise.all([
+      Feedback.find({}, { _id: 1, username: 1, rating: 1, message: 1, createdAt: 1 })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Feedback.countDocuments({})
+    ]);
+
+    return res.json({ total, feedback, pagination: { page, limit, totalPages: Math.ceil(total / limit) } });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to fetch feedback' });
   }
@@ -94,6 +104,7 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Feedback not found.' });
     }
+    await logAdminAction(req, { action: 'DELETE_FEEDBACK', targetType: 'Feedback', targetId: String(deleted._id || ''), details: { username: deleted.username } });
     return res.json({ message: 'Feedback deleted.' });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to delete feedback.' });

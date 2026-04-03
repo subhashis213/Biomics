@@ -1,6 +1,7 @@
 const express = require('express');
 const LiveClass = require('../models/LiveClass');
 const { authenticateToken } = require('../middleware/auth');
+const { logAdminAction } = require('../utils/auditLog');
 
 const router = express.Router();
 
@@ -71,6 +72,7 @@ router.post('/schedule', authenticateToken('admin'), async (req, res) => {
       isScheduled: true,
       scheduledAt
     });
+    await logAdminAction(req, { action: 'SCHEDULE_LIVE_CLASS', targetType: 'LiveClass', targetId: String(scheduled._id), details: { title, scheduledAt } });
     return res.status(201).json({
       _id: scheduled._id,
       title: scheduled.title,
@@ -87,6 +89,7 @@ router.post('/schedule', authenticateToken('admin'), async (req, res) => {
 router.delete('/schedule', authenticateToken('admin'), async (req, res) => {
   try {
     await LiveClass.deleteMany({ isScheduled: true, isActive: false });
+    await logAdminAction(req, { action: 'CANCEL_SCHEDULED_CLASS', targetType: 'LiveClass', targetId: '', details: {} });
     return res.json({ message: 'Scheduled class cancelled' });
   } catch (err) {
     console.error('[cancel-schedule] error:', err.message);
@@ -108,6 +111,7 @@ router.post('/start', authenticateToken('admin'), async (req, res) => {
     await LiveClass.updateMany({ isActive: true }, { $set: { isActive: false, endedAt: new Date() } });
 
     const liveClass = await LiveClass.create({ title, meetUrl });
+    await logAdminAction(req, { action: 'START_LIVE_CLASS', targetType: 'LiveClass', targetId: String(liveClass._id), details: { title, meetUrl } });
     return res.status(201).json({
       active: true,
       title: liveClass.title,
@@ -127,6 +131,7 @@ router.post('/end', authenticateToken('admin'), async (req, res) => {
       { isActive: true },
       { $set: { isActive: false, endedAt: new Date() } }
     );
+    await logAdminAction(req, { action: 'END_LIVE_CLASS', targetType: 'LiveClass', targetId: '', details: { ended: result.modifiedCount } });
     return res.json({ message: 'Live class ended', ended: result.modifiedCount });
   } catch (err) {
     console.error('End live class error:', err.message);

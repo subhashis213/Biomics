@@ -6,8 +6,11 @@ import {
   deleteQuiz,
   deleteVoucherAdmin,
   fetchAdminQuizzes,
+  fetchAuditLogsAdmin,
   fetchCoursePricingAdmin,
   fetchModulePricingAdmin,
+  fetchPaymentHistoryAdmin,
+  fetchQuizAnalyticsAdmin,
   fetchVouchersAdmin,
   requestJson,
   saveCoursePricingAdmin,
@@ -133,6 +136,23 @@ export default function AdminDashboard() {
   const bannerTimeoutRef = useRef(null);
   const quizMessageFadeTimeoutRef = useRef(null);
   const quizMessageClearTimeoutRef = useRef(null);
+
+  // ── Payment History state ────────────────────────────────
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [paymentHistoryPagination, setPaymentHistoryPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [paymentHistoryFilter, setPaymentHistoryFilter] = useState({ course: '', status: '', username: '' });
+  const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
+
+  // ── Quiz Analytics state ─────────────────────────────────
+  const [quizAnalytics, setQuizAnalytics] = useState([]);
+  const [quizAnalyticsCategory, setQuizAnalyticsCategory] = useState('');
+  const [quizAnalyticsLoading, setQuizAnalyticsLoading] = useState(false);
+
+  // ── Audit Log state ──────────────────────────────────────
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLogPagination, setAuditLogPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [auditLogFilter, setAuditLogFilter] = useState({ action: '', actor: '' });
+  const [auditLogLoading, setAuditLogLoading] = useState(false);
 
   function clearQuizMessageTimers() {
     if (quizMessageFadeTimeoutRef.current) {
@@ -1198,6 +1218,44 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadPaymentHistory(page = 1, filter = paymentHistoryFilter) {
+    setPaymentHistoryLoading(true);
+    try {
+      const res = await fetchPaymentHistoryAdmin({ page, limit: 20, ...filter });
+      setPaymentHistory(res.payments || []);
+      setPaymentHistoryPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load payment history.' });
+    } finally {
+      setPaymentHistoryLoading(false);
+    }
+  }
+
+  async function loadQuizAnalytics(category = quizAnalyticsCategory) {
+    setQuizAnalyticsLoading(true);
+    try {
+      const res = await fetchQuizAnalyticsAdmin(category);
+      setQuizAnalytics(res.analytics || []);
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load quiz analytics.' });
+    } finally {
+      setQuizAnalyticsLoading(false);
+    }
+  }
+
+  async function loadAuditLogs(page = 1, filter = auditLogFilter) {
+    setAuditLogLoading(true);
+    try {
+      const res = await fetchAuditLogsAdmin({ page, limit: 20, ...filter });
+      setAuditLogs(res.logs || []);
+      setAuditLogPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load audit logs.' });
+    } finally {
+      setAuditLogLoading(false);
+    }
+  }
+
   function scrollToSection(sectionId) {
     const node = document.getElementById(sectionId);
     if (node) {
@@ -1424,6 +1482,9 @@ export default function AdminDashboard() {
     { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
     { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
+    { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
+    { id: 'section-quiz-analytics', label: 'Quiz Analytics', icon: '🏆' },
+    { id: 'section-audit-log', label: 'Audit Log', icon: '🛡️' },
     { id: 'section-feedback', label: 'Feedback', icon: '💬' }
   ];
 
@@ -2403,16 +2464,43 @@ export default function AdminDashboard() {
                   {voucherList.map((voucher) => (
                     <article key={voucher._id} className="quiz-admin-item">
                       <div className="quiz-admin-item-body">
-                        <strong>{voucher.code}</strong>
-                        <p>{voucher.description || 'No description'}</p>
-                        <div className="quiz-admin-meta">
-                          <span className="quiz-admin-meta-chip">
-                            {voucher.discountType === 'percent'
-                              ? `${voucher.discountValue}%`
-                              : `Rs ${(Number(voucher.discountValue || 0) / 100).toFixed(2)}`}
+                        <div className="voucher-code-row">
+                          <strong className="voucher-code-label">{voucher.code}</strong>
+                          <span className={`status-badge status-${voucher.active ? 'paid' : 'failed'}`}>
+                            {voucher.active ? 'Active' : 'Disabled'}
                           </span>
-                          <span className="quiz-admin-meta-chip">Used: {voucher.usedCount || 0}</span>
-                          <span className="quiz-admin-meta-chip">Status: {voucher.active ? 'Active' : 'Disabled'}</span>
+                        </div>
+                        <p className="voucher-desc">{voucher.description || 'No description'}</p>
+                        <div className="quiz-admin-meta">
+                          <span className="quiz-admin-meta-chip chip-discount">
+                            {voucher.discountType === 'percent'
+                              ? `${voucher.discountValue}% off`
+                              : `₹${(Number(voucher.discountValue || 0) / 100).toFixed(0)} off`}
+                          </span>
+                          {voucher.validUntil && (
+                            <span className="quiz-admin-meta-chip">
+                              Expires: {new Date(voucher.validUntil).toLocaleDateString()}
+                            </span>
+                          )}
+                          {voucher.applicableCourses?.length > 0 && (
+                            <span className="quiz-admin-meta-chip chip-courses">
+                              {voucher.applicableCourses.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="voucher-usage-row">
+                          <span className="voucher-usage-text">
+                            Used: <strong>{voucher.usedCount || 0}</strong>
+                            {voucher.usageLimit ? ` / ${voucher.usageLimit}` : ' (unlimited)'}
+                          </span>
+                          {voucher.usageLimit ? (
+                            <div className="voucher-usage-bar-wrap">
+                              <div
+                                className="voucher-usage-bar"
+                                style={{ width: `${Math.min(100, ((voucher.usedCount || 0) / voucher.usageLimit) * 100)}%` }}
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       <div className="quiz-admin-item-actions">
@@ -2442,6 +2530,276 @@ export default function AdminDashboard() {
         </div>
       </section>
 
+      <section id="section-payment-history" className="card analytics-card">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Revenue Tracking</p>
+            <h2>📊 Payment History</h2>
+          </div>
+          <StatCard label="Total Transactions" value={paymentHistoryPagination.total} />
+        </div>
+
+        <div className="analytics-filters">
+          <input
+            className="analytics-filter-input"
+            type="text"
+            placeholder="Search by username..."
+            value={paymentHistoryFilter.username}
+            onChange={(e) => setPaymentHistoryFilter((f) => ({ ...f, username: e.target.value }))}
+          />
+          <select
+            className="analytics-filter-select"
+            value={paymentHistoryFilter.course}
+            onChange={(e) => setPaymentHistoryFilter((f) => ({ ...f, course: e.target.value }))}
+          >
+            <option value="">All Courses</option>
+            {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select
+            className="analytics-filter-select"
+            value={paymentHistoryFilter.status}
+            onChange={(e) => setPaymentHistoryFilter((f) => ({ ...f, status: e.target.value }))}
+          >
+            <option value="">All Statuses</option>
+            <option value="paid">Paid</option>
+            <option value="created">Created</option>
+            <option value="failed">Failed</option>
+          </select>
+          <button
+            className="primary-btn"
+            type="button"
+            onClick={() => loadPaymentHistory(1, paymentHistoryFilter)}
+            disabled={paymentHistoryLoading}
+          >
+            {paymentHistoryLoading ? 'Loading...' : 'Search'}
+          </button>
+          <button
+            className="secondary-btn"
+            type="button"
+            onClick={() => { setPaymentHistoryFilter({ course: '', status: '', username: '' }); loadPaymentHistory(1, { course: '', status: '', username: '' }); }}
+          >
+            Clear
+          </button>
+        </div>
+
+        <div className="analytics-section-scroll">
+          {paymentHistory.length === 0 && !paymentHistoryLoading ? (
+            <p className="empty-note">No payment records. Click Search to load.</p>
+          ) : (
+            <div className="analytics-table-wrap">
+              <table className="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Course</th>
+                    <th>Module</th>
+                    <th>Plan</th>
+                    <th>Amount</th>
+                    <th>Voucher</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentHistory.map((p) => (
+                    <tr key={p._id}>
+                      <td><strong>{p.username}</strong></td>
+                      <td>{p.course}</td>
+                      <td>{p.moduleName || <span className="muted-text">-</span>}</td>
+                      <td>{p.planType || <span className="muted-text">-</span>}</td>
+                      <td className="amount-cell">Rs {Math.round(Number(p.amountInPaise || 0) / 100)}</td>
+                      <td>{p.voucherCode || <span className="muted-text">-</span>}</td>
+                      <td>
+                        <span className={`status-badge status-${p.status}`}>{p.status}</span>
+                      </td>
+                      <td className="date-cell">{new Date(p.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {paymentHistoryPagination.totalPages > 1 && (
+          <div className="pagination-bar">
+            <button
+              className="secondary-btn pagination-btn"
+              disabled={paymentHistoryPagination.page <= 1}
+              onClick={() => loadPaymentHistory(paymentHistoryPagination.page - 1)}
+            >← Prev</button>
+            <span className="pagination-info">
+              Page {paymentHistoryPagination.page} of {paymentHistoryPagination.totalPages}
+            </span>
+            <button
+              className="secondary-btn pagination-btn"
+              disabled={paymentHistoryPagination.page >= paymentHistoryPagination.totalPages}
+              onClick={() => loadPaymentHistory(paymentHistoryPagination.page + 1)}
+            >Next →</button>
+          </div>
+        )}
+      </section>
+
+      <section id="section-quiz-analytics" className="card analytics-card">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Performance Insights</p>
+            <h2>🏆 Quiz Analytics</h2>
+          </div>
+          <StatCard label="Total Quizzes Tracked" value={quizAnalytics.length} />
+        </div>
+
+        <div className="analytics-filters">
+          <select
+            className="analytics-filter-select"
+            value={quizAnalyticsCategory}
+            onChange={(e) => setQuizAnalyticsCategory(e.target.value)}
+          >
+            <option value="">All Courses</option>
+            {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <button
+            className="primary-btn"
+            type="button"
+            onClick={() => loadQuizAnalytics(quizAnalyticsCategory)}
+            disabled={quizAnalyticsLoading}
+          >
+            {quizAnalyticsLoading ? 'Loading...' : 'Load Analytics'}
+          </button>
+        </div>
+
+        <div className="analytics-section-scroll">
+          {quizAnalytics.length === 0 && !quizAnalyticsLoading ? (
+            <p className="empty-note">Click Load Analytics to view quiz performance data.</p>
+          ) : (
+            <div className="analytics-cards-grid">
+              {quizAnalytics.map((q) => (
+                <div key={String(q.quizId)} className="quiz-stat-card">
+                  <div className="quiz-stat-card-header">
+                    <span className={`difficulty-badge diff-${q.difficulty}`}>{q.difficulty}</span>
+                    <span className="quiz-stat-module">{q.module} · {q.category}</span>
+                  </div>
+                  <h4 className="quiz-stat-title">{q.title}</h4>
+                  <div className="quiz-stat-metrics">
+                    <div className="quiz-stat-metric">
+                      <span className="metric-value">{q.totalAttempts}</span>
+                      <span className="metric-label">Attempts</span>
+                    </div>
+                    <div className="quiz-stat-metric">
+                      <span className="metric-value">{q.avgScore}</span>
+                      <span className="metric-label">Avg Score</span>
+                    </div>
+                    <div className="quiz-stat-metric">
+                      <span className={`metric-value ${Number(q.passRate) >= 60 ? 'metric-pass' : 'metric-fail'}`}>{q.passRate}%</span>
+                      <span className="metric-label">Pass Rate</span>
+                    </div>
+                  </div>
+                  <div className="quiz-stat-bar-wrap">
+                    <div className="quiz-stat-bar" style={{ width: `${Math.min(100, Number(q.avgPct))}%` }} />
+                    <span className="quiz-stat-bar-label">{q.avgPct}% avg</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section id="section-audit-log" className="card analytics-card">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Security & Compliance</p>
+            <h2>🛡️ Audit Log</h2>
+          </div>
+          <StatCard label="Total Events" value={auditLogPagination.total} />
+        </div>
+
+        <div className="analytics-filters">
+          <input
+            className="analytics-filter-input"
+            type="text"
+            placeholder="Filter by action (e.g. DELETE)..."
+            value={auditLogFilter.action}
+            onChange={(e) => setAuditLogFilter((f) => ({ ...f, action: e.target.value }))}
+          />
+          <input
+            className="analytics-filter-input"
+            type="text"
+            placeholder="Filter by admin username..."
+            value={auditLogFilter.actor}
+            onChange={(e) => setAuditLogFilter((f) => ({ ...f, actor: e.target.value }))}
+          />
+          <button
+            className="primary-btn"
+            type="button"
+            onClick={() => loadAuditLogs(1, auditLogFilter)}
+            disabled={auditLogLoading}
+          >
+            {auditLogLoading ? 'Loading...' : 'Search'}
+          </button>
+          <button
+            className="secondary-btn"
+            type="button"
+            onClick={() => { setAuditLogFilter({ action: '', actor: '' }); loadAuditLogs(1, { action: '', actor: '' }); }}
+          >
+            Clear
+          </button>
+        </div>
+
+        <div className="analytics-section-scroll">
+          {auditLogs.length === 0 && !auditLogLoading ? (
+            <p className="empty-note">No audit events. Click Search to load.</p>
+          ) : (
+            <div className="analytics-table-wrap">
+              <table className="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Target Type</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log._id}>
+                      <td className="date-cell">{new Date(log.createdAt).toLocaleString()}</td>
+                      <td><strong>{log.actorUsername}</strong></td>
+                      <td><span className="action-badge">{log.action}</span></td>
+                      <td>{log.targetType}</td>
+                      <td className="details-cell">
+                        {Object.entries(log.details || {}).map(([k, v]) => (
+                          <span key={k} className="detail-chip">{k}: {String(v)}</span>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {auditLogPagination.totalPages > 1 && (
+          <div className="pagination-bar">
+            <button
+              className="secondary-btn pagination-btn"
+              disabled={auditLogPagination.page <= 1}
+              onClick={() => loadAuditLogs(auditLogPagination.page - 1)}
+            >← Prev</button>
+            <span className="pagination-info">
+              Page {auditLogPagination.page} of {auditLogPagination.totalPages}
+            </span>
+            <button
+              className="secondary-btn pagination-btn"
+              disabled={auditLogPagination.page >= auditLogPagination.totalPages}
+              onClick={() => loadAuditLogs(auditLogPagination.page + 1)}
+            >Next →</button>
+          </div>
+        )}
+      </section>
+
       <section id="section-feedback" className="card feedback-list-card">
         <div className="section-header">
           <div>
@@ -2452,7 +2810,7 @@ export default function AdminDashboard() {
         </div>
 
         {feedback.length ? (
-          <div className="feedback-list">
+          <div className="feedback-list feedback-list-scroll">
             {feedback.map((item) => (
               <article className="feedback-item" key={item._id || `${item.username}-${item.createdAt}`}>
                 <div className="feedback-head">
