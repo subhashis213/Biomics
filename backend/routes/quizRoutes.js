@@ -349,4 +349,73 @@ router.get('/my-attempts/recent', authenticateToken('user'), async (req, res) =>
   }
 });
 
+// Student: leaderboard based on each user's best attempt in their course
+router.get('/leaderboard', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1, _id: 0 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+
+    const moduleFilter = String(req.query.module || '').trim();
+    const matchFilter = { category: user.class };
+    if (moduleFilter) {
+      matchFilter.module = moduleFilter;
+    }
+
+    const leaderboard = await QuizAttempt.aggregate([
+      { $match: matchFilter },
+      {
+        $addFields: {
+          percentage: {
+            $cond: [
+              { $gt: ['$total', 0] },
+              { $multiply: [{ $divide: ['$score', '$total'] }, 100] },
+              0
+            ]
+          }
+        }
+      },
+      { $sort: { percentage: -1, score: -1, submittedAt: -1 } },
+      {
+        $group: {
+          _id: '$username',
+          bestAttempt: { $first: '$$ROOT' },
+          attemptsCount: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          username: '$_id',
+          module: '$bestAttempt.module',
+          score: '$bestAttempt.score',
+          total: '$bestAttempt.total',
+          percentage: { $round: ['$bestAttempt.percentage', 2] },
+          submittedAt: '$bestAttempt.submittedAt',
+          attemptsCount: 1
+        }
+      },
+      { $sort: { percentage: -1, score: -1, submittedAt: 1, username: 1 } },
+      { $limit: 50 }
+    ]);
+
+    const modules = await QuizAttempt.distinct('module', { category: user.class });
+    const sortedModules = modules
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+
+    return res.json({
+      course: user.class,
+      moduleFilter: moduleFilter || null,
+      modules: sortedModules,
+      leaderboard: leaderboard.map((entry, index) => ({
+        ...entry,
+        rank: index + 1
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch leaderboard.' });
+  }
+});
+
 module.exports = router;

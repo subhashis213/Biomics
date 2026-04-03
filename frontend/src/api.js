@@ -166,6 +166,11 @@ export function fetchRecentQuizAttempts() {
   return requestJson('/quizzes/my-attempts/recent');
 }
 
+export function fetchQuizLeaderboard(moduleName) {
+  const query = moduleName ? `?module=${encodeURIComponent(moduleName)}` : '';
+  return requestJson(`/quizzes/leaderboard${query}`);
+}
+
 export function saveModuleQuiz(payload) {
   return requestJson('/quizzes', {
     method: 'POST',

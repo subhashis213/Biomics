@@ -41,8 +41,10 @@ export default function AuthPage() {
   const [toast, setToast] = useState(null);
   const [introVisible, setIntroVisible] = useState(true);
   const registerFlipTimerRef = useRef(null);
-      useEffect(() => {
-        if (!existingSession) return;
+  const forgotSuccessTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!existingSession) return;
     navigate(existingSession.role === 'admin' ? '/admin' : '/student', { replace: true });
   }, [existingSession, navigate]);
 
@@ -53,7 +55,7 @@ export default function AuthPage() {
     return () => window.clearTimeout(timer);
   }, [INTRO_DURATION_MS]);
 
-      useEffect(() => {
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => {
       setToast(null);
@@ -66,8 +68,30 @@ export default function AuthPage() {
       if (registerFlipTimerRef.current) {
         window.clearTimeout(registerFlipTimerRef.current);
       }
+      if (forgotSuccessTimerRef.current) {
+        window.clearTimeout(forgotSuccessTimerRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    const hasOpenAuthModal = forgotOpen || forgotSuccessModal;
+    if (!hasOpenAuthModal) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyTouchAction = document.body.style.touchAction;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.touchAction = previousBodyTouchAction;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [forgotOpen, forgotSuccessModal]);
 
   useEffect(() => {
     if (loginRole === 'admin') {
@@ -296,13 +320,17 @@ export default function AuthPage() {
       console.log('Password reset response:', response);
       setForgotSuccessModal(true);
       setForgotMessage(null);
-      
-      setTimeout(() => {
+
+      if (forgotSuccessTimerRef.current) {
+        window.clearTimeout(forgotSuccessTimerRef.current);
+      }
+      forgotSuccessTimerRef.current = window.setTimeout(() => {
         setForgotSuccessModal(false);
         setForgotForm({ username: '', birthDate: '', password: '', confirmPassword: '' });
         setForgotOpen(false);
         setForgotUsernameValid(null);
         setLoginForm({ username: '', password: '' });
+        forgotSuccessTimerRef.current = null;
       }, 2500);
     } catch (error) {
       console.error('Password reset error:', error);

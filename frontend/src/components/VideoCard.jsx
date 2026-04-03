@@ -71,7 +71,11 @@ export default function VideoCard({
   isFavorite = false,
   onToggleCompleted,
   isCompleted = false,
-  disableDangerActions = false
+  disableDangerActions = false,
+  undoItem = null,
+  onUndo = null,
+  undoItems = {},
+  onUndoMaterial = null
 }) {
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [savedProgressSec, setSavedProgressSec] = useState(0);
@@ -316,10 +320,21 @@ export default function VideoCard({
               onUpload={onUploadMaterial}
               onRemove={onRemoveMaterial}
               disableRemove={disableDangerActions}
+              undoItems={undoItems}
+              onUndoMaterial={onUndoMaterial}
             />
-            <button type="button" className="danger-btn" onClick={() => onDeleteVideo(video._id)} disabled={disableDangerActions}>
-              Delete video
-            </button>
+            {undoItem ? (
+              <div className="video-delete-undo">
+                <span className="undo-message">{undoItem.remainingMs > 0 ? Math.ceil(undoItem.remainingMs / 1000) : '0'}s - {undoItem.message}</span>
+                <button type="button" className="secondary-btn" onClick={onUndo}>
+                  Undo
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="danger-btn" onClick={() => onDeleteVideo(video._id)} disabled={disableDangerActions}>
+                Delete video
+              </button>
+            )}
           </>
         ) : (
           <section className="materials-panel compact">

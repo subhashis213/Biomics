@@ -98,18 +98,30 @@ export default function FinalWorkingVideoCard({
   const [showDetails, setShowDetails] = useState(false);
   const [playerError, setPlayerError] = useState('');
   const [playerInstanceKey, setPlayerInstanceKey] = useState(0);
+  const [availableQualities, setAvailableQualities] = useState([]);
+  const [currentQuality, setCurrentQuality] = useState('default');
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [hoverTime, setHoverTime] = useState(null);
 
   const playerRef = useRef(null);
   const playerContainerRef = useRef(null);
-  const playerDivRef = useRef(null);
+  const playerFrameWrapRef = useRef(null);
   const saveIntervalRef = useRef(null);
   const pendingSeekRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const progressRef = useRef(null);
+  const settingsPanelRef = useRef(null);
+  const settingsShellRef = useRef(null);
 
   const videoId = useMemo(() => resolveYouTubeVideoId(video?.url), [video?.url]);
   const canPlayInline = !adminMode && Boolean(videoId);
   const storageKey = useMemo(() => `biomics:video-progress:${String(video?._id || '')}`, [video?._id]);
+  const qualityOptions = useMemo(() => {
+    const normalized = Array.from(new Set((availableQualities || []).filter(Boolean)));
+    return ['default', ...normalized.filter((quality) => quality !== 'default')];
+  }, [availableQualities]);
 
   function clearSaveInterval() {
     if (saveIntervalRef.current) {
@@ -168,11 +180,18 @@ export default function FinalWorkingVideoCard({
 
     loadYouTubeApi()
       .then((YT) => {
-        if (cancelled || !YT?.Player || !playerDivRef.current) return;
+        if (cancelled || !YT?.Player || !playerFrameWrapRef.current) return;
 
         console.log('Creating YouTube player for video:', videoId);
 
-        playerRef.current = new YT.Player(playerDivRef.current, {
+        // Create a fresh div for YouTube to replace with its iframe.
+        // This keeps the mount point outside React's virtual DOM so React's
+        // reconciler never encounters the replaced node (avoiding insertBefore errors).
+        const ytDiv = document.createElement('div');
+        ytDiv.style.cssText = 'width:100%;height:100%;';
+        playerFrameWrapRef.current.appendChild(ytDiv);
+
+        playerRef.current = new YT.Player(ytDiv, {
           videoId,
           width: '100%',
           height: '100%',
@@ -196,7 +215,17 @@ export default function FinalWorkingVideoCard({
               setIsPlayerLoading(false);
               setIsPlayerReady(true);
               setDuration(event.target.getDuration());
-              
+              try {
+                const qualities = event.target.getAvailableQualityLevels?.();
+                if (Array.isArray(qualities) && qualities.length) setAvailableQualities(qualities);
+              } catch { /* ignore */ }
+              try {
+                setCurrentQuality(event.target.getPlaybackQuality?.() || 'default');
+              } catch { /* ignore */ }
+              try {
+                setPlaybackSpeed(event.target.getPlaybackRate?.() || 1);
+              } catch { /* ignore */ }
+
               // Explicitly unmute and set volume — required for async-initiated playback
               try { event.target.unMute(); } catch { /* ignore */ }
               try { event.target.setVolume(volume); } catch { /* ignore */ }
@@ -244,6 +273,10 @@ export default function FinalWorkingVideoCard({
               console.error('YouTube player error:', event);
               setIsPlayerLoading(false);
               setPlayerError('Video failed to load. Please reload video.');
+            },
+            onPlaybackQualityChange: (event) => {
+              if (cancelled) return;
+              setCurrentQuality(event.data || 'default');
             }
           }
         });
@@ -262,8 +295,17 @@ export default function FinalWorkingVideoCard({
         try { playerRef.current.destroy(); } catch { /* ignore */ }
         playerRef.current = null;
       }
+      // Remove YouTube-injected content from the stable wrapper so React's
+      // virtual DOM stays in sync with the real DOM on the next render.
+      try {
+        const wrap = playerFrameWrapRef.current;
+        if (wrap) {
+          while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+        }
+      } catch { /* ignore */ }
       setIsPlayerReady(false);
       setIsPlayerLoading(false);
+      setShowSettings(false);
     };
   }, [canPlayInline, videoId, isPlayerOpen, playerInstanceKey]);
 
@@ -292,6 +334,74 @@ export default function FinalWorkingVideoCard({
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  // Keyboard shortcuts while player is open
+  useEffect(() => {
+    if (!isPlayerOpen || !isPlayerReady) return undefined;
+    const handleKey = (e) => {
+      if (document.activeElement?.tagName?.match(/^(INPUT|TEXTAREA|SELECT)$/i)) return;
+      switch (e.key) {
+        case ' ':
+        case 'k':
+        case 'K':
+          e.preventDefault();
+          if (isPlaying) { try { playerRef.current?.pauseVideo(); } catch {} }
+          else { try { playerRef.current?.playVideo(); } catch {} }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          try { const t = playerRef.current?.getCurrentTime() || 0; playerRef.current?.seekTo(Math.max(0, t - 10), true); } catch {}
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          try { const t = playerRef.current?.getCurrentTime() || 0; playerRef.current?.seekTo(t + 10, true); } catch {}
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          { const v = Math.min(100, volume + 10); setVolume(v); try { playerRef.current?.setVolume(v); } catch {} }
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          { const v = Math.max(0, volume - 10); setVolume(v); try { playerRef.current?.setVolume(v); } catch {} }
+          break;
+        case 'm':
+        case 'M':
+          e.preventDefault();
+          if (isMuted) { try { playerRef.current?.unMute(); playerRef.current?.setVolume(volume); } catch {} setIsMuted(false); }
+          else { try { playerRef.current?.mute(); } catch {} setIsMuted(true); }
+          break;
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          { const fsEl = document.fullscreenElement || document.webkitFullscreenElement; if (!fsEl) { const tgt = playerContainerRef.current || playerFrameWrapRef.current?.querySelector('iframe') || document.documentElement; if (tgt.requestFullscreen) tgt.requestFullscreen().catch(() => {}); else if (tgt.webkitRequestFullscreen) tgt.webkitRequestFullscreen(); } else { if (document.exitFullscreen) document.exitFullscreen().catch(() => {}); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } }
+          break;
+        case 'Escape':
+          if (showSettings) {
+            setShowSettings(false);
+          }
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isPlayerOpen, isPlayerReady, isPlaying, volume, isMuted, showSettings]);
+
+  // Close settings panel on outside click
+  useEffect(() => {
+    if (!showSettings) return undefined;
+    const handleClickOutside = (e) => {
+      if (settingsPanelRef.current?.contains(e.target) || e.target.closest('.cpv-settings-trigger')) {
+        return;
+      }
+      if (settingsShellRef.current && !settingsShellRef.current.contains(e.target)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSettings]);
 
   function getStateName(state) {
     const YTState = window.YT?.PlayerState || {};
@@ -350,6 +460,7 @@ export default function FinalWorkingVideoCard({
     setIsPlayerOpen(false);
     setIsPlaying(false);
     setShowControls(true);
+    setShowSettings(false);
   }
 
   function handlePlayPause() {
@@ -367,6 +478,13 @@ export default function FinalWorkingVideoCard({
     const newVolume = parseInt(e.target.value);
     setVolume(newVolume);
     playerRef.current.setVolume(newVolume);
+    if (newVolume <= 0) {
+      try { playerRef.current.mute(); } catch { /* ignore */ }
+      setIsMuted(true);
+      return;
+    }
+    try { playerRef.current.unMute(); } catch { /* ignore */ }
+    setIsMuted(false);
   }
 
   function handleSeek(e) {
@@ -401,7 +519,7 @@ export default function FinalWorkingVideoCard({
 
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     if (!fsEl) {
-      const target = playerContainerRef.current || playerDivRef.current?.querySelector('iframe') || document.documentElement;
+      const target = playerContainerRef.current || playerFrameWrapRef.current?.querySelector('iframe') || document.documentElement;
       if (target.requestFullscreen) {
         target.requestFullscreen().catch(() => {});
       } else if (target.webkitRequestFullscreen) {
@@ -415,6 +533,56 @@ export default function FinalWorkingVideoCard({
     } else if (document.webkitExitFullscreen) {
       document.webkitExitFullscreen();
     }
+  }
+
+  const QUALITY_LABELS = { highres: '4K', hd2160: '4K', hd1440: '1440p', hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p', tiny: '144p', default: 'Auto' };
+
+  function handleSkip(secs) {
+    if (!isPlayerReady || !playerRef.current) return;
+    try {
+      const current = playerRef.current.getCurrentTime() || 0;
+      playerRef.current.seekTo(Math.max(0, current + secs), true);
+    } catch { /* ignore */ }
+  }
+
+  function handleSpeedChange(speed) {
+    if (!isPlayerReady || !playerRef.current) return;
+    try { playerRef.current.setPlaybackRate(speed); } catch { /* ignore */ }
+    setPlaybackSpeed(speed);
+    setShowSettings(false);
+  }
+
+  function handleQualityChange(quality) {
+    if (!isPlayerReady || !playerRef.current) return;
+    try {
+      playerRef.current.setPlaybackQuality(quality);
+      if (typeof playerRef.current.setPlaybackQualityRange === 'function') {
+        playerRef.current.setPlaybackQualityRange(quality, quality);
+      }
+    } catch { /* ignore */ }
+    setCurrentQuality(quality);
+  }
+
+  function toggleMute() {
+    if (!isPlayerReady || !playerRef.current) return;
+    try {
+      if (isMuted) {
+        playerRef.current.unMute();
+        playerRef.current.setVolume(volume);
+        setIsMuted(false);
+      } else {
+        playerRef.current.mute();
+        setIsMuted(true);
+      }
+    } catch { /* ignore */ }
+  }
+
+  function handleProgressHover(e) {
+    if (!duration) return;
+    const rect = progressRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    setHoverTime({ percent, time: formatDuration((percent / 100) * duration) });
   }
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -457,10 +625,9 @@ export default function FinalWorkingVideoCard({
             </div>
           )}
           
-          {/* YouTube player container */}
-          <div 
-            ref={playerDivRef} 
-            key={`player-${videoId}-${playerInstanceKey}`}
+          {/* YouTube player container — stable wrapper; YT mounts inside programmatically */}
+          <div
+            ref={playerFrameWrapRef}
             className="compact-premium-player-frame"
           />
 
@@ -476,70 +643,216 @@ export default function FinalWorkingVideoCard({
           {/* Custom controls overlay */}
           {isPlayerReady && (
             <div className={`compact-premium-controls-overlay ${showControls ? '' : 'hide-controls'}`}>
-              <div className="compact-premium-progress-bar" onClick={handleProgressClick} ref={progressRef}>
-                <div 
-                  className="compact-premium-progress-fill" 
-                  style={{ width: `${progressPercent}%` }}
-                >
-                  <div className="compact-premium-progress-handle"></div>
+
+              <div className="cpv-control-status-row">
+                <div className="cpv-control-badges">
+                  <span className="cpv-status-badge">Quality {QUALITY_LABELS[currentQuality] || currentQuality}</span>
+                  <span className="cpv-status-badge">Speed {playbackSpeed === 1 ? 'Normal' : `${playbackSpeed}x`}</span>
                 </div>
-                <div 
-                  className="compact-premium-progress-buffered"
-                  style={{ width: `${(savedProgressSec / duration) * 100 || 0}%` }}
-                ></div>
+                <span className="cpv-control-shortcuts">K play, Left/Right seek, M mute, F fullscreen</span>
               </div>
-              
+
+              {/* Settings panel — speed & quality — expands overlay upward */}
+              {showSettings && (
+                <div className="cpv-settings-panel" ref={settingsPanelRef}>
+                  <div className="cpv-settings-group">
+                    <span className="cpv-settings-label">Playback Speed</span>
+                    <label className="cpv-settings-field">
+                      <span className="cpv-settings-field-label">Speed</span>
+                      <select
+                        className="cpv-settings-select"
+                        value={String(playbackSpeed)}
+                        onChange={(event) => handleSpeedChange(Number(event.target.value))}
+                      >
+                        {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((speed) => (
+                          <option key={speed} value={speed}>{speed === 1 ? 'Normal (1x)' : `${speed}x`}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {qualityOptions.length > 0 && (
+                    <div className="cpv-settings-group">
+                      <span className="cpv-settings-label">Quality</span>
+                      <label className="cpv-settings-field">
+                        <span className="cpv-settings-field-label">Resolution</span>
+                        <select
+                          className="cpv-settings-select"
+                          value={currentQuality}
+                          onChange={(event) => handleQualityChange(event.target.value)}
+                        >
+                          {qualityOptions.map((quality) => (
+                            <option key={quality} value={quality}>{QUALITY_LABELS[quality] || quality}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                  <p className="cpv-settings-hint">Space/K play · Left/Right seek · Up/Down volume · M mute · F fullscreen</p>
+                </div>
+              )}
+
+              {/* Progress bar with hover tooltip */}
+              <div className="cpv-progress-wrap">
+                {hoverTime !== null && (
+                  <span
+                    className="cpv-time-tooltip"
+                    style={{ left: `clamp(24px, ${hoverTime.percent}%, calc(100% - 24px))` }}
+                  >
+                    {hoverTime.time}
+                  </span>
+                )}
+                <div
+                  className="compact-premium-progress-bar"
+                  onClick={handleProgressClick}
+                  onMouseMove={handleProgressHover}
+                  onMouseLeave={() => setHoverTime(null)}
+                  ref={progressRef}
+                >
+                  <div
+                    className="compact-premium-progress-fill"
+                    style={{ width: `${progressPercent}%` }}
+                  >
+                    <div className="compact-premium-progress-handle" />
+                  </div>
+                  <div
+                    className="compact-premium-progress-buffered"
+                    style={{ width: `${(savedProgressSec / duration) * 100 || 0}%` }}
+                  />
+                </div>
+              </div>
+
               <div className="compact-premium-controls-main">
+                {/* Left: play, skip, time */}
                 <div className="compact-premium-controls-left">
-                  <button 
+                  {/* Play / Pause */}
+                  <button
+                    type="button"
                     className="compact-premium-control-btn compact-premium-play-btn"
                     onClick={handlePlayPause}
+                    title={isPlaying ? 'Pause (Space / K)' : 'Play (Space / K)'}
+                    aria-label={isPlaying ? 'Pause' : 'Play'}
                   >
                     {isPlaying ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor">
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <rect x="6" y="4" width="4" height="16" />
                         <rect x="14" y="4" width="4" height="16" />
                       </svg>
                     ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M8 5v14l11-7z"/>
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5v14l11-7z" />
                       </svg>
                     )}
                   </button>
-                  
+
+                  {/* Rewind 10s */}
+                  <button
+                    type="button"
+                    className="compact-premium-control-btn cpv-skip-btn"
+                    onClick={() => handleSkip(-10)}
+                    title="Rewind 10s (←)"
+                    aria-label="Rewind 10 seconds"
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                    </svg>
+                    <span className="cpv-skip-label">10</span>
+                  </button>
+
+                  {/* Forward 10s */}
+                  <button
+                    type="button"
+                    className="compact-premium-control-btn cpv-skip-btn cpv-skip-fwd"
+                    onClick={() => handleSkip(10)}
+                    title="Forward 10s (→)"
+                    aria-label="Forward 10 seconds"
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8h-2z"/>
+                    </svg>
+                    <span className="cpv-skip-label">10</span>
+                  </button>
+
+                  {/* Time */}
                   <div className="compact-premium-time-display">
                     {formatDuration(currentTime)} / {formatDuration(duration)}
                   </div>
+
+                  {/* Speed badge (shown only when not 1×) */}
+                  {playbackSpeed !== 1 && (
+                    <span className="cpv-speed-badge">{playbackSpeed}×</span>
+                  )}
                 </div>
-                
-                <div className="compact-premium-controls-right">
-                  <div className="compact-premium-volume-control">
-                    <svg className="compact-premium-volume-icon" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                    </svg>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="100" 
-                      value={volume}
-                      onChange={handleVolumeChange}
-                      className="compact-premium-volume-slider"
-                    />
-                  </div>
-                  
-                  <button 
-                    className="compact-premium-control-btn"
-                    onClick={toggleFullscreen}
+
+                {/* Right: mute, volume, settings, fullscreen */}
+                <div className="compact-premium-controls-right" ref={settingsShellRef}>
+                  {/* Mute toggle */}
+                  <button
+                    type="button"
+                    className={`compact-premium-control-btn${isMuted || volume === 0 ? ' cpv-muted' : ''}`}
+                    onClick={toggleMute}
+                    title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
+                    aria-label={isMuted ? 'Unmute' : 'Mute'}
                   >
-                    {isFullscreen ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h3v-3z"/>
+                    {isMuted || volume === 0 ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/>
+                      </svg>
+                    ) : volume < 50 ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>
                       </svg>
                     ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor">
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                      </svg>
+                    )}
+                  </button>
+
+                  {/* Volume slider */}
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    className="compact-premium-volume-slider"
+                    title={`Volume ${isMuted ? '(muted)' : `${volume}%`} · ↑↓ keys`}
+                    aria-label="Volume"
+                  />
+
+                  {/* Settings: speed + quality */}
+                  <button
+                    type="button"
+                    className={`compact-premium-control-btn cpv-labeled-btn cpv-settings-trigger${showSettings ? ' cpv-settings-active' : ''}`}
+                    onClick={() => setShowSettings((p) => !p)}
+                    title="Settings — speed & quality"
+                    aria-label="Settings"
+                    aria-expanded={showSettings}
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                    </svg>
+                    <span className="cpv-control-label">Settings</span>
+                  </button>
+
+                  {/* Fullscreen */}
+                  <button
+                    type="button"
+                    className="compact-premium-control-btn cpv-labeled-btn"
+                    onClick={toggleFullscreen}
+                    title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
+                    aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  >
+                    {isFullscreen ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
                       </svg>
                     )}
+                    <span className="cpv-control-label">{isFullscreen ? 'Exit Full' : 'Fullscreen'}</span>
                   </button>
                 </div>
               </div>
@@ -655,7 +968,7 @@ export default function FinalWorkingVideoCard({
               data-tooltip="Start Over"
             >
               <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-6-2.69-6H4c0 4.42 3.58 8s8-3.58 8-8z"/>
+                <path d="M12 5a7 7 0 1 0 7 7h-2a5 5 0 1 1-5-5V5zm-1 0v4.5l3.5 2-.75 1.3L10 10.5V5h1z" />
               </svg>
             </button>
 
@@ -667,8 +980,8 @@ export default function FinalWorkingVideoCard({
               title={isFavorite ? 'Saved' : 'Save'}
               data-tooltip={isFavorite ? 'Saved' : 'Save'}
             >
-              <svg viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'}>
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42z"/>
+              <svg viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={isFavorite ? '0' : '1.8'} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" />
               </svg>
             </button>
 
@@ -750,7 +1063,7 @@ export default function FinalWorkingVideoCard({
                   title="Start Over"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-6-2.69-6H4c0 4.42 3.58 8s8-3.58 8-8z"/>
+                    <path d="M12 5a7 7 0 1 0 7 7h-2a5 5 0 1 1-5-5V5zm-1 0v4.5l3.5 2-.75 1.3L10 10.5V5h1z" />
                   </svg>
                   Start Over
                 </button>
@@ -774,8 +1087,8 @@ export default function FinalWorkingVideoCard({
                 aria-label={isFavorite ? 'Saved' : 'Save'}
                 title={isFavorite ? 'Saved' : 'Save'}
               >
-                <svg viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'}>
-                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42z"/>
+                <svg viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={isFavorite ? '0' : '1.8'} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" />
                 </svg>
                 {isFavorite ? 'Saved' : 'Save'}
               </button>

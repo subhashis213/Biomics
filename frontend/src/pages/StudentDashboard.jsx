@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { downloadMaterial, getApiBase, requestJson } from '../api';
+import { downloadMaterial, fetchQuizLeaderboard, getApiBase, requestJson } from '../api';
 import logoImg from '../assets/biomics-logo.jpeg';
 import AppShell from '../components/AppShell';
 import { QuizModal } from '../components/QuizModal';
@@ -34,6 +34,11 @@ export default function StudentDashboard() {
   const [downloadProgress, setDownloadProgress] = useState({});
   const [quizModalOpen, setQuizModalOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboardModules, setLeaderboardModules] = useState([]);
+  const [leaderboardModuleFilter, setLeaderboardModuleFilter] = useState('all');
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState(null);
   const [profileForm, setProfileForm] = useState({ username: '', phone: '', city: '', password: '' });
@@ -116,6 +121,11 @@ export default function StudentDashboard() {
 
   function normalizeId(value) {
     return String(value || '');
+  }
+
+  function safePercent(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? Math.round(num) : 0;
   }
 
   const moduleMetaByKey = {};
@@ -266,6 +276,17 @@ export default function StudentDashboard() {
     return acc;
   }, {});
 
+  const fallbackLeaderboardModules = Array.from(new Set(
+    visibleModules.map((moduleKey) => moduleMetaByKey[moduleKey]?.module).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b));
+
+  const leaderboardModuleOptions = Array.from(new Set([
+    ...leaderboardModules,
+    ...fallbackLeaderboardModules
+  ])).sort((a, b) => a.localeCompare(b));
+
+  const leaderboardChampion = leaderboard[0] || null;
+
   useEffect(() => {
     if (!loadError) return;
     if (/authentication|unauthorized/i.test(loadError.message || '')) {
@@ -298,6 +319,34 @@ export default function StudentDashboard() {
       document.body.style.overflow = previousOverflow;
     };
   }, [profileOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLeaderboardLoading(true);
+    setLeaderboardError('');
+
+    const activeModuleFilter = leaderboardModuleFilter === 'all' ? '' : leaderboardModuleFilter;
+
+    fetchQuizLeaderboard(activeModuleFilter)
+      .then((data) => {
+        if (cancelled) return;
+        setLeaderboard(data?.leaderboard || []);
+        setLeaderboardModules(data?.modules || []);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLeaderboardError(error?.message || 'Failed to load leaderboard.');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLeaderboardLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [leaderboardModuleFilter, quizAttempts.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -496,12 +545,20 @@ export default function StudentDashboard() {
     ? (/^https?:\/\//i.test(rawProfileAvatarUrl) ? rawProfileAvatarUrl : `${getApiBase()}${rawProfileAvatarUrl}`)
     : '';
   const profileInitial = (profile?.username || session?.username || 'S').trim().charAt(0).toUpperCase();
-  const studentNavItems = [
-    { id: 'section-overview', icon: '🏠', label: 'Overview' },
-    { id: 'section-learning', icon: '📚', label: 'Learning' },
-    { id: 'section-feedback', icon: '💬', label: 'Feedback' },
-    { id: 'section-connect', icon: '🌐', label: 'Connect' }
-  ];
+  const studentNavItems = useMemo(() => {
+    const baseItems = [
+      { id: 'section-overview', label: 'Overview', icon: '🏠' },
+      { id: 'section-learning', label: 'Learning', icon: '📘' },
+      { id: 'section-connect', label: 'Connect', icon: '🔗' }
+    ];
+    if (selectedModule) return baseItems;
+    return [
+      ...baseItems.slice(0, 2),
+      { id: 'section-leaderboard', label: 'Leaderboard', icon: '🏆' },
+      { id: 'section-feedback', label: 'Feedback', icon: '💬' },
+      baseItems[2]
+    ];
+  }, [selectedModule]);
 
   return (
     <>
@@ -509,9 +566,9 @@ export default function StudentDashboard() {
       title="Student Dashboard"
       subtitle={`Welcome${session?.username ? `, ${session.username}` : ''}. ${course ? `You are enrolled in ${course}.` : ''} Watch lessons and download lecture materials.`}
       roleLabel="Student"
-      navTitle="Student Menu"
-      navItems={studentNavItems}
       showThemeSwitch={false}
+      navTitle="Student Sections"
+      navItems={studentNavItems}
       actions={(
         <div className="profile-trigger-wrap">
           <button
@@ -770,20 +827,22 @@ export default function StudentDashboard() {
         </div>
       ) : selectedModule && displayedVideos.length ? (
         // Video Grid View (within selected module)
-        <div className="compact-premium-video-grid">
-          {displayedVideos.map((video) => (
-            <FinalWorkingVideoCard
-              key={video._id}
-              video={video}
-              adminMode={false}
-              downloadProgress={downloadProgress}
-              onDownloadMaterial={handleDownload}
-              onToggleFavorite={toggleFavorite}
-              isFavorite={favoriteIds.has(normalizeId(video._id))}
-              onToggleCompleted={toggleCompleted}
-              isCompleted={completedIds.has(normalizeId(video._id))}
-            />
-          ))}
+        <div className="module-videos-scroll">
+          <div className="compact-premium-video-grid">
+            {displayedVideos.map((video) => (
+              <FinalWorkingVideoCard
+                key={video._id}
+                video={video}
+                adminMode={false}
+                downloadProgress={downloadProgress}
+                onDownloadMaterial={handleDownload}
+                onToggleFavorite={toggleFavorite}
+                isFavorite={favoriteIds.has(normalizeId(video._id))}
+                onToggleCompleted={toggleCompleted}
+                isCompleted={completedIds.has(normalizeId(video._id))}
+              />
+            ))}
+          </div>
         </div>
       ) : (
         <p className="empty-state">
@@ -823,6 +882,77 @@ export default function StudentDashboard() {
               );
             })}
           </div>
+        </section>
+      ) : null}
+
+      {!selectedModule ? (
+        <section id="section-leaderboard" className="card quiz-leaderboard-panel">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Quiz Leaderboard</p>
+              <h2>Top Performers</h2>
+            </div>
+            <label className="quiz-leaderboard-filter">
+              Module
+              <select
+                value={leaderboardModuleFilter}
+                onChange={(event) => setLeaderboardModuleFilter(event.target.value)}
+              >
+                <option value="all">All Modules</option>
+                {leaderboardModuleOptions.map((moduleName) => (
+                  <option key={moduleName} value={moduleName}>{moduleName}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {leaderboardLoading ? <p className="empty-note">Loading leaderboard...</p> : null}
+          {!leaderboardLoading && leaderboardError ? <p className="inline-message error">{leaderboardError}</p> : null}
+
+          {!leaderboardLoading && !leaderboardError ? (
+            leaderboard.length ? (
+              <>
+                {leaderboardChampion ? (
+                  <article className="leaderboard-champion-card">
+                    <span className="leaderboard-crown" aria-hidden="true">👑</span>
+                    <div>
+                      <p className="leaderboard-champion-label">Highest Candidate</p>
+                      <h3>{leaderboardChampion.username}</h3>
+                      <p className="leaderboard-champion-meta">
+                        {leaderboardChampion.module || 'General'} • {leaderboardChampion.score || 0}/{leaderboardChampion.total || 0} ({safePercent(leaderboardChampion.percentage)}%)
+                      </p>
+                    </div>
+                  </article>
+                ) : null}
+                <div className="leaderboard-table-wrap">
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Candidate</th>
+                        <th>Module</th>
+                        <th>Best Score</th>
+                        <th>Attempts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboard.map((entry, index) => (
+                        <tr key={`${entry.username || 'candidate'}-${entry.module || 'General'}-${entry.rank || index + 1}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
+                          <td>#{entry.rank || index + 1}</td>
+                          <td>{entry.username || 'Anonymous'}</td>
+                          <td>{entry.module || 'General'}</td>
+                          <td>{entry.score || 0}/{entry.total || 0} ({safePercent(entry.percentage)}%)</td>
+                          <td>{entry.attemptsCount || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <p className="empty-note">No leaderboard data yet for this module. Submit a quiz attempt to appear here.</p>
+            )
+          ) : null}
         </section>
       ) : null}
 

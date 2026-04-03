@@ -65,7 +65,6 @@ export default function AdminDashboard() {
   const [isScheduling, setIsScheduling] = useState(false);
   const [isCancellingSchedule, setIsCancellingSchedule] = useState(false);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
-  const [activeSection, setActiveSection] = useState('section-live-class');
   const [quizCategory, setQuizCategory] = useState(COURSE_CATEGORIES[0]);
   const [quizModule, setQuizModule] = useState('');
   const [quizTitle, setQuizTitle] = useState('');
@@ -91,10 +90,9 @@ export default function AdminDashboard() {
     errorText: ''
   });
   const [isConfirmingAction, setIsConfirmingAction] = useState(false);
-  const [undoPopup, setUndoPopup] = useState(null);
-  const [undoRemainingMs, setUndoRemainingMs] = useState(UNDO_DURATION_MS);
-  const undoTimeoutRef = useRef(null);
-  const undoIntervalRef = useRef(null);
+  const [undoItems, setUndoItems] = useState({});
+  const undoTimeoutsRef = useRef({});
+  const undoIntervalsRef = useRef({});
   const undoActiveRef = useRef(false);
   const confirmActionRef = useRef(null);
   const bannerTimeoutRef = useRef(null);
@@ -268,12 +266,8 @@ export default function AdminDashboard() {
       if (bannerTimeoutRef.current) {
         clearTimeout(bannerTimeoutRef.current);
       }
-      if (undoTimeoutRef.current) {
-        clearTimeout(undoTimeoutRef.current);
-      }
-      if (undoIntervalRef.current) {
-        clearInterval(undoIntervalRef.current);
-      }
+      Object.values(undoTimeoutsRef.current).forEach(timeoutId => clearTimeout(timeoutId));
+      Object.values(undoIntervalsRef.current).forEach(intervalId => clearInterval(intervalId));
       clearQuizMessageTimers();
     };
   }, []);
@@ -406,20 +400,19 @@ export default function AdminDashboard() {
     }
   }
 
-  function clearUndoTimers() {
-    undoActiveRef.current = false;
-    if (undoTimeoutRef.current) {
-      clearTimeout(undoTimeoutRef.current);
-      undoTimeoutRef.current = null;
+  function clearUndoTimers(itemId) {
+    if (undoTimeoutsRef.current[itemId]) {
+      clearTimeout(undoTimeoutsRef.current[itemId]);
+      delete undoTimeoutsRef.current[itemId];
     }
-    if (undoIntervalRef.current) {
-      clearInterval(undoIntervalRef.current);
-      undoIntervalRef.current = null;
+    if (undoIntervalsRef.current[itemId]) {
+      clearInterval(undoIntervalsRef.current[itemId]);
+      delete undoIntervalsRef.current[itemId];
     }
   }
 
-  function scheduleUndoPopup({ message, commit, rollback, successText }) {
-    clearUndoTimers();
+  function scheduleUndoPopup({ itemId, message, commit, rollback, successText }) {
+    clearUndoTimers(itemId);
     undoActiveRef.current = true;
 
     const startedAt = Date.now();
@@ -429,19 +422,25 @@ export default function AdminDashboard() {
       rollback,
       successText,
       startedAt,
-      expiresAt: startedAt + UNDO_DURATION_MS
+      expiresAt: startedAt + UNDO_DURATION_MS,
+      remainingMs: UNDO_DURATION_MS
     };
 
-    setUndoPopup(action);
-    setUndoRemainingMs(UNDO_DURATION_MS);
+    setUndoItems((current) => ({
+      ...current,
+      [itemId]: action
+    }));
 
-    undoIntervalRef.current = setInterval(() => {
+    undoIntervalsRef.current[itemId] = setInterval(() => {
       const remaining = Math.max(0, action.expiresAt - Date.now());
-      setUndoRemainingMs(remaining);
+      setUndoItems((current) => ({
+        ...current,
+        [itemId]: current[itemId] ? { ...current[itemId], remainingMs: remaining } : current[itemId]
+      }));
     }, 100);
 
-    undoTimeoutRef.current = setTimeout(async () => {
-      clearUndoTimers();
+    undoTimeoutsRef.current[itemId] = setTimeout(async () => {
+      clearUndoTimers(itemId);
       try {
         await action.commit();
         setBanner({ type: 'success', text: action.successText });
@@ -449,16 +448,25 @@ export default function AdminDashboard() {
         action.rollback?.();
         setBanner({ type: 'error', text: error?.message || 'Action failed.' });
       } finally {
-        setUndoPopup(null);
+        setUndoItems((current) => {
+          const next = { ...current };
+          delete next[itemId];
+          return next;
+        });
       }
     }, UNDO_DURATION_MS);
   }
 
-  function handleUndoAction() {
-    if (!undoPopup && !undoActiveRef.current) return;
-    clearUndoTimers();
-    undoPopup.rollback?.();
-    setUndoPopup(null);
+  function handleUndoAction(itemId) {
+    const action = undoItems[itemId];
+    if (!action) return;
+    clearUndoTimers(itemId);
+    action.rollback?.();
+    setUndoItems((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
     setBanner({ type: 'success', text: 'Action cancelled.' });
   }
 
@@ -634,7 +642,7 @@ export default function AdminDashboard() {
   }
 
   function handleDeleteVideo(videoId) {
-    if (undoActiveRef.current) {
+    if (Object.keys(undoItems).length > 0) {
       setBanner({ type: 'error', text: 'Undo or wait for the current pending delete/remove action first.' });
       return;
     }
@@ -649,6 +657,7 @@ export default function AdminDashboard() {
         setVideos((current) => current.filter((video) => video._id !== videoId));
 
         scheduleUndoPopup({
+          itemId: `video-${videoId}`,
           message: `Deleting lecture${target?.title ? `: ${target.title}` : ''}`,
           commit: async () => {
             await requestJson(`/videos/${videoId}`, { method: 'DELETE' });
@@ -705,7 +714,7 @@ export default function AdminDashboard() {
   }
 
   function handleRemoveMaterial(videoId, filename) {
-    if (undoActiveRef.current) {
+    if (Object.keys(undoItems).length > 0) {
       setBanner({ type: 'error', text: 'Undo or wait for the current pending delete/remove action first.' });
       return;
     }
@@ -727,6 +736,7 @@ export default function AdminDashboard() {
         )));
 
         scheduleUndoPopup({
+          itemId: `material-${videoId}-${filename}`,
           message: `Removing material: ${filename}`,
           commit: async () => {
             await requestJson(`/videos/${videoId}/materials/${encodeURIComponent(filename)}`, { method: 'DELETE', headers: {} });
@@ -751,7 +761,7 @@ export default function AdminDashboard() {
   }
 
   function handleRemoveUser(username) {
-    if (undoActiveRef.current) {
+    if (Object.keys(undoItems).length > 0) {
       setBanner({ type: 'error', text: 'Undo or wait for the current pending delete/remove action first.' });
       return;
     }
@@ -766,6 +776,7 @@ export default function AdminDashboard() {
         setStudents((current) => current.filter((student) => student.username !== username));
 
         scheduleUndoPopup({
+          itemId: `user-${username}`,
           message: `Removing user: ${username}`,
           commit: async () => {
             await requestJson(`/auth/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
@@ -811,39 +822,6 @@ export default function AdminDashboard() {
     clearSession();
     navigate('/', { replace: true });
   }
-
-  useEffect(() => {
-    const sectionIds = [
-      'section-live-class',
-      'section-course-manager',
-      'section-registered-users',
-      'section-content-library',
-      'section-quiz-builder',
-      'section-feedback'
-    ];
-    const observers = [];
-    const ratios = {};
-    sectionIds.forEach((id) => { ratios[id] = 0; });
-
-    function pickActive() {
-      let best = sectionIds[0];
-      let bestRatio = -1;
-      sectionIds.forEach((id) => { if (ratios[id] > bestRatio) { bestRatio = ratios[id]; best = id; } });
-      setActiveSection(best);
-    }
-
-    sectionIds.forEach((id) => {
-      const node = document.getElementById(id);
-      if (!node) return;
-      const obs = new IntersectionObserver(
-        ([entry]) => { ratios[id] = entry.intersectionRatio; pickActive(); },
-        { threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] }
-      );
-      obs.observe(node);
-      observers.push(obs);
-    });
-    return () => observers.forEach((obs) => obs.disconnect());
-  }, [loading]);
 
   function scrollToSection(sectionId) {
     const node = document.getElementById(sectionId);
@@ -897,7 +875,7 @@ export default function AdminDashboard() {
   }
 
   function handleDeleteQuiz(quiz) {
-    if (undoActiveRef.current) {
+    if (Object.keys(undoItems).length > 0) {
       setQuizMessage({ type: 'error', text: 'Undo or wait for the current pending delete/remove action first.' });
       return;
     }
@@ -919,6 +897,7 @@ export default function AdminDashboard() {
         }
 
         scheduleUndoPopup({
+          itemId: `quiz-${quiz._id}`,
           message: `Deleting quiz${quiz.title ? `: ${quiz.title}` : ''}`,
           commit: async () => {
             await deleteQuiz(quiz._id);
@@ -953,6 +932,8 @@ export default function AdminDashboard() {
   const filteredVideos = activeLibraryCourse === 'All'
     ? videos
     : videos.filter((video) => (video.category || 'General') === activeLibraryCourse);
+  const activeUserUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('user-'));
+  const activeLibraryUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('video-') || id.startsWith('material-'));
 
   const modulesByCourseFromVideos = videos.reduce((acc, video) => {
     const category = video.category || 'General';
@@ -1061,24 +1042,23 @@ export default function AdminDashboard() {
     }
   }
 
+  const adminNavItems = [
+    { id: 'section-live-class', label: 'Live Class', icon: '🔴' },
+    { id: 'section-course-manager', label: 'Course Manager', icon: '📚' },
+    { id: 'section-registered-users', label: 'Learners', icon: '👥' },
+    { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
+    { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
+    { id: 'section-feedback', label: 'Feedback', icon: '💬' }
+  ];
+
   return (
     <AppShell
       title="Admin Dashboard"
       subtitle="Publish lectures, attach PDF materials, and review registered student records."
       roleLabel="Admin"
       onLogout={handleLogout}
-      navTitle="Admin Menu"
-      activeNavItemId={activeSection}
-      onNavItemClick={scrollToSection}
-      navItems={[
-        { id: 'section-live-class', icon: '🔴', label: 'Live Class' },
-        { id: 'section-course-manager', icon: '📚', label: 'Courses' },
-        { id: 'section-registered-users', icon: '👥', label: 'Users' },
-        { id: 'section-content-library', icon: '🎬', label: 'Library' },
-        { id: 'section-quiz-builder', icon: '📝', label: 'Quiz Builder' },
-        { id: 'section-feedback', icon: '💬', label: 'Feedback' }
-      ]}
-      actions={<StatCard label="Students" value={students.length} />}
+      navTitle="Admin Sections"
+      navItems={adminNavItems}
     >
       {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
@@ -1325,10 +1305,21 @@ export default function AdminDashboard() {
             </div>
             <StatCard label="Total Students" value={students.length} />
           </div>
+          {activeUserUndoEntry ? (
+            <div className="section-undo-alert" role="status" aria-live="polite">
+              <span className="undo-message">
+                {Math.ceil(Math.max(0, activeUserUndoEntry[1].remainingMs || 0) / 1000)}s - {activeUserUndoEntry[1].message}
+              </span>
+              <button type="button" className="secondary-btn undo-btn" onClick={() => handleUndoAction(activeUserUndoEntry[0])}>
+                Undo
+              </button>
+            </div>
+          ) : null}
           <div className="student-cards-scroll">
             <div className="student-cards-grid">
               {students.length ? students.map((student) => {
                 const initial = (student.username || '?')[0].toUpperCase();
+                const undoItem = undoItems[`user-${student.username}`];
                 return (
                   <div key={`${student.username}-${student.phone}`} className="student-card">
                     <div className="student-card-avatar">{initial}</div>
@@ -1340,16 +1331,31 @@ export default function AdminDashboard() {
                       </div>
                       {student.phone ? <span className="student-card-phone">📞 {student.phone}</span> : null}
                     </div>
-                    <button
-                      type="button"
-                      className="student-remove-btn"
-                      onClick={() => handleRemoveUser(student.username)}
-                      disabled={Boolean(undoPopup)}
-                      aria-label={`Remove ${student.username}`}
-                      title="Remove user"
-                    >
-                      ✕
-                    </button>
+                    {undoItem ? (
+                      <div className="student-card-undo">
+                        <span className="undo-timer">{undoItem.remainingMs > 0 ? Math.ceil(undoItem.remainingMs / 1000) : '0'}s</span>
+                        <button
+                          type="button"
+                          className="secondary-btn undo-btn"
+                          onClick={() => handleUndoAction(`user-${student.username}`)}
+                          aria-label={`Undo removal of ${student.username}`}
+                          title="Undo removal"
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="student-remove-btn"
+                        onClick={() => handleRemoveUser(student.username)}
+                        disabled={Object.keys(undoItems).length > 0}
+                        aria-label={`Remove ${student.username}`}
+                        title="Remove user"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 );
               }) : (
@@ -1387,6 +1393,16 @@ export default function AdminDashboard() {
           </div>
           <StatCard label={activeLibraryCourse === 'All' ? 'Total Lectures' : 'Showing'} value={filteredVideos.length} />
         </div>
+        {activeLibraryUndoEntry ? (
+          <div className="section-undo-alert" role="status" aria-live="polite">
+            <span className="undo-message">
+              {Math.ceil(Math.max(0, activeLibraryUndoEntry[1].remainingMs || 0) / 1000)}s - {activeLibraryUndoEntry[1].message}
+            </span>
+            <button type="button" className="secondary-btn undo-btn" onClick={() => handleUndoAction(activeLibraryUndoEntry[0])}>
+              Undo
+            </button>
+          </div>
+        ) : null}
 
         <div className="library-scroll-body">
           {loading ? <p className="empty-state">Loading dashboard...</p> : null}
@@ -1410,7 +1426,11 @@ export default function AdminDashboard() {
                 onUploadMaterial={handleUploadMaterial}
                 onRemoveMaterial={handleRemoveMaterial}
                 onDeleteVideo={handleDeleteVideo}
-                disableDangerActions={Boolean(undoPopup)}
+                disableDangerActions={Object.keys(undoItems).length > 0}
+                undoItem={undoItems[`video-${video._id}`]}
+                onUndo={() => handleUndoAction(`video-${video._id}`)}
+                undoItems={undoItems}
+                onUndoMaterial={(itemId) => handleUndoAction(itemId)}
               />
             ))}
           </div>
@@ -1770,32 +1790,6 @@ export default function AdminDashboard() {
           </section>
         </div>
       , document.body) : null}
-
-      {undoPopup ? (
-        <aside className="undo-popup" role="status" aria-live="polite">
-          <div className="undo-popup-ring" aria-hidden="true">
-            <svg viewBox="0 0 40 40" className="undo-ring-svg">
-              <circle className="undo-ring-track" cx="20" cy="20" r={RING_RADIUS} />
-              <circle
-                className="undo-ring-progress"
-                cx="20"
-                cy="20"
-                r={RING_RADIUS}
-                style={{
-                  strokeDasharray: RING_CIRCUMFERENCE,
-                  strokeDashoffset: RING_CIRCUMFERENCE * (1 - Math.max(0, undoRemainingMs) / UNDO_DURATION_MS)
-                }}
-              />
-            </svg>
-            <span className="undo-popup-seconds">{Math.ceil(Math.max(0, undoRemainingMs) / 1000)}</span>
-          </div>
-          <div className="undo-popup-content">
-            <strong>{undoPopup.message}</strong>
-            <span>You can undo before the timer ends.</span>
-          </div>
-          <button type="button" className="secondary-btn" onClick={handleUndoAction}>Undo</button>
-        </aside>
-      ) : null}
     </AppShell>
   );
 }
