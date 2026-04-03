@@ -246,3 +246,9 @@ export function updateVoucherAdmin(voucherId, payload) {
     body: JSON.stringify(payload)
   });
 }
+
+export function deleteVoucherAdmin(voucherId) {
+  return requestJson(`/payments/admin/vouchers/${encodeURIComponent(voucherId)}`, {
+    method: 'DELETE'
+  });
+}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   createVoucherAdmin,
   deleteQuiz,
+  deleteVoucherAdmin,
   fetchAdminQuizzes,
   fetchCoursePricingAdmin,
   fetchModulePricingAdmin,
@@ -1183,6 +1184,17 @@ export default function AdminDashboard() {
       setBanner({ type: 'success', text: active ? 'Voucher activated.' : 'Voucher disabled.' });
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to update voucher.' });
+    }
+  }
+
+  async function handleDeleteVoucher(voucherId, code) {
+    if (!window.confirm(`Delete voucher "${code}"? This cannot be undone.`)) return;
+    try {
+      await deleteVoucherAdmin(voucherId);
+      await loadPaymentSettings();
+      setBanner({ type: 'success', text: 'Voucher deleted.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to delete voucher.' });
     }
   }
 
@@ -2410,6 +2422,13 @@ export default function AdminDashboard() {
                           onClick={() => handleToggleVoucher(voucher._id, !voucher.active)}
                         >
                           {voucher.active ? 'Disable' : 'Enable'}
+                        </button>
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          onClick={() => handleDeleteVoucher(voucher._id, voucher.code)}
+                        >
+                          Delete
                         </button>
                       </div>
                     </article>

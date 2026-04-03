@@ -711,4 +711,14 @@ router.patch('/admin/vouchers/:id', authenticateToken('admin'), async (req, res)
   }
 });
 
+router.delete('/admin/vouchers/:id', authenticateToken('admin'), async (req, res) => {
+  try {
+    const voucher = await Voucher.findByIdAndDelete(req.params.id).lean();
+    if (!voucher) return res.status(404).json({ error: 'Voucher not found.' });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to delete voucher.' });
+  }
+});
+
 module.exports = router;
