@@ -2403,6 +2403,23 @@ html[data-theme='light'] .field-hint {
   scroll-behavior: smooth;
 }
 
+/* Pricing editor cards can be much taller than quiz rows; avoid nested clipping. */
+.payment-settings-panel .quiz-admin-items {
+  max-height: 52vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  padding-bottom: 10px;
+}
+
+.payment-pricing-card,
+.payment-voucher-card {
+  max-height: 72vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
 .quiz-count-cards {
   display: flex;
   gap: 8px;
@@ -2620,13 +2637,60 @@ html[data-theme='light'] .field-hint {
   border-top: 1px solid var(--border);
   padding: 14px 0 4px;
   margin-top: 10px;
-  overflow-x: auto;
+}
+
+.module-pricing-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.module-pricing-save-all-btn {
+  white-space: nowrap;
+}
+
+.module-pricing-toolbar-note {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.module-pricing-scroll-desktop {
+  display: block;
+}
+
+.module-pricing-scroll {
+  overflow-x: scroll;
+  overflow-y: scroll;
+  max-height: 54vh;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 12px;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 55%, transparent) color-mix(in srgb, var(--border) 65%, transparent);
+}
+
+.module-pricing-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.module-pricing-scroll::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--border) 45%, transparent);
+  border-radius: 999px;
+}
+
+.module-pricing-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 999px;
 }
 
 .module-pricing-table {
   width: 100%;
-  min-width: 600px;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -2648,9 +2712,13 @@ html[data-theme='light'] .field-hint {
   vertical-align: middle;
 }
 
-.module-pricing-action-cell {
+.module-pricing-status-empty {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.module-pricing-name-cell {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   gap: 8px;
 }
@@ -2688,6 +2756,65 @@ html[data-theme='light'] .field-hint {
 .small-btn {
   padding: 5px 12px;
   font-size: 0.78rem;
+}
+
+.module-pricing-swipe-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.module-pricing-mobile-list {
+  display: none;
+}
+
+.module-pricing-mobile-card {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--bg-card-soft) 84%, transparent);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.module-pricing-mobile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.module-pricing-mobile-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.module-pricing-mobile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.module-pricing-mobile-field span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.module-pricing-mobile-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.module-price-toggle-btn {
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .membership-plan-grid {
@@ -6245,6 +6372,8 @@ html[data-theme='light'] .empty-note {
 .library-scroll-body,
 .quiz-question-list,
 .quiz-admin-items,
+.payment-pricing-card,
+.payment-voucher-card,
 .feedback-list-card .feedback-list,
 .registered-learners-card .table-wrap {
   scrollbar-width: thin;
@@ -6254,6 +6383,8 @@ html[data-theme='light'] .empty-note {
 .library-scroll-body::-webkit-scrollbar,
 .quiz-question-list::-webkit-scrollbar,
 .quiz-admin-items::-webkit-scrollbar,
+.payment-pricing-card::-webkit-scrollbar,
+.payment-voucher-card::-webkit-scrollbar,
 .feedback-list-card .feedback-list::-webkit-scrollbar,
 .registered-learners-card .table-wrap::-webkit-scrollbar {
   width: 5px;
@@ -6263,6 +6394,8 @@ html[data-theme='light'] .empty-note {
 .library-scroll-body::-webkit-scrollbar-track,
 .quiz-question-list::-webkit-scrollbar-track,
 .quiz-admin-items::-webkit-scrollbar-track,
+.payment-pricing-card::-webkit-scrollbar-track,
+.payment-voucher-card::-webkit-scrollbar-track,
 .feedback-list-card .feedback-list::-webkit-scrollbar-track,
 .registered-learners-card .table-wrap::-webkit-scrollbar-track {
   background: transparent;
@@ -6272,6 +6405,8 @@ html[data-theme='light'] .empty-note {
 .library-scroll-body::-webkit-scrollbar-thumb,
 .quiz-question-list::-webkit-scrollbar-thumb,
 .quiz-admin-items::-webkit-scrollbar-thumb,
+.payment-pricing-card::-webkit-scrollbar-thumb,
+.payment-voucher-card::-webkit-scrollbar-thumb,
 .feedback-list-card .feedback-list::-webkit-scrollbar-thumb,
 .registered-learners-card .table-wrap::-webkit-scrollbar-thumb {
   background: var(--line);
@@ -6281,6 +6416,8 @@ html[data-theme='light'] .empty-note {
 .library-scroll-body::-webkit-scrollbar-thumb:hover,
 .quiz-question-list::-webkit-scrollbar-thumb:hover,
 .quiz-admin-items::-webkit-scrollbar-thumb:hover,
+.payment-pricing-card::-webkit-scrollbar-thumb:hover,
+.payment-voucher-card::-webkit-scrollbar-thumb:hover,
 .feedback-list-card .feedback-list::-webkit-scrollbar-thumb:hover,
 .registered-learners-card .table-wrap::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
@@ -6564,7 +6701,65 @@ html[data-theme='light'] .empty-note {
 
   .module-pricing-table {
     font-size: 0.82rem;
-    min-width: 100%;
+    min-width: 720px;
+  }
+
+  .module-pricing-scroll-desktop {
+    display: none;
+  }
+
+  .module-pricing-mobile-list {
+    display: block;
+    max-height: 52vh;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .module-pricing-panel {
+    max-height: 52vh;
+  }
+
+  .payment-settings-panel .quiz-admin-items {
+    max-height: 48vh;
+  }
+
+  .payment-pricing-card,
+  .payment-voucher-card {
+    max-height: 64vh;
+  }
+
+  .module-pricing-toolbar {
+    align-items: stretch;
+  }
+
+  .module-pricing-save-all-btn {
+    width: 100%;
+  }
+
+  .module-pricing-toolbar-note {
+    width: 100%;
+    font-size: 0.7rem;
+  }
+
+  .module-pricing-scroll {
+    max-height: 52vh;
+    overflow-y: scroll;
+    overflow-x: scroll;
+    width: 100%;
+    touch-action: pan-x pan-y;
+  }
+
+  .module-pricing-mobile-fields {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .module-pricing-swipe-hint {
+    display: block;
+    margin: 8px 2px 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
   }
 
   .module-pricing-table th,
@@ -6577,14 +6772,11 @@ html[data-theme='light'] .empty-note {
     padding: 5px 7px;
   }
 
-  .module-pricing-action-cell {
-    flex-direction: column;
-    gap: 4px;
-  }
-
   .small-btn {
     padding: 4px 10px;
     font-size: 0.72rem;
+    width: auto;
+    white-space: nowrap;
   }
 }
 
@@ -9671,7 +9863,36 @@ html[data-theme='light'] .premium-materials-panel {
 
   .module-pricing-table {
     font-size: 0.75rem;
-    min-width: 100%;
+    min-width: 680px;
+  }
+
+  .module-pricing-panel {
+    max-height: 48vh;
+  }
+
+  .payment-settings-panel .quiz-admin-items {
+    max-height: 44vh;
+  }
+
+  .payment-pricing-card,
+  .payment-voucher-card {
+    max-height: 60vh;
+  }
+
+  .module-pricing-toolbar-note {
+    font-size: 0.66rem;
+  }
+
+  .module-pricing-scroll {
+    max-height: 48vh;
+    overflow-y: scroll;
+    overflow-x: scroll;
+    width: 100%;
+    touch-action: pan-x pan-y;
+  }
+
+  .module-pricing-swipe-hint {
+    font-size: 0.68rem;
   }
 
   .module-pricing-table th,
@@ -9685,15 +9906,20 @@ html[data-theme='light'] .premium-materials-panel {
     font-size: 0.75rem;
   }
 
-  .module-pricing-action-cell {
-    flex-direction: column;
-    gap: 3px;
-  }
-
   .small-btn {
     padding: 3px 8px;
     font-size: 0.7rem;
-    width: 100%;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .module-pricing-mobile-card {
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+
+  .module-pricing-mobile-field span {
+    font-size: 0.68rem;
   }
 
   .app-side-nav-mobile {

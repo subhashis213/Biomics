@@ -1068,6 +1068,51 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleSaveAllModulePrices(courseName) {
+    const courseData = modulePricingByCourse[courseName];
+    const modulesToSave = (courseData?.modules || []).filter((mod) => !mod.isBundle);
+
+    if (!modulesToSave.length) {
+      setBanner({ type: 'error', text: `No modules available to save for ${courseName}.` });
+      return;
+    }
+
+    for (const mod of modulesToSave) {
+      const form = courseData?.priceFormByModule?.[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+      const proRupees = Number(form.proAmountRupees || 0);
+      const eliteRupees = Number(form.eliteAmountRupees || 0);
+      if (!Number.isFinite(proRupees) || proRupees < 0 || !Number.isFinite(eliteRupees) || eliteRupees < 0) {
+        setBanner({ type: 'error', text: `Invalid price for module ${mod.moduleName}.` });
+        return;
+      }
+    }
+
+    setIsSavingModulePrice(true);
+    try {
+      await Promise.all(
+        modulesToSave.map((mod) => {
+          const form = courseData?.priceFormByModule?.[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+          return saveModulePricingAdmin(courseName, mod.moduleName, {
+            proPriceInPaise: Math.round(Number(form.proAmountRupees || 0) * 100),
+            elitePriceInPaise: Math.round(Number(form.eliteAmountRupees || 0) * 100),
+            currency: 'INR',
+            active: form.active !== false
+          });
+        })
+      );
+
+      await loadModulePricing(courseName);
+      modulesToSave.forEach((mod) => {
+        setPricingInlineStatus(getPricingStatusKey(courseName, mod.moduleName), 'success', 'Saved');
+      });
+      setBanner({ type: 'success', text: `Saved pricing for all modules in ${courseName}.` });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || `Failed to save module pricing for ${courseName}.` });
+    } finally {
+      setIsSavingModulePrice(false);
+    }
+  }
+
   function updateModulePriceForm(courseName, moduleName, field, value) {
     clearPricingSaveStatus(getPricingStatusKey(courseName, moduleName));
     setModulePricingByCourse((prev) => {
@@ -1967,7 +2012,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="dashboard-grid admin-grid">
-          <section className="card">
+          <section className="card payment-pricing-card">
             <div className="section-header compact">
               <div>
                 <p className="eyebrow">Course & Module Pricing</p>
@@ -2065,7 +2110,7 @@ export default function AdminDashboard() {
                       </button>
                       <button
                         type="button"
-                        className="secondary-btn"
+                        className="secondary-btn module-price-toggle-btn"
                         onClick={() => {
                           if (isExpanded) {
                             setExpandedPricingCourse(null);
@@ -2077,7 +2122,7 @@ export default function AdminDashboard() {
                           }
                         }}
                       >
-                        {isExpanded ? '▲ Hide Modules' : '▼ Set Module Prices'}
+                        {isExpanded ? '▲ Close Module Price Editor' : '▼ Open Module Price Editor'}
                       </button>
                     </div>
 
@@ -2089,76 +2134,136 @@ export default function AdminDashboard() {
                         ) : courseModuleData.modules.length === 0 ? (
                           <p className="empty-note">No modules found for {courseName}. Upload videos with module names first.</p>
                         ) : (
-                          <table className="module-pricing-table">
-                            <thead>
-                              <tr>
-                                <th>Module</th>
-                                <th>Pro Price (₹/1 mo)</th>
-                                <th>Elite Price (₹/3 mo)</th>
-                                <th>Active</th>
-                                <th></th>
-                              </tr>
-                            </thead>
-                            <tbody>
+                          <>
+                            <div className="module-pricing-toolbar">
+                              <button
+                                type="button"
+                                className="primary-btn module-pricing-save-all-btn"
+                                disabled={isSavingModulePrice}
+                                onClick={() => handleSaveAllModulePrices(courseName)}
+                              >
+                                {isSavingModulePrice ? 'Saving Module Prices...' : 'Save All Module Prices'}
+                              </button>
+                              <span className="module-pricing-toolbar-note">Edit module prices below, then save all updates in one click.</span>
+                            </div>
+
+                            <div className="module-pricing-scroll module-pricing-scroll-desktop" role="region" aria-label={`Module pricing for ${courseName}`}>
+                              <table className="module-pricing-table">
+                                <thead>
+                                  <tr>
+                                    <th>Module</th>
+                                    <th>Pro Price (₹/1 mo)</th>
+                                    <th>Elite Price (₹/3 mo)</th>
+                                    <th>Active</th>
+                                    <th>Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {courseModuleData.modules.filter((mod) => !mod.isBundle).map((mod) => {
+                                    const mf = courseModuleData.priceFormByModule[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+                                    const moduleStatus = pricingSaveStatus[getPricingStatusKey(courseName, mod.moduleName)] || null;
+                                    return (
+                                      <tr key={mod.moduleName}>
+                                        <td>
+                                          <div className="module-pricing-name-cell">
+                                            <span className="module-pricing-name">{mod.label}</span>
+                                            {moduleStatus ? (
+                                              <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
+                                            ) : null}
+                                          </div>
+                                        </td>
+                                        <td>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="module-pricing-input"
+                                            value={mf.proAmountRupees}
+                                            onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'proAmountRupees', e.target.value)}
+                                            placeholder="0.00"
+                                          />
+                                        </td>
+                                        <td>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="module-pricing-input"
+                                            value={mf.eliteAmountRupees}
+                                            onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'eliteAmountRupees', e.target.value)}
+                                            placeholder="0.00"
+                                          />
+                                        </td>
+                                        <td>
+                                          <input
+                                            type="checkbox"
+                                            checked={mf.active !== false}
+                                            onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'active', e.target.checked)}
+                                          />
+                                        </td>
+                                        <td>
+                                          {moduleStatus ? (
+                                            <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
+                                          ) : <span className="module-pricing-status-empty">-</span>}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            <div className="module-pricing-mobile-list" aria-label={`Module pricing cards for ${courseName}`}>
                               {courseModuleData.modules.filter((mod) => !mod.isBundle).map((mod) => {
                                 const mf = courseModuleData.priceFormByModule[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
                                 const moduleStatus = pricingSaveStatus[getPricingStatusKey(courseName, mod.moduleName)] || null;
                                 return (
-                                  <tr key={mod.moduleName}>
-                                    <td>
-                                      <span className="module-pricing-name">
-                                        {mod.label}
-                                      </span>
-                                    </td>
-                                    <td>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        className="module-pricing-input"
-                                        value={mf.proAmountRupees}
-                                        onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'proAmountRupees', e.target.value)}
-                                        placeholder="0.00"
-                                      />
-                                    </td>
-                                    <td>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        className="module-pricing-input"
-                                        value={mf.eliteAmountRupees}
-                                        onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'eliteAmountRupees', e.target.value)}
-                                        placeholder="0.00"
-                                      />
-                                    </td>
-                                    <td>
+                                  <article key={`mobile-${mod.moduleName}`} className="module-pricing-mobile-card">
+                                    <div className="module-pricing-mobile-head">
+                                      <strong className="module-pricing-name">{mod.label}</strong>
+                                      {moduleStatus ? (
+                                        <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
+                                      ) : null}
+                                    </div>
+                                    <div className="module-pricing-mobile-fields">
+                                      <label className="module-pricing-mobile-field">
+                                        <span>Pro (₹/1 mo)</span>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          className="module-pricing-input"
+                                          value={mf.proAmountRupees}
+                                          onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'proAmountRupees', e.target.value)}
+                                          placeholder="0.00"
+                                        />
+                                      </label>
+                                      <label className="module-pricing-mobile-field">
+                                        <span>Elite (₹/3 mo)</span>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          className="module-pricing-input"
+                                          value={mf.eliteAmountRupees}
+                                          onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'eliteAmountRupees', e.target.value)}
+                                          placeholder="0.00"
+                                        />
+                                      </label>
+                                    </div>
+                                    <label className="module-pricing-mobile-active">
                                       <input
                                         type="checkbox"
                                         checked={mf.active !== false}
                                         onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'active', e.target.checked)}
                                       />
-                                    </td>
-                                    <td>
-                                      <div className="module-pricing-action-cell">
-                                        {moduleStatus ? (
-                                          <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
-                                        ) : null}
-                                        <button
-                                          type="button"
-                                          className="primary-btn small-btn"
-                                          disabled={isSavingModulePrice}
-                                          onClick={() => handleSaveModulePrice(courseName, mod.moduleName)}
-                                        >
-                                          {isSavingModulePrice ? '…' : 'Save'}
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
+                                      Active
+                                    </label>
+                                  </article>
                                 );
                               })}
-                            </tbody>
-                          </table>
+                            </div>
+                          </>
                         )}
                       </div>
                     )}
@@ -2168,7 +2273,7 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          <section className="card">
+          <section className="card payment-voucher-card">
             <div className="section-header compact">
               <div>
                 <p className="eyebrow">Vouchers</p>
