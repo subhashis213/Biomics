@@ -47,13 +47,14 @@
 /* Panel */
 .biotab-panel {
   position: fixed;
-  bottom: 84px;
-  right: 20px;
-  width: min(400px, calc(100vw - 24px));
-  height: min(76vh, 680px);
+  bottom: 80px;
+  right: 16px;
+  width: min(360px, calc(100vw - 24px));
+  height: clamp(420px, 68vh, 620px);
+  max-height: calc(100vh - var(--app-shell-topbar-clearance, 118px) - 16px);
   background: var(--card-bg, #1a1f2e);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  border-radius: 16px;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
   display: grid;
   grid-template-rows: auto auto auto 1fr auto auto;
@@ -63,7 +64,10 @@
 }
 .biotab-panel.expanded {
   position: fixed;
-  inset: 12px;
+  top: max(calc(var(--app-shell-topbar-clearance, 118px) + 4px), calc(env(safe-area-inset-top) + 58px));
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
   width: auto;
   height: auto;
   border-radius: 16px;
@@ -470,14 +474,18 @@
 /* Mobile */
 @media (max-width: 768px) {
   .biotab-panel {
-    bottom: 72px;
+    bottom: 68px;
     right: 8px;
     left: 8px;
     width: auto;
-    height: min(80vh, 600px);
+    height: clamp(380px, 70vh, 560px);
+    max-height: calc(100vh - var(--app-shell-topbar-clearance, 104px) - 8px);
   }
   .biotab-panel.expanded {
-    inset: 8px;
+    top: max(calc(var(--app-shell-topbar-clearance, 104px) + 4px), calc(env(safe-area-inset-top) + 52px));
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
   }
   .biotab-fab {
     bottom: 16px;
@@ -486,6 +494,7 @@
 }
 @media (max-width: 480px) {
   .biotab-panel {
-    height: min(85vh, 560px);
+    height: clamp(340px, 68vh, 500px);
+    max-height: calc(100vh - var(--app-shell-topbar-clearance, 96px) - 6px);
   }
 }

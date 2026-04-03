@@ -224,6 +224,17 @@ export default function StudentDashboard() {
     }
   });
 
+  // Keep purchasable modules discoverable even when no visible content is returned yet.
+  Object.keys(moduleAccessMap).forEach((moduleName) => {
+    const normalizedModule = normalizeModuleName(moduleName);
+    if (!normalizedModule || normalizedModule === ALL_MODULES) return;
+    const category = normalizeCourseName(course || 'General');
+    const moduleKey = resolveModuleKey(category, normalizedModule);
+    if (!moduleMetaByKey[moduleKey]) {
+      moduleMetaByKey[moduleKey] = { module: normalizedModule, category };
+    }
+  });
+
   const modules = Object.keys(moduleMetaByKey)
     .filter((moduleKey) => {
       if (!activeCourseFilter) return true;

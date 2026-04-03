@@ -85,6 +85,14 @@ export default function AppShell({
   const layoutTopPadding = topbarTop + topbarHeight + layoutTopGap;
 
   useEffect(() => {
+    const topbarClearance = Math.max(64, topbarTop + topbarHeight + 8);
+    document.documentElement.style.setProperty('--app-shell-topbar-clearance', `${topbarClearance}px`);
+    return () => {
+      document.documentElement.style.removeProperty('--app-shell-topbar-clearance');
+    };
+  }, [topbarTop, topbarHeight]);
+
+  useEffect(() => {
     const el = topbarRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
