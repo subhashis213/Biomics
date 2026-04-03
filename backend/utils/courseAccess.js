@@ -8,11 +8,11 @@ const MEMBERSHIP_PLANS = {
 const ALL_MODULES = 'ALL_MODULES';
 
 function normalizeCourseName(value) {
-  return String(value || '').trim();
+  return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
 function normalizeModuleName(value) {
-  return String(value || '').trim() || 'General';
+  return String(value || '').replace(/\s+/g, ' ').trim() || 'General';
 }
 
 function getMembershipPlan(planType) {
@@ -89,7 +89,17 @@ async function getModulePricingDoc(course, moduleName) {
   const normalized = normalizeCourseName(course);
   const normalizedMod = normalizeModuleName(moduleName);
   if (!normalized) return null;
-  return ModulePricing.findOne({ category: normalized, moduleName: normalizedMod, active: true }).lean();
+
+  const direct = await ModulePricing.findOne({
+    category: normalized,
+    moduleName: normalizedMod,
+    active: true
+  }).lean();
+  if (direct) return direct;
+
+  // Backward-compat fallback for legacy records with inconsistent spacing.
+  const candidates = await ModulePricing.find({ category: normalized, active: true }).lean();
+  return candidates.find((entry) => normalizeModuleName(entry.moduleName) === normalizedMod) || null;
 }
 
 /**
