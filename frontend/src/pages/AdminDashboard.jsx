@@ -61,6 +61,8 @@ export default function AdminDashboard() {
   const [students, setStudents] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [activeLibraryCourse, setActiveLibraryCourse] = useState('All');
+  const [librarySearchInput, setLibrarySearchInput] = useState('');
+  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
   const [videoForm, setVideoForm] = useState({ title: '', description: '', url: '' });
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [courseModalOpen, setCourseModalOpen] = useState(false);
@@ -1517,9 +1519,24 @@ export default function AdminDashboard() {
     loadAdminQuizzes(quizCategory);
   }, [quizCategory]);
 
-  const filteredVideos = activeLibraryCourse === 'All'
-    ? videos
-    : videos.filter((video) => (video.category || 'General') === activeLibraryCourse);
+  function applyLibrarySearch() {
+    setLibrarySearchQuery(String(librarySearchInput || '').trim().toLowerCase());
+  }
+
+  function clearLibrarySearch() {
+    setLibrarySearchInput('');
+    setLibrarySearchQuery('');
+  }
+
+  const filteredVideos = videos.filter((video) => {
+    const matchesCourse = activeLibraryCourse === 'All' || (video.category || 'General') === activeLibraryCourse;
+    if (!matchesCourse) return false;
+
+    if (!librarySearchQuery) return true;
+
+    const title = String(video.title || '').toLowerCase();
+    return title.includes(librarySearchQuery);
+  });
   const activeUserUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('user-'));
   const activeLibraryUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('video-') || id.startsWith('material-'));
 
@@ -2023,6 +2040,36 @@ export default function AdminDashboard() {
                 </button>
               ))}
             </div>
+            <div className="library-search-row" role="search" aria-label="Search lectures by name">
+              <input
+                type="text"
+                className="library-search-input"
+                placeholder="Search lecture name (e.g. bio, cell, dna)"
+                value={librarySearchInput}
+                onChange={(event) => setLibrarySearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyLibrarySearch();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={applyLibrarySearch}
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={clearLibrarySearch}
+                disabled={!librarySearchInput && !librarySearchQuery}
+              >
+                Clear
+              </button>
+            </div>
           </div>
           <StatCard label={activeLibraryCourse === 'All' ? 'Total Lectures' : 'Showing'} value={filteredVideos.length} />
         </div>
@@ -2041,9 +2088,11 @@ export default function AdminDashboard() {
           {loading ? <p className="empty-state">Loading dashboard...</p> : null}
           {!loading && !filteredVideos.length ? (
             <p className="empty-state">
-              {activeLibraryCourse === 'All'
-                ? `No lectures yet. Publish a lecture first, then the PDF upload button will appear on that lecture card (max ${MAX_MATERIAL_MB}MB).`
-                : `No lectures available for ${activeLibraryCourse}. Add one from Course Manager.`}
+              {librarySearchQuery
+                ? `No lectures found for "${librarySearchQuery}".`
+                : activeLibraryCourse === 'All'
+                  ? `No lectures yet. Publish a lecture first, then the PDF upload button will appear on that lecture card (max ${MAX_MATERIAL_MB}MB).`
+                  : `No lectures available for ${activeLibraryCourse}. Add one from Course Manager.`}
             </p>
           ) : null}
           <div className="video-grid">
