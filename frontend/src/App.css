@@ -219,12 +219,36 @@ button,
 input,
 select,
 textarea,
+label,
 [role='button'] {
   -webkit-tap-highlight-color: transparent;
 }
 
 :focus:not(:focus-visible) {
   outline: none;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  background-color: transparent;
+  box-shadow: none;
+  touch-action: manipulation;
+}
+
+input[type='checkbox']:focus,
+input[type='checkbox']:active,
+input[type='radio']:focus,
+input[type='radio']:active {
+  outline: none;
+  box-shadow: none;
+}
+
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 button {
