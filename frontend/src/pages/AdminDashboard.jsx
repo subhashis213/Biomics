@@ -12,6 +12,7 @@ import {
   fetchPaymentHistoryAdmin,
   fetchQuizAnalyticsAdmin,
   fetchVouchersAdmin,
+  getApiBase,
   requestJson,
   saveCoursePricingAdmin,
   saveModulePricingAdmin,
@@ -20,11 +21,12 @@ import {
   uploadMaterial
 } from '../api';
 import { MAX_MATERIAL_MB } from '../constants';
-import { clearSession } from '../session';
+import { clearSession, getSession, setSession } from '../session';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import VideoCard from '../components/VideoCard';
 import ModuleManager from '../components/ModuleManager';
+import { useThemeStore } from '../stores/themeStore';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -53,6 +55,8 @@ export default function AdminDashboard() {
   const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useThemeStore();
+  const isLightTheme = theme === 'light';
   const [videos, setVideos] = useState([]);
   const [students, setStudents] = useState([]);
   const [feedback, setFeedback] = useState([]);
@@ -153,6 +157,13 @@ export default function AdminDashboard() {
   const [auditLogPagination, setAuditLogPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [auditLogFilter, setAuditLogFilter] = useState({ action: '', actor: '' });
   const [auditLogLoading, setAuditLogLoading] = useState(false);
+  const [adminProfileOpen, setAdminProfileOpen] = useState(false);
+  const [adminProfile, setAdminProfile] = useState(null);
+  const [adminProfileForm, setAdminProfileForm] = useState({ username: '', password: '', confirmPassword: '' });
+  const [adminProfileMessage, setAdminProfileMessage] = useState(null);
+  const [isAdminProfileLoading, setIsAdminProfileLoading] = useState(false);
+  const [isAdminAvatarUploading, setIsAdminAvatarUploading] = useState(false);
+  const [isSavingAdminProfile, setIsSavingAdminProfile] = useState(false);
 
   function clearQuizMessageTimers() {
     if (quizMessageFadeTimeoutRef.current) {
@@ -282,6 +293,72 @@ export default function AdminDashboard() {
   useEffect(() => {
     refreshData();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsAdminProfileLoading(true);
+    requestJson('/auth/admin/me')
+      .then((data) => {
+        if (cancelled) return;
+        const admin = data?.admin || null;
+        setAdminProfile(admin);
+        setAdminProfileForm({ username: admin?.username || '', password: '', confirmPassword: '' });
+      })
+      .catch((error) => {
+        if (!cancelled) setBanner({ type: 'error', text: error.message || 'Failed to load admin profile.' });
+      })
+      .finally(() => {
+        if (!cancelled) setIsAdminProfileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!adminProfileOpen) return undefined;
+
+    const body = document.body;
+    const html = document.documentElement;
+    const scrollY = window.scrollY;
+
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyPosition = body.style.position;
+    const previousBodyTop = body.style.top;
+    const previousBodyLeft = body.style.left;
+    const previousBodyRight = body.style.right;
+    const previousBodyWidth = body.style.width;
+    const previousBodyTouchAction = body.style.touchAction;
+    const previousHtmlOverflow = html.style.overflow;
+
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    body.style.touchAction = 'none';
+    html.style.overflow = 'hidden';
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.position = previousBodyPosition;
+      body.style.top = previousBodyTop;
+      body.style.left = previousBodyLeft;
+      body.style.right = previousBodyRight;
+      body.style.width = previousBodyWidth;
+      body.style.touchAction = previousBodyTouchAction;
+      html.style.overflow = previousHtmlOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [adminProfileOpen]);
+
+  useEffect(() => {
+    if (!adminProfileMessage) return undefined;
+    const timer = window.setTimeout(() => setAdminProfileMessage(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [adminProfileMessage]);
 
   async function loadPaymentSettings() {
     try {
@@ -986,6 +1063,84 @@ export default function AdminDashboard() {
     navigate('/', { replace: true });
   }
 
+  async function handleAdminAvatarChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('avatar', file);
+    setIsAdminAvatarUploading(true);
+    try {
+      const response = await requestJson('/auth/admin/me/avatar', {
+        method: 'POST',
+        body: formData
+      });
+      setAdminProfile(response.admin);
+      setBanner({ type: 'success', text: response.message || 'Admin profile photo updated successfully.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to update admin profile photo.' });
+    } finally {
+      setIsAdminAvatarUploading(false);
+      event.target.value = '';
+    }
+  }
+
+  async function handleDeleteAdminAvatar() {
+    setIsAdminAvatarUploading(true);
+    try {
+      const response = await requestJson('/auth/admin/me/avatar', {
+        method: 'DELETE'
+      });
+      setAdminProfile(response.admin);
+      setBanner({ type: 'success', text: response.message || 'Admin profile photo removed successfully.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to remove admin profile photo.' });
+    } finally {
+      setIsAdminAvatarUploading(false);
+    }
+  }
+
+  async function handleSaveAdminProfile(event) {
+    event.preventDefault();
+    if (adminProfileForm.password && adminProfileForm.password !== adminProfileForm.confirmPassword) {
+      setAdminProfileMessage({ type: 'error', text: 'Passwords do not match.' });
+      return;
+    }
+
+    setIsSavingAdminProfile(true);
+    setAdminProfileMessage(null);
+    try {
+      const payload = {
+        username: adminProfileForm.username.trim()
+      };
+      if (adminProfileForm.password.trim()) {
+        payload.password = adminProfileForm.password;
+      }
+
+      const response = await requestJson('/auth/admin/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+
+      setAdminProfile(response.admin);
+      setAdminProfileForm({ username: response.admin.username || '', password: '', confirmPassword: '' });
+
+      const currentSession = getSession();
+      if (response.token && currentSession?.role === 'admin') {
+        setSession({
+          role: 'admin',
+          username: response.admin.username,
+          token: response.token
+        });
+      }
+
+      setAdminProfileMessage({ type: 'success', text: response.message || 'Admin profile updated successfully.' });
+    } catch (error) {
+      setAdminProfileMessage({ type: 'error', text: error.message || 'Failed to update admin profile.' });
+    } finally {
+      setIsSavingAdminProfile(false);
+    }
+  }
+
   async function handleSaveCoursePrice(courseName) {
     const statusKey = getPricingStatusKey(courseName);
     const form = priceFormByCourse[courseName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
@@ -1488,13 +1643,55 @@ export default function AdminDashboard() {
     { id: 'section-feedback', label: 'Feedback', icon: '💬' }
   ];
 
+  const rawAdminAvatarUrl = String(adminProfile?.avatarUrl || '').trim();
+  const adminAvatarUrl = rawAdminAvatarUrl
+    ? (/^https?:\/\//i.test(rawAdminAvatarUrl) ? rawAdminAvatarUrl : `${getApiBase()}${rawAdminAvatarUrl}`)
+    : '';
+  const adminInitial = (adminProfile?.username || 'A').trim().charAt(0).toUpperCase();
+
   return (
     <AppShell
       title="Admin Dashboard"
       roleLabel="Admin"
-      onLogout={handleLogout}
+      showThemeSwitch={false}
       navTitle="Admin Sections"
       navItems={adminNavItems}
+      actions={(
+        <div className="profile-trigger-wrap">
+          <button
+            type="button"
+            className="profile-icon-btn"
+            onClick={() => setAdminProfileOpen(true)}
+            aria-label="Open admin profile settings"
+            title="Admin profile settings"
+          >
+            {adminAvatarUrl ? (
+              <img src={adminAvatarUrl} alt="Admin profile" className="profile-icon-image" />
+            ) : (
+              <span className="profile-icon-fallback">{adminInitial}</span>
+            )}
+          </button>
+          <div className="profile-hover-card" aria-hidden="true">
+            <strong>{adminProfile?.username || 'Admin'}</strong>
+            <span>Administrator</span>
+            <button
+              type="button"
+              className="profile-theme-btn"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
+            >
+              {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+            </button>
+            <button
+              type="button"
+              className="profile-theme-btn profile-quick-logout-btn"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
     >
       {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
@@ -2948,6 +3145,116 @@ export default function AdminDashboard() {
                 {isConfirmingAction ? confirmDialog.processingLabel : confirmDialog.confirmLabel}
               </button>
             </div>
+          </section>
+        </div>
+      , document.body) : null}
+
+      {adminProfileOpen ? createPortal(
+        <div className="profile-modal-backdrop" onClick={() => setAdminProfileOpen(false)}>
+          <section className="profile-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="profile-modal-header">
+              <div>
+                <p className="eyebrow">Admin Profile</p>
+                <h2>Profile Settings</h2>
+              </div>
+              <button type="button" className="profile-close-btn" onClick={() => setAdminProfileOpen(false)} aria-label="Close admin profile settings">
+                ×
+              </button>
+            </div>
+
+            {isAdminProfileLoading ? (
+              <p className="empty-note">Loading profile...</p>
+            ) : (
+              <div className="profile-modal-body">
+                <aside className="profile-summary-card">
+                  <div className="profile-avatar-large">
+                    {adminAvatarUrl ? (
+                      <img src={adminAvatarUrl} alt="Admin profile" className="profile-avatar-large-image" />
+                    ) : (
+                      <span>{adminInitial}</span>
+                    )}
+                  </div>
+                  <label className="profile-photo-upload">
+                    <input type="file" accept="image/*" onChange={handleAdminAvatarChange} disabled={isAdminAvatarUploading} />
+                    <span>{isAdminAvatarUploading ? 'Uploading...' : 'Change Photo'}</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="secondary-btn profile-delete-photo-btn"
+                    onClick={handleDeleteAdminAvatar}
+                    disabled={!adminAvatarUrl || isAdminAvatarUploading}
+                  >
+                    Delete Photo
+                  </button>
+                  <div className="profile-summary-list">
+                    <div><span>Username</span><strong>{adminProfile?.username || '-'}</strong></div>
+                    <div><span>Role</span><strong>Administrator</strong></div>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary-btn profile-theme-modal-btn"
+                    onClick={toggleTheme}
+                  >
+                    {isLightTheme ? 'Use Dark Theme' : 'Use Light Theme'}
+                  </button>
+                  <button
+                    type="button"
+                    className="profile-logout-btn"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </button>
+                </aside>
+                <form className="profile-edit-form" onSubmit={handleSaveAdminProfile}>
+                  <label>
+                    Username
+                    <input
+                      type="text"
+                      value={adminProfileForm.username}
+                      onChange={(event) => setAdminProfileForm((current) => ({ ...current, username: event.target.value }))}
+                      placeholder="Update username"
+                    />
+                  </label>
+                  <label>
+                    New Password
+                    <input
+                      type="password"
+                      value={adminProfileForm.password}
+                      onChange={(event) => setAdminProfileForm((current) => ({ ...current, password: event.target.value }))}
+                      placeholder="Leave blank to keep current password"
+                    />
+                  </label>
+                  <label>
+                    Confirm New Password
+                    <input
+                      type="password"
+                      value={adminProfileForm.confirmPassword}
+                      onChange={(event) => setAdminProfileForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                      placeholder="Re-enter new password"
+                    />
+                  </label>
+
+                  {adminProfileMessage ? <p className={`inline-message ${adminProfileMessage.type}`}>{adminProfileMessage.text}</p> : null}
+
+                  <div className="profile-edit-actions">
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => setAdminProfileOpen(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="primary-btn"
+                      disabled={isSavingAdminProfile || isAdminAvatarUploading}
+                    >
+                      {isSavingAdminProfile ? 'Saving...' : 'Save Profile'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </section>
         </div>
       , document.body) : null}

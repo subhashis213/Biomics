@@ -2150,6 +2150,7 @@ html[data-theme='light'] .field-hint {
 .profile-trigger-wrap:focus-within .profile-hover-card {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 .profile-hover-card strong {
@@ -2177,6 +2178,17 @@ html[data-theme='light'] .field-hint {
 .profile-theme-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.profile-quick-logout-btn {
+  border-color: color-mix(in srgb, #ef4444 40%, var(--line));
+  color: #ef4444;
+}
+
+.profile-quick-logout-btn:hover {
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 16%, var(--bg-card-soft));
+  color: #ef4444;
 }
 
 .profile-icon-image,

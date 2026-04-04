@@ -241,6 +241,11 @@ const updateProfileSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters').optional()
 });
 
+const adminUpdateProfileSchema = z.object({
+  username: z.string().min(3, 'Username must be at least 3 characters').max(50).optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional()
+});
+
 // Check if username exists
 router.post('/check-username', async (req, res) => {
   const { username } = req.body;
@@ -758,11 +763,157 @@ router.post('/admin-login', async (req, res) => {
       message: 'Admin login successful',
       token,
       admin: {
-        username: admin.username
+        username: admin.username,
+        avatarUrl: buildAvatarUrl(admin)
       }
     });
   } catch (err) {
     res.status(500).json({ error: 'Admin login failed' });
+  }
+});
+
+router.get('/admin/me', authenticateToken('admin'), async (req, res) => {
+  try {
+    const admin = await Admin.findOne(
+      { username: req.user.username },
+      { username: 1, avatar: 1, _id: 0 }
+    ).lean();
+
+    if (!admin) return res.status(404).json({ error: 'Admin profile not found' });
+
+    return res.json({
+      admin: {
+        username: admin.username,
+        avatarUrl: buildAvatarUrl(admin)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch admin profile' });
+  }
+});
+
+router.patch('/admin/me', authenticateToken('admin'), validate(adminUpdateProfileSchema), async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ username: req.user.username });
+    if (!admin) return res.status(404).json({ error: 'Admin profile not found' });
+
+    const nextUsername = req.body.username ? String(req.body.username).trim() : admin.username;
+    const nextPassword = req.body.password ? String(req.body.password).trim() : '';
+
+    if (nextUsername !== admin.username) {
+      const existingByUsername = await Admin.findOne({ username: new RegExp(`^${escapeRegex(nextUsername)}$`, 'i') }).lean();
+      if (existingByUsername) return res.status(400).json({ error: 'Username already in use' });
+      admin.username = nextUsername;
+    }
+
+    if (nextPassword) {
+      if (nextPassword.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+      admin.password = nextPassword;
+    }
+
+    await admin.save();
+
+    const token = jwt.sign(
+      { username: admin.username, role: 'admin' },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    return res.json({
+      message: 'Admin profile updated successfully',
+      token,
+      admin: {
+        username: admin.username,
+        avatarUrl: buildAvatarUrl(admin)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update admin profile' });
+  }
+});
+
+router.post('/admin/me/avatar', authenticateToken('admin'), avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ username: req.user.username });
+    if (!admin) return res.status(404).json({ error: 'Admin profile not found' });
+    if (!req.file) return res.status(400).json({ error: 'Profile image is required' });
+
+    const previousFilename = admin.avatar?.filename;
+    const previousPublicId = admin.avatar?.publicId;
+
+    let nextAvatar = {
+      url: '',
+      publicId: '',
+      filename: req.file.filename,
+      originalName: req.file.originalname || req.file.filename
+    };
+
+    if (hasCloudinaryConfig) {
+      const uploadedToCloudinary = await uploadAvatarToCloudinary(req.file.path);
+      if (!uploadedToCloudinary?.url) {
+        return res.status(500).json({ error: 'Cloud avatar upload failed' });
+      }
+      nextAvatar = {
+        url: uploadedToCloudinary.url,
+        publicId: uploadedToCloudinary.publicId,
+        filename: '',
+        originalName: req.file.originalname || req.file.filename
+      };
+    }
+
+    admin.avatar = nextAvatar;
+    await admin.save();
+
+    if (hasCloudinaryConfig) {
+      safelyRemoveFile(req.file.path);
+      await deleteAvatarFromCloudinary(previousPublicId);
+    }
+
+    if (previousFilename && previousFilename !== req.file.filename) {
+      const previousPath = path.join(uploadsDir, path.basename(previousFilename));
+      safelyRemoveFile(previousPath);
+    }
+
+    return res.json({
+      message: 'Admin profile photo updated successfully',
+      admin: {
+        username: admin.username,
+        avatarUrl: buildAvatarUrl(admin)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to update admin profile photo' });
+  }
+});
+
+router.delete('/admin/me/avatar', authenticateToken('admin'), async (req, res) => {
+  try {
+    const admin = await Admin.findOne({ username: req.user.username });
+    if (!admin) return res.status(404).json({ error: 'Admin profile not found' });
+
+    const previousFilename = admin.avatar?.filename;
+    const previousPublicId = admin.avatar?.publicId;
+    admin.avatar = { url: '', publicId: '', filename: '', originalName: '' };
+    await admin.save();
+
+    await deleteAvatarFromCloudinary(previousPublicId);
+
+    if (previousFilename) {
+      const previousPath = path.join(uploadsDir, path.basename(previousFilename));
+      safelyRemoveFile(previousPath);
+    }
+
+    return res.json({
+      message: 'Admin profile photo removed successfully',
+      admin: {
+        username: admin.username,
+        avatarUrl: ''
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to remove admin profile photo' });
   }
 });
 
