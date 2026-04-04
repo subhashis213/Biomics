@@ -67,10 +67,44 @@ export default function StudentDashboard() {
 
   const allModulesUnlocked = Boolean(access?.allModulesUnlocked || access?.unlocked);
   const bundlePlanOptions = Array.isArray(access?.bundlePricing?.plans) ? access.bundlePricing.plans : [];
+  const voucherOffers = Array.isArray(access?.voucherOffers) ? access.voucherOffers : [];
   const moduleAccessMap = access?.moduleAccess || {};
   const unlockedModuleSet = new Set(Array.isArray(access?.unlockedModules) ? access.unlockedModules.map((item) => normalizeModuleName(item)) : []);
   const hasAnyUnlockedModule = allModulesUnlocked || unlockedModuleSet.size > 0;
   const activeMembership = access?.activeMembership || null;
+
+  function resolveMembershipExpiry(entry) {
+    if (!entry) return null;
+    if (entry.expiresAt) {
+      const direct = new Date(entry.expiresAt);
+      if (Number.isFinite(direct.getTime())) return direct;
+    }
+    if (entry.unlockedAt) {
+      const unlocked = new Date(entry.unlockedAt);
+      if (!Number.isFinite(unlocked.getTime())) return null;
+      const months = String(entry.planType || 'pro').toLowerCase() === 'elite' ? 3 : 1;
+      const derived = new Date(unlocked);
+      derived.setMonth(derived.getMonth() + months);
+      return Number.isFinite(derived.getTime()) ? derived : null;
+    }
+    return null;
+  }
+
+  const membershipExpiresAt = resolveMembershipExpiry(activeMembership);
+  const hasMembershipRecord = Boolean(activeMembership);
+  const hasValidMembershipExpiry = Boolean(
+    membershipExpiresAt && Number.isFinite(membershipExpiresAt.getTime())
+  );
+  const isMembershipExpired = Boolean(
+    hasMembershipRecord
+    && (
+      !hasValidMembershipExpiry
+      || membershipExpiresAt.getTime() <= Date.now()
+    )
+  );
+  const effectiveActiveMembership = isMembershipExpired ? null : activeMembership;
+  const expiredMembershipPlanLabel = activeMembership?.planType === 'elite' ? 'Elite' : 'Pro';
+  const showDealBanner = !allModulesUnlocked && voucherOffers.length > 0;
 
   const profilePasswordHint =
     profileForm.password.length > 0 && profileForm.password.length < 8
@@ -170,6 +204,15 @@ export default function StudentDashboard() {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function formatVoucherDiscount(offer) {
+    if (!offer) return '';
+    if (String(offer.discountType || '').toLowerCase() === 'percent') {
+      return `${Math.max(0, Number(offer.discountValue || 0))}% OFF`;
+    }
+    const amount = Math.max(0, Number(offer.discountValue || 0)) / 100;
+    return `Rs ${amount.toFixed(0)} OFF`;
   }
 
   function getModuleAccessInfo(moduleName) {
@@ -756,15 +799,29 @@ export default function StudentDashboard() {
       <div id="section-overview" className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
-        {activeMembership ? (
+        {effectiveActiveMembership ? (
           <section className="membership-status-banner card">
             <div>
               <p className="eyebrow">Active Membership</p>
-              <h2>{activeMembership.planType === 'elite' ? 'Elite' : 'Pro'} access is live</h2>
+              <h2>{effectiveActiveMembership.planType === 'elite' ? 'Elite' : 'Pro'} access is live</h2>
               <p className="empty-note">
-                {activeMembership.moduleName && activeMembership.moduleName !== ALL_MODULES
-                  ? `${activeMembership.moduleName} access expires on ${formatMembershipDate(activeMembership.expiresAt)}.`
-                  : `Your ${course} membership expires on ${formatMembershipDate(activeMembership.expiresAt)}.`}
+                {effectiveActiveMembership.moduleName && effectiveActiveMembership.moduleName !== ALL_MODULES
+                  ? `${effectiveActiveMembership.moduleName} access expires on ${formatMembershipDate(membershipExpiresAt)}.`
+                  : `Your ${course} membership expires on ${formatMembershipDate(membershipExpiresAt)}.`}
+              </p>
+            </div>
+          </section>
+        ) : null}
+
+        {!effectiveActiveMembership && isMembershipExpired ? (
+          <section className="membership-status-banner membership-status-banner-expired card">
+            <div>
+              <p className="eyebrow">Membership Expired</p>
+              <h2>Need to restore the {expiredMembershipPlanLabel} access</h2>
+              <p className="empty-note">
+                {activeMembership?.moduleName && activeMembership.moduleName !== ALL_MODULES
+                  ? `${activeMembership.moduleName} ${expiredMembershipPlanLabel} membership has expired. Renew now to continue lectures, materials, and quizzes.`
+                  : `Your ${course} ${expiredMembershipPlanLabel} membership has expired. Renew now to continue your learning access.`}
               </p>
             </div>
           </section>
@@ -826,6 +883,33 @@ export default function StudentDashboard() {
               ) : (
                 <span className="upcoming-link-pending">Link coming soon</span>
               )}
+            </div>
+          </section>
+        ) : null}
+
+        {showDealBanner ? (
+          <section className="card membership-deal-banner">
+            <div className="membership-deal-head">
+              <p className="eyebrow">Special Offer</p>
+              <h2>Grab the deal with discounted price</h2>
+              <p className="subtitle">Use any admin coupon code below during checkout.</p>
+            </div>
+            <div className="membership-deal-codes" role="list" aria-label="Available coupon codes">
+              {voucherOffers.map((offer) => (
+                <button
+                  key={offer.code}
+                  type="button"
+                  className="membership-deal-code-chip"
+                  onClick={() => setVoucherCode(String(offer.code || '').toUpperCase())}
+                  title="Click to apply this code"
+                >
+                  <span className="membership-deal-code-text">{offer.code}</span>
+                  <span className="membership-deal-discount">{formatVoucherDiscount(offer)}</span>
+                  {offer.validUntil ? (
+                    <span className="membership-deal-expiry">Till {formatMembershipDate(offer.validUntil)}</span>
+                  ) : null}
+                </button>
+              ))}
             </div>
           </section>
         ) : null}

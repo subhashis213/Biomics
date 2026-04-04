@@ -85,6 +85,7 @@ export function useCourseData() {
       allModulesUnlocked: true,
       unlockedModules: [],
       bundlePricing: { currency: 'INR', plans: [] },
+      voucherOffers: [],
       moduleAccess: {},
       activeMembership: null
     },

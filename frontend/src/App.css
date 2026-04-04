@@ -2743,6 +2743,13 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
   background: linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 88%, transparent), color-mix(in srgb, #10b981 12%, var(--bg-card-soft)));
 }
 
+.membership-status-banner-expired {
+  border-color: color-mix(in srgb, #f97316 46%, var(--line));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, #f97316 20%, transparent), transparent 40%),
+    linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 90%, transparent), color-mix(in srgb, #fed7aa 16%, var(--bg-card-soft)));
+}
+
 .membership-lock-panel {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, #f59e0b 32%, var(--line));
@@ -2754,6 +2761,80 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 
 .module-membership-lock-panel {
   margin-top: 6px;
+}
+
+.membership-deal-banner {
+  border: 1px solid color-mix(in srgb, #f59e0b 42%, var(--line));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, #f59e0b 24%, transparent), transparent 42%),
+    radial-gradient(circle at bottom left, color-mix(in srgb, #10b981 18%, transparent), transparent 38%),
+    linear-gradient(140deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, #fef3c7 18%, var(--bg-card-soft)));
+  box-shadow: 0 16px 34px color-mix(in srgb, #f59e0b 14%, transparent);
+}
+
+.membership-deal-head {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.membership-deal-head .subtitle {
+  margin-top: 0;
+}
+
+.membership-deal-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.membership-deal-code-chip {
+  border: 1px solid color-mix(in srgb, #f59e0b 34%, var(--line));
+  background: linear-gradient(145deg, color-mix(in srgb, #fef3c7 62%, var(--bg-card)), color-mix(in srgb, #fde68a 24%, var(--bg-card-soft)));
+  border-radius: 12px;
+  padding: 10px 11px;
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.membership-deal-code-chip:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, #f59e0b 56%, var(--line));
+  box-shadow: 0 10px 24px color-mix(in srgb, #f59e0b 22%, transparent);
+}
+
+.membership-deal-code-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #7c2d12;
+  letter-spacing: 0.03em;
+}
+
+.membership-deal-discount {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #166534;
+}
+
+.membership-deal-expiry {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--text-muted) 86%, #374151);
+}
+
+@media (max-width: 640px) {
+  .membership-deal-codes {
+    grid-template-columns: 1fr;
+  }
+
+  .membership-deal-code-chip {
+    padding: 9px 10px;
+    gap: 2px;
+  }
 }
 
 .membership-target-switch {
