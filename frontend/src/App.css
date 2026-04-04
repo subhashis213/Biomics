@@ -214,6 +214,19 @@ textarea {
   color: inherit;
 }
 
+a,
+button,
+input,
+select,
+textarea,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 button {
   cursor: pointer;
 }
