@@ -6,6 +6,7 @@ import {
   deleteQuiz,
   deleteVoucherAdmin,
   fetchAdminQuizzes,
+  fetchRecoveryActionsAdmin,
   fetchAuditLogsAdmin,
   fetchCoursePricingAdmin,
   fetchModulePricingAdmin,
@@ -17,6 +18,7 @@ import {
   saveCoursePricingAdmin,
   saveModulePricingAdmin,
   saveModuleQuiz,
+  applyRecoveryActionAdmin,
   updateVoucherAdmin,
   uploadMaterial
 } from '../api';
@@ -161,6 +163,10 @@ export default function AdminDashboard() {
   const [auditLogPagination, setAuditLogPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [auditLogFilter, setAuditLogFilter] = useState({ action: '', actor: '' });
   const [auditLogLoading, setAuditLogLoading] = useState(false);
+  const [recoveryActions, setRecoveryActions] = useState([]);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryApplyingId, setRecoveryApplyingId] = useState('');
+  const [recoveryFilter, setRecoveryFilter] = useState({ from: '', to: '' });
   const [adminProfileOpen, setAdminProfileOpen] = useState(false);
   const [adminProfile, setAdminProfile] = useState(null);
   const [adminProfileForm, setAdminProfileForm] = useState({ username: '', password: '', confirmPassword: '' });
@@ -1415,6 +1421,53 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadRecoveryActions(limit = 30, filter = recoveryFilter) {
+    setRecoveryLoading(true);
+    try {
+      const res = await fetchRecoveryActionsAdmin({ limit, ...filter });
+      setRecoveryActions(res.actions || []);
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load recovery actions.' });
+    } finally {
+      setRecoveryLoading(false);
+    }
+  }
+
+  async function handleApplyRecoveryAction(log) {
+    if (!log?._id) return;
+    if (recoveryApplyingId) return;
+    if (!log?.recovery?.supported) {
+      setBanner({ type: 'error', text: log?.recovery?.reason || 'This audit action is not recoverable.' });
+      return;
+    }
+    if (log?.recovery?.alreadyApplied) {
+      setBanner({ type: 'error', text: 'This recovery action was already applied.' });
+      return;
+    }
+
+    const label = log?.recovery?.label || 'Apply recovery action';
+    const confirmed = window.confirm(`${label}? This will modify live data.`);
+    if (!confirmed) return;
+
+    setRecoveryApplyingId(log._id);
+    try {
+      const res = await applyRecoveryActionAdmin(log._id);
+      setBanner({ type: 'success', text: res?.message || 'Recovery action applied.' });
+
+      await Promise.allSettled([
+        refreshData(),
+        loadPaymentSettings(),
+        loadAdminQuizzes(quizCategory),
+        loadAuditLogs(1, auditLogFilter),
+        loadRecoveryActions(30, recoveryFilter)
+      ]);
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to apply recovery action.' });
+    } finally {
+      setRecoveryApplyingId('');
+    }
+  }
+
   function scrollToSection(sectionId) {
     const node = document.getElementById(sectionId);
     if (node) {
@@ -1520,6 +1573,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadAdminQuizzes(quizCategory);
   }, [quizCategory]);
+
+  useEffect(() => {
+    loadRecoveryActions(30, recoveryFilter);
+  }, []);
 
   function applyLibrarySearch() {
     setLibrarySearchQuery(String(librarySearchInput || '').trim().toLowerCase());
@@ -1665,6 +1722,7 @@ export default function AdminDashboard() {
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
     { id: 'section-quiz-analytics', label: 'Quiz Analytics', icon: '🏆' },
     { id: 'section-audit-log', label: 'Audit Log', icon: '🛡️' },
+    { id: 'section-recovery-center', label: 'Recovery', icon: '♻️' },
     { id: 'section-feedback', label: 'Feedback', icon: '💬' }
   ];
 
@@ -3036,7 +3094,7 @@ export default function AdminDashboard() {
                       <td><span className="action-badge">{log.action}</span></td>
                       <td>{log.targetType}</td>
                       <td className="details-cell">
-                        {Object.entries(log.details || {}).map(([k, v]) => (
+                        {Object.entries(log.details || {}).filter(([k]) => k !== 'snapshot').map(([k, v]) => (
                           <span key={k} className="detail-chip">{k}: {String(v)}</span>
                         ))}
                       </td>
@@ -3065,6 +3123,120 @@ export default function AdminDashboard() {
             >Next →</button>
           </div>
         )}
+      </section>
+
+      <section id="section-recovery-center" className="card analytics-card recovery-center-card">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Admin Recovery</p>
+            <h2>♻️ Recovery Center</h2>
+          </div>
+          <StatCard label="Recoverable Events" value={recoveryActions.length} />
+        </div>
+
+        <div className="analytics-filters">
+          <label className="recovery-date-filter" aria-label="Recovery from date">
+            <span>From date</span>
+            <input
+              className="analytics-filter-input recovery-date-input"
+              type="date"
+              value={recoveryFilter.from}
+              onChange={(e) => setRecoveryFilter((prev) => ({ ...prev, from: e.target.value }))}
+            />
+          </label>
+          <label className="recovery-date-filter" aria-label="Recovery to date">
+            <span>To date</span>
+            <input
+              className="analytics-filter-input recovery-date-input"
+              type="date"
+              value={recoveryFilter.to}
+              onChange={(e) => setRecoveryFilter((prev) => ({ ...prev, to: e.target.value }))}
+            />
+          </label>
+          <button
+            className="primary-btn recovery-search-btn"
+            type="button"
+            onClick={() => loadRecoveryActions(30, recoveryFilter)}
+            disabled={recoveryLoading}
+          >
+            {recoveryLoading ? 'Loading...' : 'Search'}
+          </button>
+          <button
+            className="secondary-btn recovery-clear-btn"
+            type="button"
+            onClick={() => {
+              const clearFilter = { from: '', to: '' };
+              setRecoveryFilter(clearFilter);
+              loadRecoveryActions(30, clearFilter);
+            }}
+            disabled={recoveryLoading}
+          >
+            Clear
+          </button>
+        </div>
+
+        <div className="analytics-section-scroll">
+          {recoveryActions.length === 0 && !recoveryLoading ? (
+            <p className="empty-note">No recovery actions found yet.</p>
+          ) : (
+            <div className="analytics-table-wrap">
+              <table className="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Recovery</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recoveryActions.map((log) => {
+                    const supported = Boolean(log?.recovery?.supported);
+                    const alreadyApplied = Boolean(log?.recovery?.alreadyApplied);
+                    const isApplying = recoveryApplyingId === log._id;
+                    return (
+                      <tr key={log._id}>
+                        <td className="date-cell">{new Date(log.createdAt).toLocaleString()}</td>
+                        <td><span className="action-badge">{log.action}</span></td>
+                        <td>{log.targetType} {log.targetId ? `(${log.targetId})` : ''}</td>
+                        <td>
+                          {supported ? (
+                            <button
+                              type="button"
+                              className="secondary-btn recovery-action-btn"
+                              onClick={() => handleApplyRecoveryAction(log)}
+                              disabled={alreadyApplied || isApplying || Boolean(recoveryApplyingId)}
+                              aria-label={isApplying ? 'Applying recovery action' : (log?.recovery?.label || 'Apply recovery action')}
+                              title={isApplying ? 'Applying...' : (log?.recovery?.label || 'Apply')}
+                            >
+                              <span className="recovery-action-btn-text">
+                                {isApplying ? 'Applying...' : (log?.recovery?.label || 'Apply')}
+                              </span>
+                              <span className="recovery-action-btn-icon" aria-hidden="true">
+                                {isApplying ? '…' : '↺'}
+                              </span>
+                            </button>
+                          ) : (
+                            <span className="optional-note recovery-action-note" title="Not supported" aria-label="Not supported">
+                              <span className="recovery-action-note-text">Not supported</span>
+                              <span className="recovery-action-note-icon" aria-hidden="true">⦸</span>
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {alreadyApplied
+                            ? <span className="detail-chip">Applied</span>
+                            : (supported ? <span className="detail-chip">Ready</span> : <span className="detail-chip">{log?.recovery?.reason || 'Unavailable'}</span>)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </section>
 
       <section id="section-feedback" className="card feedback-list-card">

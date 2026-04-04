@@ -291,6 +291,7 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
   try {
     const video = await Video.findByIdAndDelete(req.params.id);
     if (!video) return res.status(404).json({ error: 'Video not found' });
+    const videoObj = video.toObject();
     // Remove any associated material files from disk
     if (video.materials && video.materials.length) {
       video.materials.forEach(m => {
@@ -302,7 +303,21 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
       action: 'video.delete',
       targetType: 'video',
       targetId: String(video._id),
-      details: { title: video.title, category: video.category, materialCount: video.materials?.length || 0 }
+      details: {
+        title: video.title,
+        category: video.category,
+        materialCount: video.materials?.length || 0,
+        snapshot: {
+          _id: String(videoObj._id),
+          title: videoObj.title,
+          description: videoObj.description,
+          url: videoObj.url,
+          category: videoObj.category,
+          module: videoObj.module,
+          uploadedAt: videoObj.uploadedAt,
+          materials: Array.isArray(videoObj.materials) ? videoObj.materials : []
+        }
+      }
     });
     res.json({ message: 'Video deleted' });
   } catch (err) {

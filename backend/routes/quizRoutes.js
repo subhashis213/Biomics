@@ -222,8 +222,30 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
   try {
     const deleted = await Quiz.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Quiz not found.' });
+    const deletedObj = deleted.toObject();
     await QuizAttempt.deleteMany({ quizId: deleted._id });
-    await logAdminAction(req, { action: 'DELETE_QUIZ', targetType: 'Quiz', targetId: String(deleted._id), details: { title: deleted.title, category: deleted.category, module: deleted.module } });
+    await logAdminAction(req, {
+      action: 'DELETE_QUIZ',
+      targetType: 'Quiz',
+      targetId: String(deleted._id),
+      details: {
+        title: deleted.title,
+        category: deleted.category,
+        module: deleted.module,
+        snapshot: {
+          _id: String(deletedObj._id),
+          category: deletedObj.category,
+          module: deletedObj.module,
+          title: deletedObj.title,
+          difficulty: deletedObj.difficulty,
+          requireExplanation: deletedObj.requireExplanation,
+          timeLimitMinutes: deletedObj.timeLimitMinutes,
+          questions: Array.isArray(deletedObj.questions) ? deletedObj.questions : [],
+          updatedBy: deletedObj.updatedBy,
+          updatedAt: deletedObj.updatedAt
+        }
+      }
+    });
     return res.json({ message: 'Quiz deleted.' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete quiz.' });

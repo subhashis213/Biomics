@@ -276,3 +276,18 @@ export function fetchAuditLogsAdmin(params = {}) {
   if (params.actor) qs.set('actor', params.actor);
   return requestJson(`/auth/admin/audit-logs${qs.toString() ? '?' + qs.toString() : ''}`);
 }
+
+export function fetchRecoveryActionsAdmin(params = {}) {
+  const qs = new URLSearchParams();
+  qs.set('limit', String(params.limit || 30));
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  return requestJson(`/auth/admin/recovery-actions?${qs.toString()}`);
+}
+
+export function applyRecoveryActionAdmin(auditLogId) {
+  return requestJson(`/auth/admin/recovery-actions/${encodeURIComponent(auditLogId)}/apply`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}

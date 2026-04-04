@@ -2266,6 +2266,141 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
   font-size: 1rem;
 }
 
+.recovery-center-card {
+  padding-top: 18px;
+  margin-top: 18px;
+}
+
+.recovery-center-card .section-header {
+  margin-bottom: 14px;
+}
+
+.recovery-center-card .analytics-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.recovery-center-card .analytics-section-scroll {
+  margin-top: 0;
+}
+
+.recovery-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.recovery-date-filter > span {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.recovery-date-input {
+  min-height: 30px;
+  height: 30px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  min-width: 126px;
+  max-width: 132px;
+}
+
+.recovery-search-btn,
+.recovery-clear-btn {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+}
+
+.recovery-search-btn {
+  margin-left: 2px;
+}
+
+.recovery-action-btn {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.recovery-action-btn-icon {
+  display: none;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.recovery-action-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.recovery-action-note-icon {
+  display: none;
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .recovery-action-btn {
+    min-width: 34px;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    border-radius: 10px;
+    gap: 0;
+  }
+
+  .recovery-action-btn-text {
+    display: none;
+  }
+
+  .recovery-action-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .recovery-action-note {
+    min-width: 34px;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    border-radius: 10px;
+    gap: 0;
+  }
+
+  .recovery-action-note-text {
+    display: none;
+  }
+
+  .recovery-action-note-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 .stat-card {
   min-width: 136px;
   border-radius: var(--radius-lg);
@@ -10396,6 +10531,7 @@ html[data-theme='light'] .premium-materials-panel {
 #section-payment-history,
 #section-quiz-analytics,
 #section-audit-log,
+#section-recovery-center,
 #section-feedback {
   margin-top: 18px;
 }

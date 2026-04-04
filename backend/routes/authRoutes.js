@@ -7,10 +7,14 @@ const multer = require('multer');
 const path = require('path');
 const { v2: cloudinary } = require('cloudinary');
 const { z } = require('zod');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const LoginOtp = require('../models/LoginOtp');
 const AuditLog = require('../models/AuditLog');
+const Video = require('../models/Video');
+const Quiz = require('../models/Quiz');
+const Voucher = require('../models/Voucher');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken, JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -19,6 +23,8 @@ const router = express.Router();
 const OTP_EXPIRY_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES || 5);
 const OTP_COOLDOWN_SECONDS = Number(process.env.OTP_COOLDOWN_SECONDS || 45);
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
+const RECOVERY_RETENTION_DAYS = 15;
+const RECOVERY_RETENTION_MS = RECOVERY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const uploadsDir = path.join(__dirname, '../uploads');
 
 const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
@@ -395,6 +401,295 @@ router.get('/admin/audit-logs', authenticateToken('admin'), async (req, res) => 
   }
 });
 
+function extractRecoveryMeta(log) {
+  const action = String(log?.action || '').trim();
+  const snapshot = log?.details?.snapshot;
+  const hasSnapshot = snapshot && typeof snapshot === 'object';
+  const hasTargetId = String(log?.targetId || '').trim().length > 0;
+
+  if (action === 'video.delete') {
+    return {
+      mode: 'restore',
+      supported: hasSnapshot,
+      label: 'Restore deleted video',
+      reason: hasSnapshot ? '' : 'Snapshot missing in this audit entry.'
+    };
+  }
+
+  if (action === 'DELETE_QUIZ') {
+    return {
+      mode: 'restore',
+      supported: hasSnapshot,
+      label: 'Restore deleted quiz',
+      reason: hasSnapshot ? '' : 'Snapshot missing in this audit entry.'
+    };
+  }
+
+  if (action === 'DELETE_VOUCHER') {
+    return {
+      mode: 'restore',
+      supported: hasSnapshot,
+      label: 'Restore deleted voucher',
+      reason: hasSnapshot ? '' : 'Snapshot missing in this audit entry.'
+    };
+  }
+
+  if (action === 'user.remove') {
+    return {
+      mode: 'restore',
+      supported: hasSnapshot,
+      label: 'Restore removed user',
+      reason: hasSnapshot ? '' : 'Snapshot missing in this audit entry.'
+    };
+  }
+
+  if (action === 'video.create') {
+    return {
+      mode: 'undo-create',
+      supported: hasTargetId,
+      label: 'Undo created video',
+      reason: hasTargetId ? '' : 'Target id missing in this audit entry.'
+    };
+  }
+
+  if (action === 'CREATE_VOUCHER') {
+    return {
+      mode: 'undo-create',
+      supported: hasTargetId,
+      label: 'Undo created voucher',
+      reason: hasTargetId ? '' : 'Target id missing in this audit entry.'
+    };
+  }
+
+  return {
+    mode: 'none',
+    supported: false,
+    label: 'Not recoverable',
+    reason: 'This action type is not supported for recovery.'
+  };
+}
+
+const RECOVERY_ACTIONS = ['video.delete', 'DELETE_QUIZ', 'DELETE_VOUCHER', 'user.remove', 'video.create', 'CREATE_VOUCHER'];
+
+function getRecoveryCutoffDate() {
+  return new Date(Date.now() - RECOVERY_RETENTION_MS);
+}
+
+function parseDateQuery(value, { endOfDay = false } = {}) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  // Accept YYYY-MM-DD safely from UI date input.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return new Date(`${raw}${endOfDay ? 'T23:59:59.999' : 'T00:00:00.000'}Z`);
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+async function purgeExpiredRecoveryLogs() {
+  const cutoff = getRecoveryCutoffDate();
+  await AuditLog.deleteMany({
+    action: { $in: RECOVERY_ACTIONS },
+    createdAt: { $lt: cutoff }
+  });
+}
+
+router.get('/admin/recovery-actions', authenticateToken('admin'), async (req, res) => {
+  try {
+    await purgeExpiredRecoveryLogs();
+
+    const limit = Math.min(80, Math.max(1, parseInt(req.query.limit, 10) || 30));
+    const retentionCutoff = getRecoveryCutoffDate();
+    const fromDate = req.query.from ? parseDateQuery(req.query.from, { endOfDay: false }) : null;
+    const toDate = req.query.to ? parseDateQuery(req.query.to, { endOfDay: true }) : null;
+
+    if (req.query.from && !fromDate) {
+      return res.status(400).json({ error: 'Invalid "from" date. Use YYYY-MM-DD.' });
+    }
+    if (req.query.to && !toDate) {
+      return res.status(400).json({ error: 'Invalid "to" date. Use YYYY-MM-DD.' });
+    }
+    if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
+      return res.status(400).json({ error: '"From" date must be earlier than or equal to "To" date.' });
+    }
+
+    const createdAtFilter = { $gte: retentionCutoff };
+    if (fromDate) {
+      createdAtFilter.$gte = new Date(Math.max(retentionCutoff.getTime(), fromDate.getTime()));
+    }
+    if (toDate) {
+      createdAtFilter.$lte = toDate;
+    }
+
+    const logs = await AuditLog.find({
+      action: { $in: RECOVERY_ACTIONS },
+      createdAt: createdAtFilter
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const actions = logs.map((log) => ({
+      ...log,
+      recovery: {
+        ...extractRecoveryMeta(log),
+        alreadyApplied: Boolean(log?.details?.recovery?.appliedAt)
+      }
+    }));
+
+    return res.json({ actions });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load recovery actions.' });
+  }
+});
+
+router.post('/admin/recovery-actions/:id/apply', authenticateToken('admin'), async (req, res) => {
+  try {
+    await purgeExpiredRecoveryLogs();
+
+    const log = await AuditLog.findById(req.params.id).lean();
+    if (!log) return res.status(404).json({ error: 'Recovery action not found.' });
+
+    if (new Date(log.createdAt).getTime() < getRecoveryCutoffDate().getTime()) {
+      return res.status(410).json({ error: `Recovery expired. Only ${RECOVERY_RETENTION_DAYS}-day-old data is supported.` });
+    }
+
+    const recovery = extractRecoveryMeta(log);
+    if (!recovery.supported) {
+      return res.status(400).json({ error: recovery.reason || 'This audit action cannot be recovered.' });
+    }
+
+    if (log?.details?.recovery?.appliedAt) {
+      return res.status(409).json({ error: 'This recovery action has already been applied.' });
+    }
+
+    const action = String(log.action || '').trim();
+    const snapshot = log?.details?.snapshot || {};
+
+    if (action === 'video.delete') {
+      const payload = {
+        title: String(snapshot.title || '').trim(),
+        description: String(snapshot.description || ''),
+        url: String(snapshot.url || '').trim(),
+        category: String(snapshot.category || 'General').trim() || 'General',
+        module: String(snapshot.module || 'General').trim() || 'General',
+        uploadedAt: snapshot.uploadedAt ? new Date(snapshot.uploadedAt) : new Date(),
+        materials: Array.isArray(snapshot.materials) ? snapshot.materials : []
+      };
+      if (!payload.title || !payload.url) {
+        return res.status(400).json({ error: 'Snapshot is incomplete. Cannot restore this video.' });
+      }
+      if (mongoose.Types.ObjectId.isValid(String(log.targetId || ''))) {
+        const existing = await Video.findById(log.targetId).lean();
+        if (existing) return res.status(409).json({ error: 'Video already exists. Recovery not needed.' });
+        payload._id = log.targetId;
+      }
+      await Video.create(payload);
+    } else if (action === 'DELETE_QUIZ') {
+      const payload = {
+        category: String(snapshot.category || '').trim(),
+        module: String(snapshot.module || '').trim(),
+        title: String(snapshot.title || '').trim(),
+        difficulty: String(snapshot.difficulty || 'medium').trim() || 'medium',
+        requireExplanation: Boolean(snapshot.requireExplanation),
+        timeLimitMinutes: Number(snapshot.timeLimitMinutes || 15),
+        questions: Array.isArray(snapshot.questions) ? snapshot.questions : [],
+        updatedBy: String(snapshot.updatedBy || req.user.username || 'admin').trim(),
+        updatedAt: snapshot.updatedAt ? new Date(snapshot.updatedAt) : new Date()
+      };
+      if (!payload.category || !payload.module || !payload.title || !payload.questions.length) {
+        return res.status(400).json({ error: 'Snapshot is incomplete. Cannot restore this quiz.' });
+      }
+      if (mongoose.Types.ObjectId.isValid(String(log.targetId || ''))) {
+        const existing = await Quiz.findById(log.targetId).lean();
+        if (existing) return res.status(409).json({ error: 'Quiz already exists. Recovery not needed.' });
+        payload._id = log.targetId;
+      }
+      await Quiz.create(payload);
+    } else if (action === 'DELETE_VOUCHER') {
+      const payload = {
+        code: String(snapshot.code || '').trim().toUpperCase(),
+        description: String(snapshot.description || ''),
+        discountType: String(snapshot.discountType || '').trim(),
+        discountValue: Number(snapshot.discountValue || 0),
+        maxDiscountInPaise: snapshot.maxDiscountInPaise == null ? null : Number(snapshot.maxDiscountInPaise || 0),
+        active: snapshot.active !== false,
+        validFrom: snapshot.validFrom ? new Date(snapshot.validFrom) : null,
+        validUntil: snapshot.validUntil ? new Date(snapshot.validUntil) : null,
+        usageLimit: snapshot.usageLimit == null ? null : Number(snapshot.usageLimit || 0),
+        usedCount: Number(snapshot.usedCount || 0),
+        applicableCourses: Array.isArray(snapshot.applicableCourses) ? snapshot.applicableCourses : [],
+        createdBy: String(snapshot.createdBy || req.user.username || '')
+      };
+      if (!payload.code || !payload.discountType || !payload.discountValue) {
+        return res.status(400).json({ error: 'Snapshot is incomplete. Cannot restore this voucher.' });
+      }
+      const existingByCode = await Voucher.findOne({ code: payload.code }).lean();
+      if (existingByCode) return res.status(409).json({ error: 'Voucher code already exists. Recovery not needed.' });
+      if (mongoose.Types.ObjectId.isValid(String(log.targetId || ''))) {
+        payload._id = log.targetId;
+      }
+      await Voucher.create(payload);
+    } else if (action === 'user.remove') {
+      const payload = {
+        phone: String(snapshot.phone || '').trim(),
+        username: String(snapshot.username || '').trim(),
+        class: String(snapshot.class || '').trim(),
+        city: String(snapshot.city || '').trim(),
+        security: snapshot.security && typeof snapshot.security === 'object' ? snapshot.security : undefined,
+        avatar: snapshot.avatar && typeof snapshot.avatar === 'object' ? snapshot.avatar : undefined,
+        password: String(snapshot.password || ''),
+        favorites: Array.isArray(snapshot.favorites) ? snapshot.favorites : [],
+        completedVideos: Array.isArray(snapshot.completedVideos) ? snapshot.completedVideos : [],
+        purchasedCourses: Array.isArray(snapshot.purchasedCourses) ? snapshot.purchasedCourses : []
+      };
+      if (!payload.phone || !payload.username || !payload.class || !payload.city || !payload.password) {
+        return res.status(400).json({ error: 'Snapshot is incomplete. Cannot restore this user.' });
+      }
+      const existsUsername = await User.findOne({ username: payload.username }).lean();
+      if (existsUsername) return res.status(409).json({ error: 'Username already exists. Cannot restore user.' });
+      const existsPhone = await User.findOne({ phone: payload.phone }).lean();
+      if (existsPhone) return res.status(409).json({ error: 'Phone number already exists. Cannot restore user.' });
+      await User.create(payload);
+    } else if (action === 'video.create') {
+      const deleted = await Video.findByIdAndDelete(log.targetId);
+      if (!deleted) return res.status(404).json({ error: 'Target video not found. It may already be removed.' });
+    } else if (action === 'CREATE_VOUCHER') {
+      const deleted = await Voucher.findByIdAndDelete(log.targetId);
+      if (!deleted) return res.status(404).json({ error: 'Target voucher not found. It may already be removed.' });
+    } else {
+      return res.status(400).json({ error: 'Unsupported recovery action.' });
+    }
+
+    const nextDetails = {
+      ...(log.details || {}),
+      recovery: {
+        appliedAt: new Date().toISOString(),
+        appliedBy: req.user?.username || 'admin',
+        mode: recovery.mode
+      }
+    };
+
+    await AuditLog.updateOne({ _id: log._id }, { $set: { details: nextDetails } });
+    await logAdminAction(req, {
+      action: 'RECOVERY_APPLY',
+      targetType: log.targetType || 'unknown',
+      targetId: String(log.targetId || ''),
+      details: { sourceAuditId: String(log._id), sourceAction: log.action, mode: recovery.mode }
+    });
+
+    return res.json({ success: true, message: `${recovery.label} applied successfully.` });
+  } catch (err) {
+    if (String(err?.message || '').includes('duplicate key')) {
+      return res.status(409).json({ error: 'Recovery failed due to a duplicate key conflict.' });
+    }
+    return res.status(500).json({ error: 'Failed to apply recovery action.' });
+  }
+});
+
 router.get('/me', authenticateToken('user'), async (req, res) => {
   try {
     const user = await User.findOne(
@@ -577,11 +872,27 @@ router.delete('/users/:username', authenticateToken('admin'), async (req, res) =
   try {
     const deleted = await User.findOneAndDelete({ username });
     if (!deleted) return res.status(404).json({ error: 'User not found' });
+    const deletedObj = deleted.toObject();
     await logAdminAction(req, {
       action: 'user.remove',
       targetType: 'user',
       targetId: deleted.username,
-      details: { class: deleted.class, city: deleted.city }
+      details: {
+        class: deleted.class,
+        city: deleted.city,
+        snapshot: {
+          phone: deletedObj.phone,
+          username: deletedObj.username,
+          class: deletedObj.class,
+          city: deletedObj.city,
+          security: deletedObj.security,
+          avatar: deletedObj.avatar,
+          password: deletedObj.password,
+          favorites: deletedObj.favorites || [],
+          completedVideos: deletedObj.completedVideos || [],
+          purchasedCourses: deletedObj.purchasedCourses || []
+        }
+      }
     });
     return res.json({ message: 'User removed successfully' });
   } catch (err) {

@@ -758,7 +758,29 @@ router.delete('/admin/vouchers/:id', authenticateToken('admin'), async (req, res
   try {
     const voucher = await Voucher.findByIdAndDelete(req.params.id).lean();
     if (!voucher) return res.status(404).json({ error: 'Voucher not found.' });
-    await logAdminAction(req, { action: 'DELETE_VOUCHER', targetType: 'Voucher', targetId: String(req.params.id), details: { code: voucher.code } });
+    await logAdminAction(req, {
+      action: 'DELETE_VOUCHER',
+      targetType: 'Voucher',
+      targetId: String(req.params.id),
+      details: {
+        code: voucher.code,
+        snapshot: {
+          _id: String(voucher._id),
+          code: voucher.code,
+          description: voucher.description,
+          discountType: voucher.discountType,
+          discountValue: voucher.discountValue,
+          maxDiscountInPaise: voucher.maxDiscountInPaise,
+          active: voucher.active,
+          validFrom: voucher.validFrom,
+          validUntil: voucher.validUntil,
+          usageLimit: voucher.usageLimit,
+          usedCount: voucher.usedCount,
+          applicableCourses: Array.isArray(voucher.applicableCourses) ? voucher.applicableCourses : [],
+          createdBy: voucher.createdBy
+        }
+      }
+    });
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete voucher.' });
