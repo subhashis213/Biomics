@@ -63,6 +63,8 @@ export default function AdminDashboard() {
   const [activeLibraryCourse, setActiveLibraryCourse] = useState('All');
   const [librarySearchInput, setLibrarySearchInput] = useState('');
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
+  const [libraryModuleInput, setLibraryModuleInput] = useState('');
+  const [libraryModuleQuery, setLibraryModuleQuery] = useState('');
   const [videoForm, setVideoForm] = useState({ title: '', description: '', url: '' });
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [courseModalOpen, setCourseModalOpen] = useState(false);
@@ -1521,21 +1523,27 @@ export default function AdminDashboard() {
 
   function applyLibrarySearch() {
     setLibrarySearchQuery(String(librarySearchInput || '').trim().toLowerCase());
+    setLibraryModuleQuery(String(libraryModuleInput || '').trim().toLowerCase());
   }
 
   function clearLibrarySearch() {
     setLibrarySearchInput('');
     setLibrarySearchQuery('');
+    setLibraryModuleInput('');
+    setLibraryModuleQuery('');
   }
 
   const filteredVideos = videos.filter((video) => {
     const matchesCourse = activeLibraryCourse === 'All' || (video.category || 'General') === activeLibraryCourse;
     if (!matchesCourse) return false;
 
-    if (!librarySearchQuery) return true;
-
     const title = String(video.title || '').toLowerCase();
-    return title.includes(librarySearchQuery);
+    const moduleName = String(video.module || 'General').toLowerCase();
+
+    const matchesTitle = !librarySearchQuery || title.includes(librarySearchQuery);
+    const matchesModule = !libraryModuleQuery || moduleName.includes(libraryModuleQuery);
+
+    return matchesTitle && matchesModule;
   });
   const activeUserUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('user-'));
   const activeLibraryUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('video-') || id.startsWith('material-'));
@@ -2054,6 +2062,19 @@ export default function AdminDashboard() {
                   }
                 }}
               />
+              <input
+                type="text"
+                className="library-search-input"
+                placeholder="Filter by module (e.g. genetics, unit 1)"
+                value={libraryModuleInput}
+                onChange={(event) => setLibraryModuleInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyLibrarySearch();
+                  }
+                }}
+              />
               <button
                 type="button"
                 className="primary-btn"
@@ -2065,7 +2086,7 @@ export default function AdminDashboard() {
                 type="button"
                 className="secondary-btn"
                 onClick={clearLibrarySearch}
-                disabled={!librarySearchInput && !librarySearchQuery}
+                disabled={!librarySearchInput && !librarySearchQuery && !libraryModuleInput && !libraryModuleQuery}
               >
                 Clear
               </button>
@@ -2088,8 +2109,8 @@ export default function AdminDashboard() {
           {loading ? <p className="empty-state">Loading dashboard...</p> : null}
           {!loading && !filteredVideos.length ? (
             <p className="empty-state">
-              {librarySearchQuery
-                ? `No lectures found for "${librarySearchQuery}".`
+              {librarySearchQuery || libraryModuleQuery
+                ? `No lectures found for the applied title/module filters.`
                 : activeLibraryCourse === 'All'
                   ? `No lectures yet. Publish a lecture first, then the PDF upload button will appear on that lecture card (max ${MAX_MATERIAL_MB}MB).`
                   : `No lectures available for ${activeLibraryCourse}. Add one from Course Manager.`}
