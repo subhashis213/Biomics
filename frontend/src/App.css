@@ -1652,8 +1652,8 @@ html[data-theme='light'] .field-hint {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding-top: 10px;
+  gap: 12px;
+  padding-top: 8px;
   border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
 
@@ -1670,21 +1670,22 @@ html[data-theme='light'] .field-hint {
 .topbar-inline-nav {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex: 1 1 auto;
   flex-wrap: nowrap;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 2px;
+  padding: 1px 2px 3px;
+  scroll-padding-inline: 6px;
   scrollbar-width: thin;
 }
 
 .topbar-inline-nav .app-side-nav-link {
   width: auto;
   min-height: 40px;
-  padding: 9px 14px;
+  padding: 8px 14px;
   border-radius: 999px;
   gap: 9px;
   flex: 0 0 auto;
@@ -1692,6 +1693,8 @@ html[data-theme='light'] .field-hint {
   background: color-mix(in srgb, var(--bg-card-soft) 88%, transparent);
   border-color: color-mix(in srgb, var(--line) 78%, transparent);
   box-shadow: none;
+  color: var(--text-main);
+  font-weight: 600;
 }
 
 .topbar-inline-nav .app-side-nav-link:hover {
@@ -1703,6 +1706,17 @@ html[data-theme='light'] .field-hint {
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, var(--bg-card-soft)), color-mix(in srgb, var(--accent-2) 14%, var(--bg-card)));
   border-color: color-mix(in srgb, var(--accent) 44%, transparent);
   box-shadow: 0 10px 20px color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+html[data-theme='light'] .topbar-inline-nav .app-side-nav-link {
+  color: #0f172a;
+}
+
+html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
+  color: #020617;
+  font-weight: 700;
 }
 
 .topbar-inline-nav .app-side-nav-link-icon {
@@ -2147,7 +2161,7 @@ html[data-theme='light'] .field-hint {
   height: 42px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
-  background: linear-gradient(140deg, var(--bg-card-soft), var(--bg-card));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bg-card-soft) 92%, #ffffff 8%), color-mix(in srgb, var(--bg-card) 92%, transparent));
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -2155,12 +2169,19 @@ html[data-theme='light'] .field-hint {
   overflow: hidden;
   color: var(--text-strong);
   font-weight: 700;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 10px 18px color-mix(in srgb, #0f172a 18%, transparent);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 180ms ease;
 }
 
 .profile-icon-btn:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
+  box-shadow: 0 12px 22px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.profile-icon-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 2px;
 }
 
 .profile-hover-card {
@@ -2202,19 +2223,23 @@ html[data-theme='light'] .field-hint {
 
 .profile-theme-btn {
   margin-top: 4px;
-  border: 1px solid var(--line);
-  background: var(--bg-card-soft);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bg-card-soft) 90%, #ffffff 10%), color-mix(in srgb, var(--bg-card) 92%, transparent));
   color: var(--text-main);
-  border-radius: 9px;
-  padding: 6px 8px;
+  border-radius: 8px;
+  padding: 6px 10px;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  text-align: center;
+  transition: transform 150ms ease, border-color 160ms ease, box-shadow 180ms ease, color 160ms ease, background 180ms ease;
 }
 
 .profile-theme-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .profile-quick-logout-btn {
@@ -2224,8 +2249,8 @@ html[data-theme='light'] .field-hint {
 
 .profile-quick-logout-btn:hover {
   border-color: #ef4444;
-  background: color-mix(in srgb, #ef4444 16%, var(--bg-card-soft));
-  color: #ef4444;
+  background: linear-gradient(135deg, color-mix(in srgb, #ef4444 20%, var(--bg-card-soft)), color-mix(in srgb, #dc2626 14%, var(--bg-card)));
+  color: #fff;
 }
 
 .profile-icon-image,
@@ -3781,10 +3806,11 @@ html[data-theme='light'] .field-hint {
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: var(--secondary-bg);
   color: var(--secondary-fg);
   font-weight: 700;
+  font-size: 0.78rem;
 }
 
 .profile-delete-photo-btn {
@@ -3795,6 +3821,9 @@ html[data-theme='light'] .field-hint {
   width: 100%;
   margin-top: 2px;
   justify-content: center;
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
 }
 
 .profile-summary-list {
@@ -3842,7 +3871,10 @@ html[data-theme='light'] .field-hint {
 
 .profile-edit-actions .secondary-btn,
 .profile-edit-actions .primary-btn {
-  min-width: 140px;
+  min-width: 96px;
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 0.76rem;
 }
 
 /* ── Profile modal logout button ──────────────────── */
@@ -3850,7 +3882,7 @@ html[data-theme='light'] .field-hint {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 20px;
+  padding: 8px 12px;
   border-radius: 999px;
   border: 1.5px solid color-mix(in srgb, #ef4444 32%, var(--line));
   background: linear-gradient(135deg,
@@ -3862,7 +3894,7 @@ html[data-theme='light'] .field-hint {
   letter-spacing: 0.02em;
   cursor: pointer;
   white-space: nowrap;
-  min-height: 40px;
+  min-height: 34px;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease,
               box-shadow 0.2s ease, transform 0.18s ease;
 }
@@ -6087,11 +6119,13 @@ html[data-theme='light'] .empty-note {
   .topbar-inline-nav {
     width: 100%;
     justify-content: flex-start;
+    gap: 8px;
+    padding: 1px 0 2px;
   }
 
   .topbar-inline-nav .app-side-nav-link {
     min-height: 36px;
-    padding: 8px 12px;
+    padding: 7px 11px;
     font-size: 0.79rem;
   }
 
