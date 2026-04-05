@@ -6,7 +6,6 @@ const multer = require('multer');
 const Video = require('../models/Video');
 const Module = require('../models/Module');
 const User = require('../models/User');
-const Voucher = require('../models/Voucher');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken } = require('../middleware/auth');
 const {
@@ -55,55 +54,11 @@ function sanitizeIdList(items = []) {
   return items.map((item) => String(item));
 }
 
-function isVoucherApplicable(voucher, course) {
-  if (!voucher || !voucher.active) return false;
-  const now = Date.now();
-  if (voucher.validFrom && new Date(voucher.validFrom).getTime() > now) return false;
-  if (voucher.validUntil && new Date(voucher.validUntil).getTime() < now) return false;
-  if (Number.isFinite(voucher.usageLimit) && voucher.usageLimit > 0 && voucher.usedCount >= voucher.usageLimit) {
-    return false;
-  }
-  if (!Array.isArray(voucher.applicableCourses) || voucher.applicableCourses.length === 0) {
-    return true;
-  }
-  return voucher.applicableCourses.some((entry) => normalizeCourseName(entry) === normalizeCourseName(course));
-}
-
-function normalizeVoucherOffer(voucher) {
-  return {
-    code: String(voucher.code || '').toUpperCase(),
-    description: String(voucher.description || '').trim(),
-    discountType: String(voucher.discountType || '').trim().toLowerCase(),
-    discountValue: Number(voucher.discountValue || 0),
-    maxDiscountInPaise: Number.isFinite(voucher.maxDiscountInPaise) ? Number(voucher.maxDiscountInPaise) : null,
-    validUntil: voucher.validUntil || null
-  };
-}
-
-async function getApplicableVoucherOffers(course) {
-  const vouchers = await Voucher.find({ active: true }).sort({ createdAt: -1 }).lean();
-  const validVouchers = vouchers.filter((voucher) => {
-    const now = Date.now();
-    if (voucher.validFrom && new Date(voucher.validFrom).getTime() > now) return false;
-    if (voucher.validUntil && new Date(voucher.validUntil).getTime() < now) return false;
-    if (Number.isFinite(voucher.usageLimit) && voucher.usageLimit > 0 && voucher.usedCount >= voucher.usageLimit) {
-      return false;
-    }
-    return true;
-  });
-
-  const applicable = validVouchers.filter((voucher) => isVoucherApplicable(voucher, course));
-  const source = applicable.length ? applicable : validVouchers;
-
-  return source.slice(0, 8).map(normalizeVoucherOffer);
-}
-
 async function getUserCourseAccessSnapshot(user) {
   const course = normalizeCourseName(user?.class);
-  const [pricingDocs, modules, voucherOffers] = await Promise.all([
+  const [pricingDocs, modules] = await Promise.all([
     getCoursePricingDocs(course),
-    Module.find({ category: course }).sort({ name: 1 }).lean(),
-    getApplicableVoucherOffers(course)
+    Module.find({ category: course }).sort({ name: 1 }).lean()
   ]);
   const pricingByModule = new Map(pricingDocs.map((entry) => [normalizeModuleName(entry.moduleName), entry]));
   const bundlePricing = pricingByModule.get(ALL_MODULES) || null;
@@ -155,7 +110,6 @@ async function getUserCourseAccessSnapshot(user) {
       currency: String(bundlePricing?.currency || 'INR'),
       plans: buildPlans(bundlePricing)
     },
-    voucherOffers,
     moduleAccess,
     activeMembership: activeMembership
       ? {

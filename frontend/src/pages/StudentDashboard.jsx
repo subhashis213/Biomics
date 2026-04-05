@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   createCourseOrder,
   downloadMaterial,
@@ -11,7 +11,6 @@ import {
 } from '../api';
 import logoImg from '../assets/biomics-logo.jpeg';
 import AppShell from '../components/AppShell';
-import { QuizModal } from '../components/QuizModal';
 import StatCard from '../components/StatCard';
 import FinalWorkingVideoCard from '../components/FinalWorkingVideoCard';
 import StudentChatAgent from '../components/StudentChatAgent';
@@ -25,6 +24,7 @@ const ALL_MODULES = 'ALL_MODULES';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, logout, login } = useSessionStore();
   const { theme, toggleTheme } = useThemeStore();
   const isLightTheme = theme === 'light';
@@ -43,8 +43,6 @@ export default function StudentDashboard() {
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [banner, setBanner] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState({});
-  const [quizModalOpen, setQuizModalOpen] = useState(false);
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [leaderboardModules, setLeaderboardModules] = useState([]);
   const [leaderboardModuleFilter, setLeaderboardModuleFilter] = useState('all');
@@ -64,47 +62,21 @@ export default function StudentDashboard() {
   const [selectedPlan, setSelectedPlan] = useState('pro');
   const [isUnlockingCourse, setIsUnlockingCourse] = useState(false);
   const [selectedAccessTarget, setSelectedAccessTarget] = useState(ALL_MODULES);
+  const [selectedModuleSection, setSelectedModuleSection] = useState('');
 
   const allModulesUnlocked = Boolean(access?.allModulesUnlocked || access?.unlocked);
   const bundlePlanOptions = Array.isArray(access?.bundlePricing?.plans) ? access.bundlePricing.plans : [];
-  const voucherOffers = Array.isArray(access?.voucherOffers) ? access.voucherOffers : [];
   const moduleAccessMap = access?.moduleAccess || {};
   const unlockedModuleSet = new Set(Array.isArray(access?.unlockedModules) ? access.unlockedModules.map((item) => normalizeModuleName(item)) : []);
   const hasAnyUnlockedModule = allModulesUnlocked || unlockedModuleSet.size > 0;
   const activeMembership = access?.activeMembership || null;
 
-  function resolveMembershipExpiry(entry) {
-    if (!entry) return null;
-    if (entry.expiresAt) {
-      const direct = new Date(entry.expiresAt);
-      if (Number.isFinite(direct.getTime())) return direct;
-    }
-    if (entry.unlockedAt) {
-      const unlocked = new Date(entry.unlockedAt);
-      if (!Number.isFinite(unlocked.getTime())) return null;
-      const months = String(entry.planType || 'pro').toLowerCase() === 'elite' ? 3 : 1;
-      const derived = new Date(unlocked);
-      derived.setMonth(derived.getMonth() + months);
-      return Number.isFinite(derived.getTime()) ? derived : null;
-    }
-    return null;
-  }
-
-  const membershipExpiresAt = resolveMembershipExpiry(activeMembership);
-  const hasMembershipRecord = Boolean(activeMembership);
-  const hasValidMembershipExpiry = Boolean(
-    membershipExpiresAt && Number.isFinite(membershipExpiresAt.getTime())
-  );
-  const isMembershipExpired = Boolean(
-    hasMembershipRecord
-    && (
-      !hasValidMembershipExpiry
-      || membershipExpiresAt.getTime() <= Date.now()
-    )
-  );
-  const effectiveActiveMembership = isMembershipExpired ? null : activeMembership;
-  const expiredMembershipPlanLabel = activeMembership?.planType === 'elite' ? 'Elite' : 'Pro';
-  const showDealBanner = !allModulesUnlocked && voucherOffers.length > 0;
+  const moduleMemberships = Object.values(moduleAccessMap)
+    .map((entry) => entry?.activeMembership)
+    .filter(Boolean)
+    .sort((left, right) => new Date(left?.expiresAt || 0).getTime() - new Date(right?.expiresAt || 0).getTime());
+  const visibleMembership = activeMembership || moduleMemberships[0] || null;
+  const shouldShowLeaderboard = hasAnyUnlockedModule && !selectedModule;
 
   const profilePasswordHint =
     profileForm.password.length > 0 && profileForm.password.length < 8
@@ -128,11 +100,7 @@ export default function StudentDashboard() {
     normalizeCourseName(selectedModuleCourse).toLowerCase() === normalizeCourseName(course || '').toLowerCase();
 
   const {
-    moduleQuiz, moduleQuizList, quizAnswers, quizResult, quizReview,
-    showQuizReview, quizSecondsLeft, loadingQuiz, loadingQuizDetailsId, submittingQuiz,
-    moduleHasQuiz, setQuizAnswers, setShowQuizReview,
-    handleSelectQuizFromList, handleBackToQuizList, handleRetakeQuiz,
-    handleSubmitQuiz, handleLoadQuizForModule
+    moduleQuizList, loadingQuiz, moduleHasQuiz, handleLoadQuizForModule
   } = useQuizSession({
     selectedModule: quizEnabledForSelection ? selectedModuleName : null,
     quizzes,
@@ -145,26 +113,7 @@ export default function StudentDashboard() {
     feedbackInlineError, feedbackToast, isFeedbackToastDismissing, dismissFeedbackToast
   } = useFeedback();
 
-  function formatTimer(totalSeconds) {
-    const safe = Math.max(0, totalSeconds || 0);
-    const minutes = Math.floor(safe / 60);
-    const seconds = safe % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-
   const query = searchQuery.trim().toLowerCase();
-
-  function resolveReviewCorrectIndex(item) {
-    const direct = Number(item?.correctIndex);
-    if (Number.isInteger(direct) && direct >= 0 && direct <= 3) return direct;
-
-    if (item?.correctAnswer && Array.isArray(item?.options)) {
-      const matchIndex = item.options.findIndex((opt) => String(opt).trim().toLowerCase() === String(item.correctAnswer).trim().toLowerCase());
-      if (matchIndex >= 0) return matchIndex;
-    }
-
-    return -1;
-  }
 
   function normalizeModuleName(value) {
     return String(value || '').trim().replace(/\s+/g, ' ');
@@ -204,15 +153,6 @@ export default function StudentDashboard() {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
-  function formatVoucherDiscount(offer) {
-    if (!offer) return '';
-    if (String(offer.discountType || '').toLowerCase() === 'percent') {
-      return `${Math.max(0, Number(offer.discountValue || 0))}% OFF`;
-    }
-    const amount = Math.max(0, Number(offer.discountValue || 0)) / 100;
-    return `Rs ${amount.toFixed(0)} OFF`;
   }
 
   function getModuleAccessInfo(moduleName) {
@@ -348,32 +288,6 @@ export default function StudentDashboard() {
       return sameModule && sameCategory;
     })
     : [];
-  const fallbackReviewFromLocalQuiz = (
-    moduleQuiz?.questions?.length
-      ? moduleQuiz.questions.map((question, idx) => {
-        const selectedIndex = Number.isInteger(quizAnswers[idx]) ? quizAnswers[idx] : -1;
-        const correctIndex = Number.isInteger(question.correctIndex) ? question.correctIndex : -1;
-        const correctAnswer = correctIndex >= 0 && Array.isArray(question.options)
-          ? question.options[correctIndex]
-          : '';
-        return {
-          question: question.question,
-          options: question.options || [],
-          selectedIndex,
-          correctIndex,
-          correctAnswer,
-          isCorrect: selectedIndex >= 0 && selectedIndex === correctIndex,
-          explanation: question.explanation || ''
-        };
-      })
-      : []
-  );
-
-  const reviewItems = quizReview.length
-    ? quizReview
-    : (Array.isArray(quizResult?.review) && quizResult.review.length
-      ? quizResult.review
-      : fallbackReviewFromLocalQuiz);
 
   const latestAttemptByModule = quizAttempts.reduce((acc, attempt) => {
     const moduleKey = resolveModuleKey(attempt.category || course || 'General', attempt.module || 'General');
@@ -440,6 +354,19 @@ export default function StudentDashboard() {
   }, [selectedModule, access]);
 
   useEffect(() => {
+    const restoreModule = location.state?.restoreModule;
+    if (!restoreModule?.name) return;
+
+    setSelectedModule({
+      name: normalizeModuleName(restoreModule.name),
+      category: normalizeCourseName(restoreModule.category || course || 'General')
+    });
+    setSelectedModuleSection('');
+
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate, course]);
+
+  useEffect(() => {
     let cancelled = false;
     setLeaderboardLoading(true);
     setLeaderboardError('');
@@ -494,16 +421,6 @@ export default function StudentDashboard() {
     };
   }, []);
 
-  // Open modal when a quiz becomes active; close when quiz is cleared.
-  useEffect(() => {
-    if (moduleQuiz) {
-      setQuizModalOpen(true);
-      setShowExitConfirm(false);
-    } else {
-      setQuizModalOpen(false);
-      setShowExitConfirm(false);
-    }
-  }, [moduleQuiz]);
 
   // Poll for live class status every 5 seconds
   useEffect(() => {
@@ -551,18 +468,6 @@ export default function StudentDashboard() {
     return () => window.clearInterval(t);
   }, [upcomingClass]);
 
-  function handleCloseQuizModal() {
-    if (moduleQuiz && !quizResult) {
-      setShowExitConfirm(true);
-    } else {
-      handleBackToQuizList();
-    }
-  }
-
-  function handleConfirmExit() {
-    setShowExitConfirm(false);
-    handleBackToQuizList();
-  }
 
   async function handleDownload(material) {
     setDownloadProgress((current) => ({ ...current, [material.filename]: 0 }));
@@ -799,29 +704,15 @@ export default function StudentDashboard() {
       <div id="section-overview" className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
-        {effectiveActiveMembership ? (
+        {visibleMembership ? (
           <section className="membership-status-banner card">
             <div>
               <p className="eyebrow">Active Membership</p>
-              <h2>{effectiveActiveMembership.planType === 'elite' ? 'Elite' : 'Pro'} access is live</h2>
+              <h2>{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'} access is live</h2>
               <p className="empty-note">
-                {effectiveActiveMembership.moduleName && effectiveActiveMembership.moduleName !== ALL_MODULES
-                  ? `${effectiveActiveMembership.moduleName} access expires on ${formatMembershipDate(membershipExpiresAt)}.`
-                  : `Your ${course} membership expires on ${formatMembershipDate(membershipExpiresAt)}.`}
-              </p>
-            </div>
-          </section>
-        ) : null}
-
-        {!effectiveActiveMembership && isMembershipExpired ? (
-          <section className="membership-status-banner membership-status-banner-expired card">
-            <div>
-              <p className="eyebrow">Membership Expired</p>
-              <h2>Need to restore the {expiredMembershipPlanLabel} access</h2>
-              <p className="empty-note">
-                {activeMembership?.moduleName && activeMembership.moduleName !== ALL_MODULES
-                  ? `${activeMembership.moduleName} ${expiredMembershipPlanLabel} membership has expired. Renew now to continue lectures, materials, and quizzes.`
-                  : `Your ${course} ${expiredMembershipPlanLabel} membership has expired. Renew now to continue your learning access.`}
+                {visibleMembership.moduleName && visibleMembership.moduleName !== ALL_MODULES
+                  ? `${visibleMembership.moduleName} access expires on ${formatMembershipDate(visibleMembership.expiresAt)}.`
+                  : `Your ${course} membership expires on ${formatMembershipDate(visibleMembership.expiresAt)}.`}
               </p>
             </div>
           </section>
@@ -887,33 +778,6 @@ export default function StudentDashboard() {
           </section>
         ) : null}
 
-        {showDealBanner ? (
-          <section className="card membership-deal-banner">
-            <div className="membership-deal-head">
-              <p className="eyebrow">Special Offer</p>
-              <h2>Grab the deal with discounted price</h2>
-              <p className="subtitle">Use any admin coupon code below during checkout.</p>
-            </div>
-            <div className="membership-deal-codes" role="list" aria-label="Available coupon codes">
-              {voucherOffers.map((offer) => (
-                <button
-                  key={offer.code}
-                  type="button"
-                  className="membership-deal-code-chip"
-                  onClick={() => setVoucherCode(String(offer.code || '').toUpperCase())}
-                  title="Click to apply this code"
-                >
-                  <span className="membership-deal-code-text">{offer.code}</span>
-                  <span className="membership-deal-discount">{formatVoucherDiscount(offer)}</span>
-                  {offer.validUntil ? (
-                    <span className="membership-deal-expiry">Till {formatMembershipDate(offer.validUntil)}</span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
       <section className="student-tools-row card">
         <label>
           Search modules or lectures
@@ -938,7 +802,7 @@ export default function StudentDashboard() {
             ))}
           </select>
         </label>
-        {selectedModule ? (
+        {selectedModule && selectedModuleSection === 'lectures' ? (
           <>
             <label>
               Sort lectures
@@ -975,10 +839,13 @@ export default function StudentDashboard() {
                 key={video._id}
                 type="button"
                 className="favorite-chip"
-                onClick={() => setSelectedModule({
-                  name: String(video.module || 'General').trim() || 'General',
-                  category: normalizeCourseName(video.category || 'General')
-                })}
+                onClick={() => {
+                  setSelectedModule({
+                    name: String(video.module || 'General').trim() || 'General',
+                    category: normalizeCourseName(video.category || 'General')
+                  });
+                  setSelectedModuleSection('');
+                }}
               >
                 <span>★</span>
                 {video.title}
@@ -996,7 +863,10 @@ export default function StudentDashboard() {
               <h2>{selectedModuleCourse} - {selectedModuleName}</h2>
               <button
                 className="back-btn small"
-                onClick={() => setSelectedModule(null)}
+                onClick={() => {
+                  setSelectedModule(null);
+                  setSelectedModuleSection('');
+                }}
                 title="Back to modules"
               >
                 ← Back to Modules
@@ -1108,7 +978,10 @@ export default function StudentDashboard() {
                 <button
                   key={moduleKey}
                   className={`module-card-btn${moduleIsLocked ? ' module-card-btn-locked' : ''}`}
-                  onClick={() => setSelectedModule({ name: module, category: moduleCourse })}
+                  onClick={() => {
+                    setSelectedModule({ name: module, category: moduleCourse });
+                    setSelectedModuleSection('');
+                  }}
                 >
                   <div className="module-card-header">
                     <span className="module-card-icon">📚</span>
@@ -1210,7 +1083,7 @@ export default function StudentDashboard() {
             </button>
           </div>
         </section>
-      ) : selectedModule && displayedVideos.length ? (
+      ) : selectedModule && !moduleLocked && selectedModuleSection === 'lectures' && displayedVideos.length ? (
         // Video Grid View (within selected module)
         <div className="module-videos-scroll">
           <div className="compact-premium-video-grid">
@@ -1229,11 +1102,37 @@ export default function StudentDashboard() {
             ))}
           </div>
         </div>
+      ) : selectedModule && !moduleLocked && selectedModuleSection === 'lectures' ? (
+        <p className="empty-state">No lectures available in {selectedModuleName}.</p>
+      ) : selectedModule && !moduleLocked ? (
+        <section className="card module-section-chooser">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Module Workspace</p>
+              <h2>Choose section to continue</h2>
+            </div>
+            <StatCard label="Module" value={selectedModuleName || 'Selected'} />
+          </div>
+          <div className="module-section-grid">
+            <button
+              type="button"
+              className="module-section-card"
+              onClick={() => navigate(`/student/module/${encodeURIComponent(selectedModuleCourse || course || 'General')}/${encodeURIComponent(selectedModuleName || 'General')}/lectures`)}
+            >
+              <span className="module-section-icon" aria-hidden="true">🎬</span>
+              <strong>Lecture Section</strong>
+              <p>Open all videos for this module in a focused lecture layout.</p>
+            </button>
+            <button type="button" className="module-section-card" onClick={() => setSelectedModuleSection('quiz')}>
+              <span className="module-section-icon" aria-hidden="true">📝</span>
+              <strong>Quiz Section</strong>
+              <p>Open assessment quizzes and track performance for this chapter.</p>
+            </button>
+          </div>
+        </section>
       ) : (
         <p className="empty-state">
-          {selectedModule 
-            ? `No lectures available in ${selectedModuleName}.`
-            : (activeCourseFilter ? `No modules available for ${activeCourseFilter}.` : 'No modules available yet.')}
+          {activeCourseFilter ? `No modules available for ${activeCourseFilter}.` : 'No modules available yet.'}
         </p>
       )}
 
@@ -1270,7 +1169,7 @@ export default function StudentDashboard() {
         </section>
       ) : null}
 
-      {allModulesUnlocked && !selectedModule ? (
+      {shouldShowLeaderboard ? (
         <section id="section-leaderboard" className="card quiz-leaderboard-panel">
           <div className="section-header compact">
             <div>
@@ -1341,8 +1240,13 @@ export default function StudentDashboard() {
         </section>
       ) : null}
 
-      {!moduleLocked && selectedModule ? (
+      {!moduleLocked && selectedModule && selectedModuleSection === 'quiz' ? (
         <section className="card quiz-panel">
+          <div className="quiz-picker-back">
+            <button type="button" className="secondary-btn" onClick={() => setSelectedModuleSection('')}>
+              ← Back to Module Sections
+            </button>
+          </div>
           <div className="section-header compact">
             <div>
               <p className="eyebrow">Chapter Quiz</p>
@@ -1365,14 +1269,12 @@ export default function StudentDashboard() {
                   : `This module has ${moduleQuizList.length} quizzes. Click one to begin:`}
               </p>
               {moduleQuizList.map((quiz) => {
-                const isActive = moduleQuiz && String(moduleQuiz._id) === String(quiz._id);
                 return (
                   <button
                     key={quiz._id}
                     type="button"
-                    className={`quiz-picker-card${isActive ? ' quiz-picker-card--active' : ''}`}
-                    disabled={loadingQuizDetailsId === String(quiz._id)}
-                    onClick={() => isActive ? setQuizModalOpen(true) : handleSelectQuizFromList(quiz)}
+                    className="quiz-picker-card"
+                    onClick={() => navigate(`/student/quiz/${encodeURIComponent(quiz._id)}?module=${encodeURIComponent(selectedModuleName || quiz.module || '')}`)}
                   >
                     <div className="quiz-picker-info">
                       <strong className="quiz-picker-title">{quiz.title}</strong>
@@ -1380,12 +1282,9 @@ export default function StudentDashboard() {
                         <span className={`quiz-difficulty quiz-difficulty-${quiz.difficulty || 'medium'}`}>{quiz.difficulty || 'medium'}</span>
                         <span>{getQuestionCount(quiz)} {getQuestionCount(quiz) === 1 ? 'question' : 'questions'}</span>
                         <span>{quiz.timeLimitMinutes} min</span>
-                        {isActive ? <span className="quiz-in-progress-badge">● In Progress</span> : null}
                       </div>
                     </div>
-                    <span className="quiz-picker-arrow" aria-hidden="true">
-                      {loadingQuizDetailsId === String(quiz._id) ? '...' : isActive ? '↗ Resume' : '→'}
-                    </span>
+                    <span className="quiz-picker-arrow" aria-hidden="true">→</span>
                   </button>
                 );
               })}
@@ -1538,125 +1437,6 @@ export default function StudentDashboard() {
       </footer>
 
       </AppShell>
-
-      {/* ── Quiz Full-Screen Modal Outside AppShell ── */}
-      <QuizModal
-        open={quizModalOpen}
-        title={moduleQuiz?.title || 'Quiz'}
-        onClose={handleCloseQuizModal}
-        showExitConfirm={showExitConfirm}
-        onCancelExit={() => setShowExitConfirm(false)}
-        onConfirmExit={handleConfirmExit}
-      >
-        {moduleQuiz && !quizResult ? (
-          <form className="quiz-form" onSubmit={handleSubmitQuiz}>
-            <div className="quiz-meta-strip">
-              <span className={`quiz-difficulty quiz-difficulty-${moduleQuiz.difficulty || 'medium'}`}>
-                Difficulty: {moduleQuiz.difficulty || 'medium'}
-              </span>
-              <span className={`quiz-timer ${quizSecondsLeft <= 30 ? 'quiz-timer-warning' : ''}`}>
-                Time Left: {formatTimer(quizSecondsLeft)}
-              </span>
-            </div>
-            {moduleQuiz.questions.map((question, index) => (
-              <div key={`${question.question}-${index}`} className="quiz-question-card">
-                <p><strong>Q{index + 1}.</strong> {question.question}</p>
-                <div className="quiz-options-grid">
-                  {question.options.map((option, optionIndex) => {
-                    const isSelected = quizAnswers[index] === optionIndex;
-                    return (
-                      <label key={`${option}-${optionIndex}`} className={`quiz-option${isSelected ? ' is-selected' : ''}`}>
-                        <input
-                          type="radio"
-                          name={`question-${index}`}
-                          checked={quizAnswers[index] === optionIndex}
-                          onChange={() => {
-                            const next = [...quizAnswers];
-                            next[index] = optionIndex;
-                            setQuizAnswers(next);
-                          }}
-                        />
-                        <span>{option}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-            <button type="submit" className="primary-btn" disabled={submittingQuiz}>
-              {submittingQuiz ? 'Submitting...' : 'Submit Quiz'}
-            </button>
-          </form>
-        ) : moduleQuiz && quizResult ? (
-          <section className="quiz-thankyou-pop" role="status" aria-live="polite">
-            <h3>Thank you for submitting!</h3>
-            <p>You have completed the quiz for {selectedModuleName}.</p>
-            <div className="quiz-result-box">
-              <strong>Your Score: {quizResult.score}/{quizResult.total}</strong>
-              <span>Percentage: {quizResult.percentage}%</span>
-            </div>
-            <div className="quiz-thankyou-actions">
-              {moduleQuizList.length > 1 ? (
-                <button type="button" className="secondary-btn" onClick={handleBackToQuizList}>
-                  ← All Quizzes
-                </button>
-              ) : null}
-              <button type="button" className="secondary-btn" onClick={() => setShowQuizReview((c) => !c)}>
-                {showQuizReview ? 'Hide Review' : 'Review Answers'}
-              </button>
-              <button type="button" className="primary-btn" onClick={handleRetakeQuiz}>
-                Take Test Again
-              </button>
-              <button type="button" className="secondary-btn" onClick={handleCloseQuizModal}>
-                Close
-              </button>
-            </div>
-
-            {showQuizReview ? (
-              <div className="quiz-review-list">
-                {reviewItems.length ? reviewItems.map((item, idx) => (
-                  <article key={`review-${idx}`} className={`quiz-review-item ${item.isCorrect ? 'correct' : 'incorrect'}`}>
-                    <p><strong>Q{idx + 1}.</strong> {item.question}</p>
-                    <div className="quiz-review-options">
-                      {item.options.map((option, optionIndex) => {
-                        const parsedCorrectIndex = resolveReviewCorrectIndex(item);
-                        const isCorrectOption = optionIndex === parsedCorrectIndex;
-                        const isSelectedOption = optionIndex === item.selectedIndex;
-                        return (
-                          <p
-                            key={`review-${idx}-option-${optionIndex}`}
-                            className={`quiz-review-option ${isCorrectOption ? 'correct' : ''} ${isSelectedOption ? 'selected' : ''}`}
-                          >
-                            <span className="quiz-review-option-index">{String.fromCharCode(65 + optionIndex)}.</span> {option}
-                            {isCorrectOption ? <strong className="quiz-review-badge"> Correct</strong> : null}
-                            {isSelectedOption && !isCorrectOption ? <strong className="quiz-review-badge"> Your choice</strong> : null}
-                          </p>
-                        );
-                      })}
-                    </div>
-                    <p>
-                      <span className="quiz-review-label">Your answer:</span>{' '}
-                      {item.selectedIndex >= 0 ? item.options[item.selectedIndex] : 'Not answered'}
-                    </p>
-                    <p>
-                      <span className="quiz-review-label">Correct answer:</span>{' '}
-                      {(resolveReviewCorrectIndex(item) >= 0 && item.options[resolveReviewCorrectIndex(item)])
-                        ? item.options[resolveReviewCorrectIndex(item)]
-                        : (item.correctAnswer || 'Correct answer unavailable')}
-                    </p>
-                    {item.explanation ? (
-                      <p><span className="quiz-review-label">Explanation:</span> {item.explanation}</p>
-                    ) : null}
-                  </article>
-                )) : (
-                  <p className="empty-note">Review details are not available. Please retake the quiz.</p>
-                )}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-      </QuizModal>
-
       {profileOpen ? (
         <div className="profile-modal-backdrop" onClick={() => setProfileOpen(false)}>
           <section className="profile-modal" onClick={(event) => event.stopPropagation()}>

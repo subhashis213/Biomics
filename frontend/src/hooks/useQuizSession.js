@@ -248,9 +248,10 @@ export function useQuizSession({ selectedModule, quizzes, onError, onAttemptsRef
       autoSubmitFiredRef.current = false;
     },
 
-    async handleSubmitQuiz(event) {
-      event.preventDefault();
-      await _submitQuiz({ requireAllAnswered: true });
+    async handleSubmitQuiz(event, options = {}) {
+      if (event?.preventDefault) event.preventDefault();
+      const requireAllAnswered = options.requireAllAnswered ?? true;
+      await _submitQuiz({ requireAllAnswered });
     },
 
     async handleLoadQuizForModule() {

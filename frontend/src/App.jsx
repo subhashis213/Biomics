@@ -5,6 +5,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminDashboard from './pages/AdminDashboard';
 import AuthPage from './pages/AuthPage';
 import StudentDashboard from './pages/StudentDashboard';
+import StudentLecturePage from './pages/StudentLecturePage';
+import StudentQuizPage from './pages/StudentQuizPage';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -33,6 +35,22 @@ export default function App() {
         element={(
           <ProtectedRoute role="user">
             <StudentDashboard />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/quiz/:quizId"
+        element={(
+          <ProtectedRoute role="user">
+            <StudentQuizPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/module/:courseName/:moduleName/lectures"
+        element={(
+          <ProtectedRoute role="user">
+            <StudentLecturePage />
           </ProtectedRoute>
         )}
       />
