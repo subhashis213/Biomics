@@ -2387,7 +2387,7 @@ export default function AdminDashboard() {
                     <button type="button" className="secondary-btn" onClick={() => editQuiz(quiz)}>
                       Edit
                     </button>
-                    <button type="button" className="danger-btn" onClick={() => handleDeleteQuiz(quiz)} disabled={Boolean(undoPopup)}>
+                    <button type="button" className="danger-btn" onClick={() => handleDeleteQuiz(quiz)} disabled={Object.keys(undoItems).length > 0}>
                       Delete
                     </button>
                   </div>
