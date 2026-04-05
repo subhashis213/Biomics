@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { fetchQuizById, submitQuiz } from '../api';
+import { fetchQuizById, fetchRecentQuizAttempts, submitQuiz } from '../api';
 
 function formatTimer(totalSeconds) {
   const safe = Math.max(0, Number(totalSeconds) || 0);
@@ -23,6 +23,24 @@ function resolveReviewCorrectIndex(item) {
   return -1;
 }
 
+function buildQuestionOrder(length, shouldShuffle) {
+  const order = Array.from({ length }, (_, index) => index);
+  if (!shouldShuffle || length <= 1) return order;
+
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const randomIndex = Math.floor(Math.random() * (i + 1));
+    [order[i], order[randomIndex]] = [order[randomIndex], order[i]];
+  }
+
+  const unchanged = order.every((value, index) => value === index);
+  if (unchanged && length > 1) {
+    const first = order.shift();
+    order.push(first);
+  }
+
+  return order;
+}
+
 export default function StudentQuizPage() {
   const navigate = useNavigate();
   const { quizId } = useParams();
@@ -34,6 +52,7 @@ export default function StudentQuizPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [quiz, setQuiz] = useState(null);
+  const [questionOrder, setQuestionOrder] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [reviewMarks, setReviewMarks] = useState({});
@@ -61,14 +80,21 @@ export default function StudentQuizPage() {
     setIsLoading(true);
     setLoadError('');
 
-    fetchQuizById(quizId)
-      .then((data) => {
+    Promise.all([fetchQuizById(quizId), fetchRecentQuizAttempts().catch(() => ({ attempts: [] }))])
+      .then(([quizData, attemptData]) => {
         if (cancelled) return;
-        const nextQuiz = data?.quiz || null;
+        const nextQuiz = quizData?.quiz || null;
         if (!nextQuiz?.questions?.length) {
           throw new Error('Quiz questions are unavailable.');
         }
+
+        const hasAttemptedThisQuiz = Array.isArray(attemptData?.attempts)
+          ? attemptData.attempts.some((attempt) => String(attempt?.quizId || '') === String(nextQuiz._id || quizId))
+          : false;
+        const nextQuestionOrder = buildQuestionOrder(nextQuiz.questions.length, hasAttemptedThisQuiz);
+
         setQuiz(nextQuiz);
+        setQuestionOrder(nextQuestionOrder);
         setAnswers(Array(nextQuiz.questions.length).fill(-1));
         setActiveIndex(0);
         setReviewMarks({});
@@ -107,7 +133,16 @@ export default function StudentQuizPage() {
     setIsSubmitting(true);
     try {
       const durationSeconds = startedAt ? Math.max(0, Math.round((Date.now() - startedAt) / 1000)) : undefined;
-      const data = await submitQuiz(quiz._id, answers, durationSeconds);
+      const normalizedOrder = questionOrder.length === answers.length
+        ? questionOrder
+        : Array.from({ length: answers.length }, (_, index) => index);
+      const answersForSubmission = Array.from({ length: answers.length }, () => -1);
+      normalizedOrder.forEach((originalIndex, displayIndex) => {
+        const value = Number(answers[displayIndex]);
+        answersForSubmission[originalIndex] = Number.isInteger(value) && value >= 0 && value <= 3 ? value : -1;
+      });
+
+      const data = await submitQuiz(quiz._id, answersForSubmission, durationSeconds);
       setResult(data?.result || null);
       setShowReview(false);
     } catch (error) {
@@ -159,9 +194,15 @@ export default function StudentQuizPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const totalQuestions = Array.isArray(quiz?.questions) ? quiz.questions.length : 0;
+  const displayedQuestions = useMemo(() => {
+    if (!Array.isArray(quiz?.questions)) return [];
+    if (questionOrder.length !== quiz.questions.length) return quiz.questions;
+    return questionOrder.map((index) => quiz.questions[index]).filter(Boolean);
+  }, [quiz, questionOrder]);
+
+  const totalQuestions = displayedQuestions.length;
   const safeActiveIndex = totalQuestions ? Math.max(0, Math.min(activeIndex, totalQuestions - 1)) : 0;
-  const activeQuestion = totalQuestions ? quiz.questions[safeActiveIndex] : null;
+  const activeQuestion = totalQuestions ? displayedQuestions[safeActiveIndex] : null;
 
   const attemptedCount = useMemo(() => {
     return answers.reduce((count, value) => count + (Number.isInteger(value) && value >= 0 ? 1 : 0), 0);
