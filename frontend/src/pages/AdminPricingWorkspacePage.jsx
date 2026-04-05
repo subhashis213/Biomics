@@ -402,6 +402,51 @@ export default function AdminPricingWorkspacePage() {
                               </tbody>
                             </table>
                           </div>
+
+                          <div className="module-pricing-mobile-list" role="region" aria-label={`Module pricing cards for ${courseName}`}>
+                            {courseModuleData.modules.filter((mod) => !mod.isBundle).map((mod) => {
+                              const mf = courseModuleData.priceFormByModule[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
+                              return (
+                                <article key={`${mod.moduleName}-mobile`} className="module-pricing-mobile-card">
+                                  <div className="module-pricing-mobile-head">
+                                    <strong className="module-pricing-name">{mod.label}</strong>
+                                  </div>
+                                  <div className="module-pricing-mobile-fields">
+                                    <label className="module-pricing-mobile-field">
+                                      <span>Pro Price (Rs/mo)</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        className="module-pricing-input"
+                                        value={mf.proAmountRupees}
+                                        onChange={(event) => updateModulePriceForm(courseName, mod.moduleName, 'proAmountRupees', event.target.value)}
+                                      />
+                                    </label>
+                                    <label className="module-pricing-mobile-field">
+                                      <span>Elite Price (Rs/3 mo)</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        className="module-pricing-input"
+                                        value={mf.eliteAmountRupees}
+                                        onChange={(event) => updateModulePriceForm(courseName, mod.moduleName, 'eliteAmountRupees', event.target.value)}
+                                      />
+                                    </label>
+                                  </div>
+                                  <label className="module-pricing-mobile-active">
+                                    <input
+                                      type="checkbox"
+                                      checked={mf.active !== false}
+                                      onChange={(event) => updateModulePriceForm(courseName, mod.moduleName, 'active', event.target.checked)}
+                                    />
+                                    Active module
+                                  </label>
+                                </article>
+                              );
+                            })}
+                          </div>
                         </>
                       )}
                     </div>
