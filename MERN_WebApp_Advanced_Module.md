@@ -359,3 +359,74 @@ You now have both:
 - Architecture and production mindset (Part 2)
 
 Once you can explain one feature from click -> API -> DB -> response -> UI update, you are already thinking like a real full-stack developer.
+
+---
+
+## 15. April 2026 Advanced Update Notes
+
+### 15.1 New subsystem: Monthly Mock Exam domain
+
+A complete new bounded context was introduced:
+- exam authoring and scheduling (admin)
+- one-attempt exam execution (student)
+- delayed result release policy (admin controlled)
+- result analytics and leaderboard surfaces
+
+This adds a second assessment path parallel to quizzes, with stricter attempt constraints.
+
+### 15.2 Data integrity pattern: single-attempt enforcement
+
+`MockExamAttempt` uses a unique index on `(examId, username)`.
+
+Architectural impact:
+- prevents duplicate attempts under concurrent submit races
+- shifts attempt integrity from UI-only assumptions to database-level guarantee
+
+### 15.3 Leaderboard correctness model
+
+Leaderboard now distinguishes:
+- best score summary fields
+- attempted exam title list
+- total attempts count
+
+This avoids a common analytics mismatch where one displayed exam label is incorrectly interpreted as full attempt history.
+
+### 15.4 Release-gated transparency model
+
+Result visibility is controlled by admin `resultReleased` flag.
+
+Benefits:
+- allows controlled publication windows
+- supports centralized result announcements
+- keeps attempt capture independent from immediate disclosure
+
+### 15.5 Notice governance model
+
+Exam notice banners can be enabled/disabled per exam (`noticeEnabled`).
+
+Benefits:
+- operational flexibility for admin
+- prevents stale notices after schedule changes
+- allows targeted communication by exam state
+
+### 15.6 PDF result generation considerations
+
+`pdfkit`-based result export was added with pagination safeguards.
+
+Key production concerns addressed:
+- overflow-aware content rendering
+- predictable page numbering
+- reduced blank-page risk via buffered page handling
+
+### 15.7 Build-time env dependency (Vite) and deployment gap
+
+WhatsApp FAB visibility depends on frontend build-time env.
+
+Constraint:
+- `VITE_` variables are injected during build, not backend runtime.
+
+Operational lesson:
+- local success with `.env` does not guarantee production behavior
+- production platform env must be configured and redeployed
+
+This is a classic frontend deployment pitfall and a critical DevOps checklist item for Vite-based apps.

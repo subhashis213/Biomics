@@ -396,3 +396,63 @@ npm run build
 ```
 
 This validates the frontend production build and catches most UI/runtime import issues early.
+
+## Latest Update (5 Apr 2026)
+
+### New Product Features
+
+- Monthly Mock Exam system added end-to-end:
+  - Admin can create, edit, schedule, and manage monthly mock exams per course.
+  - Students can attempt exam once and later view released results.
+  - Admin can release/hide results and enable/disable dashboard notice banner per exam.
+- Exam leaderboard and analytics:
+  - Student-side exam leaderboard with month filter.
+  - Admin-side student exam performance table with month filter.
+  - Leaderboard now shows attempted exam titles so displayed exam data matches attempt count.
+- Student exam UX improvements:
+  - Added warning dialog on exit without submit.
+  - Added warning dialog for submit with unanswered questions.
+  - Improved mobile spacing so floating back/controls do not overlap action areas.
+- Profile modal UX improvements:
+  - Background scroll lock while modal is open.
+  - Smooth open/close animation handling with close-state transition.
+- WhatsApp quick support action:
+  - Added WhatsApp floating icon above chatbot button in student UI.
+  - WhatsApp icon uses frontend Vite env variables.
+
+### Backend Additions
+
+- New models:
+  - `backend/models/MockExam.js`
+  - `backend/models/MockExamAttempt.js`
+- New routes:
+  - `backend/routes/mockExamRoutes.js`
+- Route mounted in `backend/server.js` under `/mock-exams`.
+- Added `pdfkit` dependency for downloadable exam result PDF generation.
+
+### Frontend Additions
+
+- New student page:
+  - `frontend/src/pages/StudentMockExamPage.jsx`
+- App routing updated in `frontend/src/App.jsx` for `/student/mock-exam/:examId`.
+- API helpers added in `frontend/src/api.js` for mock exam CRUD, leaderboard, performance, submission, result, and PDF download.
+- Student and admin dashboards updated for exam workflows and leaderboards.
+
+### Production Deployment Note (Important)
+
+The WhatsApp icon appears only when this frontend build-time variable is available:
+
+- `VITE_BIOMICS_WHATSAPP_NUMBER`
+
+Optional message variable:
+
+- `VITE_BIOMICS_WHATSAPP_MESSAGE`
+
+For Vercel deployment:
+
+1. Open project -> Settings -> Environment Variables.
+2. Add the two `VITE_` variables for Production (and Preview if required).
+3. Redeploy the frontend so Vite injects values at build time.
+
+Note: local `frontend/.env` and `backend/.env` are ignored by git and are not pushed to repository.
+

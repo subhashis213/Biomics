@@ -378,3 +378,31 @@ export function downloadMockExamResultPdf(examId) {
     xhr.send();
   });
 }
+
+export function fetchStudentAnnouncements() {
+  return requestJson('/announcements');
+}
+
+export function fetchAdminAnnouncements() {
+  return requestJson('/announcements/admin');
+}
+
+export function createAnnouncementAdmin(payload) {
+  return requestJson('/announcements', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAnnouncementAdmin(announcementId, isActive) {
+  return requestJson(`/announcements/${encodeURIComponent(announcementId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive })
+  });
+}
+
+export function deleteAnnouncementAdmin(announcementId) {
+  return requestJson(`/announcements/${encodeURIComponent(announcementId)}`, {
+    method: 'DELETE'
+  });
+}

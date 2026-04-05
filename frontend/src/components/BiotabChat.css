@@ -61,6 +61,220 @@
   filter: saturate(1.08);
   box-shadow: 0 10px 24px rgba(18, 140, 126, 0.62);
 }
+
+.biotab-announcement-fab {
+  position: fixed;
+  bottom: 144px;
+  right: 24px;
+  z-index: 1001;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(217, 119, 6, 0.5);
+  transition: transform 220ms ease, box-shadow 220ms ease, filter 180ms ease;
+}
+
+.biotab-announcement-fab:hover {
+  transform: scale(1.08);
+  filter: saturate(1.08);
+  box-shadow: 0 10px 24px rgba(217, 119, 6, 0.62);
+}
+
+.biotab-announcement-fab-ringing {
+  animation: biotabBellGlow 1.8s ease-in-out infinite;
+}
+
+.biotab-announcement-fab-ringing svg {
+  transform-origin: 50% 0%;
+  animation: biotabBellRing 1.2s ease-in-out infinite;
+}
+
+.biotab-announcement-count {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.45);
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.64rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.biotab-announcement-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 196px;
+  z-index: 1002;
+  width: min(330px, calc(100vw - 24px));
+  max-height: min(52vh, 430px);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(251, 191, 36, 0.16), transparent 42%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    var(--card-bg, #1a1f2e);
+  border: 1px solid color-mix(in srgb, #f59e0b 28%, rgba(255, 255, 255, 0.14));
+  border-radius: 16px;
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.55);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.biotab-announcement-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 13px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.24), rgba(217, 119, 6, 0.3));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.biotab-announcement-head strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff7ed;
+}
+
+.biotab-announcement-close {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.biotab-announcement-close:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.biotab-announcement-list {
+  overflow: auto;
+  padding: 9px;
+  display: grid;
+  gap: 9px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.35) rgba(148, 163, 184, 0.14);
+}
+
+.biotab-announcement-list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.biotab-announcement-list::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.42);
+  border-radius: 999px;
+}
+
+.biotab-announcement-item {
+  border: 1px solid color-mix(in srgb, #f59e0b 20%, rgba(255, 255, 255, 0.16));
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(15, 23, 42, 0.28);
+  padding: 11px 11px 10px;
+  display: grid;
+  gap: 7px;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.biotab-announcement-item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, #f59e0b 36%, rgba(255, 255, 255, 0.22));
+  box-shadow: 0 8px 16px rgba(2, 6, 23, 0.28);
+}
+
+.biotab-announcement-item h4 {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.3;
+  color: #fff7ed;
+}
+
+.biotab-announcement-item p {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text-secondary, #cdd6e3) 90%, #fff 10%);
+}
+
+.biotab-announcement-item span {
+  justify-self: flex-start;
+  font-size: 0.64rem;
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.biotab-announcement-empty {
+  margin: 0;
+  padding: 12px 13px;
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--text-muted, #8a9bb0) 85%, #fff 15%);
+}
+
+html[data-theme='light'] .biotab-announcement-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(251, 191, 36, 0.2), transparent 44%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 251, 235, 0.95));
+  border-color: rgba(217, 119, 6, 0.34);
+  box-shadow: 0 16px 36px rgba(148, 163, 184, 0.35);
+}
+
+html[data-theme='light'] .biotab-announcement-head strong {
+  color: #7c2d12;
+}
+
+html[data-theme='light'] .biotab-announcement-close {
+  color: #7c2d12;
+  border-color: rgba(124, 45, 18, 0.2);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+html[data-theme='light'] .biotab-announcement-item {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 251, 235, 0.9));
+  border-color: rgba(217, 119, 6, 0.24);
+}
+
+html[data-theme='light'] .biotab-announcement-item h4 {
+  color: #7c2d12;
+}
+
+html[data-theme='light'] .biotab-announcement-item p {
+  color: #374151;
+}
+
+html[data-theme='light'] .biotab-announcement-item span {
+  color: #92400e;
+  background: rgba(251, 191, 36, 0.2);
+  border-color: rgba(217, 119, 6, 0.24);
+}
 .biotab-fab-ring {
   position: absolute;
   inset: -4px;
@@ -497,6 +711,35 @@
   40%           { transform: scale(1); opacity: 1; }
 }
 
+@keyframes biotabBellRing {
+  0%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(16deg); }
+  20% { transform: rotate(-14deg); }
+  30% { transform: rotate(12deg); }
+  40% { transform: rotate(-10deg); }
+  50% { transform: rotate(7deg); }
+  60% { transform: rotate(-4deg); }
+  70% { transform: rotate(2deg); }
+}
+
+@keyframes biotabBellGlow {
+  0%, 100% {
+    box-shadow: 0 8px 20px rgba(217, 119, 6, 0.5);
+    filter: saturate(1);
+  }
+  50% {
+    box-shadow: 0 10px 28px rgba(245, 158, 11, 0.68);
+    filter: saturate(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .biotab-announcement-fab-ringing,
+  .biotab-announcement-fab-ringing svg {
+    animation: none;
+  }
+}
+
 /* Mobile */
 @media (max-width: 768px) {
   .biotab-panel {
@@ -523,6 +766,20 @@
     right: 16px;
     width: 44px;
     height: 44px;
+  }
+
+  .biotab-announcement-fab {
+    bottom: 128px;
+    right: 16px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .biotab-announcement-panel {
+    right: 12px;
+    bottom: 174px;
+    width: min(320px, calc(100vw - 20px));
+    max-height: min(52vh, 390px);
   }
 }
 @media (max-width: 480px) {

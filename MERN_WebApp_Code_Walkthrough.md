@@ -518,6 +518,92 @@ router.delete('/', authenticateToken(['admin']), async (req, res) => {
 module.exports = router;
 ```
 
+---
+
+## SECTION 6: Monthly Mock Exam Implementation (New)
+
+### 6.1 Backend route registration
+
+File: `backend/server.js`
+
+What changed:
+- Added import for `mockExamRoutes`
+- Mounted route using `app.use('/mock-exams', mockExamRoutes)`
+- Added `/mock-exams` path to SPA fallback exclusion list
+
+Why this matters:
+- Keeps exam APIs reachable in both local development and production single-server mode.
+
+### 6.2 New exam data models
+
+Files:
+- `backend/models/MockExam.js`
+- `backend/models/MockExamAttempt.js`
+
+What they do:
+- `MockExam`: exam metadata, course/category, schedule, duration, question set, result/notice flags.
+- `MockExamAttempt`: one submission record per student per exam.
+
+Important index:
+- unique composite index on `(examId, username)` in attempt model enforces one attempt per exam per user.
+
+### 6.3 New exam API route file
+
+File: `backend/routes/mockExamRoutes.js`
+
+Major endpoints covered:
+- Admin create/update exam
+- Admin exam list
+- Admin release/hide result
+- Admin enable/disable notice banner
+- Admin performance table with month filter
+- Student my-course exam list + notices
+- Student fetch exam by id
+- Student one-time submit
+- Student result fetch
+- Student result PDF download
+- Student exam leaderboard with month filter
+
+### 6.4 Frontend route and page
+
+Files:
+- `frontend/src/App.jsx`
+- `frontend/src/pages/StudentMockExamPage.jsx`
+
+What changed:
+- Added protected student route: `/student/mock-exam/:examId`
+- Added full exam attempt flow page with:
+  - timer
+  - question navigation
+  - submit flow
+  - result/review flow
+  - PDF download
+  - warning dialogs for unsafe exit and unanswered submissions
+
+### 6.5 API helper expansion
+
+File: `frontend/src/api.js`
+
+New helper group added for mock exam workflows:
+- admin exam CRUD + release/notice toggles
+- student exam fetch/submit/result
+- leaderboard + admin performance fetch
+- PDF download helper
+
+### 6.6 WhatsApp icon deployment behavior
+
+File: `frontend/src/components/StudentChatAgent.jsx`
+
+Key behavior:
+- WhatsApp icon renders only when `VITE_BIOMICS_WHATSAPP_NUMBER` is present.
+- In local this can work from local env.
+- In production (Vercel), variables must be configured in project Environment Variables and app must be redeployed.
+
+Hands-on check:
+1. Set `VITE_BIOMICS_WHATSAPP_NUMBER` in Vercel project settings.
+2. Redeploy.
+3. Verify icon appears above chatbot FAB.
+
 findOneAndUpdate with upsert:
 - Searches for { category, name }
 - If found: updates createdBy

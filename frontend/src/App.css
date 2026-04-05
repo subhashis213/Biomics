@@ -18,6 +18,7 @@
 
   --accent: #6366f1;
   --accent-2: #4f46e5;
+  --accent-ink: #eef2ff;
   --danger: #f43f5e;
   --focus-ring: rgba(99, 102, 241, 0.25);
 
@@ -132,6 +133,7 @@ html[data-theme='light'] {
 
   --accent: #4f46e5;
   --accent-2: #4338ca;
+  --accent-ink: #1e1b4b;
   --danger: #e11d48;
   --focus-ring: rgba(79, 70, 229, 0.2);
 
@@ -2223,9 +2225,13 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 
 .profile-membership-card {
   margin-top: 6px;
-  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line-strong) 82%, transparent);
   border-radius: 10px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 10%, var(--bg-card-soft)), color-mix(in srgb, var(--bg-card) 90%, transparent));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--accent) 14%, var(--bg-card-soft)),
+    color-mix(in srgb, var(--bg-card) 86%, transparent)
+  );
   padding: 8px 9px;
   display: flex;
   flex-direction: column;
@@ -2240,7 +2246,7 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 }
 
 .profile-membership-label {
-  color: var(--text-main);
+  color: var(--text-strong);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -2249,8 +2255,8 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 
 .profile-membership-tag {
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--accent) 16%, #ffffff 84%);
-  border: 1px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  background: color-mix(in srgb, var(--accent) 42%, var(--bg-card-soft));
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, transparent);
   border-radius: 999px;
   font-size: 0.66rem;
   font-weight: 700;
@@ -2259,9 +2265,13 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 }
 
 .profile-membership-expiry {
-  color: var(--text-soft);
+  color: color-mix(in srgb, var(--text-main) 88%, #ffffff 12%);
   font-size: 0.72rem;
   line-height: 1.35;
+}
+
+html[data-theme='light'] .profile-membership-tag {
+  background: color-mix(in srgb, var(--accent) 16%, #ffffff 84%);
 }
 
 .profile-theme-btn {
@@ -4386,6 +4396,7 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 #section-content-library,
 #section-quiz-builder,
 #section-monthly-mock-exam,
+#section-announcements,
 #section-feedback {
   scroll-margin-top: 76px;
 }

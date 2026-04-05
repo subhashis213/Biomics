@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
+  createAnnouncementAdmin,
   createVoucherAdmin,
   deleteQuiz,
+  deleteAnnouncementAdmin,
   deleteVoucherAdmin,
+  fetchAdminAnnouncements,
   fetchAdminQuizzes,
   fetchRecoveryActionsAdmin,
   fetchAuditLogsAdmin,
@@ -23,6 +26,7 @@ import {
   saveModulePricingAdmin,
   saveModuleQuiz,
   releaseMockExamResultAdmin,
+  updateAnnouncementAdmin,
   applyRecoveryActionAdmin,
   updateVoucherAdmin,
   uploadMaterial
@@ -130,6 +134,11 @@ export default function AdminDashboard() {
   const [mockExamPerformanceError, setMockExamPerformanceError] = useState('');
   const [editingMockExamId, setEditingMockExamId] = useState('');
   const [mockExamMessage, setMockExamMessage] = useState(null);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+  const [announcementList, setAnnouncementList] = useState([]);
+  const [announcementInlineMessage, setAnnouncementInlineMessage] = useState(null);
   const [isQuizMessageDismissing, setIsQuizMessageDismissing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -1665,6 +1674,62 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadAnnouncements() {
+    try {
+      const data = await fetchAdminAnnouncements();
+      setAnnouncementList(Array.isArray(data?.announcements) ? data.announcements : []);
+    } catch (error) {
+      setAnnouncementInlineMessage({ type: 'error', text: error.message || 'Failed to load announcements.' });
+    }
+  }
+
+  async function handleCreateAnnouncement(event) {
+    event.preventDefault();
+    const title = announcementTitle.trim();
+    const message = announcementMessage.trim();
+    if (!title || !message) {
+      setAnnouncementInlineMessage({ type: 'error', text: 'Announcement title and message are required.' });
+      return;
+    }
+
+    setAnnouncementSaving(true);
+    setAnnouncementInlineMessage(null);
+    try {
+      await createAnnouncementAdmin({ title, message, isActive: true });
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+      setAnnouncementInlineMessage({ type: 'success', text: 'Announcement published.' });
+      await loadAnnouncements();
+    } catch (error) {
+      setAnnouncementInlineMessage({ type: 'error', text: error.message || 'Failed to publish announcement.' });
+    } finally {
+      setAnnouncementSaving(false);
+    }
+  }
+
+  async function handleToggleAnnouncementStatus(item) {
+    try {
+      await updateAnnouncementAdmin(item._id, !(item.isActive !== false));
+      await loadAnnouncements();
+      setAnnouncementInlineMessage({
+        type: 'success',
+        text: item.isActive !== false ? 'Announcement hidden from students.' : 'Announcement enabled for students.'
+      });
+    } catch (error) {
+      setAnnouncementInlineMessage({ type: 'error', text: error.message || 'Failed to update announcement status.' });
+    }
+  }
+
+  async function handleDeleteAnnouncement(item) {
+    try {
+      await deleteAnnouncementAdmin(item._id);
+      await loadAnnouncements();
+      setAnnouncementInlineMessage({ type: 'success', text: 'Announcement deleted.' });
+    } catch (error) {
+      setAnnouncementInlineMessage({ type: 'error', text: error.message || 'Failed to delete announcement.' });
+    }
+  }
+
   function resetQuizBuilder() {
     setEditingQuizId(null);
     setQuizModule('');
@@ -1757,6 +1822,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadMockExamPerformance(mockExamCategory, mockExamPerformanceMonthFilter);
   }, [mockExamCategory, mockExamPerformanceMonthFilter]);
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, []);
 
   useEffect(() => {
     setMockExamPerformanceMonthFilter('all');
@@ -1913,6 +1982,7 @@ export default function AdminDashboard() {
     { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
     { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
     { id: 'section-monthly-mock-exam', label: 'Monthly Exam', icon: '📅' },
+    { id: 'section-announcements', label: 'Announcements', icon: '📢' },
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
     { id: 'section-quiz-analytics', label: 'Quiz Analytics', icon: '🏆' },
@@ -2853,6 +2923,89 @@ export default function AdminDashboard() {
               <p className="empty-note">No student attempts found for this filter.</p>
             )
           ) : null}
+        </section>
+      </section>
+
+      <section id="section-announcements" className="card quiz-builder-panel quiz-builder-section">
+        <div className="section-header compact quiz-builder-heading-row">
+          <div>
+            <p className="eyebrow">Student Announcements</p>
+            <h2>Publish important updates</h2>
+            <p className="subtitle">Announcements appear in the student announcement icon above WhatsApp.</p>
+          </div>
+          <div className="quiz-count-cards">
+            <StatCard label="Total" value={announcementList.length} />
+            <StatCard label="Active" value={announcementList.filter((item) => item.isActive !== false).length} />
+          </div>
+        </div>
+
+        <form className="quiz-builder-form" onSubmit={handleCreateAnnouncement}>
+          <label>
+            Announcement title
+            <input
+              value={announcementTitle}
+              onChange={(event) => setAnnouncementTitle(event.target.value)}
+              placeholder="Example: Sunday live doubt session at 7 PM"
+              required
+            />
+          </label>
+
+          <label>
+            Message
+            <textarea
+              rows="3"
+              value={announcementMessage}
+              onChange={(event) => setAnnouncementMessage(event.target.value)}
+              placeholder="Write announcement details shown to students"
+              required
+            />
+          </label>
+
+          {announcementInlineMessage ? <p className={`inline-message ${announcementInlineMessage.type}`}>{announcementInlineMessage.text}</p> : null}
+
+          <button className="primary-btn" type="submit" disabled={announcementSaving}>
+            {announcementSaving ? 'Publishing...' : 'Publish Announcement'}
+          </button>
+        </form>
+
+        <section className="quiz-admin-list">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Announcement Feed</p>
+              <h3>Recent announcements</h3>
+            </div>
+          </div>
+
+          {announcementList.length ? (
+            <div className="quiz-admin-items">
+              {announcementList.map((item) => (
+                <article key={item._id} className="quiz-admin-item">
+                  <div className="quiz-admin-item-body">
+                    <strong>{item.title}</strong>
+                    <p>{item.message}</p>
+                    <div className="quiz-admin-meta">
+                      <span className="quiz-admin-meta-chip">{item.isActive !== false ? 'Active' : 'Hidden'}</span>
+                      <span className="quiz-admin-meta-chip">{item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}</span>
+                    </div>
+                  </div>
+                  <div className="quiz-admin-item-actions">
+                    <button
+                      type="button"
+                      className={item.isActive !== false ? 'secondary-btn' : 'primary-btn'}
+                      onClick={() => handleToggleAnnouncementStatus(item)}
+                    >
+                      {item.isActive !== false ? 'Hide' : 'Show'}
+                    </button>
+                    <button type="button" className="danger-btn" onClick={() => handleDeleteAnnouncement(item)}>
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-note">No announcements posted yet.</p>
+          )}
         </section>
       </section>
 

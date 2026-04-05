@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Bell,
   BookOpen,
   Bot,
   FlaskConical,
@@ -15,7 +16,7 @@ import {
   User,
   X
 } from 'lucide-react';
-import { requestJson } from '../api';
+import { fetchStudentAnnouncements, requestJson } from '../api';
 import { useSessionStore } from '../stores/sessionStore';
 import './BiotabChat.css';
 
@@ -84,6 +85,10 @@ export default function StudentChatAgent() {
   const [isTyping, setIsTyping] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [apiError, setApiError] = useState(null);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [announcementsError, setAnnouncementsError] = useState('');
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -94,6 +99,27 @@ export default function StudentChatAgent() {
   const whatsappUrl = whatsappNumber
     ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage || DEFAULT_WHATSAPP_MESSAGE)}`
     : '';
+
+  const activeAnnouncementCount = announcements.length;
+  const shouldRingAnnouncement = activeAnnouncementCount > 0 && !announcementsOpen;
+
+  const loadAnnouncements = useCallback(async () => {
+    if (!isLoggedIn) {
+      setAnnouncements([]);
+      return;
+    }
+
+    setAnnouncementsLoading(true);
+    setAnnouncementsError('');
+    try {
+      const data = await fetchStudentAnnouncements();
+      setAnnouncements(Array.isArray(data?.announcements) ? data.announcements : []);
+    } catch (error) {
+      setAnnouncementsError(error.message || 'Failed to load announcements.');
+    } finally {
+      setAnnouncementsLoading(false);
+    }
+  }, [isLoggedIn]);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
@@ -133,11 +159,16 @@ export default function StudentChatAgent() {
 
   useEffect(() => {
     if (isOpen) {
+      setAnnouncementsOpen(false);
       scrollToBottom();
       const t = setTimeout(() => inputRef.current?.focus(), 250);
       return () => clearTimeout(t);
     }
   }, [isOpen, messages]);
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, [loadAnnouncements]);
 
   // Prevent background page scrolling when chat is open.
   useEffect(() => {
@@ -234,6 +265,23 @@ export default function StudentChatAgent() {
       {/* ── Floating Action Button — always shows when panel is closed ── */}
       {!isOpen && (
         <>
+        {isLoggedIn ? (
+          <button
+            type="button"
+            className={`biotab-announcement-fab${shouldRingAnnouncement ? ' biotab-announcement-fab-ringing' : ''}`}
+            title="View announcements"
+            aria-label="View admin announcements"
+            onClick={() => {
+              setAnnouncementsOpen((current) => !current);
+              if (!announcementsOpen) loadAnnouncements();
+            }}
+          >
+            <Bell size={19} />
+            {activeAnnouncementCount > 0 ? (
+              <span className="biotab-announcement-count">{activeAnnouncementCount > 9 ? '9+' : activeAnnouncementCount}</span>
+            ) : null}
+          </button>
+        ) : null}
         {whatsappUrl ? (
           <a
             href={whatsappUrl}
@@ -258,6 +306,41 @@ export default function StudentChatAgent() {
         </button>
         </>
       )}
+
+      {!isOpen && announcementsOpen ? (
+        <div className="biotab-announcement-panel" role="dialog" aria-label="Student announcements">
+          <div className="biotab-announcement-head">
+            <strong>Announcements</strong>
+            <button
+              type="button"
+              className="biotab-announcement-close"
+              onClick={() => setAnnouncementsOpen(false)}
+              aria-label="Close announcements"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {announcementsLoading ? <p className="biotab-announcement-empty">Loading announcements...</p> : null}
+          {!announcementsLoading && announcementsError ? <p className="biotab-announcement-empty">{announcementsError}</p> : null}
+
+          {!announcementsLoading && !announcementsError ? (
+            announcements.length ? (
+              <div className="biotab-announcement-list">
+                {announcements.map((item) => (
+                  <article key={item._id} className="biotab-announcement-item">
+                    <h4>{item.title}</h4>
+                    <p>{item.message}</p>
+                    <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="biotab-announcement-empty">No announcements yet.</p>
+            )
+          ) : null}
+        </div>
+      ) : null}
 
       {/* ── Chat Panel — shown when open ── */}
       {isOpen && (

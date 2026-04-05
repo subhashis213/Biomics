@@ -388,3 +388,54 @@ Use this cycle:
 5. Re-test
 
 This project is already a strong real-world MERN example. If you understand this code flow, you can build many commercial apps.
+
+---
+
+## 14) Latest platform updates (April 2026)
+
+### 14.1 Monthly Mock Exam feature (new)
+
+The app now has a complete exam layer in addition to lecture + quiz.
+
+Admin can:
+- Create and edit monthly mock exams course-wise
+- Set exam date/time and duration
+- Add question set with options, correct answer, explanation
+- Release or hide results
+- Toggle student dashboard notice banner per exam
+
+Student can:
+- View available monthly exams for their course
+- Attempt each exam once
+- See result when admin releases it
+- Download result PDF
+- View exam leaderboard with month filter
+
+### 14.2 New backend building blocks
+
+- `MockExam` model stores exam definition.
+- `MockExamAttempt` model stores single-attempt student submissions.
+- New `mockExamRoutes` handle:
+  - admin exam management
+  - student exam access
+  - leaderboard
+  - result release
+  - PDF result generation
+
+### 14.3 Frontend UX additions
+
+- New student exam attempt page.
+- Exit warning before leaving unsubmitted exam.
+- Submit warning if unanswered questions exist.
+- Profile modal improved with scroll lock and smooth close animation.
+- Floating WhatsApp support button added above chatbot button.
+
+### 14.4 Important deployment lesson from this project
+
+Vite frontend variables must be available at build time in hosting platform settings.
+
+For WhatsApp icon to show in production, set on Vercel:
+- `VITE_BIOMICS_WHATSAPP_NUMBER`
+- `VITE_BIOMICS_WHATSAPP_MESSAGE` (optional)
+
+Then redeploy. If these are missing at build time, the icon is intentionally hidden in UI.
