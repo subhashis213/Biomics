@@ -6,6 +6,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AuthPage from './pages/AuthPage';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentLecturePage from './pages/StudentLecturePage';
+import StudentMockExamPage from './pages/StudentMockExamPage';
 import StudentQuizPage from './pages/StudentQuizPage';
 
 function ScrollToTop() {
@@ -51,6 +52,14 @@ export default function App() {
         element={(
           <ProtectedRoute role="user">
             <StudentLecturePage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/mock-exam/:examId"
+        element={(
+          <ProtectedRoute role="user">
+            <StudentMockExamPage />
           </ProtectedRoute>
         )}
       />

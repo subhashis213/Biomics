@@ -291,3 +291,90 @@ export function applyRecoveryActionAdmin(auditLogId) {
     body: JSON.stringify({})
   });
 }
+
+export function saveMockExamAdmin(payload) {
+  return requestJson('/mock-exams', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchMockExamsAdmin(category = '') {
+  const query = category ? `?category=${encodeURIComponent(category)}` : '';
+  return requestJson(`/mock-exams/admin${query}`);
+}
+
+export function releaseMockExamResultAdmin(examId, resultReleased) {
+  return requestJson(`/mock-exams/${encodeURIComponent(examId)}/release`, {
+    method: 'PATCH',
+    body: JSON.stringify({ resultReleased })
+  });
+}
+
+export function toggleMockExamNoticeAdmin(examId, noticeEnabled) {
+  return requestJson(`/mock-exams/${encodeURIComponent(examId)}/notice`, {
+    method: 'PATCH',
+    body: JSON.stringify({ noticeEnabled })
+  });
+}
+
+export function fetchMyMockExams() {
+  return requestJson('/mock-exams/my-course');
+}
+
+export function fetchMockExamLeaderboard(month = '') {
+  const query = month ? `?month=${encodeURIComponent(month)}` : '';
+  return requestJson(`/mock-exams/leaderboard${query}`);
+}
+
+export function fetchMockExamPerformanceAdmin(category = '', month = '') {
+  const qs = new URLSearchParams();
+  if (category) qs.set('category', category);
+  if (month) qs.set('month', month);
+  return requestJson(`/mock-exams/admin/performance${qs.toString() ? `?${qs.toString()}` : ''}`);
+}
+
+export function fetchMockExamById(examId) {
+  return requestJson(`/mock-exams/my-course/${encodeURIComponent(examId)}`);
+}
+
+export function submitMockExam(examId, answers, durationSeconds) {
+  return requestJson(`/mock-exams/${encodeURIComponent(examId)}/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ answers, durationSeconds })
+  });
+}
+
+export function fetchMockExamResult(examId) {
+  return requestJson(`/mock-exams/${encodeURIComponent(examId)}/result`);
+}
+
+export function downloadMockExamResultPdf(examId) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', buildUrl(`/mock-exams/${encodeURIComponent(examId)}/result/pdf`), true);
+    xhr.responseType = 'blob';
+    const token = getToken();
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error('Failed to download result PDF.'));
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(xhr.response);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `biomics-mock-exam-${examId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      resolve();
+    };
+
+    xhr.onerror = () => reject(new Error('Network error during PDF download.'));
+    xhr.send();
+  });
+}

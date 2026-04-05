@@ -35,6 +35,32 @@
   transform: scale(1.1);
   box-shadow: 0 6px 24px rgba(13, 148, 136, 0.6);
 }
+
+.biotab-whatsapp-fab {
+  position: fixed;
+  bottom: 88px;
+  right: 24px;
+  z-index: 1001;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  cursor: pointer;
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(18, 140, 126, 0.52);
+  transition: transform 220ms ease, box-shadow 220ms ease, filter 180ms ease;
+  text-decoration: none;
+}
+
+.biotab-whatsapp-fab:hover {
+  transform: scale(1.08);
+  filter: saturate(1.08);
+  box-shadow: 0 10px 24px rgba(18, 140, 126, 0.62);
+}
 .biotab-fab-ring {
   position: absolute;
   inset: -4px;
@@ -490,6 +516,13 @@
   .biotab-fab {
     bottom: 16px;
     right: 16px;
+  }
+
+  .biotab-whatsapp-fab {
+    bottom: 76px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
   }
 }
 @media (max-width: 480px) {

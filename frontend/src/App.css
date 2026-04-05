@@ -2188,7 +2188,7 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
-  min-width: 190px;
+  min-width: 220px;
   border-radius: 16px;
   border: 1px solid var(--line-strong);
   background: linear-gradient(150deg, var(--surface-start), var(--surface-end));
@@ -2219,6 +2219,49 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 .profile-hover-card span {
   color: var(--text-soft);
   font-size: 0.78rem;
+}
+
+.profile-membership-card {
+  margin-top: 6px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
+  border-radius: 10px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 10%, var(--bg-card-soft)), color-mix(in srgb, var(--bg-card) 90%, transparent));
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.profile-membership-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.profile-membership-label {
+  color: var(--text-main);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-membership-tag {
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 16%, #ffffff 84%);
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+}
+
+.profile-membership-expiry {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .profile-theme-btn {
@@ -2741,6 +2784,15 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 .membership-status-banner {
   border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
   background: linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 88%, transparent), color-mix(in srgb, #10b981 12%, var(--bg-card-soft)));
+}
+.monthly-exam-notice {
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, var(--line));
+  background:
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.2), transparent 38%),
+    linear-gradient(155deg, color-mix(in srgb, var(--bg-card) 92%, transparent), color-mix(in srgb, var(--bg-card-soft) 88%, transparent));
+}
+.monthly-exam-panel {
+  border: 1px solid color-mix(in srgb, #06b6d4 26%, var(--line));
 }
 
 .membership-lock-panel {
@@ -3841,6 +3893,11 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
   backdrop-filter: blur(12px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  animation: profile-backdrop-in 220ms ease both;
+}
+
+.profile-modal-backdrop.closing {
+  animation: profile-backdrop-out 190ms ease both;
 }
 
 .profile-modal {
@@ -3853,8 +3910,63 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
   background: linear-gradient(160deg, var(--surface-start), var(--surface-end));
   box-shadow: var(--shadow-lg);
   padding: 24px;
-  animation: modal-slide-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: profile-modal-in 280ms cubic-bezier(0.24, 0.92, 0.3, 1) both;
   box-sizing: border-box;
+  transform-origin: top center;
+  will-change: transform, opacity;
+}
+
+.profile-modal.closing {
+  animation: profile-modal-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes profile-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes profile-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes profile-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes profile-modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-modal-backdrop,
+  .profile-modal,
+  .profile-modal-backdrop.closing,
+  .profile-modal.closing {
+    animation: none;
+  }
 }
 
 .profile-modal-header {
@@ -4273,8 +4385,20 @@ html[data-theme='light'] .topbar-inline-nav .app-side-nav-link.active {
 #section-registered-users,
 #section-content-library,
 #section-quiz-builder,
+#section-monthly-mock-exam,
 #section-feedback {
   scroll-margin-top: 76px;
+}
+
+/* Student section anchors need topbar clearance when jumping via nav chips. */
+#section-overview,
+#section-learning,
+#section-monthly-exam,
+#section-quiz-performance,
+#section-leaderboard,
+#section-feedback,
+#section-connect {
+  scroll-margin-top: calc(var(--app-shell-topbar-clearance, 96px) + 10px);
 }
 
 .course-filter-row {
@@ -6005,9 +6129,29 @@ th {
   gap: 8px;
 }
 
+.quiz-confirm-actions .quiz-exit-anyway-btn {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 12%, var(--bg-card));
+}
+
+.quiz-confirm-actions .quiz-exit-anyway-btn:hover {
+  border-color: #dc2626;
+  background: linear-gradient(135deg, color-mix(in srgb, #ef4444 88%, #ffffff 12%), #dc2626);
+  color: #ffffff;
+}
+
+.quiz-confirm-actions .quiz-exit-anyway-btn:active {
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #ffffff;
+  transform: translateY(1px);
+}
+
 @media (max-width: 768px) {
   .quiz-exam-page {
     padding: 12px;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px));
   }
 
   .quiz-exam-header {
@@ -6053,14 +6197,19 @@ th {
   }
 
   .quiz-floating-back {
+    left: auto;
     right: 12px;
-    left: 12px;
-    bottom: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     width: auto;
+    max-width: min(72vw, 220px);
+    min-height: 42px;
+    padding: 9px 12px;
+    font-size: 0.8rem;
   }
 
   .quiz-workspace-sidebar {
     position: static;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
   .quiz-question-head {
@@ -6969,9 +7118,18 @@ html[data-theme='light'] .empty-note {
     animation: profile-sheet-up 320ms cubic-bezier(0.32, 0.72, 0.28, 1) both;
   }
 
+  .profile-modal.closing {
+    animation: profile-sheet-down 210ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
   @keyframes profile-sheet-up {
     from { transform: translateY(100%); opacity: 0.6; }
     to   { transform: translateY(0);    opacity: 1;   }
+  }
+
+  @keyframes profile-sheet-down {
+    from { transform: translateY(0); opacity: 1; }
+    to   { transform: translateY(100%); opacity: 0.9; }
   }
 
   /* Drag handle bar */

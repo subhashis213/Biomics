@@ -4,6 +4,7 @@ import {
   Bot,
   FlaskConical,
   Leaf,
+  MessageCircle,
   Maximize2,
   Microscope,
   Minimize2,
@@ -46,6 +47,8 @@ const QUICK_MODES = [
   { icon: BookOpen, title: 'MCQ Practice', action: 'Give me 5 quality MCQs with answers and short explanations.' }
 ];
 
+const DEFAULT_WHATSAPP_MESSAGE = 'Hi Biomics Hub, I need support.';
+
 function formatNow() {
   return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
@@ -85,6 +88,12 @@ export default function StudentChatAgent() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const nextIdRef = useRef(1);
+
+  const whatsappNumber = String(import.meta.env.VITE_BIOMICS_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+  const whatsappMessage = String(import.meta.env.VITE_BIOMICS_WHATSAPP_MESSAGE || DEFAULT_WHATSAPP_MESSAGE).trim();
+  const whatsappUrl = whatsappNumber
+    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage || DEFAULT_WHATSAPP_MESSAGE)}`
+    : '';
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
@@ -224,6 +233,19 @@ export default function StudentChatAgent() {
     <>
       {/* ── Floating Action Button — always shows when panel is closed ── */}
       {!isOpen && (
+        <>
+        {whatsappUrl ? (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="biotab-whatsapp-fab"
+            title="Chat on WhatsApp"
+            aria-label="Open WhatsApp chat with Biomics Hub"
+          >
+            <MessageCircle size={20} />
+          </a>
+        ) : null}
         <button
           className="biotab-fab"
           onClick={() => { setIsOpen(true); setShowSettings(false); }}
@@ -234,6 +256,7 @@ export default function StudentChatAgent() {
           <Bot size={22} />
           <span className="biotab-fab-ring" aria-hidden="true" />
         </button>
+        </>
       )}
 
       {/* ── Chat Panel — shown when open ── */}

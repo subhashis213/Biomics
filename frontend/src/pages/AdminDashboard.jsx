@@ -10,14 +10,19 @@ import {
   fetchAuditLogsAdmin,
   fetchCoursePricingAdmin,
   fetchModulePricingAdmin,
+  fetchMockExamsAdmin,
+  fetchMockExamPerformanceAdmin,
   fetchPaymentHistoryAdmin,
   fetchQuizAnalyticsAdmin,
   fetchVouchersAdmin,
   getApiBase,
   requestJson,
   saveCoursePricingAdmin,
+  saveMockExamAdmin,
+  toggleMockExamNoticeAdmin,
   saveModulePricingAdmin,
   saveModuleQuiz,
+  releaseMockExamResultAdmin,
   applyRecoveryActionAdmin,
   updateVoucherAdmin,
   uploadMaterial
@@ -107,6 +112,24 @@ export default function AdminDashboard() {
   const [editingQuizId, setEditingQuizId] = useState(null);
   const [quizSaving, setQuizSaving] = useState(false);
   const [quizMessage, setQuizMessage] = useState(null);
+  const [mockExamCategory, setMockExamCategory] = useState(COURSE_CATEGORIES[0]);
+  const [mockExamTitle, setMockExamTitle] = useState('');
+  const [mockExamDescription, setMockExamDescription] = useState('');
+  const [mockExamDate, setMockExamDate] = useState('');
+  const [mockExamDurationMinutes, setMockExamDurationMinutes] = useState(60);
+  const [mockExamNoticeEnabled, setMockExamNoticeEnabled] = useState(true);
+  const [mockExamQuestions, setMockExamQuestions] = useState([
+    { question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' }
+  ]);
+  const [mockExamSaving, setMockExamSaving] = useState(false);
+  const [mockExamList, setMockExamList] = useState([]);
+  const [mockExamPerformance, setMockExamPerformance] = useState([]);
+  const [mockExamPerformanceMonths, setMockExamPerformanceMonths] = useState([]);
+  const [mockExamPerformanceMonthFilter, setMockExamPerformanceMonthFilter] = useState('all');
+  const [mockExamPerformanceLoading, setMockExamPerformanceLoading] = useState(false);
+  const [mockExamPerformanceError, setMockExamPerformanceError] = useState('');
+  const [editingMockExamId, setEditingMockExamId] = useState('');
+  const [mockExamMessage, setMockExamMessage] = useState(null);
   const [isQuizMessageDismissing, setIsQuizMessageDismissing] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -1489,6 +1512,159 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadMockExamList(category = mockExamCategory) {
+    try {
+      const data = await fetchMockExamsAdmin(category);
+      setMockExamList(data?.exams || []);
+    } catch (error) {
+      setMockExamMessage({ type: 'error', text: error.message || 'Failed to load monthly mock exams.' });
+    }
+  }
+
+  function formatMonthLabel(monthValue) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(monthValue || ''))) return monthValue || 'Unknown Month';
+    const [year, month] = String(monthValue).split('-');
+    const parsed = new Date(Number(year), Number(month) - 1, 1);
+    return parsed.toLocaleDateString([], { month: 'long', year: 'numeric' });
+  }
+
+  async function loadMockExamPerformance(category = mockExamCategory, monthFilter = mockExamPerformanceMonthFilter) {
+    setMockExamPerformanceLoading(true);
+    setMockExamPerformanceError('');
+    try {
+      const activeMonthFilter = monthFilter === 'all' ? '' : monthFilter;
+      const data = await fetchMockExamPerformanceAdmin(category, activeMonthFilter);
+      setMockExamPerformance(Array.isArray(data?.performance) ? data.performance : []);
+      setMockExamPerformanceMonths(Array.isArray(data?.months) ? data.months : []);
+    } catch (error) {
+      setMockExamPerformanceError(error.message || 'Failed to load exam performance.');
+    } finally {
+      setMockExamPerformanceLoading(false);
+    }
+  }
+
+  function resetMockExamBuilder() {
+    setEditingMockExamId('');
+    setMockExamTitle('');
+    setMockExamDescription('');
+    setMockExamDate('');
+    setMockExamDurationMinutes(60);
+    setMockExamNoticeEnabled(true);
+    setMockExamQuestions([{ question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' }]);
+  }
+
+  function updateMockExamQuestion(index, field, value) {
+    setMockExamQuestions((current) => current.map((item, idx) => (idx === index ? { ...item, [field]: value } : item)));
+  }
+
+  function updateMockExamOption(questionIndex, optionIndex, value) {
+    setMockExamQuestions((current) => current.map((item, idx) => {
+      if (idx !== questionIndex) return item;
+      const nextOptions = [...item.options];
+      nextOptions[optionIndex] = value;
+      return { ...item, options: nextOptions };
+    }));
+  }
+
+  function addMockExamQuestion() {
+    setMockExamQuestions((current) => [
+      ...current,
+      { question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' }
+    ]);
+  }
+
+  function removeMockExamQuestion(index) {
+    setMockExamQuestions((current) => {
+      if (current.length === 1) return current;
+      return current.filter((_, idx) => idx !== index);
+    });
+  }
+
+  function editMockExam(exam) {
+    setEditingMockExamId(exam._id);
+    setMockExamCategory(exam.category || COURSE_CATEGORIES[0]);
+    setMockExamTitle(exam.title || '');
+    setMockExamDescription(exam.description || '');
+    setMockExamDate(exam.examDate ? new Date(exam.examDate).toISOString().slice(0, 16) : '');
+    setMockExamDurationMinutes(exam.durationMinutes || 60);
+    setMockExamNoticeEnabled(exam.noticeEnabled !== false);
+    setMockExamQuestions((exam.questions || []).map((item) => ({
+      question: item.question,
+      options: [...item.options],
+      correctIndex: Number(item.correctIndex || 0),
+      explanation: item.explanation || ''
+    })));
+    setMockExamMessage(null);
+    setTimeout(() => scrollToSection('section-monthly-mock-exam'), 0);
+  }
+
+  async function handleSaveMockExam(event) {
+    event.preventDefault();
+    if (!mockExamCategory || !mockExamTitle.trim() || !mockExamDate) {
+      setMockExamMessage({ type: 'error', text: 'Course, title and exam date are required.' });
+      return;
+    }
+
+    const hasInvalidQuestion = mockExamQuestions.some((item) => {
+      if (!item.question.trim()) return true;
+      if (!Array.isArray(item.options) || item.options.length !== 4) return true;
+      if (item.options.some((opt) => !opt.trim())) return true;
+      return item.correctIndex < 0 || item.correctIndex > 3;
+    });
+
+    if (hasInvalidQuestion) {
+      setMockExamMessage({ type: 'error', text: 'Each question must have text, 4 options and one correct answer.' });
+      return;
+    }
+
+    setMockExamSaving(true);
+    setMockExamMessage(null);
+    try {
+      await saveMockExamAdmin({
+        examId: editingMockExamId || undefined,
+        category: mockExamCategory,
+        title: mockExamTitle.trim(),
+        description: mockExamDescription.trim(),
+        examDate: new Date(mockExamDate).toISOString(),
+        durationMinutes: Number(mockExamDurationMinutes || 60),
+        noticeEnabled: mockExamNoticeEnabled,
+        questions: mockExamQuestions.map((item) => ({
+          question: item.question.trim(),
+          options: item.options.map((opt) => opt.trim()),
+          correctIndex: Number(item.correctIndex),
+          explanation: String(item.explanation || '').trim()
+        }))
+      });
+      setMockExamMessage({ type: 'success', text: editingMockExamId ? 'Mock exam updated.' : 'Mock exam created.' });
+      resetMockExamBuilder();
+      await loadMockExamList(mockExamCategory);
+    } catch (error) {
+      setMockExamMessage({ type: 'error', text: error.message || 'Failed to save mock exam.' });
+    } finally {
+      setMockExamSaving(false);
+    }
+  }
+
+  async function handleToggleMockResultRelease(exam) {
+    try {
+      await releaseMockExamResultAdmin(exam._id, !exam.resultReleased);
+      await loadMockExamList(mockExamCategory);
+      setMockExamMessage({ type: 'success', text: !exam.resultReleased ? 'Result released.' : 'Result hidden.' });
+    } catch (error) {
+      setMockExamMessage({ type: 'error', text: error.message || 'Failed to update result release.' });
+    }
+  }
+
+  async function handleToggleMockNotice(exam) {
+    try {
+      await toggleMockExamNoticeAdmin(exam._id, !(exam.noticeEnabled !== false));
+      await loadMockExamList(mockExamCategory);
+      setMockExamMessage({ type: 'success', text: exam.noticeEnabled !== false ? 'Student notice banner disabled.' : 'Student notice banner enabled.' });
+    } catch (error) {
+      setMockExamMessage({ type: 'error', text: error.message || 'Failed to update exam notice setting.' });
+    }
+  }
+
   function resetQuizBuilder() {
     setEditingQuizId(null);
     setQuizModule('');
@@ -1573,6 +1749,24 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadAdminQuizzes(quizCategory);
   }, [quizCategory]);
+
+  useEffect(() => {
+    loadMockExamList(mockExamCategory);
+  }, [mockExamCategory]);
+
+  useEffect(() => {
+    loadMockExamPerformance(mockExamCategory, mockExamPerformanceMonthFilter);
+  }, [mockExamCategory, mockExamPerformanceMonthFilter]);
+
+  useEffect(() => {
+    setMockExamPerformanceMonthFilter('all');
+  }, [mockExamCategory]);
+
+  useEffect(() => {
+    if (mockExamPerformanceMonthFilter === 'all') return;
+    if (mockExamPerformanceMonths.includes(mockExamPerformanceMonthFilter)) return;
+    setMockExamPerformanceMonthFilter('all');
+  }, [mockExamPerformanceMonths, mockExamPerformanceMonthFilter]);
 
   useEffect(() => {
     loadRecoveryActions(30, recoveryFilter);
@@ -1718,6 +1912,7 @@ export default function AdminDashboard() {
     { id: 'section-registered-users', label: 'Learners', icon: '👥' },
     { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
     { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
+    { id: 'section-monthly-mock-exam', label: 'Monthly Exam', icon: '📅' },
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
     { id: 'section-quiz-analytics', label: 'Quiz Analytics', icon: '🏆' },
@@ -2397,6 +2592,267 @@ export default function AdminDashboard() {
           ) : (
             <p className="empty-note">No quizzes created for this course yet.</p>
           )}
+        </section>
+      </section>
+
+      <section id="section-monthly-mock-exam" className="card quiz-builder-panel quiz-builder-section">
+        <div className="section-header compact quiz-builder-heading-row">
+          <div>
+            <p className="eyebrow">Monthly Mock Test</p>
+            <h2>Schedule and manage mock exams</h2>
+            <p className="subtitle">Students get one attempt only. Release results manually when ready.</p>
+          </div>
+          <div className="quiz-count-cards">
+            <StatCard label={`${mockExamCategory} Exams`} value={mockExamList.length} />
+          </div>
+        </div>
+
+        <form className="quiz-builder-form" onSubmit={handleSaveMockExam}>
+          <label>
+            Course
+            <select value={mockExamCategory} onChange={(event) => setMockExamCategory(event.target.value)}>
+              {COURSE_CATEGORIES.map((course) => (
+                <option key={course} value={course}>{course}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Exam title
+            <input
+              value={mockExamTitle}
+              onChange={(event) => setMockExamTitle(event.target.value)}
+              placeholder="Example: April Grand Mock Test"
+              required
+            />
+          </label>
+
+          <label>
+            Description
+            <textarea
+              rows="2"
+              value={mockExamDescription}
+              onChange={(event) => setMockExamDescription(event.target.value)}
+              placeholder="Optional exam instructions"
+            />
+          </label>
+
+          <div className="quiz-meta-grid">
+            <label>
+              Exam date & time
+              <input
+                type="datetime-local"
+                value={mockExamDate}
+                onChange={(event) => setMockExamDate(event.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Duration (minutes)
+              <input
+                type="number"
+                min="5"
+                max="300"
+                value={mockExamDurationMinutes}
+                onChange={(event) => setMockExamDurationMinutes(Number(event.target.value))}
+                required
+              />
+            </label>
+            <label>
+              Student notice banner
+              <select
+                value={mockExamNoticeEnabled ? 'enabled' : 'disabled'}
+                onChange={(event) => setMockExamNoticeEnabled(event.target.value === 'enabled')}
+              >
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="quiz-question-list">
+            {mockExamQuestions.map((question, questionIndex) => (
+              <article key={`mock-question-${questionIndex}`} className="quiz-editor-card">
+                <div className="quiz-editor-head">
+                  <strong>Question {questionIndex + 1}</strong>
+                  {mockExamQuestions.length > 1 ? (
+                    <button type="button" className="danger-text-btn" onClick={() => removeMockExamQuestion(questionIndex)}>
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+
+                <label>
+                  Question text
+                  <input
+                    value={question.question}
+                    onChange={(event) => updateMockExamQuestion(questionIndex, 'question', event.target.value)}
+                    placeholder="Enter question"
+                    required
+                  />
+                </label>
+
+                <div className="quiz-options-list">
+                  {question.options.map((option, optionIndex) => (
+                    <label key={`mock-question-${questionIndex}-option-${optionIndex}`}>
+                      Option {optionIndex + 1}
+                      <input
+                        value={option}
+                        onChange={(event) => updateMockExamOption(questionIndex, optionIndex, event.target.value)}
+                        placeholder={`Option ${optionIndex + 1}`}
+                        required
+                      />
+                    </label>
+                  ))}
+                </div>
+
+                <label>
+                  Correct option
+                  <select
+                    value={question.correctIndex}
+                    onChange={(event) => updateMockExamQuestion(questionIndex, 'correctIndex', Number(event.target.value))}
+                  >
+                    <option value={0}>Option 1</option>
+                    <option value={1}>Option 2</option>
+                    <option value={2}>Option 3</option>
+                    <option value={3}>Option 4</option>
+                  </select>
+                </label>
+
+                <label>
+                  Explanation (for released result)
+                  <textarea
+                    rows="2"
+                    value={question.explanation || ''}
+                    onChange={(event) => updateMockExamQuestion(questionIndex, 'explanation', event.target.value)}
+                    placeholder="Optional explanation"
+                  />
+                </label>
+              </article>
+            ))}
+          </div>
+
+          <button type="button" className="secondary-btn" onClick={addMockExamQuestion}>
+            + Add Question
+          </button>
+
+          {editingMockExamId ? (
+            <button type="button" className="secondary-btn" onClick={resetMockExamBuilder}>
+              Cancel Edit
+            </button>
+          ) : null}
+
+          {mockExamMessage ? <p className={`inline-message ${mockExamMessage.type}`}>{mockExamMessage.text}</p> : null}
+
+          <button className="primary-btn" type="submit" disabled={mockExamSaving}>
+            {mockExamSaving ? 'Saving exam...' : editingMockExamId ? 'Update Exam' : 'Create Exam'}
+          </button>
+        </form>
+
+        <section className="quiz-admin-list">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Scheduled Mock Exams</p>
+              <h3>{mockExamCategory} monthly exams</h3>
+            </div>
+          </div>
+
+          {mockExamList.length ? (
+            <div className="quiz-admin-items">
+              {mockExamList.map((exam) => (
+                <article key={exam._id} className="quiz-admin-item">
+                  <div className="quiz-admin-item-body">
+                    <strong>{exam.title}</strong>
+                    <p>{new Date(exam.examDate).toLocaleString()}</p>
+                    <div className="quiz-admin-meta">
+                      <span className="quiz-admin-meta-chip">{exam.questions?.length || 0} questions</span>
+                      <span className="quiz-admin-meta-chip">{exam.durationMinutes || 60} min</span>
+                      <span className="quiz-admin-meta-chip">Notice {exam.noticeEnabled !== false ? 'On' : 'Off'}</span>
+                      <span className="quiz-admin-meta-chip">{exam.resultReleased ? 'Result Released' : 'Result Pending'}</span>
+                    </div>
+                  </div>
+                  <div className="quiz-admin-item-actions">
+                    <button type="button" className="secondary-btn" onClick={() => editMockExam(exam)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className={exam.noticeEnabled !== false ? 'secondary-btn' : 'primary-btn'}
+                      onClick={() => handleToggleMockNotice(exam)}
+                    >
+                      {exam.noticeEnabled !== false ? 'Disable Notice' : 'Enable Notice'}
+                    </button>
+                    <button
+                      type="button"
+                      className={exam.resultReleased ? 'danger-btn' : 'primary-btn'}
+                      onClick={() => handleToggleMockResultRelease(exam)}
+                    >
+                      {exam.resultReleased ? 'Hide Result' : 'Release Result'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-note">No monthly mock exams scheduled for this course yet.</p>
+          )}
+        </section>
+
+        <section className="quiz-admin-list">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Student Performance</p>
+              <h3>{mockExamCategory} exam attempts</h3>
+            </div>
+            <label className="quiz-leaderboard-filter">
+              Month
+              <select
+                value={mockExamPerformanceMonthFilter}
+                onChange={(event) => setMockExamPerformanceMonthFilter(event.target.value)}
+              >
+                <option value="all">All Months</option>
+                {mockExamPerformanceMonths.map((monthValue) => (
+                  <option key={monthValue} value={monthValue}>{formatMonthLabel(monthValue)}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {mockExamPerformanceLoading ? <p className="empty-note">Loading performance...</p> : null}
+          {!mockExamPerformanceLoading && mockExamPerformanceError ? <p className="inline-message error">{mockExamPerformanceError}</p> : null}
+
+          {!mockExamPerformanceLoading && !mockExamPerformanceError ? (
+            mockExamPerformance.length ? (
+              <div className="leaderboard-table-wrap">
+                <table className="leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Student</th>
+                      <th>Exam</th>
+                      <th>Month</th>
+                      <th>Score</th>
+                      <th>Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mockExamPerformance.map((entry, index) => (
+                      <tr key={`${entry.username || 'student'}-${entry.examTitle || 'exam'}-${entry.submittedAt || index}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
+                        <td>#{entry.rank || index + 1}</td>
+                        <td>{entry.username || 'Unknown'}</td>
+                        <td>{entry.examTitle || 'Monthly Mock Exam'}</td>
+                        <td>{formatMonthLabel(entry.month)}</td>
+                        <td>{entry.score || 0}/{entry.total || 0} ({Math.round(Number(entry.percentage) || 0)}%)</td>
+                        <td>{entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="empty-note">No student attempts found for this filter.</p>
+            )
+          ) : null}
         </section>
       </section>
 

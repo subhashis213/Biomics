@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
+  fetchMockExamLeaderboard,
   createCourseOrder,
   downloadMaterial,
+  fetchMyMockExams,
   fetchMyCoursePaymentInfo,
   fetchQuizLeaderboard,
   getApiBase,
@@ -49,6 +51,7 @@ export default function StudentDashboard() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileClosing, setProfileClosing] = useState(false);
   const [profile, setProfile] = useState(null);
   const [profileForm, setProfileForm] = useState({ username: '', phone: '', city: '', password: '' });
   const [profileMessage, setProfileMessage] = useState(null);
@@ -63,6 +66,16 @@ export default function StudentDashboard() {
   const [isUnlockingCourse, setIsUnlockingCourse] = useState(false);
   const [selectedAccessTarget, setSelectedAccessTarget] = useState(ALL_MODULES);
   const [selectedModuleSection, setSelectedModuleSection] = useState('');
+  const [mockExams, setMockExams] = useState([]);
+  const [mockExamNotices, setMockExamNotices] = useState([]);
+  const [mockExamLoading, setMockExamLoading] = useState(false);
+  const [examLeaderboard, setExamLeaderboard] = useState([]);
+  const [examLeaderboardMonths, setExamLeaderboardMonths] = useState([]);
+  const [examLeaderboardMonthFilter, setExamLeaderboardMonthFilter] = useState('all');
+  const [examLeaderboardLoading, setExamLeaderboardLoading] = useState(false);
+  const [examLeaderboardError, setExamLeaderboardError] = useState('');
+  const profileScrollLockRef = useRef(0);
+  const profileCloseTimerRef = useRef(null);
 
   const allModulesUnlocked = Boolean(access?.allModulesUnlocked || access?.unlocked);
   const bundlePlanOptions = Array.isArray(access?.bundlePricing?.plans) ? access.bundlePricing.plans : [];
@@ -153,6 +166,13 @@ export default function StudentDashboard() {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function formatMonthLabel(monthValue) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(monthValue || ''))) return monthValue || 'Unknown Month';
+    const [year, month] = String(monthValue).split('-');
+    const parsed = new Date(Number(year), Number(month) - 1, 1);
+    return parsed.toLocaleDateString([], { month: 'long', year: 'numeric' });
   }
 
   function getModuleAccessInfo(moduleName) {
@@ -334,11 +354,48 @@ export default function StudentDashboard() {
   }, [profileMessage]);
 
   useEffect(() => {
-    if (!profileOpen) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (!profileOpen || typeof window === 'undefined') return undefined;
+
+    const { body, documentElement } = document;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    profileScrollLockRef.current = scrollY;
+
+    const previousBodyStyles = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overscrollBehavior: body.style.overscrollBehavior
+    };
+
+    const previousHtmlStyles = {
+      overflow: documentElement.style.overflow,
+      overscrollBehavior: documentElement.style.overscrollBehavior
+    };
+
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overscrollBehavior = 'none';
+    documentElement.style.overflow = 'hidden';
+    documentElement.style.overscrollBehavior = 'none';
+
     return () => {
-      document.body.style.overflow = previousOverflow;
+      body.style.overflow = previousBodyStyles.overflow;
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.left = previousBodyStyles.left;
+      body.style.right = previousBodyStyles.right;
+      body.style.width = previousBodyStyles.width;
+      body.style.overscrollBehavior = previousBodyStyles.overscrollBehavior;
+      documentElement.style.overflow = previousHtmlStyles.overflow;
+      documentElement.style.overscrollBehavior = previousHtmlStyles.overscrollBehavior;
+      window.scrollTo(0, profileScrollLockRef.current);
     };
   }, [profileOpen]);
 
@@ -352,6 +409,14 @@ export default function StudentDashboard() {
       setSelectedAccessTarget(normalizeModuleName(selectedModule.name));
     }
   }, [selectedModule, access]);
+
+  useEffect(() => {
+    return () => {
+      if (profileCloseTimerRef.current) {
+        window.clearTimeout(profileCloseTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const restoreModule = location.state?.restoreModule;
@@ -420,6 +485,59 @@ export default function StudentDashboard() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMockExamLoading(true);
+    fetchMyMockExams()
+      .then((data) => {
+        if (cancelled) return;
+        setMockExams(Array.isArray(data?.exams) ? data.exams : []);
+        setMockExamNotices(Array.isArray(data?.notices) ? data.notices : []);
+      })
+      .catch((error) => {
+        if (!cancelled) setBanner({ type: 'error', text: error.message || 'Failed to load monthly mock exams.' });
+      })
+      .finally(() => {
+        if (!cancelled) setMockExamLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quizAttempts.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setExamLeaderboardLoading(true);
+    setExamLeaderboardError('');
+
+    const activeMonthFilter = examLeaderboardMonthFilter === 'all' ? '' : examLeaderboardMonthFilter;
+
+    fetchMockExamLeaderboard(activeMonthFilter)
+      .then((data) => {
+        if (cancelled) return;
+        setExamLeaderboard(Array.isArray(data?.leaderboard) ? data.leaderboard : []);
+        setExamLeaderboardMonths(Array.isArray(data?.months) ? data.months : []);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setExamLeaderboardError(error?.message || 'Failed to load exam leaderboard.');
+      })
+      .finally(() => {
+        if (!cancelled) setExamLeaderboardLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mockExams.length, quizAttempts.length, examLeaderboardMonthFilter]);
+
+  useEffect(() => {
+    if (examLeaderboardMonthFilter === 'all') return;
+    if (examLeaderboardMonths.includes(examLeaderboardMonthFilter)) return;
+    setExamLeaderboardMonthFilter('all');
+  }, [examLeaderboardMonths, examLeaderboardMonthFilter]);
 
 
   // Poll for live class status every 5 seconds
@@ -564,6 +682,25 @@ export default function StudentDashboard() {
     navigate('/', { replace: true });
   }
 
+  function openProfileModal() {
+    if (profileCloseTimerRef.current) {
+      window.clearTimeout(profileCloseTimerRef.current);
+      profileCloseTimerRef.current = null;
+    }
+    setProfileClosing(false);
+    setProfileOpen(true);
+  }
+
+  function closeProfileModal() {
+    if (!profileOpen || profileClosing) return;
+    setProfileClosing(true);
+    profileCloseTimerRef.current = window.setTimeout(() => {
+      setProfileOpen(false);
+      setProfileClosing(false);
+      profileCloseTimerRef.current = null;
+    }, 220);
+  }
+
   async function handleSaveProfile(event) {
     event.preventDefault();
     setIsSavingProfile(true);
@@ -656,7 +793,10 @@ export default function StudentDashboard() {
     if (selectedModule) return baseItems;
     return [
       ...baseItems.slice(0, 2),
+      { id: 'section-quiz-performance', label: 'Quiz Performance', icon: '📊' },
       { id: 'section-leaderboard', label: 'Leaderboard', icon: '🏆' },
+      { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
+      { id: 'section-exam-leaderboard', label: 'Exam Leaderboard', icon: '🥇' },
       { id: 'section-feedback', label: 'Feedback', icon: '💬' },
       baseItems[2]
     ];
@@ -675,7 +815,7 @@ export default function StudentDashboard() {
           <button
             type="button"
             className="profile-icon-btn"
-            onClick={() => setProfileOpen(true)}
+            onClick={openProfileModal}
             aria-label="Open profile settings"
             title="Profile settings"
           >
@@ -689,6 +829,17 @@ export default function StudentDashboard() {
             <strong>{profile?.username || session?.username || 'Student'}</strong>
             <span>{profile?.class || course || 'Course unavailable'}</span>
             <span>{profile?.city || 'City unavailable'}</span>
+            {visibleMembership ? (
+              <div className="profile-membership-card" role="status" aria-live="polite">
+                <div className="profile-membership-head">
+                  <span className="profile-membership-label">Active membership</span>
+                  <span className="profile-membership-tag">{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'}</span>
+                </div>
+                <span className="profile-membership-expiry">
+                  Expires {formatMembershipDate(visibleMembership.expiresAt)}
+                </span>
+              </div>
+            ) : null}
             <button
               type="button"
               className="profile-theme-btn"
@@ -704,18 +855,29 @@ export default function StudentDashboard() {
       <div id="section-overview" className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
-        {visibleMembership ? (
-          <section className="membership-status-banner card">
+        {!selectedModule && mockExamNotices.length ? (
+          <aside className="monthly-exam-notice card" role="status" aria-live="polite">
             <div>
-              <p className="eyebrow">Active Membership</p>
-              <h2>{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'} access is live</h2>
-              <p className="empty-note">
-                {visibleMembership.moduleName && visibleMembership.moduleName !== ALL_MODULES
-                  ? `${visibleMembership.moduleName} access expires on ${formatMembershipDate(visibleMembership.expiresAt)}.`
-                  : `Your ${course} membership expires on ${formatMembershipDate(visibleMembership.expiresAt)}.`}
-              </p>
+              <p className="eyebrow">Monthly Mock Exam Notice</p>
+              <h3>
+                {mockExamNotices[0].type === 'resultReleased'
+                  ? 'Result released. Go to Exam section to view details.'
+                  : `Upcoming exam on ${new Date(mockExamNotices[0].examDate).toLocaleDateString()}.`}
+              </h3>
+              <p>{mockExamNotices[0].title}</p>
             </div>
-          </section>
+            <div className="quiz-thankyou-actions">
+              <button type="button" className="primary-btn" onClick={() => {
+                const node = document.getElementById('section-monthly-exam');
+                if (node) node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}>
+                Go To Exam Section
+              </button>
+              <button type="button" className="secondary-btn" onClick={() => setMockExamNotices((current) => current.slice(1))}>
+                Dismiss
+              </button>
+            </div>
+          </aside>
         ) : null}
 
         {/* ── Live Class Banner ──────────────────────────── */}
@@ -1137,7 +1299,7 @@ export default function StudentDashboard() {
       )}
 
       {hasAnyUnlockedModule && !selectedModule && visibleModules.length ? (
-        <section className="card quiz-history-panel">
+        <section id="section-quiz-performance" className="card quiz-history-panel">
           <div className="section-header compact">
             <div>
               <p className="eyebrow">Quiz Performance</p>
@@ -1235,6 +1397,113 @@ export default function StudentDashboard() {
               </>
             ) : (
               <p className="empty-note">No leaderboard data yet for this module. Submit a quiz attempt to appear here.</p>
+            )
+          ) : null}
+        </section>
+      ) : null}
+
+      {!selectedModule ? (
+        <section id="section-monthly-exam" className="card monthly-exam-panel">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Monthly Mock Test</p>
+              <h2>Exam Section</h2>
+            </div>
+            <StatCard label="Exams" value={mockExams.length} />
+          </div>
+
+          {mockExamLoading ? <p className="empty-note">Loading monthly exams...</p> : null}
+
+          {!mockExamLoading && !mockExams.length ? (
+            <p className="empty-note">No monthly exams published yet.</p>
+          ) : null}
+
+          {!mockExamLoading && mockExams.length ? (
+            <div className="quiz-admin-items">
+              {mockExams.map((exam) => (
+                <article key={exam._id} className="quiz-admin-item">
+                  <div className="quiz-admin-item-body">
+                    <strong>{exam.title}</strong>
+                    <p>{new Date(exam.examDate).toLocaleString()}</p>
+                    <div className="quiz-admin-meta">
+                      <span className="quiz-admin-meta-chip">{exam.questionCount || 0} questions</span>
+                      <span className="quiz-admin-meta-chip">{exam.durationMinutes || 60} min</span>
+                      <span className="quiz-admin-meta-chip">{exam.attempted ? 'Attempted' : 'Pending'}</span>
+                      <span className="quiz-admin-meta-chip">{exam.resultReleased ? 'Result Released' : 'Result Pending'}</span>
+                    </div>
+                  </div>
+                  <div className="quiz-admin-item-actions">
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      onClick={() => navigate(`/student/mock-exam/${encodeURIComponent(exam._id)}`)}
+                    >
+                      {exam.resultReleased && exam.attempted ? 'View Result' : exam.attempted ? 'View Status' : 'Start Exam'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {!selectedModule ? (
+        <section id="section-exam-leaderboard" className="card quiz-leaderboard-panel">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Exam Leaderboard</p>
+              <h2>Top Monthly Mock Performers</h2>
+            </div>
+            <label className="quiz-leaderboard-filter">
+              Month
+              <select
+                value={examLeaderboardMonthFilter}
+                onChange={(event) => setExamLeaderboardMonthFilter(event.target.value)}
+              >
+                <option value="all">All Months</option>
+                {examLeaderboardMonths.map((monthValue) => (
+                  <option key={monthValue} value={monthValue}>{formatMonthLabel(monthValue)}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {examLeaderboardLoading ? <p className="empty-note">Loading exam leaderboard...</p> : null}
+          {!examLeaderboardLoading && examLeaderboardError ? <p className="inline-message error">{examLeaderboardError}</p> : null}
+
+          {!examLeaderboardLoading && !examLeaderboardError ? (
+            examLeaderboard.length ? (
+              <div className="leaderboard-table-wrap">
+                <table className="leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Candidate</th>
+                      <th>Exam(s) Attempted</th>
+                      <th>Best Score</th>
+                      <th>Exams Attempted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {examLeaderboard.map((entry, index) => (
+                      <tr key={`${entry.username || 'candidate'}-${entry.rank || index + 1}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
+                        <td>#{entry.rank || index + 1}</td>
+                        <td>{entry.username || 'Anonymous'}</td>
+                        <td>
+                          {Array.isArray(entry.attemptedExamTitles) && entry.attemptedExamTitles.length
+                            ? entry.attemptedExamTitles.join(', ')
+                            : (entry.examTitle || 'Monthly Mock Exam')}
+                        </td>
+                        <td>{entry.bestScore || 0}/{entry.bestTotal || 0} ({safePercent(entry.bestPercentage)}%)</td>
+                        <td>{entry.examsAttempted || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="empty-note">No exam leaderboard data yet. Attempt a monthly mock test to appear here.</p>
             )
           ) : null}
         </section>
@@ -1438,14 +1707,14 @@ export default function StudentDashboard() {
 
       </AppShell>
       {profileOpen ? (
-        <div className="profile-modal-backdrop" onClick={() => setProfileOpen(false)}>
-          <section className="profile-modal" onClick={(event) => event.stopPropagation()}>
+        <div className={`profile-modal-backdrop${profileClosing ? ' closing' : ''}`} onClick={closeProfileModal}>
+          <section className={`profile-modal${profileClosing ? ' closing' : ''}`} onClick={(event) => event.stopPropagation()}>
             <div className="profile-modal-header">
               <div>
                 <p className="eyebrow">Student Profile</p>
                 <h2>Profile Settings</h2>
               </div>
-              <button type="button" className="profile-close-btn" onClick={() => setProfileOpen(false)} aria-label="Close profile settings">
+              <button type="button" className="profile-close-btn" onClick={closeProfileModal} aria-label="Close profile settings">
                 ×
               </button>
             </div>
@@ -1480,6 +1749,17 @@ export default function StudentDashboard() {
                     <div><span>Course</span><strong>{profile?.class || '-'}</strong></div>
                     <div><span>City</span><strong>{profile?.city || '-'}</strong></div>
                   </div>
+                  {visibleMembership ? (
+                    <div className="profile-membership-card" role="status" aria-live="polite">
+                      <div className="profile-membership-head">
+                        <span className="profile-membership-label">Active membership</span>
+                        <span className="profile-membership-tag">{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'}</span>
+                      </div>
+                      <span className="profile-membership-expiry">
+                        Expires {formatMembershipDate(visibleMembership.expiresAt)}
+                      </span>
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     className="secondary-btn profile-theme-modal-btn"
@@ -1545,7 +1825,7 @@ export default function StudentDashboard() {
                       </svg>
                       Logout
                     </button>
-                    <button type="button" className="secondary-btn" onClick={() => setProfileOpen(false)}>
+                    <button type="button" className="secondary-btn" onClick={closeProfileModal}>
                       Close
                     </button>
                   </div>

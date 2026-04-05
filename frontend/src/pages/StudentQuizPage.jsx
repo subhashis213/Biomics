@@ -459,7 +459,7 @@ export default function StudentQuizPage() {
               </button>
               <button
                 type="button"
-                className="danger-btn"
+                className="danger-btn quiz-exit-anyway-btn"
                 onClick={() => {
                   setExitConfirmOpen(false);
                   setIsExiting(true);
