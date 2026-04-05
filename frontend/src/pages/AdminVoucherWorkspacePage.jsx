@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { createVoucherAdmin, deleteVoucherAdmin, fetchVouchersAdmin, updateVoucherAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -17,7 +19,9 @@ export default function AdminVoucherWorkspacePage() {
   const navigate = useNavigate();
   const [voucherList, setVoucherList] = useState([]);
   const [isSavingVoucher, setIsSavingVoucher] = useState(false);
+  const [isDeletingVoucher, setIsDeletingVoucher] = useState(false);
   const [banner, setBanner] = useState(null);
+  const [voucherDeleteDialog, setVoucherDeleteDialog] = useState({ open: false, voucherId: '', code: '' });
   const [voucherForm, setVoucherForm] = useState({
     code: '',
     description: '',
@@ -28,6 +32,38 @@ export default function AdminVoucherWorkspacePage() {
     validUntil: '',
     applicableCourses: []
   });
+
+  useAutoDismissMessage(banner, setBanner);
+
+  useEffect(() => {
+    if (!voucherDeleteDialog.open) return undefined;
+
+    const body = document.body;
+    const html = document.documentElement;
+    const scrollY = window.scrollY;
+
+    body.dataset.voucherModalScrollY = String(scrollY);
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+
+    return () => {
+      const y = Number(body.dataset.voucherModalScrollY || '0');
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.width = '';
+      body.style.overflow = '';
+      html.style.overflow = '';
+      delete body.dataset.voucherModalScrollY;
+      window.scrollTo(0, y);
+    };
+  }, [voucherDeleteDialog.open]);
 
   async function loadVouchers() {
     try {
@@ -98,15 +134,26 @@ export default function AdminVoucherWorkspacePage() {
   }
 
   async function handleDeleteVoucher(voucherId, code) {
-    const ok = window.confirm(`Delete voucher "${code}"? This cannot be undone.`);
-    if (!ok) return;
+    setVoucherDeleteDialog({ open: true, voucherId, code });
+  }
 
+  function closeVoucherDeleteDialog() {
+    if (isDeletingVoucher) return;
+    setVoucherDeleteDialog({ open: false, voucherId: '', code: '' });
+  }
+
+  async function confirmDeleteVoucher() {
+    if (!voucherDeleteDialog.voucherId || isDeletingVoucher) return;
+    setIsDeletingVoucher(true);
     try {
-      await deleteVoucherAdmin(voucherId);
+      await deleteVoucherAdmin(voucherDeleteDialog.voucherId);
       await loadVouchers();
       setBanner({ type: 'success', text: 'Voucher deleted.' });
+      setVoucherDeleteDialog({ open: false, voucherId: '', code: '' });
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to delete voucher.' });
+    } finally {
+      setIsDeletingVoucher(false);
     }
   }
 
@@ -306,6 +353,47 @@ export default function AdminVoucherWorkspacePage() {
           </div>
         </section>
       </main>
+
+      {voucherDeleteDialog.open ? createPortal(
+        <div
+          className="confirm-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeVoucherDeleteDialog();
+          }}
+        >
+          <section className="confirm-modal card voucher-confirm-modal" role="dialog" aria-modal="true" aria-label="Delete voucher confirmation">
+            <p className="eyebrow">Delete Voucher</p>
+            <h2>Delete {voucherDeleteDialog.code}?</h2>
+            <p className="subtitle">This action cannot be undone. Students will no longer be able to use this voucher code.</p>
+            <div className="confirm-modal-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeVoucherDeleteDialog();
+                }}
+                disabled={isDeletingVoucher}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  confirmDeleteVoucher();
+                }}
+                disabled={isDeletingVoucher}
+              >
+                {isDeletingVoucher ? 'Deleting...' : 'Delete Voucher'}
+              </button>
+            </div>
+          </section>
+        </div>,
+        document.body
+      ) : null}
     </AppShell>
   );
 }

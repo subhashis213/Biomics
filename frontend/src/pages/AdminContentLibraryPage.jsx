@@ -5,6 +5,7 @@ import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import VideoCard from '../components/VideoCard';
 import { MAX_MATERIAL_MB } from '../constants';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -37,6 +38,8 @@ export default function AdminContentLibraryPage() {
   const [uploadFiles, setUploadFiles] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
   const [materialMessages, setMaterialMessages] = useState({});
+
+  useAutoDismissMessage(banner, setBanner);
 
   useEffect(() => {
     let ignore = false;

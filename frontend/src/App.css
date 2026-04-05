@@ -3933,6 +3933,17 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   margin-top: 0;
 }
 
+.voucher-confirm-modal {
+  border: 1px solid color-mix(in srgb, #ef4444 24%, var(--line));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, #ef4444 12%, transparent), transparent 55%),
+    linear-gradient(160deg, var(--surface-start) 0%, var(--surface-end) 100%);
+}
+
+.voucher-confirm-modal h2 {
+  color: color-mix(in srgb, #ef4444 75%, var(--text-main));
+}
+
 .profile-modal-backdrop {
   position: fixed;
   inset: 0;

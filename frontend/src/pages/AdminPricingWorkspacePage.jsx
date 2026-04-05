@@ -8,6 +8,7 @@ import {
 } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -42,6 +43,8 @@ export default function AdminPricingWorkspacePage() {
   const [pricingSaveStatus, setPricingSaveStatus] = useState({});
   const [banner, setBanner] = useState(null);
 
+  useAutoDismissMessage(banner, setBanner);
+
   function setPricingInlineStatus(key, type, text) {
     setPricingSaveStatus((current) => ({
       ...current,
@@ -62,11 +65,14 @@ export default function AdminPricingWorkspacePage() {
     try {
       const pricingResponse = await fetchCoursePricingAdmin();
       const pricing = Array.isArray(pricingResponse?.pricing) ? pricingResponse.pricing : [];
-      setCoursePricing(pricing);
+      const bundlePricing = pricing.filter((entry) => String(entry?.moduleName || '') === 'ALL_MODULES');
+      setCoursePricing(bundlePricing);
 
       const nextPriceForm = {};
-      pricing.forEach((entry) => {
-        nextPriceForm[entry.course] = {
+      bundlePricing.forEach((entry) => {
+        const category = String(entry?.category || '').trim();
+        if (!category) return;
+        nextPriceForm[category] = {
           proAmountRupees: String(Number(entry.proPriceInPaise || 0) / 100),
           eliteAmountRupees: String(Number(entry.elitePriceInPaise || 0) / 100),
           active: entry.active !== false

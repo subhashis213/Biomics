@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchAuditLogsAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
 export default function AdminAuditLogPage() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ export default function AdminAuditLogPage() {
   const [auditLogFilter, setAuditLogFilter] = useState({ action: '', actor: '' });
   const [auditLogLoading, setAuditLogLoading] = useState(false);
   const [banner, setBanner] = useState(null);
+
+  useAutoDismissMessage(banner, setBanner);
 
   async function loadAuditLogs(page = 1, filter = auditLogFilter) {
     setAuditLogLoading(true);

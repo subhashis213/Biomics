@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { applyRecoveryActionAdmin, fetchRecoveryActionsAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
 export default function AdminRecoveryCenterPage() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ export default function AdminRecoveryCenterPage() {
   const [recoveryApplyingId, setRecoveryApplyingId] = useState('');
   const [recoveryFilter, setRecoveryFilter] = useState({ from: '', to: '' });
   const [banner, setBanner] = useState(null);
+
+  useAutoDismissMessage(banner, setBanner);
 
   async function loadRecoveryActions(limit = 30, filter = recoveryFilter) {
     setRecoveryLoading(true);

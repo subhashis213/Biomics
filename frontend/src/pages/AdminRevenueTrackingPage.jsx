@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchPaymentHistoryAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -20,6 +21,8 @@ export default function AdminRevenueTrackingPage() {
   const [paymentHistoryFilter, setPaymentHistoryFilter] = useState({ course: '', status: '', username: '' });
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [banner, setBanner] = useState(null);
+
+  useAutoDismissMessage(banner, setBanner);
 
   async function loadPaymentHistory(page = 1, filter = paymentHistoryFilter) {
     setPaymentHistoryLoading(true);

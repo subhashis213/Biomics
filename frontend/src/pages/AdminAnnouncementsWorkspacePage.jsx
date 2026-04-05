@@ -8,6 +8,7 @@ import {
 } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
 export default function AdminAnnouncementsWorkspacePage() {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ export default function AdminAnnouncementsWorkspacePage() {
   const [announcementList, setAnnouncementList] = useState([]);
   const [announcementInlineMessage, setAnnouncementInlineMessage] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  useAutoDismissMessage(announcementInlineMessage, setAnnouncementInlineMessage);
 
   async function loadAnnouncements(showRefreshingState = false) {
     if (showRefreshingState) setRefreshing(true);
