@@ -24,6 +24,7 @@ export default function StudentMockExamPage() {
   const [submitMessage, setSubmitMessage] = useState('');
   const [result, setResult] = useState(null);
   const [showReview, setShowReview] = useState(false);
+  const [reviewMarks, setReviewMarks] = useState({});
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [pendingUnansweredCount, setPendingUnansweredCount] = useState(0);
 
@@ -47,6 +48,7 @@ export default function StudentMockExamPage() {
         if (!nextExam) throw new Error('Mock exam is unavailable.');
         setExam(nextExam);
         setAnswers(Array((nextExam.questions || []).length).fill(-1));
+        setReviewMarks({});
         setActiveIndex(0);
         setSecondsLeft((nextExam.durationMinutes || 60) * 60);
         setStartedAt(Date.now());
@@ -123,6 +125,22 @@ export default function StudentMockExamPage() {
   const activeQuestion = totalQuestions ? exam.questions[safeActiveIndex] : null;
 
   const attemptedCount = useMemo(() => answers.filter((value) => value >= 0).length, [answers]);
+  const markedCount = useMemo(
+    () => Object.keys(reviewMarks).filter((key) => reviewMarks[key]).length,
+    [reviewMarks]
+  );
+
+  function handleToggleReview() {
+    setReviewMarks((current) => {
+      const next = { ...current };
+      if (next[safeActiveIndex]) {
+        delete next[safeActiveIndex];
+      } else {
+        next[safeActiveIndex] = true;
+      }
+      return next;
+    });
+  }
 
   function handleSelectOption(optionIndex) {
     setAnswers((current) => {
@@ -179,6 +197,13 @@ export default function StudentMockExamPage() {
                 <article className="quiz-question-card">
                   <div className="quiz-question-head">
                     <span className="quiz-question-index">Question {safeActiveIndex + 1} / {totalQuestions}</span>
+                    <button
+                      type="button"
+                      className={`secondary-btn quiz-review-toggle${reviewMarks[safeActiveIndex] ? ' is-marked' : ''}`}
+                      onClick={handleToggleReview}
+                    >
+                      {reviewMarks[safeActiveIndex] ? 'Marked for Review' : 'Mark for Review'}
+                    </button>
                   </div>
                   <p className="quiz-question-text"><strong>Q{safeActiveIndex + 1}.</strong> {activeQuestion.question}</p>
                   <div className="quiz-options-grid">
@@ -225,17 +250,20 @@ export default function StudentMockExamPage() {
                 <h4>Exam Summary</h4>
                 <p>Total Questions: <strong>{totalQuestions}</strong></p>
                 <p>Attempted: <strong>{attemptedCount}</strong></p>
+                <p>Marked for review: <strong>{markedCount}</strong></p>
                 <p>Unattempted: <strong>{Math.max(0, totalQuestions - attemptedCount)}</strong></p>
               </div>
 
               <div className="quiz-question-navigator" role="list">
                 {Array.from({ length: totalQuestions }).map((_, index) => {
                   const isAttempted = answers[index] >= 0;
+                  const isMarked = Boolean(reviewMarks[index]);
+                  const statusClass = isMarked ? 'is-review' : (isAttempted ? 'is-attempted' : 'is-unattempted');
                   return (
                     <button
                       key={`exam-question-nav-${index}`}
                       type="button"
-                      className={`quiz-nav-item ${isAttempted ? 'is-attempted' : 'is-unattempted'}${safeActiveIndex === index ? ' is-active' : ''}`}
+                      className={`quiz-nav-item ${statusClass}${safeActiveIndex === index ? ' is-active' : ''}`}
                       onClick={() => setActiveIndex(index)}
                       role="listitem"
                     >

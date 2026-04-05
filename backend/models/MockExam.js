@@ -19,6 +19,7 @@ const mockExamSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, trim: true },
   examDate: { type: Date, required: true },
+  examWindowEndAt: { type: Date, default: null },
   durationMinutes: { type: Number, min: 5, max: 300, default: 60 },
   resultReleased: { type: Boolean, default: false },
   noticeEnabled: { type: Boolean, default: true },

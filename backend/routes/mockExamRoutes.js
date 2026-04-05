@@ -42,12 +42,20 @@ function sanitizeQuestionsForReview(questions = [], answers = []) {
 
 function validateExamPayload(payload) {
   if (!payload || typeof payload !== 'object') return 'Invalid mock exam payload.';
-  const { category, title, examDate, durationMinutes, questions } = payload;
+  const { category, title, examDate, examWindowEndAt, durationMinutes, questions } = payload;
   if (!category || !title || !examDate) return 'Category, title and exam date are required.';
   if (!Array.isArray(questions) || questions.length === 0) return 'At least one question is required.';
 
   const date = new Date(examDate);
   if (Number.isNaN(date.getTime())) return 'Exam date is invalid.';
+
+  if (examWindowEndAt) {
+    const windowEnd = new Date(examWindowEndAt);
+    if (Number.isNaN(windowEnd.getTime())) return 'Exam window end date is invalid.';
+    if (windowEnd.getTime() <= date.getTime()) {
+      return 'Exam window end must be after exam start date.';
+    }
+  }
 
   const duration = Number(durationMinutes || 60);
   if (!Number.isFinite(duration) || duration < 5 || duration > 300) {
@@ -91,6 +99,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       title: String(req.body.title).trim(),
       description: String(req.body.description || '').trim(),
       examDate: new Date(req.body.examDate),
+      examWindowEndAt: req.body.examWindowEndAt ? new Date(req.body.examWindowEndAt) : null,
       durationMinutes: Number(req.body.durationMinutes || 60),
       resultReleased: Boolean(req.body.resultReleased),
       noticeEnabled: req.body.noticeEnabled !== false,
@@ -273,9 +282,11 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
         title: exam.title,
         description: exam.description || '',
         examDate: exam.examDate,
+        examWindowEndAt: exam.examWindowEndAt || null,
         durationMinutes: exam.durationMinutes || 60,
         questionCount: Array.isArray(exam.questions) ? exam.questions.length : 0,
         attempted: Boolean(attempt),
+        windowClosed: Boolean(!attempt && exam.examWindowEndAt && new Date(exam.examWindowEndAt).getTime() < now),
         noticeEnabled: exam.noticeEnabled !== false,
         attemptSummary: attempt
           ? {
@@ -315,6 +326,11 @@ router.get('/my-course/:id', authenticateToken('user'), async (req, res) => {
     }
 
     const attempt = await MockExamAttempt.findOne({ examId: exam._id, username: req.user.username }, { _id: 1 }).lean();
+    const examWindowEndAt = exam.examWindowEndAt ? new Date(exam.examWindowEndAt).getTime() : null;
+    const windowClosed = Boolean(!attempt && Number.isFinite(examWindowEndAt) && Date.now() > examWindowEndAt);
+    if (windowClosed) {
+      return res.status(403).json({ error: 'Exam window is over.' });
+    }
 
     return res.json({
       exam: {
@@ -323,6 +339,7 @@ router.get('/my-course/:id', authenticateToken('user'), async (req, res) => {
         title: exam.title,
         description: exam.description || '',
         examDate: exam.examDate,
+        examWindowEndAt: exam.examWindowEndAt || null,
         durationMinutes: exam.durationMinutes || 60,
         questions: sanitizeQuestionsForStudent(exam.questions || []),
         attempted: Boolean(attempt),
@@ -460,6 +477,11 @@ router.post('/:id/submit', authenticateToken('user'), async (req, res) => {
     const examStartsAt = new Date(exam.examDate).getTime();
     if (Number.isFinite(examStartsAt) && Date.now() < examStartsAt) {
       return res.status(403).json({ error: `Exam will start on ${new Date(exam.examDate).toLocaleString()}.` });
+    }
+
+    const examWindowEndAt = exam.examWindowEndAt ? new Date(exam.examWindowEndAt).getTime() : null;
+    if (Number.isFinite(examWindowEndAt) && Date.now() > examWindowEndAt) {
+      return res.status(403).json({ error: 'Exam window is over.' });
     }
 
     const existingAttempt = await MockExamAttempt.findOne({ examId: exam._id, username: req.user.username }, { _id: 1 }).lean();

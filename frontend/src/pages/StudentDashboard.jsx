@@ -1429,16 +1429,29 @@ export default function StudentDashboard() {
                       <span className="quiz-admin-meta-chip">{exam.questionCount || 0} questions</span>
                       <span className="quiz-admin-meta-chip">{exam.durationMinutes || 60} min</span>
                       <span className="quiz-admin-meta-chip">{exam.attempted ? 'Attempted' : 'Pending'}</span>
+                      <span className="quiz-admin-meta-chip">
+                        {exam.windowClosed ? 'Window Over' : exam.examWindowEndAt ? `Window till ${new Date(exam.examWindowEndAt).toLocaleDateString()}` : 'Open Window'}
+                      </span>
                       <span className="quiz-admin-meta-chip">{exam.resultReleased ? 'Result Released' : 'Result Pending'}</span>
                     </div>
                   </div>
                   <div className="quiz-admin-item-actions">
                     <button
                       type="button"
-                      className="primary-btn"
-                      onClick={() => navigate(`/student/mock-exam/${encodeURIComponent(exam._id)}`)}
+                      className={exam.windowClosed && !exam.attempted ? 'secondary-btn' : 'primary-btn'}
+                      onClick={() => {
+                        if (exam.windowClosed && !exam.attempted) return;
+                        navigate(`/student/mock-exam/${encodeURIComponent(exam._id)}`);
+                      }}
+                      disabled={exam.windowClosed && !exam.attempted}
                     >
-                      {exam.resultReleased && exam.attempted ? 'View Result' : exam.attempted ? 'View Status' : 'Start Exam'}
+                      {exam.windowClosed && !exam.attempted
+                        ? 'Exam Window Is Over'
+                        : exam.resultReleased && exam.attempted
+                          ? 'View Result'
+                          : exam.attempted
+                            ? 'View Status'
+                            : 'Start Exam'}
                     </button>
                   </div>
                 </article>

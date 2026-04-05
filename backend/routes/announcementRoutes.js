@@ -62,6 +62,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
 router.patch('/:id', authenticateToken('admin'), async (req, res) => {
   try {
     const isActive = req.body?.isActive !== false;
+
     const announcement = await Announcement.findByIdAndUpdate(
       req.params.id,
       {

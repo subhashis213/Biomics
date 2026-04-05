@@ -49,12 +49,12 @@ const COURSE_CATEGORIES = [
 ];
 
 const COURSE_META = {
-  '11th':                  { icon: '📖', color: '#3b82f6' },
-  '12th':                  { icon: '🎓', color: '#8b5cf6' },
-  'NEET':                  { icon: '🧬', color: '#10b981' },
-  'IIT-JAM':               { icon: '⚗️',  color: '#f59e0b' },
-  'CSIR-NET Life Science': { icon: '🔬', color: '#06b6d4' },
-  'GATE':                  { icon: '💻', color: '#ef4444' },
+  '11th':                  { icon: '📖', color: '#2563eb' },
+  '12th':                  { icon: '🎓', color: '#0f766e' },
+  'NEET':                  { icon: '🧬', color: '#16a34a' },
+  'IIT-JAM':               { icon: '⚗️',  color: '#d97706' },
+  'CSIR-NET Life Science': { icon: '🔬', color: '#0891b2' },
+  'GATE':                  { icon: '💻', color: '#dc2626' },
 };
 
 export default function AdminDashboard() {
@@ -71,11 +71,6 @@ export default function AdminDashboard() {
   const [videos, setVideos] = useState([]);
   const [students, setStudents] = useState([]);
   const [feedback, setFeedback] = useState([]);
-  const [activeLibraryCourse, setActiveLibraryCourse] = useState('All');
-  const [librarySearchInput, setLibrarySearchInput] = useState('');
-  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
-  const [libraryModuleInput, setLibraryModuleInput] = useState('');
-  const [libraryModuleQuery, setLibraryModuleQuery] = useState('');
   const [videoForm, setVideoForm] = useState({ title: '', description: '', url: '' });
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [courseModalOpen, setCourseModalOpen] = useState(false);
@@ -120,6 +115,7 @@ export default function AdminDashboard() {
   const [mockExamTitle, setMockExamTitle] = useState('');
   const [mockExamDescription, setMockExamDescription] = useState('');
   const [mockExamDate, setMockExamDate] = useState('');
+  const [mockExamWindowEndAt, setMockExamWindowEndAt] = useState('');
   const [mockExamDurationMinutes, setMockExamDurationMinutes] = useState(60);
   const [mockExamNoticeEnabled, setMockExamNoticeEnabled] = useState(true);
   const [mockExamQuestions, setMockExamQuestions] = useState([
@@ -1419,8 +1415,25 @@ export default function AdminDashboard() {
     setPaymentHistoryLoading(true);
     try {
       const res = await fetchPaymentHistoryAdmin({ page, limit: 20, ...filter });
-      setPaymentHistory(res.payments || []);
-      setPaymentHistoryPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
+      const payments = Array.isArray(res?.payments) ? res.payments : [];
+      const normalizedTotal = Number.isFinite(Number(res?.pagination?.total))
+        ? Number(res.pagination.total)
+        : Number.isFinite(Number(res?.total))
+          ? Number(res.total)
+          : payments.length;
+      const total = Math.max(normalizedTotal, payments.length);
+      const limit = Number.isFinite(Number(res?.pagination?.limit))
+        ? Number(res.pagination.limit)
+        : 20;
+      const totalPages = Number.isFinite(Number(res?.pagination?.totalPages))
+        ? Number(res.pagination.totalPages)
+        : Math.max(1, Math.ceil(total / Math.max(1, limit)));
+      const currentPage = Number.isFinite(Number(res?.pagination?.page))
+        ? Number(res.pagination.page)
+        : page;
+
+      setPaymentHistory(payments);
+      setPaymentHistoryPagination({ page: currentPage, totalPages, total });
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to load payment history.' });
     } finally {
@@ -1444,8 +1457,25 @@ export default function AdminDashboard() {
     setAuditLogLoading(true);
     try {
       const res = await fetchAuditLogsAdmin({ page, limit: 20, ...filter });
-      setAuditLogs(res.logs || []);
-      setAuditLogPagination(res.pagination || { page: 1, totalPages: 1, total: 0 });
+      const logs = Array.isArray(res?.logs) ? res.logs : [];
+      const normalizedTotal = Number.isFinite(Number(res?.pagination?.total))
+        ? Number(res.pagination.total)
+        : Number.isFinite(Number(res?.total))
+          ? Number(res.total)
+          : logs.length;
+      const total = Math.max(normalizedTotal, logs.length);
+      const limit = Number.isFinite(Number(res?.pagination?.limit))
+        ? Number(res.pagination.limit)
+        : 20;
+      const totalPages = Number.isFinite(Number(res?.pagination?.totalPages))
+        ? Number(res.pagination.totalPages)
+        : Math.max(1, Math.ceil(total / Math.max(1, limit)));
+      const currentPage = Number.isFinite(Number(res?.pagination?.page))
+        ? Number(res.pagination.page)
+        : page;
+
+      setAuditLogs(logs);
+      setAuditLogPagination({ page: currentPage, totalPages, total });
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to load audit logs.' });
     } finally {
@@ -1503,7 +1533,9 @@ export default function AdminDashboard() {
   function scrollToSection(sectionId) {
     const node = document.getElementById(sectionId);
     if (node) {
-      node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const topOffset = window.innerWidth <= 768 ? 84 : 112;
+      const targetTop = node.getBoundingClientRect().top + window.scrollY - topOffset;
+      window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
     }
   }
 
@@ -1557,6 +1589,7 @@ export default function AdminDashboard() {
     setMockExamTitle('');
     setMockExamDescription('');
     setMockExamDate('');
+    setMockExamWindowEndAt('');
     setMockExamDurationMinutes(60);
     setMockExamNoticeEnabled(true);
     setMockExamQuestions([{ question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' }]);
@@ -1595,6 +1628,7 @@ export default function AdminDashboard() {
     setMockExamTitle(exam.title || '');
     setMockExamDescription(exam.description || '');
     setMockExamDate(exam.examDate ? new Date(exam.examDate).toISOString().slice(0, 16) : '');
+    setMockExamWindowEndAt(exam.examWindowEndAt ? new Date(exam.examWindowEndAt).toISOString().slice(0, 16) : '');
     setMockExamDurationMinutes(exam.durationMinutes || 60);
     setMockExamNoticeEnabled(exam.noticeEnabled !== false);
     setMockExamQuestions((exam.questions || []).map((item) => ({
@@ -1635,6 +1669,7 @@ export default function AdminDashboard() {
         title: mockExamTitle.trim(),
         description: mockExamDescription.trim(),
         examDate: new Date(mockExamDate).toISOString(),
+        examWindowEndAt: mockExamWindowEndAt ? new Date(mockExamWindowEndAt).toISOString() : null,
         durationMinutes: Number(mockExamDurationMinutes || 60),
         noticeEnabled: mockExamNoticeEnabled,
         questions: mockExamQuestions.map((item) => ({
@@ -1841,32 +1876,21 @@ export default function AdminDashboard() {
     loadRecoveryActions(30, recoveryFilter);
   }, []);
 
-  function applyLibrarySearch() {
-    setLibrarySearchQuery(String(librarySearchInput || '').trim().toLowerCase());
-    setLibraryModuleQuery(String(libraryModuleInput || '').trim().toLowerCase());
+  useEffect(() => {
+    loadPaymentHistory(1, paymentHistoryFilter);
+    loadAuditLogs(1, auditLogFilter);
+  }, []);
+
+  function openLibraryCourseView(course) {
+    const search = course === 'All' ? '' : `?course=${encodeURIComponent(course)}`;
+    navigate(`/admin/content-library${search}`);
   }
 
-  function clearLibrarySearch() {
-    setLibrarySearchInput('');
-    setLibrarySearchQuery('');
-    setLibraryModuleInput('');
-    setLibraryModuleQuery('');
+  function handleAdminNavItemClick(id) {
+    scrollToSection(id);
   }
 
-  const filteredVideos = videos.filter((video) => {
-    const matchesCourse = activeLibraryCourse === 'All' || (video.category || 'General') === activeLibraryCourse;
-    if (!matchesCourse) return false;
-
-    const title = String(video.title || '').toLowerCase();
-    const moduleName = String(video.module || 'General').toLowerCase();
-
-    const matchesTitle = !librarySearchQuery || title.includes(librarySearchQuery);
-    const matchesModule = !libraryModuleQuery || moduleName.includes(libraryModuleQuery);
-
-    return matchesTitle && matchesModule;
-  });
   const activeUserUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('user-'));
-  const activeLibraryUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('video-') || id.startsWith('material-'));
 
   const modulesByCourseFromVideos = videos.reduce((acc, video) => {
     const category = video.category || 'General';
@@ -2004,6 +2028,7 @@ export default function AdminDashboard() {
       showThemeSwitch={false}
       navTitle="Admin Sections"
       navItems={adminNavItems}
+      onNavItemClick={handleAdminNavItemClick}
       actions={(
         <div className="profile-trigger-wrap">
           <button
@@ -2347,1231 +2372,171 @@ export default function AdminDashboard() {
         </section>
       </section>
 
-      <section id="section-content-library" className="card content-library-card">
+      <section id="section-content-library" className="card content-library-card is-overview">
         <div className="section-header content-library-header">
           <div>
             <p className="eyebrow">Content Library</p>
             <h2>Uploaded lectures</h2>
-            <div className="course-filter-row" role="tablist" aria-label="Filter lectures by course">
-              <button
-                type="button"
-                className={`secondary-btn course-filter-btn ${activeLibraryCourse === 'All' ? 'active' : ''}`}
-                onClick={() => setActiveLibraryCourse('All')}
-              >
-                All
-              </button>
-              {COURSE_CATEGORIES.map((course) => (
-                <button
-                  key={course}
-                  type="button"
-                  className={`secondary-btn course-filter-btn ${activeLibraryCourse === course ? 'active' : ''}`}
-                  onClick={() => setActiveLibraryCourse(course)}
-                >
-                  {course}
-                </button>
-              ))}
-            </div>
-            <div className="library-search-row" role="search" aria-label="Search lectures by name">
-              <input
-                type="text"
-                className="library-search-input"
-                placeholder="Search lecture name (e.g. bio, cell, dna)"
-                value={librarySearchInput}
-                onChange={(event) => setLibrarySearchInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    applyLibrarySearch();
-                  }
-                }}
-              />
-              <input
-                type="text"
-                className="library-search-input"
-                placeholder="Filter by module (e.g. genetics, unit 1)"
-                value={libraryModuleInput}
-                onChange={(event) => setLibraryModuleInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    applyLibrarySearch();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={applyLibrarySearch}
-              >
-                Search
-              </button>
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={clearLibrarySearch}
-                disabled={!librarySearchInput && !librarySearchQuery && !libraryModuleInput && !libraryModuleQuery}
-              >
-                Clear
-              </button>
-            </div>
+            <p className="subtitle">Choose a course and open uploaded contents in a dedicated page view.</p>
           </div>
-          <StatCard label={activeLibraryCourse === 'All' ? 'Total Lectures' : 'Showing'} value={filteredVideos.length} />
+          <div className="quiz-count-cards">
+            <StatCard label="Total Lectures" value={videos.length} />
+            <StatCard label="Courses With Content" value={COURSE_CATEGORIES.filter((course) => videos.some((v) => (v.category || 'General') === course)).length} />
+          </div>
         </div>
-        {activeLibraryUndoEntry ? (
-          <div className="section-undo-alert" role="status" aria-live="polite">
-            <span className="undo-message">
-              {Math.ceil(Math.max(0, activeLibraryUndoEntry[1].remainingMs || 0) / 1000)}s - {activeLibraryUndoEntry[1].message}
-            </span>
-            <button type="button" className="secondary-btn undo-btn" onClick={() => handleUndoAction(activeLibraryUndoEntry[0])}>
-              Undo
-            </button>
-          </div>
-        ) : null}
 
-        <div className="library-scroll-body">
-          {loading ? <p className="empty-state">Loading dashboard...</p> : null}
-          {!loading && !filteredVideos.length ? (
-            <p className="empty-state">
-              {librarySearchQuery || libraryModuleQuery
-                ? `No lectures found for the applied title/module filters.`
-                : activeLibraryCourse === 'All'
-                  ? `No lectures yet. Publish a lecture first, then the PDF upload button will appear on that lecture card (max ${MAX_MATERIAL_MB}MB).`
-                  : `No lectures available for ${activeLibraryCourse}. Add one from Course Manager.`}
-            </p>
-          ) : null}
-          <div className="video-grid">
-            {filteredVideos.map((video) => (
-              <VideoCard
-                key={video._id}
-                video={video}
-                adminMode
-                selectedFile={uploadFiles[video._id]}
-                uploadProgress={uploadProgress[video._id]}
-                materialMessage={materialMessages[video._id]}
-                onFileSelect={(videoId, file) => setUploadFiles((current) => ({ ...current, [videoId]: file }))}
-                onUploadMaterial={handleUploadMaterial}
-                onRemoveMaterial={handleRemoveMaterial}
-                onDeleteVideo={handleDeleteVideo}
-                disableDangerActions={Object.keys(undoItems).length > 0}
-                undoItem={undoItems[`video-${video._id}`]}
-                onUndo={() => handleUndoAction(`video-${video._id}`)}
-                undoItems={undoItems}
-                onUndoMaterial={(itemId) => handleUndoAction(itemId)}
-              />
-            ))}
-          </div>
+        <div className="library-course-selector" role="list" aria-label="Select course to open uploaded contents">
+          {COURSE_CATEGORIES.map((course) => {
+            const meta = COURSE_META[course] || { icon: '📚', color: '#6b7280' };
+            const lectureCount = videos.filter((video) => (video.category || 'General') === course).length;
+            const moduleCount = Array.from(new Set(videos
+              .filter((video) => (video.category || 'General') === course)
+              .map((video) => String(video.module || 'General')))).length;
+
+            return (
+              <button
+                key={`library-${course}`}
+                type="button"
+                className="course-tile library-course-tile"
+                style={{ '--tile-accent': meta.color }}
+                onClick={() => openLibraryCourseView(course)}
+                role="listitem"
+              >
+                <span className="course-tile-icon">{meta.icon}</span>
+                <span className="course-tile-body">
+                  <span className="course-tile-label">{course}</span>
+                  <span className="course-tile-count">
+                    {moduleCount} {moduleCount === 1 ? 'module' : 'modules'} · {lectureCount} {lectureCount === 1 ? 'lecture' : 'lectures'}
+                  </span>
+                </span>
+                <span className="course-tile-plus" aria-hidden="true">→</span>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            className="course-tile library-course-tile library-course-all"
+            style={{ '--tile-accent': '#6366f1' }}
+            onClick={() => openLibraryCourseView('All')}
+            role="listitem"
+          >
+            <span className="course-tile-icon">🎬</span>
+            <span className="course-tile-body">
+              <span className="course-tile-label">All Uploaded Contents</span>
+              <span className="course-tile-count">Browse all courses in one list</span>
+            </span>
+            <span className="course-tile-plus" aria-hidden="true">→</span>
+          </button>
         </div>
       </section>
 
-      <section id="section-quiz-builder" className="card quiz-builder-panel quiz-builder-section">
+      <section id="section-quiz-builder" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card quiz-link-card">
         <div className="section-header compact quiz-builder-heading-row">
           <div>
             <p className="eyebrow">Quiz Builder</p>
-            <h2>Create chapter-wise quizzes</h2>
-            <p className="subtitle">Use uploaded lecture modules as quiz chapters and manage all quizzes in one place.</p>
+            <h2>Chapter-wise quiz workspace</h2>
+            <p className="subtitle">Open the dedicated page to choose class, set quiz details and build question sets in a cleaner UI.</p>
           </div>
           <div className="quiz-count-cards">
             <StatCard label={`${quizCategory} Quizzes`} value={adminQuizzes.length} />
             <StatCard label="Total Quizzes" value={allQuizzesCount} />
           </div>
         </div>
-
-        <form className="quiz-builder-form" onSubmit={handleSaveQuiz}>
-          <label>
-            Course
-            <select value={quizCategory} onChange={(event) => setQuizCategory(event.target.value)}>
-              {COURSE_CATEGORIES.map((course) => (
-                <option key={course} value={course}>{course}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Module
-            <input
-              list="available-modules"
-              value={quizModule}
-              onChange={(event) => setQuizModule(event.target.value)}
-              placeholder="Type module name or choose existing"
-              required
-            />
-            <datalist id="available-modules">
-              {availableModules.map((module) => (
-                <option key={module} value={module} />
-              ))}
-            </datalist>
-          </label>
-
-          <label>
-            Quiz title
-            <input
-              value={quizTitle}
-              onChange={(event) => setQuizTitle(event.target.value)}
-              placeholder="Example: Chapter 1 Fundamentals Quiz"
-              required
-            />
-          </label>
-
-          <div className="quiz-meta-grid">
-            <label>
-              Difficulty
-              <select value={quizDifficulty} onChange={(event) => setQuizDifficulty(event.target.value)}>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </label>
-            <label>
-              Time limit (minutes)
-              <input
-                type="number"
-                min="1"
-                max="180"
-                value={quizTimeLimitMinutes}
-                onChange={(event) => setQuizTimeLimitMinutes(Number(event.target.value))}
-                required
-              />
-            </label>
-          </div>
-
-          <label className="quiz-toggle-row">
-            <input
-              type="checkbox"
-              checked={quizRequireExplanation}
-              onChange={(event) => setQuizRequireExplanation(event.target.checked)}
-            />
-            Require explanation for all questions
-          </label>
-
-          <div className="quiz-question-list">
-            {quizQuestions.map((question, questionIndex) => (
-              <article key={`quiz-question-${questionIndex}`} className="quiz-editor-card">
-                <div className="quiz-editor-head">
-                  <strong>Question {questionIndex + 1}</strong>
-                  {quizQuestions.length > 1 ? (
-                    <button type="button" className="danger-text-btn" onClick={() => removeQuizQuestion(questionIndex)}>
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-
-                <label>
-                  Question text
-                  <input
-                    value={question.question}
-                    onChange={(event) => updateQuizQuestion(questionIndex, 'question', event.target.value)}
-                    placeholder="Enter question"
-                    required
-                  />
-                </label>
-
-                <div className="quiz-options-list">
-                  {question.options.map((option, optionIndex) => (
-                    <label key={`question-${questionIndex}-option-${optionIndex}`}>
-                      Option {optionIndex + 1}
-                      <input
-                        value={option}
-                        onChange={(event) => updateQuizOption(questionIndex, optionIndex, event.target.value)}
-                        placeholder={`Option ${optionIndex + 1}`}
-                        required
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                <label>
-                  Correct option
-                  <select
-                    value={question.correctIndex}
-                    onChange={(event) => updateQuizQuestion(questionIndex, 'correctIndex', Number(event.target.value))}
-                  >
-                    <option value={0}>Option 1</option>
-                    <option value={1}>Option 2</option>
-                    <option value={2}>Option 3</option>
-                    <option value={3}>Option 4</option>
-                  </select>
-                </label>
-
-                <label>
-                  Explanation (shown after submit)
-                  <textarea
-                    rows="2"
-                    value={question.explanation || ''}
-                    onChange={(event) => updateQuizQuestion(questionIndex, 'explanation', event.target.value)}
-                    placeholder="Optional explanation for why this answer is correct"
-                  />
-                </label>
-              </article>
-            ))}
-          </div>
-
-          <button type="button" className="secondary-btn" onClick={addQuizQuestion}>
-            + Add Question
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/quiz-builder')}>
+            Open Quiz Workspace
           </button>
-
-          {editingQuizId ? (
-            <button type="button" className="secondary-btn" onClick={resetQuizBuilder}>
-              Cancel Edit
-            </button>
-          ) : null}
-
-          {quizMessage ? (
-            <p className={`inline-message ${quizMessage.type}${isQuizMessageDismissing ? ' inline-message-dismissing' : ''}`}>
-              {quizMessage.text}
-            </p>
-          ) : null}
-
-          <button className="primary-btn" type="submit" disabled={quizSaving}>
-            {quizSaving ? 'Saving quiz...' : editingQuizId ? 'Update Quiz' : 'Save Quiz'}
-          </button>
-        </form>
-
-        <section className="quiz-admin-list">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Existing Quizzes</p>
-              <h3>Manage quizzes for {quizCategory}</h3>
-            </div>
-          </div>
-
-          {adminQuizzes.length ? (
-            <div className="quiz-admin-items">
-              {adminQuizzes.map((quiz) => (
-                <article key={quiz._id} className="quiz-admin-item">
-                  <div className="quiz-admin-item-body">
-                    <strong>{quiz.module}</strong>
-                    <p>{quiz.title}</p>
-                    <div className="quiz-admin-meta" aria-label="Quiz details">
-                      <span className="quiz-admin-meta-chip">{quiz.questions?.length || 0} questions</span>
-                      <span className="quiz-admin-meta-chip">{quiz.difficulty || 'medium'}</span>
-                      <span className="quiz-admin-meta-chip">{quiz.timeLimitMinutes || 15} min</span>
-                      <span className="quiz-admin-meta-chip">{quiz.requireExplanation ? 'explanation required' : 'explanation optional'}</span>
-                    </div>
-                  </div>
-                  <div className="quiz-admin-item-actions">
-                    <button type="button" className="secondary-btn" onClick={() => editQuiz(quiz)}>
-                      Edit
-                    </button>
-                    <button type="button" className="danger-btn" onClick={() => handleDeleteQuiz(quiz)} disabled={Object.keys(undoItems).length > 0}>
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-note">No quizzes created for this course yet.</p>
-          )}
-        </section>
+        </div>
       </section>
 
-      <section id="section-monthly-mock-exam" className="card quiz-builder-panel quiz-builder-section">
+      <section id="section-monthly-mock-exam" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card mock-link-card">
         <div className="section-header compact quiz-builder-heading-row">
           <div>
             <p className="eyebrow">Monthly Mock Test</p>
-            <h2>Schedule and manage mock exams</h2>
-            <p className="subtitle">Students get one attempt only. Release results manually when ready.</p>
+            <h2>Monthly exam workspace</h2>
+            <p className="subtitle">Open the dedicated page to choose class, set exam details and add questions with a focused layout.</p>
           </div>
           <div className="quiz-count-cards">
             <StatCard label={`${mockExamCategory} Exams`} value={mockExamList.length} />
+            <StatCard label="Performance Rows" value={mockExamPerformance.length} />
           </div>
         </div>
-
-        <form className="quiz-builder-form" onSubmit={handleSaveMockExam}>
-          <label>
-            Course
-            <select value={mockExamCategory} onChange={(event) => setMockExamCategory(event.target.value)}>
-              {COURSE_CATEGORIES.map((course) => (
-                <option key={course} value={course}>{course}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Exam title
-            <input
-              value={mockExamTitle}
-              onChange={(event) => setMockExamTitle(event.target.value)}
-              placeholder="Example: April Grand Mock Test"
-              required
-            />
-          </label>
-
-          <label>
-            Description
-            <textarea
-              rows="2"
-              value={mockExamDescription}
-              onChange={(event) => setMockExamDescription(event.target.value)}
-              placeholder="Optional exam instructions"
-            />
-          </label>
-
-          <div className="quiz-meta-grid">
-            <label>
-              Exam date & time
-              <input
-                type="datetime-local"
-                value={mockExamDate}
-                onChange={(event) => setMockExamDate(event.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Duration (minutes)
-              <input
-                type="number"
-                min="5"
-                max="300"
-                value={mockExamDurationMinutes}
-                onChange={(event) => setMockExamDurationMinutes(Number(event.target.value))}
-                required
-              />
-            </label>
-            <label>
-              Student notice banner
-              <select
-                value={mockExamNoticeEnabled ? 'enabled' : 'disabled'}
-                onChange={(event) => setMockExamNoticeEnabled(event.target.value === 'enabled')}
-              >
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="quiz-question-list">
-            {mockExamQuestions.map((question, questionIndex) => (
-              <article key={`mock-question-${questionIndex}`} className="quiz-editor-card">
-                <div className="quiz-editor-head">
-                  <strong>Question {questionIndex + 1}</strong>
-                  {mockExamQuestions.length > 1 ? (
-                    <button type="button" className="danger-text-btn" onClick={() => removeMockExamQuestion(questionIndex)}>
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-
-                <label>
-                  Question text
-                  <input
-                    value={question.question}
-                    onChange={(event) => updateMockExamQuestion(questionIndex, 'question', event.target.value)}
-                    placeholder="Enter question"
-                    required
-                  />
-                </label>
-
-                <div className="quiz-options-list">
-                  {question.options.map((option, optionIndex) => (
-                    <label key={`mock-question-${questionIndex}-option-${optionIndex}`}>
-                      Option {optionIndex + 1}
-                      <input
-                        value={option}
-                        onChange={(event) => updateMockExamOption(questionIndex, optionIndex, event.target.value)}
-                        placeholder={`Option ${optionIndex + 1}`}
-                        required
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                <label>
-                  Correct option
-                  <select
-                    value={question.correctIndex}
-                    onChange={(event) => updateMockExamQuestion(questionIndex, 'correctIndex', Number(event.target.value))}
-                  >
-                    <option value={0}>Option 1</option>
-                    <option value={1}>Option 2</option>
-                    <option value={2}>Option 3</option>
-                    <option value={3}>Option 4</option>
-                  </select>
-                </label>
-
-                <label>
-                  Explanation (for released result)
-                  <textarea
-                    rows="2"
-                    value={question.explanation || ''}
-                    onChange={(event) => updateMockExamQuestion(questionIndex, 'explanation', event.target.value)}
-                    placeholder="Optional explanation"
-                  />
-                </label>
-              </article>
-            ))}
-          </div>
-
-          <button type="button" className="secondary-btn" onClick={addMockExamQuestion}>
-            + Add Question
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/mock-exams')}>
+            Open Monthly Exam Workspace
           </button>
-
-          {editingMockExamId ? (
-            <button type="button" className="secondary-btn" onClick={resetMockExamBuilder}>
-              Cancel Edit
-            </button>
-          ) : null}
-
-          {mockExamMessage ? <p className={`inline-message ${mockExamMessage.type}`}>{mockExamMessage.text}</p> : null}
-
-          <button className="primary-btn" type="submit" disabled={mockExamSaving}>
-            {mockExamSaving ? 'Saving exam...' : editingMockExamId ? 'Update Exam' : 'Create Exam'}
-          </button>
-        </form>
-
-        <section className="quiz-admin-list">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Scheduled Mock Exams</p>
-              <h3>{mockExamCategory} monthly exams</h3>
-            </div>
-          </div>
-
-          {mockExamList.length ? (
-            <div className="quiz-admin-items">
-              {mockExamList.map((exam) => (
-                <article key={exam._id} className="quiz-admin-item">
-                  <div className="quiz-admin-item-body">
-                    <strong>{exam.title}</strong>
-                    <p>{new Date(exam.examDate).toLocaleString()}</p>
-                    <div className="quiz-admin-meta">
-                      <span className="quiz-admin-meta-chip">{exam.questions?.length || 0} questions</span>
-                      <span className="quiz-admin-meta-chip">{exam.durationMinutes || 60} min</span>
-                      <span className="quiz-admin-meta-chip">Notice {exam.noticeEnabled !== false ? 'On' : 'Off'}</span>
-                      <span className="quiz-admin-meta-chip">{exam.resultReleased ? 'Result Released' : 'Result Pending'}</span>
-                    </div>
-                  </div>
-                  <div className="quiz-admin-item-actions">
-                    <button type="button" className="secondary-btn" onClick={() => editMockExam(exam)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={exam.noticeEnabled !== false ? 'secondary-btn' : 'primary-btn'}
-                      onClick={() => handleToggleMockNotice(exam)}
-                    >
-                      {exam.noticeEnabled !== false ? 'Disable Notice' : 'Enable Notice'}
-                    </button>
-                    <button
-                      type="button"
-                      className={exam.resultReleased ? 'danger-btn' : 'primary-btn'}
-                      onClick={() => handleToggleMockResultRelease(exam)}
-                    >
-                      {exam.resultReleased ? 'Hide Result' : 'Release Result'}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-note">No monthly mock exams scheduled for this course yet.</p>
-          )}
-        </section>
-
-        <section className="quiz-admin-list">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Student Performance</p>
-              <h3>{mockExamCategory} exam attempts</h3>
-            </div>
-            <label className="quiz-leaderboard-filter">
-              Month
-              <select
-                value={mockExamPerformanceMonthFilter}
-                onChange={(event) => setMockExamPerformanceMonthFilter(event.target.value)}
-              >
-                <option value="all">All Months</option>
-                {mockExamPerformanceMonths.map((monthValue) => (
-                  <option key={monthValue} value={monthValue}>{formatMonthLabel(monthValue)}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {mockExamPerformanceLoading ? <p className="empty-note">Loading performance...</p> : null}
-          {!mockExamPerformanceLoading && mockExamPerformanceError ? <p className="inline-message error">{mockExamPerformanceError}</p> : null}
-
-          {!mockExamPerformanceLoading && !mockExamPerformanceError ? (
-            mockExamPerformance.length ? (
-              <div className="leaderboard-table-wrap">
-                <table className="leaderboard-table">
-                  <thead>
-                    <tr>
-                      <th>Rank</th>
-                      <th>Student</th>
-                      <th>Exam</th>
-                      <th>Month</th>
-                      <th>Score</th>
-                      <th>Submitted</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockExamPerformance.map((entry, index) => (
-                      <tr key={`${entry.username || 'student'}-${entry.examTitle || 'exam'}-${entry.submittedAt || index}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
-                        <td>#{entry.rank || index + 1}</td>
-                        <td>{entry.username || 'Unknown'}</td>
-                        <td>{entry.examTitle || 'Monthly Mock Exam'}</td>
-                        <td>{formatMonthLabel(entry.month)}</td>
-                        <td>{entry.score || 0}/{entry.total || 0} ({Math.round(Number(entry.percentage) || 0)}%)</td>
-                        <td>{entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="empty-note">No student attempts found for this filter.</p>
-            )
-          ) : null}
-        </section>
+        </div>
       </section>
 
-      <section id="section-announcements" className="card quiz-builder-panel quiz-builder-section">
+      <section id="section-announcements" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card announcements-link-card">
         <div className="section-header compact quiz-builder-heading-row">
           <div>
             <p className="eyebrow">Student Announcements</p>
-            <h2>Publish important updates</h2>
-            <p className="subtitle">Announcements appear in the student announcement icon above WhatsApp.</p>
+            <h2>Announcement workspace</h2>
+            <p className="subtitle">Open the dedicated colorful page to publish updates and manage active announcements cleanly.</p>
           </div>
           <div className="quiz-count-cards">
             <StatCard label="Total" value={announcementList.length} />
             <StatCard label="Active" value={announcementList.filter((item) => item.isActive !== false).length} />
           </div>
         </div>
-
-        <form className="quiz-builder-form" onSubmit={handleCreateAnnouncement}>
-          <label>
-            Announcement title
-            <input
-              value={announcementTitle}
-              onChange={(event) => setAnnouncementTitle(event.target.value)}
-              placeholder="Example: Sunday live doubt session at 7 PM"
-              required
-            />
-          </label>
-
-          <label>
-            Message
-            <textarea
-              rows="3"
-              value={announcementMessage}
-              onChange={(event) => setAnnouncementMessage(event.target.value)}
-              placeholder="Write announcement details shown to students"
-              required
-            />
-          </label>
-
-          {announcementInlineMessage ? <p className={`inline-message ${announcementInlineMessage.type}`}>{announcementInlineMessage.text}</p> : null}
-
-          <button className="primary-btn" type="submit" disabled={announcementSaving}>
-            {announcementSaving ? 'Publishing...' : 'Publish Announcement'}
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/announcements-workspace')}>
+            Open Announcement Workspace
           </button>
-        </form>
-
-        <section className="quiz-admin-list">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Announcement Feed</p>
-              <h3>Recent announcements</h3>
-            </div>
-          </div>
-
-          {announcementList.length ? (
-            <div className="quiz-admin-items">
-              {announcementList.map((item) => (
-                <article key={item._id} className="quiz-admin-item">
-                  <div className="quiz-admin-item-body">
-                    <strong>{item.title}</strong>
-                    <p>{item.message}</p>
-                    <div className="quiz-admin-meta">
-                      <span className="quiz-admin-meta-chip">{item.isActive !== false ? 'Active' : 'Hidden'}</span>
-                      <span className="quiz-admin-meta-chip">{item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}</span>
-                    </div>
-                  </div>
-                  <div className="quiz-admin-item-actions">
-                    <button
-                      type="button"
-                      className={item.isActive !== false ? 'secondary-btn' : 'primary-btn'}
-                      onClick={() => handleToggleAnnouncementStatus(item)}
-                    >
-                      {item.isActive !== false ? 'Hide' : 'Show'}
-                    </button>
-                    <button type="button" className="danger-btn" onClick={() => handleDeleteAnnouncement(item)}>
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-note">No announcements posted yet.</p>
-          )}
-        </section>
+        </div>
       </section>
 
       <section id="section-payment-settings" className="card payment-settings-panel">
         <div className="section-header">
           <div>
             <p className="eyebrow">Monetization</p>
-            <h2>Course Pricing and Vouchers</h2>
+            <h2>Pricing and Voucher Workspaces</h2>
           </div>
           <StatCard label="Active Vouchers" value={voucherList.filter((voucher) => voucher.active).length} />
         </div>
 
-        <div className="dashboard-grid admin-grid">
-          <section className="card payment-pricing-card">
-            <div className="section-header compact">
-              <div>
-                <p className="eyebrow">Course & Module Pricing</p>
-                <h3>Set Pro &amp; Elite prices per course or module</h3>
-              </div>
-            </div>
-            <p className="empty-note" style={{ marginBottom: '1rem' }}>
-              <strong>Bundle (All Modules)</strong> — unlocks the whole course for Pro (1 month) or Elite (3 months).<br />
-              <strong>Per-Module</strong> — students can also buy access to individual modules. Click "Set Module Prices" to expand.
-            </p>
-            <div className="quiz-admin-items">
-              {COURSE_CATEGORIES.map((courseName) => {
-                const meta = COURSE_META[courseName] || {};
-                const form = priceFormByCourse[courseName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
-                const isExpanded = expandedPricingCourse === courseName;
-                const courseModuleData = modulePricingByCourse[courseName];
-                const bundleStatus = pricingSaveStatus[getPricingStatusKey(courseName)] || null;
+        <div className="workspace-launch-grid">
+          <article className="workspace-launch-card workspace-launch-pricing">
+            <p className="eyebrow">Pricing Setup</p>
+            <h3>Course and module pricing</h3>
+            <p className="subtitle">Open a dedicated page to manage bundle and module plans without dashboard clutter.</p>
+            <button type="button" className="primary-btn" onClick={() => navigate('/admin/pricing-workspace')}>
+              Open Pricing Workspace
+            </button>
+          </article>
 
-                return (
-                  <article key={courseName} className="quiz-admin-item pricing-course-item">
-                    {/* ── Bundle row ── */}
-                    <div className="quiz-admin-item-body">
-                      <div className="pricing-course-header">
-                        <span className="pricing-course-icon">{meta.icon || '📚'}</span>
-                        <div>
-                          <strong>{courseName}</strong>
-                          <p className="pricing-course-sub">All Modules Bundle — Pro&nbsp;(1 mo) &amp; Elite&nbsp;(3 mo)</p>
-                        </div>
-                      </div>
-                      <div className="quiz-admin-meta pricing-input-row" aria-label="Bundle pricing">
-                        <label className="pricing-input-label">
-                          <span>Pro (₹/mo)</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.proAmountRupees}
-                            onChange={(event) => {
-                              const proAmountRupees = event.target.value;
-                              setPriceFormByCourse((current) => ({
-                                ...current,
-                                [courseName]: { ...(current[courseName] || {}), proAmountRupees }
-                              }));
-                              clearPricingSaveStatus(getPricingStatusKey(courseName));
-                            }}
-                            placeholder="0.00"
-                          />
-                        </label>
-                        <label className="pricing-input-label">
-                          <span>Elite (₹/3 mo)</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.eliteAmountRupees}
-                            onChange={(event) => {
-                              const eliteAmountRupees = event.target.value;
-                              setPriceFormByCourse((current) => ({
-                                ...current,
-                                [courseName]: { ...(current[courseName] || {}), eliteAmountRupees }
-                              }));
-                              clearPricingSaveStatus(getPricingStatusKey(courseName));
-                            }}
-                            placeholder="0.00"
-                          />
-                        </label>
-                        <label className="pricing-active-label">
-                          <input
-                            type="checkbox"
-                            checked={form.active !== false}
-                            onChange={(event) => {
-                              const active = event.target.checked;
-                              setPriceFormByCourse((current) => ({
-                                ...current,
-                                [courseName]: { ...(current[courseName] || {}), active }
-                              }));
-                              clearPricingSaveStatus(getPricingStatusKey(courseName));
-                            }}
-                          />
-                          Active
-                        </label>
-                      </div>
-                    </div>
-                    <div className="quiz-admin-item-actions pricing-actions-col">
-                      {bundleStatus ? (
-                        <span className={`pricing-inline-status pricing-inline-status-${bundleStatus.type}`}>{bundleStatus.text}</span>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="primary-btn"
-                        disabled={isSavingPricing}
-                        onClick={() => handleSaveCoursePrice(courseName)}
-                      >
-                        {isSavingPricing ? 'Saving...' : 'Save Bundle'}
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary-btn module-price-toggle-btn"
-                        onClick={() => {
-                          if (isExpanded) {
-                            setExpandedPricingCourse(null);
-                          } else {
-                            setExpandedPricingCourse(courseName);
-                            if (!modulePricingByCourse[courseName]) {
-                              loadModulePricing(courseName);
-                            }
-                          }
-                        }}
-                      >
-                        {isExpanded ? '▲ Close Module Price Editor' : '▼ Open Module Price Editor'}
-                      </button>
-                    </div>
-
-                    {/* ── Per-module pricing panel ── */}
-                    {isExpanded && (
-                      <div className="module-pricing-panel">
-                        {!courseModuleData ? (
-                          <p className="empty-note">Loading modules…</p>
-                        ) : courseModuleData.modules.length === 0 ? (
-                          <p className="empty-note">No modules found for {courseName}. Upload videos with module names first.</p>
-                        ) : (
-                          <>
-                            <div className="module-pricing-toolbar">
-                              <button
-                                type="button"
-                                className="primary-btn module-pricing-save-all-btn"
-                                disabled={isSavingModulePrice}
-                                onClick={() => handleSaveAllModulePrices(courseName)}
-                              >
-                                {isSavingModulePrice ? 'Saving Module Prices...' : 'Save All Module Prices'}
-                              </button>
-                              <span className="module-pricing-toolbar-note">Edit module prices below, then save all updates in one click.</span>
-                            </div>
-
-                            <div className="module-pricing-scroll module-pricing-scroll-desktop" role="region" aria-label={`Module pricing for ${courseName}`}>
-                              <table className="module-pricing-table">
-                                <thead>
-                                  <tr>
-                                    <th>Module</th>
-                                    <th>Pro Price (₹/1 mo)</th>
-                                    <th>Elite Price (₹/3 mo)</th>
-                                    <th>Active</th>
-                                    <th>Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {courseModuleData.modules.filter((mod) => !mod.isBundle).map((mod) => {
-                                    const mf = courseModuleData.priceFormByModule[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
-                                    const moduleStatus = pricingSaveStatus[getPricingStatusKey(courseName, mod.moduleName)] || null;
-                                    return (
-                                      <tr key={mod.moduleName}>
-                                        <td>
-                                          <div className="module-pricing-name-cell">
-                                            <span className="module-pricing-name">{mod.label}</span>
-                                            {moduleStatus ? (
-                                              <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
-                                            ) : null}
-                                          </div>
-                                        </td>
-                                        <td>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="module-pricing-input"
-                                            value={mf.proAmountRupees}
-                                            onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'proAmountRupees', e.target.value)}
-                                            placeholder="0.00"
-                                          />
-                                        </td>
-                                        <td>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="module-pricing-input"
-                                            value={mf.eliteAmountRupees}
-                                            onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'eliteAmountRupees', e.target.value)}
-                                            placeholder="0.00"
-                                          />
-                                        </td>
-                                        <td>
-                                          <input
-                                            type="checkbox"
-                                            checked={mf.active !== false}
-                                            onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'active', e.target.checked)}
-                                          />
-                                        </td>
-                                        <td>
-                                          {moduleStatus ? (
-                                            <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
-                                          ) : <span className="module-pricing-status-empty">-</span>}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            <div className="module-pricing-mobile-list" aria-label={`Module pricing cards for ${courseName}`}>
-                              {courseModuleData.modules.filter((mod) => !mod.isBundle).map((mod) => {
-                                const mf = courseModuleData.priceFormByModule[mod.moduleName] || { proAmountRupees: '0', eliteAmountRupees: '0', active: true };
-                                const moduleStatus = pricingSaveStatus[getPricingStatusKey(courseName, mod.moduleName)] || null;
-                                return (
-                                  <article key={`mobile-${mod.moduleName}`} className="module-pricing-mobile-card">
-                                    <div className="module-pricing-mobile-head">
-                                      <strong className="module-pricing-name">{mod.label}</strong>
-                                      {moduleStatus ? (
-                                        <span className={`pricing-inline-status pricing-inline-status-${moduleStatus.type}`}>{moduleStatus.text}</span>
-                                      ) : null}
-                                    </div>
-                                    <div className="module-pricing-mobile-fields">
-                                      <label className="module-pricing-mobile-field">
-                                        <span>Pro (₹/1 mo)</span>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          step="0.01"
-                                          className="module-pricing-input"
-                                          value={mf.proAmountRupees}
-                                          onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'proAmountRupees', e.target.value)}
-                                          placeholder="0.00"
-                                        />
-                                      </label>
-                                      <label className="module-pricing-mobile-field">
-                                        <span>Elite (₹/3 mo)</span>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          step="0.01"
-                                          className="module-pricing-input"
-                                          value={mf.eliteAmountRupees}
-                                          onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'eliteAmountRupees', e.target.value)}
-                                          placeholder="0.00"
-                                        />
-                                      </label>
-                                    </div>
-                                    <label className="module-pricing-mobile-active">
-                                      <input
-                                        type="checkbox"
-                                        checked={mf.active !== false}
-                                        onChange={(e) => updateModulePriceForm(courseName, mod.moduleName, 'active', e.target.checked)}
-                                      />
-                                      Active
-                                    </label>
-                                  </article>
-                                );
-                              })}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="card payment-voucher-card">
-            <div className="section-header compact">
-              <div>
-                <p className="eyebrow">Vouchers</p>
-                <h3>Create special voucher</h3>
-              </div>
-            </div>
-            <form className="quiz-builder-form" onSubmit={handleCreateVoucher}>
-              <label>
-                Voucher code
-                <input
-                  value={voucherForm.code}
-                  onChange={(event) => setVoucherForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
-                  placeholder="BIO10"
-                  maxLength={20}
-                  required
-                />
-              </label>
-              <label>
-                Description
-                <input
-                  value={voucherForm.description}
-                  onChange={(event) => setVoucherForm((current) => ({ ...current, description: event.target.value }))}
-                  placeholder="Optional internal note"
-                />
-              </label>
-              <label>
-                Discount type
-                <select
-                  value={voucherForm.discountType}
-                  onChange={(event) => setVoucherForm((current) => ({ ...current, discountType: event.target.value }))}
-                >
-                  <option value="percent">Percent (%)</option>
-                  <option value="fixed">Fixed (INR)</option>
-                </select>
-              </label>
-              <label>
-                Discount value
-                <input
-                  type="number"
-                  min="1"
-                  step={voucherForm.discountType === 'percent' ? '1' : '0.01'}
-                  value={voucherForm.discountValue}
-                  onChange={(event) => setVoucherForm((current) => ({ ...current, discountValue: event.target.value }))}
-                  required
-                />
-              </label>
-              <label>
-                Max discount in INR (optional)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={voucherForm.maxDiscountInPaise}
-                  onChange={(event) => setVoucherForm((current) => ({ ...current, maxDiscountInPaise: event.target.value }))}
-                />
-              </label>
-              <label>
-                Usage limit (optional)
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={voucherForm.usageLimit}
-                  onChange={(event) => setVoucherForm((current) => ({ ...current, usageLimit: event.target.value }))}
-                />
-              </label>
-              <label>
-                Valid until (optional)
-                <input
-                  type="datetime-local"
-                  value={voucherForm.validUntil}
-                  onChange={(event) => setVoucherForm((current) => ({ ...current, validUntil: event.target.value }))}
-                />
-              </label>
-
-              <div className="quiz-builder-header-checkbox">
-                <span>Applicable courses</span>
-                {COURSE_CATEGORIES.map((courseName) => {
-                  const selected = voucherForm.applicableCourses.includes(courseName);
-                  return (
-                    <label key={`voucher-course-${courseName}`} className="quiz-inline-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setVoucherForm((current) => ({
-                            ...current,
-                            applicableCourses: checked
-                              ? [...current.applicableCourses, courseName]
-                              : current.applicableCourses.filter((entry) => entry !== courseName)
-                          }));
-                        }}
-                      />
-                      <span>{courseName}</span>
-                    </label>
-                  );
-                })}
-              </div>
-
-              <button className="primary-btn" type="submit" disabled={isSavingVoucher}>
-                {isSavingVoucher ? 'Creating...' : 'Create Voucher'}
-              </button>
-            </form>
-
-            <div className="quiz-admin-list">
-              <div className="section-header compact">
-                <div>
-                  <p className="eyebrow">Voucher List</p>
-                  <h3>Manage special offers</h3>
-                </div>
-              </div>
-              {voucherList.length ? (
-                <div className="quiz-admin-items">
-                  {voucherList.map((voucher) => (
-                    <article key={voucher._id} className="quiz-admin-item">
-                      <div className="quiz-admin-item-body">
-                        <div className="voucher-code-row">
-                          <strong className="voucher-code-label">{voucher.code}</strong>
-                          <span className={`status-badge status-${voucher.active ? 'paid' : 'failed'}`}>
-                            {voucher.active ? 'Active' : 'Disabled'}
-                          </span>
-                        </div>
-                        <p className="voucher-desc">{voucher.description || 'No description'}</p>
-                        <div className="quiz-admin-meta">
-                          <span className="quiz-admin-meta-chip chip-discount">
-                            {voucher.discountType === 'percent'
-                              ? `${voucher.discountValue}% off`
-                              : `₹${(Number(voucher.discountValue || 0) / 100).toFixed(0)} off`}
-                          </span>
-                          {voucher.validUntil && (
-                            <span className="quiz-admin-meta-chip">
-                              Expires: {new Date(voucher.validUntil).toLocaleDateString()}
-                            </span>
-                          )}
-                          {voucher.applicableCourses?.length > 0 && (
-                            <span className="quiz-admin-meta-chip chip-courses">
-                              {voucher.applicableCourses.join(', ')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="voucher-usage-row">
-                          <span className="voucher-usage-text">
-                            Used: <strong>{voucher.usedCount || 0}</strong>
-                            {voucher.usageLimit ? ` / ${voucher.usageLimit}` : ' (unlimited)'}
-                          </span>
-                          {voucher.usageLimit ? (
-                            <div className="voucher-usage-bar-wrap">
-                              <div
-                                className="voucher-usage-bar"
-                                style={{ width: `${Math.min(100, ((voucher.usedCount || 0) / voucher.usageLimit) * 100)}%` }}
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="quiz-admin-item-actions">
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => handleToggleVoucher(voucher._id, !voucher.active)}
-                        >
-                          {voucher.active ? 'Disable' : 'Enable'}
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          onClick={() => handleDeleteVoucher(voucher._id, voucher.code)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="empty-note">No vouchers created yet.</p>
-              )}
-            </div>
-          </section>
+          <article className="workspace-launch-card workspace-launch-voucher">
+            <p className="eyebrow">Voucher Setup</p>
+            <h3>Create and manage vouchers</h3>
+            <p className="subtitle">Use the voucher workspace for smooth offer creation, status toggles and deletion.</p>
+            <button type="button" className="primary-btn" onClick={() => navigate('/admin/voucher-workspace')}>
+              Open Voucher Workspace
+            </button>
+          </article>
         </div>
       </section>
 
-      <section id="section-payment-history" className="card analytics-card">
+      <section id="section-payment-history" className="card analytics-card workspace-launch-card workspace-launch-revenue">
         <div className="section-header">
           <div>
             <p className="eyebrow">Revenue Tracking</p>
-            <h2>📊 Payment History</h2>
+            <h2>Open Revenue Workspace</h2>
+            <p className="subtitle">Go to the dedicated colorful page for payment filters, tables and pagination.</p>
+            <div className="workspace-quick-chips" aria-label="Revenue quick insights">
+              <span className="workspace-quick-chip">{paymentHistoryLoading ? 'Refreshing data' : 'Data synced'}</span>
+              <span className="workspace-quick-chip">Page {paymentHistoryPagination.page} / {paymentHistoryPagination.totalPages}</span>
+              <span className="workspace-quick-chip">{paymentHistoryFilter.status || 'All statuses'}</span>
+            </div>
           </div>
           <StatCard label="Total Transactions" value={paymentHistoryPagination.total} />
         </div>
-
-        <div className="analytics-filters">
-          <input
-            className="analytics-filter-input"
-            type="text"
-            placeholder="Search by username..."
-            value={paymentHistoryFilter.username}
-            onChange={(e) => setPaymentHistoryFilter((f) => ({ ...f, username: e.target.value }))}
-          />
-          <select
-            className="analytics-filter-select"
-            value={paymentHistoryFilter.course}
-            onChange={(e) => setPaymentHistoryFilter((f) => ({ ...f, course: e.target.value }))}
-          >
-            <option value="">All Courses</option>
-            {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select
-            className="analytics-filter-select"
-            value={paymentHistoryFilter.status}
-            onChange={(e) => setPaymentHistoryFilter((f) => ({ ...f, status: e.target.value }))}
-          >
-            <option value="">All Statuses</option>
-            <option value="paid">Paid</option>
-            <option value="created">Created</option>
-            <option value="failed">Failed</option>
-          </select>
-          <button
-            className="primary-btn"
-            type="button"
-            onClick={() => loadPaymentHistory(1, paymentHistoryFilter)}
-            disabled={paymentHistoryLoading}
-          >
-            {paymentHistoryLoading ? 'Loading...' : 'Search'}
-          </button>
-          <button
-            className="secondary-btn"
-            type="button"
-            onClick={() => { setPaymentHistoryFilter({ course: '', status: '', username: '' }); loadPaymentHistory(1, { course: '', status: '', username: '' }); }}
-          >
-            Clear
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/revenue-tracking')}>
+            Open Revenue Tracking
           </button>
         </div>
-
-        <div className="analytics-section-scroll">
-          {paymentHistory.length === 0 && !paymentHistoryLoading ? (
-            <p className="empty-note">No payment records. Click Search to load.</p>
-          ) : (
-            <div className="analytics-table-wrap">
-              <table className="analytics-table">
-                <thead>
-                  <tr>
-                    <th>Username</th>
-                    <th>Course</th>
-                    <th>Module</th>
-                    <th>Plan</th>
-                    <th>Amount</th>
-                    <th>Voucher</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paymentHistory.map((p) => (
-                    <tr key={p._id}>
-                      <td><strong>{p.username}</strong></td>
-                      <td>{p.course}</td>
-                      <td>{p.moduleName || <span className="muted-text">-</span>}</td>
-                      <td>{p.planType || <span className="muted-text">-</span>}</td>
-                      <td className="amount-cell">Rs {Math.round(Number(p.amountInPaise || 0) / 100)}</td>
-                      <td>{p.voucherCode || <span className="muted-text">-</span>}</td>
-                      <td>
-                        <span className={`status-badge status-${p.status}`}>{p.status}</span>
-                      </td>
-                      <td className="date-cell">{new Date(p.createdAt).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {paymentHistoryPagination.totalPages > 1 && (
-          <div className="pagination-bar">
-            <button
-              className="secondary-btn pagination-btn"
-              disabled={paymentHistoryPagination.page <= 1}
-              onClick={() => loadPaymentHistory(paymentHistoryPagination.page - 1)}
-            >← Prev</button>
-            <span className="pagination-info">
-              Page {paymentHistoryPagination.page} of {paymentHistoryPagination.totalPages}
-            </span>
-            <button
-              className="secondary-btn pagination-btn"
-              disabled={paymentHistoryPagination.page >= paymentHistoryPagination.totalPages}
-              onClick={() => loadPaymentHistory(paymentHistoryPagination.page + 1)}
-            >Next →</button>
-          </div>
-        )}
       </section>
 
       <section id="section-quiz-analytics" className="card analytics-card">
@@ -3639,212 +2604,45 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section id="section-audit-log" className="card analytics-card">
+      <section id="section-audit-log" className="card analytics-card workspace-launch-card workspace-launch-audit">
         <div className="section-header">
           <div>
             <p className="eyebrow">Security & Compliance</p>
-            <h2>🛡️ Audit Log</h2>
+            <h2>Open Audit Log Workspace</h2>
+            <p className="subtitle">Use the dedicated colorful page to search and inspect full audit events cleanly.</p>
+            <div className="workspace-quick-chips" aria-label="Audit quick insights">
+              <span className="workspace-quick-chip">{auditLogLoading ? 'Refreshing events' : 'Events synced'}</span>
+              <span className="workspace-quick-chip">Page {auditLogPagination.page} / {auditLogPagination.totalPages}</span>
+              <span className="workspace-quick-chip">{auditLogFilter.action || 'All actions'}</span>
+            </div>
           </div>
           <StatCard label="Total Events" value={auditLogPagination.total} />
         </div>
-
-        <div className="analytics-filters">
-          <input
-            className="analytics-filter-input"
-            type="text"
-            placeholder="Filter by action (e.g. DELETE)..."
-            value={auditLogFilter.action}
-            onChange={(e) => setAuditLogFilter((f) => ({ ...f, action: e.target.value }))}
-          />
-          <input
-            className="analytics-filter-input"
-            type="text"
-            placeholder="Filter by admin username..."
-            value={auditLogFilter.actor}
-            onChange={(e) => setAuditLogFilter((f) => ({ ...f, actor: e.target.value }))}
-          />
-          <button
-            className="primary-btn"
-            type="button"
-            onClick={() => loadAuditLogs(1, auditLogFilter)}
-            disabled={auditLogLoading}
-          >
-            {auditLogLoading ? 'Loading...' : 'Search'}
-          </button>
-          <button
-            className="secondary-btn"
-            type="button"
-            onClick={() => { setAuditLogFilter({ action: '', actor: '' }); loadAuditLogs(1, { action: '', actor: '' }); }}
-          >
-            Clear
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/audit-log')}>
+            Open Audit Log
           </button>
         </div>
-
-        <div className="analytics-section-scroll">
-          {auditLogs.length === 0 && !auditLogLoading ? (
-            <p className="empty-note">No audit events. Click Search to load.</p>
-          ) : (
-            <div className="analytics-table-wrap">
-              <table className="analytics-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Target Type</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLogs.map((log) => (
-                    <tr key={log._id}>
-                      <td className="date-cell">{new Date(log.createdAt).toLocaleString()}</td>
-                      <td><strong>{log.actorUsername}</strong></td>
-                      <td><span className="action-badge">{log.action}</span></td>
-                      <td>{log.targetType}</td>
-                      <td className="details-cell">
-                        {Object.entries(log.details || {}).filter(([k]) => k !== 'snapshot').map(([k, v]) => (
-                          <span key={k} className="detail-chip">{k}: {String(v)}</span>
-                        ))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {auditLogPagination.totalPages > 1 && (
-          <div className="pagination-bar">
-            <button
-              className="secondary-btn pagination-btn"
-              disabled={auditLogPagination.page <= 1}
-              onClick={() => loadAuditLogs(auditLogPagination.page - 1)}
-            >← Prev</button>
-            <span className="pagination-info">
-              Page {auditLogPagination.page} of {auditLogPagination.totalPages}
-            </span>
-            <button
-              className="secondary-btn pagination-btn"
-              disabled={auditLogPagination.page >= auditLogPagination.totalPages}
-              onClick={() => loadAuditLogs(auditLogPagination.page + 1)}
-            >Next →</button>
-          </div>
-        )}
       </section>
 
-      <section id="section-recovery-center" className="card analytics-card recovery-center-card">
+      <section id="section-recovery-center" className="card analytics-card recovery-center-card workspace-launch-card workspace-launch-recovery">
         <div className="section-header">
           <div>
             <p className="eyebrow">Admin Recovery</p>
-            <h2>♻️ Recovery Center</h2>
+            <h2>Open Recovery Workspace</h2>
+            <p className="subtitle">Move to the dedicated colorful page to filter recoverable actions and apply rollback safely.</p>
+            <div className="workspace-quick-chips" aria-label="Recovery quick insights">
+              <span className="workspace-quick-chip">{recoveryLoading ? 'Refreshing recoveries' : 'Recovery feed synced'}</span>
+              <span className="workspace-quick-chip">Supported: {recoveryActions.filter((item) => item?.recovery?.supported).length}</span>
+              <span className="workspace-quick-chip">Applied: {recoveryActions.filter((item) => item?.recovery?.alreadyApplied).length}</span>
+            </div>
           </div>
           <StatCard label="Recoverable Events" value={recoveryActions.length} />
         </div>
-
-        <div className="analytics-filters">
-          <label className="recovery-date-filter" aria-label="Recovery from date">
-            <span>From date</span>
-            <input
-              className="analytics-filter-input recovery-date-input"
-              type="date"
-              value={recoveryFilter.from}
-              onChange={(e) => setRecoveryFilter((prev) => ({ ...prev, from: e.target.value }))}
-            />
-          </label>
-          <label className="recovery-date-filter" aria-label="Recovery to date">
-            <span>To date</span>
-            <input
-              className="analytics-filter-input recovery-date-input"
-              type="date"
-              value={recoveryFilter.to}
-              onChange={(e) => setRecoveryFilter((prev) => ({ ...prev, to: e.target.value }))}
-            />
-          </label>
-          <button
-            className="primary-btn recovery-search-btn"
-            type="button"
-            onClick={() => loadRecoveryActions(30, recoveryFilter)}
-            disabled={recoveryLoading}
-          >
-            {recoveryLoading ? 'Loading...' : 'Search'}
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/recovery-center')}>
+            Open Recovery Center
           </button>
-          <button
-            className="secondary-btn recovery-clear-btn"
-            type="button"
-            onClick={() => {
-              const clearFilter = { from: '', to: '' };
-              setRecoveryFilter(clearFilter);
-              loadRecoveryActions(30, clearFilter);
-            }}
-            disabled={recoveryLoading}
-          >
-            Clear
-          </button>
-        </div>
-
-        <div className="analytics-section-scroll">
-          {recoveryActions.length === 0 && !recoveryLoading ? (
-            <p className="empty-note">No recovery actions found yet.</p>
-          ) : (
-            <div className="analytics-table-wrap">
-              <table className="analytics-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Action</th>
-                    <th>Target</th>
-                    <th>Recovery</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recoveryActions.map((log) => {
-                    const supported = Boolean(log?.recovery?.supported);
-                    const alreadyApplied = Boolean(log?.recovery?.alreadyApplied);
-                    const isApplying = recoveryApplyingId === log._id;
-                    return (
-                      <tr key={log._id}>
-                        <td className="date-cell">{new Date(log.createdAt).toLocaleString()}</td>
-                        <td><span className="action-badge">{log.action}</span></td>
-                        <td>{log.targetType} {log.targetId ? `(${log.targetId})` : ''}</td>
-                        <td>
-                          {supported ? (
-                            <button
-                              type="button"
-                              className="secondary-btn recovery-action-btn"
-                              onClick={() => handleApplyRecoveryAction(log)}
-                              disabled={alreadyApplied || isApplying || Boolean(recoveryApplyingId)}
-                              aria-label={isApplying ? 'Applying recovery action' : (log?.recovery?.label || 'Apply recovery action')}
-                              title={isApplying ? 'Applying...' : (log?.recovery?.label || 'Apply')}
-                            >
-                              <span className="recovery-action-btn-text">
-                                {isApplying ? 'Applying...' : (log?.recovery?.label || 'Apply')}
-                              </span>
-                              <span className="recovery-action-btn-icon" aria-hidden="true">
-                                {isApplying ? '…' : '↺'}
-                              </span>
-                            </button>
-                          ) : (
-                            <span className="optional-note recovery-action-note" title="Not supported" aria-label="Not supported">
-                              <span className="recovery-action-note-text">Not supported</span>
-                              <span className="recovery-action-note-icon" aria-hidden="true">⦸</span>
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {alreadyApplied
-                            ? <span className="detail-chip">Applied</span>
-                            : (supported ? <span className="detail-chip">Ready</span> : <span className="detail-chip">{log?.recovery?.reason || 'Unavailable'}</span>)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       </section>
 
