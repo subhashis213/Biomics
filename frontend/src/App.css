@@ -4448,6 +4448,7 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 
 /* Scroll offset so sticky nav doesn’t hide section headings */
 #section-live-class,
+#section-community-chat,
 #section-course-manager,
 #section-registered-users,
 #section-content-library,
@@ -4461,6 +4462,7 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 /* Student section anchors need topbar clearance when jumping via nav chips. */
 #section-overview,
 #section-learning,
+#section-community-chat,
 #section-monthly-exam,
 #section-quiz-performance,
 #section-leaderboard,
@@ -4764,6 +4766,7 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 .community-chat-page {
   display: grid;
   gap: 14px;
+  padding-top: 6px;
 }
 
 .community-chat-shell {
@@ -5106,6 +5109,10 @@ html[data-theme='light'] .community-chat-shell .str-chat__message--me .str-chat_
 }
 
 @media (max-width: 720px) {
+  .community-chat-page {
+    padding-top: 12px;
+  }
+
   .community-chat-shell {
     --chat-font-size: 0.92rem;
     --chat-font-size-meta: 0.72rem;
