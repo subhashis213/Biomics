@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
+  clearAiTutorHistoryAdmin,
+  clearCommunityChatAdmin,
   createAnnouncementAdmin,
   createVoucherAdmin,
   deleteQuiz,
@@ -165,6 +167,8 @@ export default function AdminDashboard() {
   });
   const [isSavingPricing, setIsSavingPricing] = useState(false);
   const [isSavingVoucher, setIsSavingVoucher] = useState(false);
+  const [isClearingCommunityChat, setIsClearingCommunityChat] = useState(false);
+  const [isClearingAiTutorHistory, setIsClearingAiTutorHistory] = useState(false);
   const [undoItems, setUndoItems] = useState({});
   const undoTimeoutsRef = useRef({});
   const undoIntervalsRef = useRef({});
@@ -669,6 +673,43 @@ export default function AdminDashboard() {
     } finally {
       setIsConfirmingAction(false);
     }
+  }
+
+  function handleClearCommunityChatClick() {
+    openConfirmDialog({
+      title: 'Clear Community Chat?',
+      message: 'This will permanently delete all messages in the student-admin community chat for everyone.',
+      confirmLabel: 'Clear All Messages',
+      processingLabel: 'Clearing...',
+      onConfirm: async () => {
+        setIsClearingCommunityChat(true);
+        try {
+          await clearCommunityChatAdmin();
+          setBanner({ type: 'success', text: 'Community chat was cleared for all users.' });
+        } finally {
+          setIsClearingCommunityChat(false);
+        }
+      }
+    });
+  }
+
+  function handleClearAiTutorHistoryClick() {
+    openConfirmDialog({
+      title: 'Clear All AI Tutor History?',
+      message: 'This will permanently delete all AI tutor conversation history records from the database for every user.',
+      confirmLabel: 'Clear AI Tutor History',
+      processingLabel: 'Clearing...',
+      onConfirm: async () => {
+        setIsClearingAiTutorHistory(true);
+        try {
+          const response = await clearAiTutorHistoryAdmin();
+          const deletedCount = Number(response?.deletedCount || 0);
+          setBanner({ type: 'success', text: `AI tutor history cleared (${deletedCount} records removed).` });
+        } finally {
+          setIsClearingAiTutorHistory(false);
+        }
+      }
+    });
   }
 
   function clearUndoTimers(itemId) {
@@ -2001,6 +2042,19 @@ export default function AdminDashboard() {
 
   const adminNavItems = [
     { id: 'section-live-class', label: 'Live Class', icon: '🔴' },
+    {
+      id: 'section-community-chat',
+      label: (
+        <span className="nav-live-label">
+          Community Chat
+          <span className="live-badge" aria-hidden="true">
+            <span className="live-badge-dot" />
+            LIVE
+          </span>
+        </span>
+      ),
+      icon: '💬'
+    },
     { id: 'section-course-manager', label: 'Course Manager', icon: '📚' },
     { id: 'section-registered-users', label: 'Learners', icon: '👥' },
     { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
@@ -2273,103 +2327,146 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        <section id="section-course-manager" className="card compose-card course-manager-card">
-          <h2>Course categories</h2>
-          <p className="subtitle">Tap a course to add lectures &amp; notes.</p>
-          <div className="course-grid">
-            {COURSE_CATEGORIES.map((course) => {
-              const meta = COURSE_META[course] || { icon: '\ud83d\udcda', color: '#6b7280' };
-              const lectureCount = videos.filter((v) => (v.category || 'General') === course).length;
-              const moduleCount = getModulesForCourse(course).length;
-              return (
-                <button
-                  key={course}
-                  type="button"
-                  className="course-tile"
-                  style={{ '--tile-accent': meta.color }}
-                  onClick={() => openCourseModal(course)}
-                >
-                  <span className="course-tile-icon">{meta.icon}</span>
-                  <span className="course-tile-body">
-                    <span className="course-tile-label">{course}</span>
-                    <span className="course-tile-count">
-                      {moduleCount} {moduleCount === 1 ? 'module' : 'modules'} · {lectureCount} {lectureCount === 1 ? 'lecture' : 'lectures'}
-                    </span>
-                  </span>
-                  <span className="course-tile-plus" aria-hidden="true">+</span>
-                </button>
-              );
-            })}
+        <section id="section-community-chat" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card community-link-card">
+          <div className="section-header compact quiz-builder-heading-row">
+            <div>
+              <p className="eyebrow section-live-eyebrow">
+                Community Space
+                <span className="live-badge" aria-hidden="true">
+                  <span className="live-badge-dot" />
+                  LIVE
+                </span>
+              </p>
+              <h2>Live student-admin community chat</h2>
+              <p className="subtitle">Join the real-time room where admins and students can discuss doubts and updates together.</p>
+            </div>
+            <div className="quiz-count-cards">
+              <StatCard label="Mode" value="Live" />
+              <StatCard label="Access" value="All" />
+            </div>
+          </div>
+          <div className="workspace-link-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/admin/community-chat')}>
+              Open Community Chat
+            </button>
+            <button
+              type="button"
+              className="danger-btn"
+              onClick={handleClearCommunityChatClick}
+              disabled={isClearingCommunityChat}
+            >
+              {isClearingCommunityChat ? 'Clearing...' : 'Clear All Chat Messages'}
+            </button>
+            <button
+              type="button"
+              className="danger-btn"
+              onClick={handleClearAiTutorHistoryClick}
+              disabled={isClearingAiTutorHistory}
+            >
+              {isClearingAiTutorHistory ? 'Clearing...' : 'Clear All AI Tutor History'}
+            </button>
           </div>
         </section>
 
-        <section id="section-registered-users" className="card table-card registered-learners-card">
-          <div className="section-header" style={{ marginTop: 0 }}>
-            <div>
-              <p className="eyebrow">Students</p>
-              <h2>Registered learners</h2>
-            </div>
-            <StatCard label="Total Students" value={students.length} />
-          </div>
-          {activeUserUndoEntry ? (
-            <div className="section-undo-alert" role="status" aria-live="polite">
-              <span className="undo-message">
-                {Math.ceil(Math.max(0, activeUserUndoEntry[1].remainingMs || 0) / 1000)}s - {activeUserUndoEntry[1].message}
-              </span>
-              <button type="button" className="secondary-btn undo-btn" onClick={() => handleUndoAction(activeUserUndoEntry[0])}>
-                Undo
-              </button>
-            </div>
-          ) : null}
-          <div className="student-cards-scroll">
-            <div className="student-cards-grid">
-              {students.length ? students.map((student) => {
-                const initial = (student.username || '?')[0].toUpperCase();
-                const undoItem = undoItems[`user-${student.username}`];
+        <div className="admin-after-community-grid">
+          <section id="section-course-manager" className="card compose-card course-manager-card">
+            <h2>Course categories</h2>
+            <p className="subtitle">Tap a course to add lectures &amp; notes.</p>
+            <div className="course-grid">
+              {COURSE_CATEGORIES.map((course) => {
+                const meta = COURSE_META[course] || { icon: '\ud83d\udcda', color: '#6b7280' };
+                const lectureCount = videos.filter((v) => (v.category || 'General') === course).length;
+                const moduleCount = getModulesForCourse(course).length;
                 return (
-                  <div key={`${student.username}-${student.phone}`} className="student-card">
-                    <div className="student-card-avatar">{initial}</div>
-                    <div className="student-card-info">
-                      <span className="student-card-name">{student.username}</span>
-                      <div className="student-card-meta">
-                        {student.class ? <span className="student-course-badge">{student.class}</span> : null}
-                        {student.city ? <span className="student-city">📍 {student.city}</span> : null}
+                  <button
+                    key={course}
+                    type="button"
+                    className="course-tile"
+                    style={{ '--tile-accent': meta.color }}
+                    onClick={() => openCourseModal(course)}
+                  >
+                    <span className="course-tile-icon">{meta.icon}</span>
+                    <span className="course-tile-body">
+                      <span className="course-tile-label">{course}</span>
+                      <span className="course-tile-count">
+                        {moduleCount} {moduleCount === 1 ? 'module' : 'modules'} · {lectureCount} {lectureCount === 1 ? 'lecture' : 'lectures'}
+                      </span>
+                    </span>
+                    <span className="course-tile-plus" aria-hidden="true">+</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section id="section-registered-users" className="card table-card registered-learners-card">
+            <div className="section-header" style={{ marginTop: 0 }}>
+              <div>
+                <p className="eyebrow">Students</p>
+                <h2>Registered learners</h2>
+              </div>
+              <StatCard label="Total Students" value={students.length} />
+            </div>
+            {activeUserUndoEntry ? (
+              <div className="section-undo-alert" role="status" aria-live="polite">
+                <span className="undo-message">
+                  {Math.ceil(Math.max(0, activeUserUndoEntry[1].remainingMs || 0) / 1000)}s - {activeUserUndoEntry[1].message}
+                </span>
+                <button type="button" className="secondary-btn undo-btn" onClick={() => handleUndoAction(activeUserUndoEntry[0])}>
+                  Undo
+                </button>
+              </div>
+            ) : null}
+            <div className="student-cards-scroll">
+              <div className="student-cards-grid">
+                {students.length ? students.map((student) => {
+                  const initial = (student.username || '?')[0].toUpperCase();
+                  const undoItem = undoItems[`user-${student.username}`];
+                  return (
+                    <div key={`${student.username}-${student.phone}`} className="student-card">
+                      <div className="student-card-avatar">{initial}</div>
+                      <div className="student-card-info">
+                        <span className="student-card-name">{student.username}</span>
+                        <div className="student-card-meta">
+                          {student.class ? <span className="student-course-badge">{student.class}</span> : null}
+                          {student.city ? <span className="student-city">📍 {student.city}</span> : null}
+                        </div>
+                        {student.phone ? <span className="student-card-phone">📞 {student.phone}</span> : null}
                       </div>
-                      {student.phone ? <span className="student-card-phone">📞 {student.phone}</span> : null}
-                    </div>
-                    {undoItem ? (
-                      <div className="student-card-undo">
-                        <span className="undo-timer">{undoItem.remainingMs > 0 ? Math.ceil(undoItem.remainingMs / 1000) : '0'}s</span>
+                      {undoItem ? (
+                        <div className="student-card-undo">
+                          <span className="undo-timer">{undoItem.remainingMs > 0 ? Math.ceil(undoItem.remainingMs / 1000) : '0'}s</span>
+                          <button
+                            type="button"
+                            className="secondary-btn undo-btn"
+                            onClick={() => handleUndoAction(`user-${student.username}`)}
+                            aria-label={`Undo removal of ${student.username}`}
+                            title="Undo removal"
+                          >
+                            Undo
+                          </button>
+                        </div>
+                      ) : (
                         <button
                           type="button"
-                          className="secondary-btn undo-btn"
-                          onClick={() => handleUndoAction(`user-${student.username}`)}
-                          aria-label={`Undo removal of ${student.username}`}
-                          title="Undo removal"
+                          className="student-remove-btn"
+                          onClick={() => handleRemoveUser(student.username)}
+                          disabled={Object.keys(undoItems).length > 0}
+                          aria-label={`Remove ${student.username}`}
+                          title="Remove user"
                         >
-                          Undo
+                          ✕
                         </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="student-remove-btn"
-                        onClick={() => handleRemoveUser(student.username)}
-                        disabled={Object.keys(undoItems).length > 0}
-                        aria-label={`Remove ${student.username}`}
-                        title="Remove user"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                );
-              }) : (
-                <p className="empty-state">No students registered yet.</p>
-              )}
+                      )}
+                    </div>
+                  );
+                }) : (
+                  <p className="empty-state">No students registered yet.</p>
+                )}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </section>
 
       <section id="section-content-library" className="card content-library-card is-overview">

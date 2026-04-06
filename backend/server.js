@@ -1,8 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 // Auto-restart trigger
 const express = require('express');
 const fs = require('fs');
-const path = require('path');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -37,6 +37,7 @@ app.use(helmet({
       // Allow Jitsi Meet to be embedded as an iframe for live classes
       'frame-src': ["'self'", 'https://meet.jit.si'],
       'img-src': ["'self'", 'data:', 'https:'],
+      'connect-src': ["'self'", 'https://chat.stream-io-api.com', 'wss://chat.stream-io-api.com'],
     }
   }
 }));

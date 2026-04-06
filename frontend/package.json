@@ -18,6 +18,8 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.71.2",
     "react-router-dom": "^6.30.1",
+    "stream-chat": "^9.40.0",
+    "stream-chat-react": "^13.14.3",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

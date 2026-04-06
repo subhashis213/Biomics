@@ -112,6 +112,8 @@ TWILIO_FROM_NUMBER=+1xxxxxxxxxx
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+STREAM_API_KEY=your_stream_api_key
+STREAM_API_SECRET=your_stream_api_secret
 ```
 
 ## Installation

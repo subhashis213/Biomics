@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -17,6 +17,8 @@ import StudentDashboard from './pages/StudentDashboard';
 import StudentLecturePage from './pages/StudentLecturePage';
 import StudentMockExamPage from './pages/StudentMockExamPage';
 import StudentQuizPage from './pages/StudentQuizPage';
+
+const CommunityChatPage = lazy(() => import('./pages/CommunityChatPage'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -94,6 +96,16 @@ export default function App() {
         )}
       />
       <Route
+        path="/admin/community-chat"
+        element={(
+          <ProtectedRoute role="admin">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading community chat...</div>}>
+              <CommunityChatPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/admin/revenue-tracking"
         element={(
           <ProtectedRoute role="admin">
@@ -122,6 +134,16 @@ export default function App() {
         element={(
           <ProtectedRoute role="user">
             <StudentDashboard />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/community-chat"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading community chat...</div>}>
+              <CommunityChatPage />
+            </Suspense>
           </ProtectedRoute>
         )}
       />

@@ -793,6 +793,19 @@ export default function StudentDashboard() {
     if (selectedModule) return baseItems;
     return [
       ...baseItems.slice(0, 2),
+      {
+        id: 'section-community-chat',
+        label: (
+          <span className="nav-live-label">
+            Community Chat
+            <span className="live-badge" aria-hidden="true">
+              <span className="live-badge-dot" />
+              LIVE
+            </span>
+          </span>
+        ),
+        icon: '💬'
+      },
       { id: 'section-quiz-performance', label: 'Quiz Performance', icon: '📊' },
       { id: 'section-leaderboard', label: 'Leaderboard', icon: '🏆' },
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
@@ -854,6 +867,30 @@ export default function StudentDashboard() {
     >
       <div id="section-overview" className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
+
+        {!selectedModule ? (
+          <section id="section-community-chat" className="card student-community-launch-card">
+            <div className="section-header compact">
+              <div>
+                <p className="eyebrow section-live-eyebrow">
+                  Community Chat
+                  <span className="live-badge" aria-hidden="true">
+                    <span className="live-badge-dot" />
+                    LIVE
+                  </span>
+                </p>
+                <h2>Talk with admins and learners in real time</h2>
+                <p className="subtitle">Ask doubts, share tips, and stay connected with the whole Biomics community.</p>
+              </div>
+              <StatCard label="Status" value="Live" />
+            </div>
+            <div className="workspace-link-actions">
+              <button type="button" className="primary-btn" onClick={() => navigate('/student/community-chat')}>
+                Open Community Chat
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {!selectedModule && mockExamNotices.length ? (
           <aside className="monthly-exam-notice card" role="status" aria-live="polite">

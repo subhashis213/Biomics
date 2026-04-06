@@ -1,4 +1,5 @@
 const express = require('express');
+const { StreamChat } = require('stream-chat');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const ChatHistory = require('../models/ChatHistory');
@@ -6,6 +7,132 @@ const ChatHistory = require('../models/ChatHistory');
 const MAX_HISTORY_MESSAGES = 200;
 const CONTEXT_WINDOW = 20; // how many recent messages to send as context
 const DEFAULT_MAX_OUTPUT_TOKENS = 1200;
+const STREAM_CHANNEL_TYPE = 'messaging';
+const STREAM_CHANNEL_ID = 'community-general';
+
+function toStreamSafeUserId(role, username) {
+  const safeName = String(username || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9@_. -]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[\s.-]+|[\s.-]+$/g, '');
+  const suffix = safeName || 'member';
+  return `${role}-${suffix}`.slice(0, 80);
+}
+
+// POST /chat/community/token — issue Stream user token for real-time community chat
+router.post('/community/token', authenticateToken(), async (req, res) => {
+  try {
+    const apiKey = String(process.env.STREAM_API_KEY || '').trim();
+    const apiSecret = String(process.env.STREAM_API_SECRET || '').trim();
+    if (!apiKey || !apiSecret) {
+      return res.status(500).json({ error: 'Stream chat is not configured on server.' });
+    }
+
+    const username = String(req.user?.username || '').trim();
+    const role = req.user?.role === 'admin' ? 'admin' : 'user';
+    if (!username) {
+      return res.status(400).json({ error: 'Invalid session user.' });
+    }
+
+    const streamClient = StreamChat.getInstance(apiKey, apiSecret);
+    const streamUserId = toStreamSafeUserId(role, username);
+    const displayName = role === 'admin' ? `Admin · ${username}` : username;
+
+    await streamClient.upsertUser({
+      id: streamUserId,
+      name: displayName,
+      biomicsRole: role
+    });
+
+    const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
+      name: 'Biomics Community',
+      members: [streamUserId],
+      created_by_id: streamUserId
+    });
+
+    try {
+      await channel.create();
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('already exists')) {
+        throw error;
+      }
+    }
+
+    try {
+      await channel.addMembers([streamUserId]);
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('already') && !message.includes('member')) {
+        throw error;
+      }
+    }
+
+    const token = streamClient.createToken(streamUserId);
+    return res.json({
+      apiKey,
+      token,
+      user: {
+        id: streamUserId,
+        name: displayName,
+        biomicsRole: role
+      },
+      channel: {
+        type: STREAM_CHANNEL_TYPE,
+        id: STREAM_CHANNEL_ID
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'Failed to initialize community chat.' });
+  }
+});
+
+// DELETE /chat/community/messages — admin-only wipe of all community chat messages
+router.delete('/community/messages', authenticateToken('admin'), async (req, res) => {
+  try {
+    const apiKey = String(process.env.STREAM_API_KEY || '').trim();
+    const apiSecret = String(process.env.STREAM_API_SECRET || '').trim();
+    if (!apiKey || !apiSecret) {
+      return res.status(500).json({ error: 'Stream chat is not configured on server.' });
+    }
+
+    const adminUsername = String(req.user?.username || '').trim();
+    const adminId = toStreamSafeUserId('admin', adminUsername || 'admin');
+    const streamClient = StreamChat.getInstance(apiKey, apiSecret);
+
+    await streamClient.upsertUser({
+      id: adminId,
+      name: adminUsername ? `Admin · ${adminUsername}` : 'Admin',
+      biomicsRole: 'admin'
+    });
+
+    const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
+      name: 'Biomics Community',
+      created_by_id: adminId
+    });
+
+    try {
+      await channel.create();
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('already exists')) {
+        throw error;
+      }
+    }
+
+    await channel.truncate();
+
+    return res.json({
+      message: 'Community chat conversations cleared successfully.',
+      clearedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'Failed to clear community chat.' });
+  }
+});
 
 function estimateAnswerProfile(question = '') {
   const text = String(question || '').trim();
@@ -255,6 +382,21 @@ router.delete('/history', authenticateToken('user'), async (req, res) => {
   } catch (err) {
     console.error('Chat /history DELETE error:', err);
     res.status(500).json({ error: 'Failed to clear history' });
+  }
+});
+
+// DELETE /chat/history/all — admin-only wipe of all AI tutor chat history in MongoDB
+router.delete('/history/all', authenticateToken('admin'), async (req, res) => {
+  try {
+    const result = await ChatHistory.deleteMany({});
+    res.json({
+      ok: true,
+      deletedCount: Number(result?.deletedCount || 0),
+      message: 'All AI tutor chat histories were cleared.'
+    });
+  } catch (err) {
+    console.error('Chat /history/all DELETE error:', err);
+    res.status(500).json({ error: 'Failed to clear all AI tutor histories' });
   }
 });
 

@@ -25,7 +25,15 @@ async function parseJsonResponse(response) {
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    data = { error: text || `Request failed (${response.status})` };
+    const isHtml = /<\/?html|<\/?body|<\/?pre/i.test(text || '');
+    const cannotRouteMatch = (text || '').match(/Cannot\s+(GET|POST|PUT|PATCH|DELETE)\s+([^<\n]+)/i);
+    if (isHtml && cannotRouteMatch) {
+      data = { error: `API route not found: ${cannotRouteMatch[1]} ${cannotRouteMatch[2].trim()}` };
+    } else if (isHtml) {
+      data = { error: `Request failed (${response.status}). Server returned an unexpected HTML response.` };
+    } else {
+      data = { error: text || `Request failed (${response.status})` };
+    }
   }
   if (!response.ok) {
     const fallbackByStatus = response.status === 401
@@ -403,6 +411,25 @@ export function updateAnnouncementAdmin(announcementId, isActive) {
 
 export function deleteAnnouncementAdmin(announcementId) {
   return requestJson(`/announcements/${encodeURIComponent(announcementId)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function fetchCommunityChatToken() {
+  return requestJson('/chat/community/token', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export function clearCommunityChatAdmin() {
+  return requestJson('/chat/community/messages', {
+    method: 'DELETE'
+  });
+}
+
+export function clearAiTutorHistoryAdmin() {
+  return requestJson('/chat/history/all', {
     method: 'DELETE'
   });
 }
