@@ -18,6 +18,7 @@ const COURSE_CATEGORIES = [
   'CSIR-NET Life Science',
   'GATE'
 ];
+const DEFAULT_COURSE = 'CSIR-NET Life Science';
 
 function formatMonthLabel(monthValue) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(monthValue || ''))) return monthValue || 'Unknown Month';
@@ -28,7 +29,7 @@ function formatMonthLabel(monthValue) {
 
 export default function AdminMockExamPage() {
   const navigate = useNavigate();
-  const [mockExamCategory, setMockExamCategory] = useState(COURSE_CATEGORIES[0]);
+  const [mockExamCategory, setMockExamCategory] = useState(DEFAULT_COURSE);
   const [mockExamTitle, setMockExamTitle] = useState('');
   const [mockExamDescription, setMockExamDescription] = useState('');
   const [mockExamDate, setMockExamDate] = useState('');
@@ -90,7 +91,7 @@ export default function AdminMockExamPage() {
 
   function editExam(exam) {
     setEditingMockExamId(exam._id);
-    setMockExamCategory(exam.category || COURSE_CATEGORIES[0]);
+    setMockExamCategory(exam.category || DEFAULT_COURSE);
     setMockExamTitle(exam.title || '');
     setMockExamDescription(exam.description || '');
     setMockExamDate(exam.examDate ? new Date(exam.examDate).toISOString().slice(0, 16) : '');
@@ -148,7 +149,7 @@ export default function AdminMockExamPage() {
   async function handleSaveMockExam(event) {
     event.preventDefault();
     if (!mockExamCategory || !mockExamTitle.trim() || !mockExamDate) {
-      setMockExamMessage({ type: 'error', text: 'Class, title and exam date are required.' });
+      setMockExamMessage({ type: 'error', text: 'Course, title and exam date are required.' });
       return;
     }
 
@@ -230,8 +231,8 @@ export default function AdminMockExamPage() {
         <section className="workspace-hero workspace-hero-mock">
           <div>
             <p className="eyebrow">Monthly Mock Test</p>
-            <h2>Choose class, configure exam details and add questions</h2>
-            <p className="subtitle">Stylish dedicated interface for class-wise monthly exam management.</p>
+              <h2>Choose course, configure exam details and add questions</h2>
+              <p className="subtitle">Stylish dedicated interface for course-wise monthly exam management.</p>
           </div>
           <div className="workspace-hero-stats">
             <StatCard label={`${mockExamCategory} Exams`} value={mockExamList.length} />
@@ -242,7 +243,7 @@ export default function AdminMockExamPage() {
         <section className="card quiz-builder-panel workspace-panel">
           <form className="quiz-builder-form" onSubmit={handleSaveMockExam}>
             <label>
-              Class
+              Course
               <select value={mockExamCategory} onChange={(event) => setMockExamCategory(event.target.value)}>
                 {COURSE_CATEGORIES.map((course) => (
                   <option key={course} value={course}>{course}</option>

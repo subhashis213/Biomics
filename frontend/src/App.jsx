@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigationType } from 'react-r
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminContentLibraryPage from './pages/AdminContentLibraryPage';
+import AdminCourseWorkspacePage from './pages/AdminCourseWorkspacePage';
 import AdminAnnouncementsWorkspacePage from './pages/AdminAnnouncementsWorkspacePage';
 import AdminAuditLogPage from './pages/AdminAuditLogPage';
 import AdminDashboard from './pages/AdminDashboard';
@@ -16,6 +17,7 @@ import AuthPage from './pages/AuthPage';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentLecturePage from './pages/StudentLecturePage';
 import StudentMockExamPage from './pages/StudentMockExamPage';
+import StudentModuleQuizPage from './pages/StudentModuleQuizPage';
 import StudentQuizPage from './pages/StudentQuizPage';
 
 const CommunityChatPage = lazy(() => import('./pages/CommunityChatPage'));
@@ -44,6 +46,14 @@ export default function App() {
         element={(
           <ProtectedRoute role="admin">
             <AdminDashboard />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/course-workspace/:courseName"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminCourseWorkspacePage />
           </ProtectedRoute>
         )}
       />
@@ -160,6 +170,14 @@ export default function App() {
         element={(
           <ProtectedRoute role="user">
             <StudentLecturePage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/module/:courseName/:moduleName/quizzes"
+        element={(
+          <ProtectedRoute role="user">
+            <StudentModuleQuizPage />
           </ProtectedRoute>
         )}
       />

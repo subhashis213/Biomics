@@ -21,8 +21,10 @@ export default function AppShell({
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
   const [activeNavId, setActiveNavId] = useState(navItems[0]?.id || '');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [topbarHeight, setTopbarHeight] = useState(104);
   const topbarRef = useRef(null);
+  const menuScrollLockRef = useRef(0);
   const hasSideNav = navItems.length > 0;
   const isNavControlled = typeof activeNavItemId === 'string' && activeNavItemId.length > 0;
   const currentActiveNavId = isNavControlled ? activeNavItemId : activeNavId;
@@ -41,10 +43,76 @@ export default function AppShell({
     setActiveNavId(safeNavItems[0]?.id || '');
   }, [safeNavItems, isNavControlled]);
 
+  useEffect(() => {
+    if (!hasSideNav) {
+      setIsMenuOpen(false);
+    }
+  }, [hasSideNav]);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const { body, documentElement } = document;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    menuScrollLockRef.current = scrollY;
+
+    const previousBodyStyles = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      touchAction: body.style.touchAction,
+      overscrollBehavior: body.style.overscrollBehavior
+    };
+
+    const previousHtmlStyles = {
+      overflow: documentElement.style.overflow,
+      overscrollBehavior: documentElement.style.overscrollBehavior
+    };
+
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.touchAction = 'none';
+    body.style.overscrollBehavior = 'none';
+    documentElement.style.overflow = 'hidden';
+    documentElement.style.overscrollBehavior = 'none';
+
+    return () => {
+      body.style.overflow = previousBodyStyles.overflow;
+      body.style.position = previousBodyStyles.position;
+      body.style.top = previousBodyStyles.top;
+      body.style.left = previousBodyStyles.left;
+      body.style.right = previousBodyStyles.right;
+      body.style.width = previousBodyStyles.width;
+      body.style.touchAction = previousBodyStyles.touchAction;
+      body.style.overscrollBehavior = previousBodyStyles.overscrollBehavior;
+      documentElement.style.overflow = previousHtmlStyles.overflow;
+      documentElement.style.overscrollBehavior = previousHtmlStyles.overscrollBehavior;
+      window.scrollTo(0, menuScrollLockRef.current);
+    };
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMenuOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setIsMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMenuOpen]);
+
   function handleNavClick(id) {
     if (!isNavControlled) {
       setActiveNavId(id);
     }
+
+    setIsMenuOpen(false);
 
     if (typeof onNavItemClick === 'function') {
       onNavItemClick(id);
@@ -61,20 +129,36 @@ export default function AppShell({
 
   }
 
-  function renderNavLinks(className = 'app-side-nav-list') {
+  function renderNavLinks(className = 'hub-side-list') {
+    function getNavTone(item) {
+      const key = `${String(item?.id || '')} ${String(item?.label || '')}`.toLowerCase();
+      if (/dashboard|home|overview/.test(key)) return 'home';
+      if (/video|content|library|lecture|module/.test(key)) return 'content';
+      if (/quiz|exam|mock/.test(key)) return 'assessment';
+      if (/chat|community/.test(key)) return 'community';
+      if (/price|revenue|payment|voucher/.test(key)) return 'commerce';
+      if (/profile|setting|account/.test(key)) return 'profile';
+      if (/audit|recovery|admin/.test(key)) return 'security';
+      return 'default';
+    }
+
     return (
       <nav className={className} aria-label={`${navTitle} sections`}>
-        {safeNavItems.map((item) => (
+        {safeNavItems.map((item, index) => {
+          const tone = getNavTone(item);
+          return (
           <button
             key={item.id}
             type="button"
-            className={`app-side-nav-link${currentActiveNavId === item.id ? ' active' : ''}`}
+            className={`hub-side-link tone-${tone}${currentActiveNavId === item.id ? ' active' : ''}`}
             onClick={() => handleNavClick(item.id)}
+            style={{ '--menu-index': index }}
           >
-            <span className="app-side-nav-link-icon" aria-hidden="true">{item.icon || '•'}</span>
-            <span className="app-side-nav-link-label">{item.label}</span>
+            <span className="hub-side-link-icon" aria-hidden="true">{item.icon || '•'}</span>
+            <span className="hub-side-link-label">{item.label}</span>
           </button>
-        ))}
+          );
+        })}
       </nav>
     );
   }
@@ -83,6 +167,8 @@ export default function AppShell({
   const topbarTop = viewportWidth <= 375 ? 4 : viewportWidth <= 720 ? 6 : 8;
   const layoutTopGap = viewportWidth <= 375 ? 18 : viewportWidth <= 720 ? 16 : 10;
   const layoutTopPadding = topbarTop + topbarHeight + layoutTopGap;
+  const sidePanelTop = Math.max(8, shellPad);
+  const sidePanelHeight = `calc(100dvh - ${sidePanelTop + shellPad}px)`;
 
   useEffect(() => {
     const topbarClearance = Math.max(64, topbarTop + topbarHeight + 8);
@@ -108,7 +194,7 @@ export default function AppShell({
     <>
       <header
         ref={topbarRef}
-        className="topbar"
+        className={`topbar${isMenuOpen ? ' topbar-dimmed' : ''}`}
         style={{
           position: 'fixed',
           top: `${topbarTop}px`,
@@ -120,6 +206,23 @@ export default function AppShell({
       >
         <div className="topbar-main">
           <div className="topbar-brand">
+            {hasSideNav ? (
+              <button
+                type="button"
+                className={`hub-menu-trigger${isMenuOpen ? ' is-open' : ''}`}
+                aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={isMenuOpen}
+                onClick={() => setIsMenuOpen((current) => !current)}
+              >
+                <span className="hub-menu-trigger-glow" aria-hidden="true" />
+                <span className="hub-menu-trigger-bars" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                <span className="hub-menu-trigger-label">Menu</span>
+              </button>
+            ) : null}
             <img src={logoImg} alt="Biomics Hub logo" className="topbar-logo" />
             <div className="topbar-brand-text">
               <span className="topbar-site-name">Biomics Hub</span>
@@ -156,13 +259,43 @@ export default function AppShell({
             ) : null}
           </div>
         </div>
-        {hasSideNav ? (
-          <div className="topbar-nav-row">
-            <p className="topbar-nav-label">{navTitle}</p>
-            {renderNavLinks('topbar-inline-nav')}
-          </div>
-        ) : null}
       </header>
+
+      {hasSideNav ? (
+        <>
+          <button
+            type="button"
+            className={`hub-side-overlay${isMenuOpen ? ' visible' : ''}`}
+            aria-label="Close navigation menu"
+            onClick={() => setIsMenuOpen(false)}
+          />
+          <aside
+            className={`hub-side-panel${isMenuOpen ? ' open' : ''}`}
+            aria-label={navTitle}
+            style={{
+              top: `${sidePanelTop}px`,
+              left: `${shellPad}px`,
+              height: sidePanelHeight
+            }}
+          >
+            <div className="hub-side-head">
+              <p>
+                <span className="hub-side-head-kicker">Navigation</span>
+                <span className="hub-side-head-title">{navTitle}</span>
+              </p>
+              <button
+                type="button"
+                className="hub-side-close"
+                onClick={() => setIsMenuOpen(false)}
+                aria-label="Close menu"
+              >
+                ×
+              </button>
+            </div>
+            {renderNavLinks('hub-side-list')}
+          </aside>
+        </>
+      ) : null}
 
       <div className={`app-shell${hasSideNav ? ' app-shell--with-nav' : ''}`}>
         <div className="app-shell-layout" style={{ paddingTop: `${layoutTopPadding}px` }}>

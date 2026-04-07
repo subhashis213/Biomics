@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchMockExamLeaderboard,
   createCourseOrder,
   downloadMaterial,
   fetchMyMockExams,
-  fetchMyCoursePaymentInfo,
+  previewCourseOrder,
   fetchQuizLeaderboard,
   getApiBase,
   requestJson,
@@ -15,7 +16,7 @@ import logoImg from '../assets/biomics-logo.jpeg';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import FinalWorkingVideoCard from '../components/FinalWorkingVideoCard';
-import StudentChatAgent from '../components/StudentChatAgent';
+import StudentChatAgent, { StudentAnnouncementBell } from '../components/StudentChatAgent';
 import { useCourseData } from '../hooks/useCourseData';
 import { useFeedback } from '../hooks/useFeedback';
 import { useQuizSession } from '../hooks/useQuizSession';
@@ -23,6 +24,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useThemeStore } from '../stores/themeStore';
 
 const ALL_MODULES = 'ALL_MODULES';
+const CART_STORAGE_PREFIX = 'biomics:student-cart:';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -33,6 +35,7 @@ export default function StudentDashboard() {
 
   const {
     videos, course, favoriteIds, completedIds, quizzes, quizAttempts,
+    moduleCatalog,
     access,
     isLoading, loadError, toggleFavorite, toggleCompleted, refreshAttempts,
     favMutError, progressMutError
@@ -66,6 +69,19 @@ export default function StudentDashboard() {
   const [isUnlockingCourse, setIsUnlockingCourse] = useState(false);
   const [selectedAccessTarget, setSelectedAccessTarget] = useState(ALL_MODULES);
   const [selectedModuleSection, setSelectedModuleSection] = useState('');
+  const [lockedModuleCart, setLockedModuleCart] = useState([]);
+  const [recentlyAddedCartKey, setRecentlyAddedCartKey] = useState('');
+  const [cartPlanType, setCartPlanType] = useState('pro');
+  const [cartVoucherCode, setCartVoucherCode] = useState('');
+  const [appliedCartVoucherCode, setAppliedCartVoucherCode] = useState('');
+  const [cartVoucherMessage, setCartVoucherMessage] = useState('');
+  const [isApplyingCartVoucher, setIsApplyingCartVoucher] = useState(false);
+  const [cartVoucherPreviewByKey, setCartVoucherPreviewByKey] = useState({});
+  const [cartPriceSyncMessage, setCartPriceSyncMessage] = useState('');
+  const [cartOpen, setCartOpen] = useState(false);
+  const [isBulkCheckoutRunning, setIsBulkCheckoutRunning] = useState(false);
+  const [cartItemCheckoutKey, setCartItemCheckoutKey] = useState('');
+  const [isCartHydrated, setIsCartHydrated] = useState(false);
   const [mockExams, setMockExams] = useState([]);
   const [mockExamNotices, setMockExamNotices] = useState([]);
   const [mockExamLoading, setMockExamLoading] = useState(false);
@@ -76,6 +92,10 @@ export default function StudentDashboard() {
   const [examLeaderboardError, setExamLeaderboardError] = useState('');
   const profileScrollLockRef = useRef(0);
   const profileCloseTimerRef = useRef(null);
+  const recentlyAddedCartTimerRef = useRef(null);
+  const cartIconButtonRef = useRef(null);
+  const cartPulseTimerRef = useRef(null);
+  const cartVoucherRequestRef = useRef(0);
 
   const allModulesUnlocked = Boolean(access?.allModulesUnlocked || access?.unlocked);
   const bundlePlanOptions = Array.isArray(access?.bundlePricing?.plans) ? access.bundlePricing.plans : [];
@@ -98,8 +118,14 @@ export default function StudentDashboard() {
 
   const selectedModuleName = selectedModule?.name || '';
   const selectedModuleCourse = selectedModule?.category || '';
-  const selectedModuleAccess = selectedModule ? getModuleAccessInfo(selectedModuleName) : null;
+  const selectedModuleAccess = selectedModule ? getModuleAccessInfo(selectedModuleName, selectedModuleCourse) : null;
+  const selectedModuleCartKey = buildLockedCartKey(selectedModuleName, selectedModuleCourse);
+  const selectedModuleIsInCart = lockedModuleCart.some((item) => item.key === selectedModuleCartKey);
   const moduleLocked = Boolean(selectedModuleAccess?.purchaseRequired && !selectedModuleAccess?.unlocked);
+  const isCrossCourseSelection = Boolean(
+    selectedModule
+    && normalizeCourseName(selectedModuleCourse).toLowerCase() !== normalizeCourseName(course || '').toLowerCase()
+  );
   const selectedTargetIsBundle = selectedAccessTarget === ALL_MODULES;
   const selectedTargetAccess = selectedTargetIsBundle
     ? {
@@ -107,7 +133,7 @@ export default function StudentDashboard() {
         unlocked: allModulesUnlocked,
         activeMembership: activeMembership
       }
-    : getModuleAccessInfo(selectedAccessTarget);
+    : getModuleAccessInfo(selectedAccessTarget, selectedModuleCourse || course);
   const selectedTargetPlans = Array.isArray(selectedTargetAccess?.pricing?.plans) ? selectedTargetAccess.pricing.plans : [];
   const quizEnabledForSelection = Boolean(selectedModuleName) &&
     normalizeCourseName(selectedModuleCourse).toLowerCase() === normalizeCourseName(course || '').toLowerCase();
@@ -134,6 +160,43 @@ export default function StudentDashboard() {
 
   function normalizeCourseName(value) {
     return String(value || '').trim().replace(/\s+/g, ' ');
+  }
+
+  function getCartStorageUsernameKey(usernameValue) {
+    return String(usernameValue || '').trim().toLowerCase();
+  }
+
+  function readCartStorage(storageKey) {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw !== null) return raw;
+    } catch {
+      // Fall through to sessionStorage.
+    }
+    try {
+      return window.sessionStorage.getItem(storageKey);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeCartStorage(storageKey, value) {
+    if (typeof window === 'undefined') return;
+    let wroteLocal = false;
+    try {
+      window.localStorage.setItem(storageKey, value);
+      wroteLocal = true;
+    } catch {
+      // Try sessionStorage as a fallback.
+    }
+    try {
+      window.sessionStorage.setItem(storageKey, value);
+    } catch {
+      if (!wroteLocal) {
+        // Both storage writes failed; keep in-memory cart only.
+      }
+    }
   }
 
   function resolveModuleKey(categoryName, moduleName) {
@@ -168,6 +231,643 @@ export default function StudentDashboard() {
     return parsed.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
+  function buildLockedCartKey(moduleName, moduleCourse) {
+    return `${normalizeCourseName(moduleCourse || '')}::${normalizeModuleName(moduleName || '')}`;
+  }
+
+  function triggerCartIconPulse() {
+    const cartButton = cartIconButtonRef.current;
+    if (!cartButton) return;
+
+    cartButton.classList.remove('is-cart-bumping');
+    void cartButton.offsetWidth;
+    cartButton.classList.add('is-cart-bumping');
+
+    if (cartPulseTimerRef.current) {
+      window.clearTimeout(cartPulseTimerRef.current);
+    }
+    cartPulseTimerRef.current = window.setTimeout(() => {
+      cartButton.classList.remove('is-cart-bumping');
+      cartPulseTimerRef.current = null;
+    }, 380);
+  }
+
+  function animateAddToCartToHeader(originElement) {
+    if (typeof document === 'undefined') return;
+    const cartButton = cartIconButtonRef.current;
+    if (!cartButton || !originElement) {
+      triggerCartIconPulse();
+      return;
+    }
+
+    const originRect = originElement.getBoundingClientRect();
+    const targetRect = cartButton.getBoundingClientRect();
+    if (!originRect || !targetRect) {
+      triggerCartIconPulse();
+      return;
+    }
+
+    const startX = originRect.left + originRect.width / 2;
+    const startY = originRect.top + originRect.height / 2;
+    const endX = targetRect.left + targetRect.width / 2;
+    const endY = targetRect.top + targetRect.height / 2;
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
+
+    const flyNode = document.createElement('span');
+    flyNode.className = 'student-cart-fly-chip';
+    flyNode.setAttribute('aria-hidden', 'true');
+    flyNode.textContent = '●';
+    flyNode.style.left = `${startX}px`;
+    flyNode.style.top = `${startY}px`;
+    document.body.appendChild(flyNode);
+
+    const animation = flyNode.animate(
+      [
+        { transform: 'translate(-50%, -50%) scale(1)', opacity: 0.94, offset: 0 },
+        {
+          transform: `translate(calc(-50% + ${Math.round(deltaX * 0.56)}px), calc(-50% + ${Math.round(deltaY * 0.28 - 34)}px)) scale(1.05)`,
+          opacity: 0.9,
+          offset: 0.58
+        },
+        {
+          transform: `translate(calc(-50% + ${Math.round(deltaX)}px), calc(-50% + ${Math.round(deltaY)}px)) scale(0.32)`,
+          opacity: 0.1,
+          offset: 1
+        }
+      ],
+      {
+        duration: 620,
+        easing: 'cubic-bezier(0.2, 0.9, 0.2, 1)',
+        fill: 'forwards'
+      }
+    );
+
+    animation.onfinish = () => {
+      flyNode.remove();
+      triggerCartIconPulse();
+    };
+    animation.oncancel = () => {
+      flyNode.remove();
+      triggerCartIconPulse();
+    };
+  }
+
+  function addLockedModuleToCart(moduleName, moduleCourse, moduleAccessInfo, originElement) {
+    const normalizedModule = normalizeModuleName(moduleName);
+    const normalizedCourse = normalizeCourseName(moduleCourse || course || 'General');
+    const itemKey = buildLockedCartKey(normalizedModule, normalizedCourse);
+    const planPrices = (Array.isArray(moduleAccessInfo?.pricing?.plans) ? moduleAccessInfo.pricing.plans : []).reduce((acc, plan) => {
+      const planType = String(plan?.type || '').toLowerCase();
+      if (!planType) return acc;
+      acc[planType] = Number(plan?.amountInPaise || 0);
+      return acc;
+    }, {});
+    const crossCourse = normalizeCourseName(course || '').toLowerCase() !== normalizedCourse.toLowerCase();
+
+    let wasDuplicate = false;
+    setLockedModuleCart((current) => {
+      if (current.some((item) => item.key === itemKey)) {
+        wasDuplicate = true;
+        return current;
+      }
+      return [
+        ...current,
+        {
+          key: itemKey,
+          moduleName: normalizedModule,
+          moduleCourse: normalizedCourse,
+          planPrices,
+          crossCourse
+        }
+      ];
+    });
+
+    // Silent add-to-cart flow: only header count updates.
+    if (wasDuplicate) return;
+    setRecentlyAddedCartKey(itemKey);
+    if (recentlyAddedCartTimerRef.current) {
+      window.clearTimeout(recentlyAddedCartTimerRef.current);
+    }
+    recentlyAddedCartTimerRef.current = window.setTimeout(() => {
+      setRecentlyAddedCartKey('');
+      recentlyAddedCartTimerRef.current = null;
+    }, 900);
+    animateAddToCartToHeader(originElement);
+  }
+
+  function removeLockedModuleFromCart(itemKey) {
+    setLockedModuleCart((current) => current.filter((item) => item.key !== itemKey));
+  }
+
+  function getCartItemPlanPrice(item, planType) {
+    if (!item) return 0;
+    const prices = item.planPrices || {};
+    const selected = Number(prices[planType] ?? 0);
+    if (Number.isFinite(selected) && selected > 0) return selected;
+    const fallback = Number(prices.pro ?? prices.elite ?? 0);
+    return Number.isFinite(fallback) ? fallback : 0;
+  }
+
+  function getCourseTone(courseName) {
+    const normalized = normalizeCourseName(courseName).toLowerCase();
+    if (normalized === '11th') return 'school11';
+    if (normalized === '12th') return 'school12';
+    if (normalized === 'neet') return 'neet';
+    if (normalized === 'iit-jam') return 'jam';
+    if (normalized === 'csir-net life science') return 'csir';
+    if (normalized === 'gate') return 'gate';
+    return 'default';
+  }
+
+  function getCartItemEffectivePrice(item, planType) {
+    const basePrice = getCartItemPlanPrice(item, planType);
+    if (!appliedCartVoucherCode) return basePrice;
+    const preview = cartVoucherPreviewByKey[item?.key];
+    if (!preview || typeof preview.finalAmountInPaise !== 'number') return basePrice;
+    return Math.max(0, Number(preview.finalAmountInPaise || 0));
+  }
+
+  const cartPriceSyncSignature = lockedModuleCart
+    .map((item) => `${item.key}:${Number(item?.planPrices?.pro || 0)}:${Number(item?.planPrices?.elite || 0)}`)
+    .join('|');
+
+  const payableCartItems = lockedModuleCart;
+  const payableCartEstimate = payableCartItems.reduce((total, item) => total + getCartItemEffectivePrice(item, cartPlanType), 0);
+  const payableCartOriginalTotal = payableCartItems.reduce((total, item) => total + getCartItemPlanPrice(item, cartPlanType), 0);
+  const payableCartDiscountTotal = Math.max(0, payableCartOriginalTotal - payableCartEstimate);
+
+  async function buildVoucherPreviewForCart(voucherCode, planType) {
+    const normalizedVoucher = String(voucherCode || '').trim().toUpperCase();
+    if (!normalizedVoucher) {
+      setCartVoucherPreviewByKey({});
+      return { success: false, message: 'Enter a voucher code to apply.' };
+    }
+
+    if (!payableCartItems.length) {
+      setCartVoucherPreviewByKey({});
+      return { success: false, message: 'No payable modules in cart.' };
+    }
+
+    const requestId = Date.now();
+    cartVoucherRequestRef.current = requestId;
+    setIsApplyingCartVoucher(true);
+
+    try {
+      const results = await Promise.all(
+        payableCartItems.map(async (item) => {
+          try {
+            const preview = await previewCourseOrder(planType, normalizedVoucher, item.moduleName, item.moduleCourse);
+            return {
+              key: item.key,
+              ok: true,
+              pricing: preview?.pricing || null
+            };
+          } catch (error) {
+            return {
+              key: item.key,
+              ok: false,
+              error: error?.message || 'Failed to validate voucher.'
+            };
+          }
+        })
+      );
+
+      if (cartVoucherRequestRef.current !== requestId) {
+        return { success: false, message: 'Preview superseded by a newer request.' };
+      }
+
+      const previewMap = {};
+      let successCount = 0;
+      let firstError = '';
+      results.forEach((entry) => {
+        if (entry.ok && entry.pricing) {
+          successCount += 1;
+          previewMap[entry.key] = {
+            originalAmountInPaise: Number(entry.pricing.originalAmountInPaise || 0),
+            discountInPaise: Number(entry.pricing.discountInPaise || 0),
+            finalAmountInPaise: Number(entry.pricing.finalAmountInPaise || 0)
+          };
+        } else if (!firstError) {
+          firstError = entry.error || 'Voucher is invalid.';
+        }
+      });
+
+      if (successCount === 0) {
+        setCartVoucherPreviewByKey({});
+        return { success: false, message: firstError || 'Voucher is invalid.' };
+      }
+
+      setCartVoucherPreviewByKey(previewMap);
+      return {
+        success: true,
+        message: successCount === payableCartItems.length
+          ? `Voucher ${normalizedVoucher} applied.`
+          : `Voucher applied for ${successCount} item${successCount === 1 ? '' : 's'}.`
+      };
+    } finally {
+      if (cartVoucherRequestRef.current === requestId) {
+        setIsApplyingCartVoucher(false);
+      }
+    }
+  }
+
+  async function handleApplyCartVoucher() {
+    const normalized = String(cartVoucherCode || '').trim().toUpperCase();
+    const result = await buildVoucherPreviewForCart(normalized, cartPlanType);
+    if (!result.success) {
+      setAppliedCartVoucherCode('');
+      setCartVoucherMessage(result.message);
+      return;
+    }
+
+    setAppliedCartVoucherCode(normalized);
+    setCartVoucherCode(normalized);
+    setCartVoucherMessage(result.message);
+  }
+
+  function handleRemoveCartVoucher() {
+    setAppliedCartVoucherCode('');
+    setCartVoucherCode('');
+    setCartVoucherPreviewByKey({});
+    setCartVoucherMessage('Voucher removed. Price reverted to original rate.');
+  }
+
+  useEffect(() => {
+    if (!appliedCartVoucherCode) return;
+    buildVoucherPreviewForCart(appliedCartVoucherCode, cartPlanType)
+      .then((result) => {
+        if (!result.success) {
+          setAppliedCartVoucherCode('');
+          setCartVoucherMessage(result.message);
+          return;
+        }
+        setCartVoucherMessage(result.message);
+      })
+      .catch((error) => {
+        setAppliedCartVoucherCode('');
+        setCartVoucherPreviewByKey({});
+        setCartVoucherMessage(error?.message || 'Failed to refresh voucher pricing.');
+      });
+    // Intentionally track length and plan for re-pricing cart on structure changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedCartVoucherCode, cartPlanType, payableCartItems.length]);
+
+  useEffect(() => {
+    const username = getCartStorageUsernameKey(session?.username);
+    setIsCartHydrated(false);
+
+    if (!username || typeof window === 'undefined') {
+      setLockedModuleCart([]);
+      setIsCartHydrated(true);
+      return;
+    }
+
+    const storageKey = `${CART_STORAGE_PREFIX}${username}`;
+    try {
+      const raw = readCartStorage(storageKey);
+      if (!raw) {
+        setLockedModuleCart([]);
+      } else {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          setLockedModuleCart([]);
+        } else {
+          const safe = parsed
+            .filter((item) => item && typeof item === 'object')
+            .map((item) => ({
+              key: String(item.key || ''),
+              moduleName: normalizeModuleName(item.moduleName || ''),
+              moduleCourse: normalizeCourseName(item.moduleCourse || String(item.key || '').split('::')[0] || course || 'General'),
+              planPrices: item.planPrices && typeof item.planPrices === 'object' ? item.planPrices : {},
+              crossCourse: Boolean(item.crossCourse)
+            }))
+            .map((item) => ({
+              ...item,
+              key: item.key || buildLockedCartKey(item.moduleName, item.moduleCourse)
+            }))
+            .filter((item) => item.key && item.moduleName)
+            .filter((item, index, current) => current.findIndex((entry) => entry.key === item.key) === index);
+          setLockedModuleCart(safe);
+        }
+      }
+    } catch {
+      setLockedModuleCart([]);
+    } finally {
+      setIsCartHydrated(true);
+    }
+  }, [session?.username]);
+
+  useEffect(() => {
+    const username = getCartStorageUsernameKey(session?.username);
+    if (!username || typeof window === 'undefined') return;
+    if (!isCartHydrated) return;
+
+    const storageKey = `${CART_STORAGE_PREFIX}${username}`;
+    try {
+      writeCartStorage(storageKey, JSON.stringify(lockedModuleCart));
+    } catch {
+      // Ignore storage quota/privacy mode errors; cart still works in-memory.
+    }
+  }, [lockedModuleCart, session?.username, isCartHydrated]);
+
+  useEffect(() => {
+    if (!isCartHydrated || !lockedModuleCart.length) return;
+
+    let cancelled = false;
+
+    async function syncCartPlanPrices() {
+      const updates = await Promise.all(
+        lockedModuleCart.map(async (item) => {
+          const [proPreview, elitePreview] = await Promise.all([
+            previewCourseOrder('pro', '', item.moduleName, item.moduleCourse).catch(() => null),
+            previewCourseOrder('elite', '', item.moduleName, item.moduleCourse).catch(() => null)
+          ]);
+
+          const nextPro = Number(proPreview?.pricing?.originalAmountInPaise ?? item?.planPrices?.pro ?? 0);
+          const nextElite = Number(elitePreview?.pricing?.originalAmountInPaise ?? item?.planPrices?.elite ?? 0);
+          return {
+            key: item.key,
+            pro: Number.isFinite(nextPro) ? Math.max(0, nextPro) : 0,
+            elite: Number.isFinite(nextElite) ? Math.max(0, nextElite) : 0
+          };
+        })
+      );
+
+      if (cancelled) return;
+
+      const updateMap = new Map(updates.map((entry) => [entry.key, entry]));
+      const hasAnyPriceUpdate = lockedModuleCart.some((item) => {
+        const update = updateMap.get(item.key);
+        if (!update) return false;
+        const currentPro = Number(item?.planPrices?.pro ?? 0);
+        const currentElite = Number(item?.planPrices?.elite ?? 0);
+        return currentPro !== update.pro || currentElite !== update.elite;
+      });
+
+      setLockedModuleCart((current) => {
+        let changed = false;
+        const next = current.map((item) => {
+          const update = updateMap.get(item.key);
+          if (!update) return item;
+          const currentPro = Number(item?.planPrices?.pro ?? 0);
+          const currentElite = Number(item?.planPrices?.elite ?? 0);
+          if (currentPro === update.pro && currentElite === update.elite) return item;
+          changed = true;
+          return {
+            ...item,
+            planPrices: {
+              ...item.planPrices,
+              pro: update.pro,
+              elite: update.elite
+            }
+          };
+        });
+        return changed ? next : current;
+      });
+
+      if (hasAnyPriceUpdate) {
+        setCartPriceSyncMessage('Prices refreshed from latest admin settings.');
+      }
+    }
+
+    syncCartPlanPrices().catch(() => {
+      // Best effort: keep last known cart prices if preview API fails.
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isCartHydrated, cartPriceSyncSignature, session?.username]);
+
+  async function startMembershipCheckout({
+    targetCourse,
+    targetModuleName,
+    planType,
+    voucher = '',
+    reloadOnSuccess = true,
+    showSuccessBanner = true,
+    showCancelBanner = true
+  }) {
+    const normalizedTargetCourse = normalizeCourseName(targetCourse || course || '');
+    const targetLabel = targetModuleName === ALL_MODULES
+      ? `${normalizedTargetCourse || course || 'Course'} bundle`
+      : `${targetModuleName}${normalizedTargetCourse ? ` (${normalizedTargetCourse})` : ''}`;
+
+    const orderResponse = await createCourseOrder(
+      planType,
+      voucher.trim(),
+      targetModuleName || ALL_MODULES,
+      normalizedTargetCourse
+    );
+    if (orderResponse?.unlocked) {
+      if (showSuccessBanner) {
+        setBanner({ type: 'success', text: `${targetLabel} unlocked successfully.` });
+      }
+      await refreshAttempts();
+      if (reloadOnSuccess) window.location.reload();
+      return { status: 'already-unlocked' };
+    }
+
+    const scriptReady = await loadRazorpayCheckoutScript();
+    if (!scriptReady || !window.Razorpay) {
+      throw new Error('Unable to load Razorpay checkout. Please try again.');
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let paymentHandlerStarted = false;
+
+      const safeResolve = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      const safeReject = (error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+
+      const options = {
+        key: orderResponse.razorpayKeyId,
+        amount: orderResponse?.order?.amount,
+        currency: orderResponse?.order?.currency || 'INR',
+        name: 'Biomics Hub',
+        description: `${targetLabel} ${planType === 'elite' ? 'Elite' : 'Pro'} Membership`,
+        order_id: orderResponse?.order?.id,
+        handler: async (response) => {
+          paymentHandlerStarted = true;
+          try {
+            await verifyCoursePayment(response);
+            if (showSuccessBanner) {
+              setBanner({ type: 'success', text: `${targetLabel} unlocked successfully.` });
+            }
+            await refreshAttempts();
+            if (reloadOnSuccess) window.location.reload();
+            safeResolve({ status: 'paid' });
+          } catch (verifyErr) {
+            safeReject(new Error(verifyErr.message || 'Payment verification failed.'));
+          }
+        },
+        prefill: {
+          name: session?.username || ''
+        },
+        theme: {
+          color: '#0f766e'
+        },
+        modal: {
+          ondismiss: () => {
+            // Razorpay can emit dismiss around payment completion; wait briefly to avoid false cancellation.
+            window.setTimeout(() => {
+              if (paymentHandlerStarted) return;
+              if (showCancelBanner) {
+                setBanner({ type: 'error', text: 'Payment cancelled before completion.' });
+              }
+              safeResolve({ status: 'cancelled' });
+            }, 450);
+          }
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    });
+  }
+
+  async function handlePayNowForCart() {
+    if (isBulkCheckoutRunning || isUnlockingCourse) return;
+
+    if (!payableCartItems.length) {
+      setBanner({ type: 'error', text: 'No payable modules in cart for this account.' });
+      return;
+    }
+
+    setIsBulkCheckoutRunning(true);
+    setBanner(null);
+
+    const purchasedKeys = [];
+    let cancelled = false;
+
+    try {
+      for (const item of payableCartItems) {
+        const result = await startMembershipCheckout({
+          targetCourse: item.moduleCourse,
+          targetModuleName: item.moduleName,
+          planType: cartPlanType,
+          voucher: appliedCartVoucherCode,
+          reloadOnSuccess: false,
+          showSuccessBanner: false,
+          showCancelBanner: false
+        });
+
+        if (result?.status === 'cancelled') {
+          cancelled = true;
+          break;
+        }
+
+        if (['paid', 'already-unlocked', 'free'].includes(result?.status)) {
+          purchasedKeys.push(item.key);
+        }
+      }
+
+      if (purchasedKeys.length) {
+        setLockedModuleCart((current) => current.filter((item) => !purchasedKeys.includes(item.key)));
+        if (cancelled) {
+          setBanner({
+            type: 'success',
+            text: `${purchasedKeys.length} module${purchasedKeys.length === 1 ? '' : 's'} unlocked. Checkout was stopped for remaining items.`
+          });
+        } else {
+          setBanner({ type: 'success', text: `${purchasedKeys.length} module${purchasedKeys.length === 1 ? '' : 's'} unlocked successfully.` });
+        }
+        if (lockedModuleCart.length === purchasedKeys.length || !cancelled) {
+          setCartOpen(false);
+        }
+        return;
+      }
+
+      if (cancelled) {
+        setBanner({ type: 'error', text: 'Checkout was cancelled. No payment was made.' });
+      }
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Bulk checkout failed.' });
+    } finally {
+      setIsBulkCheckoutRunning(false);
+    }
+  }
+
+  async function handleCheckoutSingleCartItem(item) {
+    if (!item) {
+      setBanner({ type: 'error', text: 'Invalid cart item.' });
+      return;
+    }
+
+    setCartItemCheckoutKey(item.key);
+    try {
+      const result = await startMembershipCheckout({
+        targetCourse: item.moduleCourse,
+        targetModuleName: item.moduleName,
+        planType: cartPlanType,
+        voucher: appliedCartVoucherCode,
+        reloadOnSuccess: false,
+        showSuccessBanner: false,
+        showCancelBanner: true
+      });
+
+      if (['paid', 'already-unlocked', 'free'].includes(result?.status)) {
+        setLockedModuleCart((current) => current.filter((entry) => entry.key !== item.key));
+        setBanner({ type: 'success', text: `${item.moduleName} unlocked successfully.` });
+      }
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Checkout failed for selected module.' });
+    } finally {
+      setCartItemCheckoutKey('');
+    }
+  }
+
+  useEffect(() => {
+    if (!cartOpen) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setCartOpen(false);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [cartOpen]);
+
+  useEffect(() => {
+    if (!cartOpen || typeof document === 'undefined') return undefined;
+
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarGap = window.innerWidth - document.documentElement.clientWidth;
+
+    body.style.overflow = 'hidden';
+    if (scrollbarGap > 0) {
+      body.style.paddingRight = `${scrollbarGap}px`;
+    }
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+    };
+  }, [cartOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (recentlyAddedCartTimerRef.current) {
+        window.clearTimeout(recentlyAddedCartTimerRef.current);
+      }
+      if (cartPulseTimerRef.current) {
+        window.clearTimeout(cartPulseTimerRef.current);
+      }
+    };
+  }, []);
+
   function formatMonthLabel(monthValue) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(monthValue || ''))) return monthValue || 'Unknown Month';
     const [year, month] = String(monthValue).split('-');
@@ -175,8 +875,21 @@ export default function StudentDashboard() {
     return parsed.toLocaleDateString([], { month: 'long', year: 'numeric' });
   }
 
-  function getModuleAccessInfo(moduleName) {
+  function getModuleAccessInfo(moduleName, moduleCourse = course) {
     const normalizedModule = normalizeModuleName(moduleName);
+    const normalizedModuleCourse = normalizeCourseName(moduleCourse || '');
+    const normalizedStudentCourse = normalizeCourseName(course || '');
+
+    if (normalizedModuleCourse && normalizedStudentCourse && normalizedModuleCourse !== normalizedStudentCourse) {
+      return {
+        unlocked: false,
+        purchaseRequired: true,
+        pricing: { currency: 'INR', plans: [] },
+        activeMembership: null,
+        crossCourse: true
+      };
+    }
+
     return moduleAccessMap[normalizedModule] || {
       unlocked: true,
       purchaseRequired: false,
@@ -186,7 +899,6 @@ export default function StudentDashboard() {
   }
 
   const moduleMetaByKey = {};
-  const availableCourses = Array.from(new Set(videos.map((video) => normalizeCourseName(video.category || '')).filter(Boolean))).sort((a, b) => a.localeCompare(b));
   const activeCourseFilter = selectedCourseFilter === 'all' ? '' : selectedCourseFilter;
 
   // Group videos by course+module key.
@@ -227,6 +939,17 @@ export default function StudentDashboard() {
     }
   });
 
+  // Include the admin-created module catalog so modules show even before content upload.
+  (Array.isArray(moduleCatalog) ? moduleCatalog : []).forEach((entry) => {
+    const category = normalizeCourseName(entry?.category || '');
+    const displayModule = normalizeModuleName(entry?.name || '');
+    if (!category || !displayModule) return;
+    const moduleKey = resolveModuleKey(category, displayModule);
+    if (!moduleMetaByKey[moduleKey]) {
+      moduleMetaByKey[moduleKey] = { module: displayModule, category };
+    }
+  });
+
   // Keep purchasable modules discoverable even when no visible content is returned yet.
   Object.keys(moduleAccessMap).forEach((moduleName) => {
     const normalizedModule = normalizeModuleName(moduleName);
@@ -237,6 +960,14 @@ export default function StudentDashboard() {
       moduleMetaByKey[moduleKey] = { module: normalizedModule, category };
     }
   });
+
+  const availableCourses = Array.from(new Set([
+    ...videos.map((video) => normalizeCourseName(video.category || '')).filter(Boolean),
+    ...quizzes.map((quiz) => normalizeCourseName(quiz.category || '')).filter(Boolean),
+    ...quizAttempts.map((attempt) => normalizeCourseName(attempt.category || '')).filter(Boolean),
+    ...Object.values(moduleMetaByKey).map((meta) => normalizeCourseName(meta?.category || '')).filter(Boolean),
+    normalizeCourseName(course || '')
+  ])).sort((a, b) => a.localeCompare(b));
 
   const modules = Object.keys(moduleMetaByKey)
     .filter((moduleKey) => {
@@ -330,6 +1061,12 @@ export default function StudentDashboard() {
   const leaderboardChampion = leaderboard[0] || null;
 
   useEffect(() => {
+    if (selectedCourseFilter === 'all') return;
+    if (availableCourses.includes(selectedCourseFilter)) return;
+    setSelectedCourseFilter('all');
+  }, [availableCourses, selectedCourseFilter]);
+
+  useEffect(() => {
     if (!loadError) return;
     if (/authentication|unauthorized/i.test(loadError.message || '')) {
       logout();
@@ -352,6 +1089,20 @@ export default function StudentDashboard() {
     const timer = window.setTimeout(() => setProfileMessage(null), 3000);
     return () => window.clearTimeout(timer);
   }, [profileMessage]);
+
+  useEffect(() => {
+    if (!cartPriceSyncMessage) return undefined;
+    const timer = window.setTimeout(() => setCartPriceSyncMessage(''), 3000);
+    return () => window.clearTimeout(timer);
+  }, [cartPriceSyncMessage]);
+
+  useEffect(() => {
+    if (!banner?.text) return undefined;
+    if (banner.text !== 'Checkout was cancelled. No payment was made.') return undefined;
+
+    const timer = window.setTimeout(() => setBanner(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [banner]);
 
   useEffect(() => {
     if (!profileOpen || typeof window === 'undefined') return undefined;
@@ -404,7 +1155,7 @@ export default function StudentDashboard() {
       setSelectedAccessTarget(ALL_MODULES);
       return;
     }
-    const nextModuleAccess = getModuleAccessInfo(selectedModule.name);
+    const nextModuleAccess = getModuleAccessInfo(selectedModule.name, selectedModule.category);
     if (nextModuleAccess?.purchaseRequired && !nextModuleAccess?.unlocked) {
       setSelectedAccessTarget(normalizeModuleName(selectedModule.name));
     }
@@ -618,58 +1369,14 @@ export default function StudentDashboard() {
     setIsUnlockingCourse(true);
     setBanner(null);
     try {
-      const paymentInfo = await fetchMyCoursePaymentInfo();
-      const targetLabel = selectedAccessTarget === ALL_MODULES ? `${course} bundle` : selectedAccessTarget;
-      const selectedTargetModule = selectedAccessTarget || ALL_MODULES;
-      if (!paymentInfo?.purchaseRequired) {
-        setBanner({ type: 'success', text: 'This content is currently free and already available.' });
-        return;
-      }
-
-      const orderResponse = await createCourseOrder(selectedPlan, voucherCode.trim(), selectedTargetModule);
-      if (orderResponse?.unlocked) {
-        await refreshAttempts();
-        window.location.reload();
-        return;
-      }
-
-      const scriptReady = await loadRazorpayCheckoutScript();
-      if (!scriptReady || !window.Razorpay) {
-        throw new Error('Unable to load Razorpay checkout. Please try again.');
-      }
-
-      const options = {
-        key: orderResponse.razorpayKeyId || paymentInfo.razorpayKeyId,
-        amount: orderResponse?.order?.amount,
-        currency: orderResponse?.order?.currency || 'INR',
-        name: 'Biomics Hub',
-        description: `${targetLabel} ${selectedPlan === 'elite' ? 'Elite' : 'Pro'} Membership`,
-        order_id: orderResponse?.order?.id,
-        handler: async (response) => {
-          try {
-            await verifyCoursePayment(response);
-            setBanner({ type: 'success', text: `${targetLabel} unlocked successfully.` });
-            await refreshAttempts();
-            window.location.reload();
-          } catch (verifyErr) {
-            setBanner({ type: 'error', text: verifyErr.message || 'Payment verification failed.' });
-          }
-        },
-        prefill: {
-          name: session?.username || ''
-        },
-        theme: {
-          color: '#0f766e'
-        },
-        modal: {
-          ondismiss: () => {
-            setBanner({ type: 'error', text: 'Payment cancelled before completion.' });
-          }
-        }
-      };
-
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+      await startMembershipCheckout({
+        targetModuleName: selectedAccessTarget || ALL_MODULES,
+        planType: selectedPlan,
+        voucher: voucherCode,
+        reloadOnSuccess: true,
+        showSuccessBanner: true,
+        showCancelBanner: true
+      });
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to start payment.' });
     } finally {
@@ -787,12 +1494,11 @@ export default function StudentDashboard() {
   const studentNavItems = useMemo(() => {
     const baseItems = [
       { id: 'section-overview', label: 'Overview', icon: '🏠' },
-      { id: 'section-learning', label: 'Learning', icon: '📘' },
-      { id: 'section-connect', label: 'Connect', icon: '🔗' }
+      { id: 'section-learning', label: 'Learning', icon: '📘' }
     ];
-    if (selectedModule) return baseItems;
+    if (selectedModule) return [...baseItems, { id: 'section-connect', label: 'Connect', icon: '🔗' }];
     return [
-      ...baseItems.slice(0, 2),
+      ...baseItems,
       {
         id: 'section-community-chat',
         label: (
@@ -811,7 +1517,7 @@ export default function StudentDashboard() {
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
       { id: 'section-exam-leaderboard', label: 'Exam Leaderboard', icon: '🥇' },
       { id: 'section-feedback', label: 'Feedback', icon: '💬' },
-      baseItems[2]
+      { id: 'section-connect', label: 'Connect', icon: '🔗' }
     ];
   }, [selectedModule]);
 
@@ -824,43 +1530,57 @@ export default function StudentDashboard() {
       navTitle="Student Sections"
       navItems={studentNavItems}
       actions={(
-        <div className="profile-trigger-wrap">
+        <div className="topbar-user-actions">
+          <StudentAnnouncementBell />
           <button
             type="button"
-            className="profile-icon-btn"
-            onClick={openProfileModal}
-            aria-label="Open profile settings"
-            title="Profile settings"
+            ref={cartIconButtonRef}
+            className="student-cart-header-btn"
+            title="Open cart"
+            aria-label="Open cart"
+            onClick={() => setCartOpen((current) => !current)}
           >
-            {profileAvatarUrl ? (
-              <img src={profileAvatarUrl} alt="Student profile" className="profile-icon-image" />
-            ) : (
-              <span className="profile-icon-fallback">{profileInitial}</span>
-            )}
+            <span aria-hidden="true">🛒</span>
+            {lockedModuleCart.length ? <span className="student-cart-header-count">{lockedModuleCart.length > 9 ? '9+' : lockedModuleCart.length}</span> : null}
           </button>
-          <div className="profile-hover-card" aria-hidden="true">
-            <strong>{profile?.username || session?.username || 'Student'}</strong>
-            <span>{profile?.class || course || 'Course unavailable'}</span>
-            <span>{profile?.city || 'City unavailable'}</span>
-            {visibleMembership ? (
-              <div className="profile-membership-card" role="status" aria-live="polite">
-                <div className="profile-membership-head">
-                  <span className="profile-membership-label">Active membership</span>
-                  <span className="profile-membership-tag">{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'}</span>
-                </div>
-                <span className="profile-membership-expiry">
-                  Expires {formatMembershipDate(visibleMembership.expiresAt)}
-                </span>
-              </div>
-            ) : null}
+          <div className="profile-trigger-wrap">
             <button
               type="button"
-              className="profile-theme-btn"
-              onClick={toggleTheme}
-              aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
+              className="profile-icon-btn"
+              onClick={openProfileModal}
+              aria-label="Open profile settings"
+              title="Profile settings"
             >
-              {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+              {profileAvatarUrl ? (
+                <img src={profileAvatarUrl} alt="Student profile" className="profile-icon-image" />
+              ) : (
+                <span className="profile-icon-fallback">{profileInitial}</span>
+              )}
             </button>
+            <div className="profile-hover-card" aria-hidden="true">
+              <strong>{profile?.username || session?.username || 'Student'}</strong>
+              <span>{profile?.class || course || 'Course unavailable'}</span>
+              <span>{profile?.city || 'City unavailable'}</span>
+              {visibleMembership ? (
+                <div className="profile-membership-card" role="status" aria-live="polite">
+                  <div className="profile-membership-head">
+                    <span className="profile-membership-label">Active membership</span>
+                    <span className="profile-membership-tag">{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'}</span>
+                  </div>
+                  <span className="profile-membership-expiry">
+                    Expires {formatMembershipDate(visibleMembership.expiresAt)}
+                  </span>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="profile-theme-btn"
+                onClick={toggleTheme}
+                aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
+              >
+                {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -868,28 +1588,136 @@ export default function StudentDashboard() {
       <div id="section-overview" className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
-        {!selectedModule ? (
-          <section id="section-community-chat" className="card student-community-launch-card">
-            <div className="section-header compact">
-              <div>
-                <p className="eyebrow section-live-eyebrow">
-                  Community Chat
-                  <span className="live-badge" aria-hidden="true">
-                    <span className="live-badge-dot" />
-                    LIVE
-                  </span>
-                </p>
-                <h2>Talk with admins and learners in real time</h2>
-                <p className="subtitle">Ask doubts, share tips, and stay connected with the whole Biomics community.</p>
+        {cartOpen && typeof document !== 'undefined' ? createPortal(
+          <div className="student-cart-overlay" role="presentation" onClick={() => setCartOpen(false)}>
+            <aside
+              className="student-cart-drawer student-cart-drawer-floating"
+              role="dialog"
+              aria-label="Checkout cart"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="student-cart-drawer-head">
+                <div>
+                  <p className="eyebrow">Checkout Cart</p>
+                  <h3>{lockedModuleCart.length} item{lockedModuleCart.length === 1 ? '' : 's'} in cart</h3>
+                </div>
+                <button type="button" className="student-cart-close-btn" onClick={() => setCartOpen(false)} aria-label="Close cart">
+                  ×
+                </button>
+              </header>
+
+              <div className="student-cart-drawer-body">
+                <div className="student-cart-plan-row" role="group" aria-label="Select cart plan">
+                  <button
+                    type="button"
+                    className={`secondary-btn${cartPlanType === 'pro' ? ' active' : ''}`}
+                    onClick={() => setCartPlanType('pro')}
+                  >
+                    Pro Plan
+                  </button>
+                  <button
+                    type="button"
+                    className={`secondary-btn${cartPlanType === 'elite' ? ' active' : ''}`}
+                    onClick={() => setCartPlanType('elite')}
+                  >
+                    Elite Plan
+                  </button>
+                </div>
+
+                <label className="student-cart-voucher-field">
+                  Voucher Code
+                  <div className="student-cart-voucher-row">
+                    <input
+                      type="text"
+                      placeholder="Enter voucher"
+                      value={cartVoucherCode}
+                      onChange={(event) => {
+                        setCartVoucherCode(event.target.value.toUpperCase());
+                        if (cartVoucherMessage) setCartVoucherMessage('');
+                      }}
+                      maxLength={20}
+                    />
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={handleApplyCartVoucher}
+                      disabled={isApplyingCartVoucher || !cartVoucherCode.trim() || cartVoucherCode.trim().toUpperCase() === appliedCartVoucherCode}
+                    >
+                      {isApplyingCartVoucher ? 'Applying...' : 'Apply'}
+                    </button>
+                  </div>
+                </label>
+
+                {appliedCartVoucherCode ? (
+                  <div className="student-cart-voucher-applied" role="status" aria-live="polite">
+                    <span>Applied: {appliedCartVoucherCode}</span>
+                    <button type="button" className="link-btn" onClick={handleRemoveCartVoucher}>Remove</button>
+                  </div>
+                ) : null}
+
+                {cartVoucherMessage ? (
+                  <p className="student-cart-voucher-note" role="status" aria-live="polite">{cartVoucherMessage}</p>
+                ) : null}
+
+                {cartPriceSyncMessage ? (
+                  <p className="student-cart-voucher-note" role="status" aria-live="polite">{cartPriceSyncMessage}</p>
+                ) : null}
+
+                {!lockedModuleCart.length ? (
+                  <p className="empty-state">Your cart is empty. Add locked modules from cards.</p>
+                ) : (
+                  <div className="student-cart-items">
+                    {lockedModuleCart.map((item) => (
+                      <article key={item.key} className="student-cart-drawer-item">
+                        <div>
+                          <div className="student-cart-item-headline">
+                            <strong>{item.moduleName}</strong>
+                            <span className={`student-cart-course-chip tone-${getCourseTone(item.moduleCourse)}`}>{item.moduleCourse}</span>
+                          </div>
+                          <p>Course purchase</p>
+                          <span>
+                            {`${cartPlanType === 'elite' ? 'Elite' : 'Pro'} • ${formatPriceInPaise(getCartItemEffectivePrice(item, cartPlanType))}`}
+                          </span>
+                        </div>
+                        <div className="student-cart-item-actions">
+                          <button
+                            type="button"
+                            className="link-btn"
+                            disabled={isBulkCheckoutRunning || cartItemCheckoutKey === item.key}
+                            onClick={() => handleCheckoutSingleCartItem(item)}
+                          >
+                            {cartItemCheckoutKey === item.key ? 'Processing...' : 'Checkout'}
+                          </button>
+                          <button type="button" className="secondary-btn" onClick={() => removeLockedModuleFromCart(item.key)}>
+                            Remove
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </div>
-              <StatCard label="Status" value="Live" />
-            </div>
-            <div className="workspace-link-actions">
-              <button type="button" className="primary-btn" onClick={() => navigate('/student/community-chat')}>
-                Open Community Chat
-              </button>
-            </div>
-          </section>
+
+              <footer className="student-cart-drawer-foot">
+                <div>
+                  <small>{appliedCartVoucherCode ? 'Estimated total (voucher applied)' : 'Estimated total'}</small>
+                  <strong>{formatPriceInPaise(payableCartEstimate)}</strong>
+                  {appliedCartVoucherCode && payableCartDiscountTotal > 0 ? (
+                    <span className="student-cart-savings-note">You save {formatPriceInPaise(payableCartDiscountTotal)}</span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={handlePayNowForCart}
+                  disabled={isBulkCheckoutRunning || isUnlockingCourse || !payableCartItems.length}
+                >
+                  {isBulkCheckoutRunning ? 'Processing Cart...' : `Pay Now (${payableCartItems.length})`}
+                </button>
+              </footer>
+            </aside>
+          </div>,
+          document.body
         ) : null}
 
         {!selectedModule && mockExamNotices.length ? (
@@ -1158,8 +1986,11 @@ export default function StudentDashboard() {
               const moduleMeta = moduleMetaByKey[moduleKey];
               const module = moduleMeta.module;
               const moduleCourse = moduleMeta.category;
-              const moduleAccessInfo = getModuleAccessInfo(module);
+              const moduleAccessInfo = getModuleAccessInfo(module, moduleCourse);
               const moduleIsLocked = Boolean(moduleAccessInfo.purchaseRequired && !moduleAccessInfo.unlocked);
+              const cartItemKey = buildLockedCartKey(module, moduleCourse);
+              const isInLockedCart = lockedModuleCart.some((item) => item.key === cartItemKey);
+              const isJustAddedToCart = recentlyAddedCartKey === cartItemKey;
               const moduleVideos = videosByModule[moduleKey] || [];
               const completedInModule = moduleVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
               const moduleQuizCount = (quizzesByModule[moduleKey] || []).length;
@@ -1174,14 +2005,7 @@ export default function StudentDashboard() {
                 moduleProgressPercent = Math.round((lectureProgress + (hasQuizAttempt ? 100 : 0)) / 2);
               }
               return (
-                <button
-                  key={moduleKey}
-                  className={`module-card-btn${moduleIsLocked ? ' module-card-btn-locked' : ''}`}
-                  onClick={() => {
-                    setSelectedModule({ name: module, category: moduleCourse });
-                    setSelectedModuleSection('');
-                  }}
-                >
+                <article key={moduleKey} className={`module-card-btn${moduleIsLocked ? ' module-card-btn-locked' : ''}`}>
                   <div className="module-card-header">
                     <span className="module-card-icon">📚</span>
                     <span className="module-card-count">{moduleVideos.length}</span>
@@ -1195,7 +2019,9 @@ export default function StudentDashboard() {
                     </p>
                     <p className="module-card-progress">
                       {moduleIsLocked
-                        ? `Locked • ${formatPriceInPaise(moduleAccessInfo.pricing?.plans?.[0]?.amountInPaise || 0)} Pro`
+                        ? (moduleAccessInfo.crossCourse
+                            ? 'Locked • Separate course purchase required'
+                            : `Locked • ${formatPriceInPaise(moduleAccessInfo.pricing?.plans?.[0]?.amountInPaise || 0)} Pro`)
                         : `Progress: ${moduleProgressPercent}%`}
                     </p>
                     {latestAttemptByModule[moduleKey] ? (
@@ -1204,8 +2030,35 @@ export default function StudentDashboard() {
                       </p>
                     ) : null}
                   </div>
+                  <div className="module-card-actions">
+                    <button
+                      type="button"
+                      className="primary-btn module-open-btn"
+                      onClick={() => {
+                        setSelectedModule({ name: module, category: moduleCourse });
+                        setSelectedModuleSection('');
+                      }}
+                    >
+                      {moduleIsLocked ? 'View Lock Details' : 'Open Module'}
+                    </button>
+                    {moduleIsLocked ? (
+                      <button
+                        type="button"
+                        className={`secondary-btn module-cart-btn${isInLockedCart ? ' in-cart go-cart' : ''}${isJustAddedToCart ? ' just-added' : ''}`}
+                        onClick={(event) => {
+                          if (isInLockedCart) {
+                            setCartOpen(true);
+                            return;
+                          }
+                          addLockedModuleToCart(module, moduleCourse, moduleAccessInfo, event.currentTarget);
+                        }}
+                      >
+                        {isInLockedCart ? (isJustAddedToCart ? 'Added ✓' : 'Go to Cart') : 'Add to Cart'}
+                      </button>
+                    ) : null}
+                  </div>
                   <span className="module-card-arrow">{moduleIsLocked ? '🔒' : '→'}</span>
-                </button>
+                </article>
               );
             })}
           </div>
@@ -1219,68 +2072,106 @@ export default function StudentDashboard() {
             </div>
             <StatCard label="Course" value={selectedModuleCourse || course || 'Module'} />
           </div>
-          <p className="empty-note">Choose whether you want access to only this module or the full-course bundle.</p>
+          {isCrossCourseSelection ? (
+            <p className="empty-note">
+              Buy this module from {selectedModuleCourse} using cart checkout. You can purchase courses across branches from the same account.
+            </p>
+          ) : (
+            <p className="empty-note">Choose whether you want access to only this module or the full-course bundle.</p>
+          )}
 
-          <div className="membership-target-switch">
-            <button
-              type="button"
-              className={`secondary-btn${selectedAccessTarget === normalizeModuleName(selectedModuleName) ? ' active' : ''}`}
-              onClick={() => setSelectedAccessTarget(normalizeModuleName(selectedModuleName))}
-            >
-              This Module
-            </button>
-            <button
-              type="button"
-              className={`secondary-btn${selectedAccessTarget === ALL_MODULES ? ' active' : ''}`}
-              onClick={() => setSelectedAccessTarget(ALL_MODULES)}
-            >
-              All Modules Bundle
-            </button>
-          </div>
+          {isCrossCourseSelection ? (
+            <div className="material-upload-row membership-actions-row">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={(event) => {
+                  if (selectedModuleIsInCart) {
+                    setCartOpen(true);
+                    return;
+                  }
+                  addLockedModuleToCart(
+                    selectedModuleName,
+                    selectedModuleCourse,
+                    selectedModuleAccess || { pricing: { plans: [] } },
+                    event.currentTarget
+                  );
+                }}
+              >
+                {selectedModuleIsInCart ? 'Go to Cart' : 'Add to Cart'}
+              </button>
+              <button type="button" className="primary-btn" onClick={() => setCartOpen(true)}>
+                Open Cart Checkout
+              </button>
+            </div>
+          ) : null}
 
-          <div className="membership-plan-grid">
-            {selectedTargetPlans.map((plan) => {
-              const isSelected = selectedPlan === plan.type;
-              const isElite = plan.type === 'elite';
-              return (
-                <button
-                  key={`${selectedAccessTarget}-${plan.type}`}
-                  type="button"
-                  className={`membership-plan-card${isSelected ? ' selected' : ''}${isElite ? ' elite' : ' pro'}`}
-                  onClick={() => setSelectedPlan(plan.type)}
-                >
-                  <div className="membership-plan-head">
-                    <span className="membership-plan-kicker">{selectedAccessTarget === ALL_MODULES ? 'Bundle Access' : 'Module Access'}</span>
-                    <span className="membership-plan-badge">{plan.label}</span>
-                    {isElite ? <span className="membership-plan-elite-flag">Most Popular</span> : null}
-                  </div>
-                  <div className="membership-plan-price">{formatPriceInPaise(plan.amountInPaise)}</div>
-                  <p className="membership-plan-duration">{plan.durationMonths} {plan.durationMonths === 1 ? 'month' : 'months'} access</p>
-                  <ul className="membership-plan-points">
-                    <li>{selectedAccessTarget === ALL_MODULES ? `All modules in ${selectedModuleCourse || course}` : `Only ${selectedModuleName}`}</li>
-                    <li>Lecture videos and notes</li>
-                    <li>Quizzes for unlocked modules</li>
-                    <li>{isElite ? 'Longer validity and premium status' : 'Fast monthly access'}</li>
-                  </ul>
-                </button>
-              );
-            })}
-          </div>
+          {!isCrossCourseSelection ? (
+            <div className="membership-target-switch">
+              <button
+                type="button"
+                className={`secondary-btn${selectedAccessTarget === normalizeModuleName(selectedModuleName) ? ' active' : ''}`}
+                onClick={() => setSelectedAccessTarget(normalizeModuleName(selectedModuleName))}
+              >
+                This Module
+              </button>
+              <button
+                type="button"
+                className={`secondary-btn${selectedAccessTarget === ALL_MODULES ? ' active' : ''}`}
+                onClick={() => setSelectedAccessTarget(ALL_MODULES)}
+              >
+                All Modules Bundle
+              </button>
+            </div>
+          ) : null}
 
-          <div className="material-upload-row membership-actions-row">
-            <input
-              type="text"
-              placeholder="Voucher code (optional)"
-              value={voucherCode}
-              onChange={(event) => setVoucherCode(event.target.value.toUpperCase())}
-              maxLength={20}
-            />
-            <button type="button" className="primary-btn" onClick={handleUnlockCourse} disabled={isUnlockingCourse || !selectedPlan || !selectedTargetPlans.length}>
-              {isUnlockingCourse
-                ? 'Processing...'
-                : `Unlock ${selectedAccessTarget === ALL_MODULES ? 'All Modules' : 'This Module'} with ${selectedPlan === 'elite' ? 'Elite' : 'Pro'}`}
-            </button>
-          </div>
+          {!isCrossCourseSelection ? (
+            <div className="membership-plan-grid">
+              {selectedTargetPlans.map((plan) => {
+                const isSelected = selectedPlan === plan.type;
+                const isElite = plan.type === 'elite';
+                return (
+                  <button
+                    key={`${selectedAccessTarget}-${plan.type}`}
+                    type="button"
+                    className={`membership-plan-card${isSelected ? ' selected' : ''}${isElite ? ' elite' : ' pro'}`}
+                    onClick={() => setSelectedPlan(plan.type)}
+                  >
+                    <div className="membership-plan-head">
+                      <span className="membership-plan-kicker">{selectedAccessTarget === ALL_MODULES ? 'Bundle Access' : 'Module Access'}</span>
+                      <span className="membership-plan-badge">{plan.label}</span>
+                      {isElite ? <span className="membership-plan-elite-flag">Most Popular</span> : null}
+                    </div>
+                    <div className="membership-plan-price">{formatPriceInPaise(plan.amountInPaise)}</div>
+                    <p className="membership-plan-duration">{plan.durationMonths} {plan.durationMonths === 1 ? 'month' : 'months'} access</p>
+                    <ul className="membership-plan-points">
+                      <li>{selectedAccessTarget === ALL_MODULES ? `All modules in ${selectedModuleCourse || course}` : `Only ${selectedModuleName}`}</li>
+                      <li>Lecture videos and notes</li>
+                      <li>Quizzes for unlocked modules</li>
+                      <li>{isElite ? 'Longer validity and premium status' : 'Fast monthly access'}</li>
+                    </ul>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {!isCrossCourseSelection ? (
+            <div className="material-upload-row membership-actions-row">
+              <input
+                type="text"
+                placeholder="Voucher code (optional)"
+                value={voucherCode}
+                onChange={(event) => setVoucherCode(event.target.value.toUpperCase())}
+                maxLength={20}
+              />
+              <button type="button" className="primary-btn" onClick={handleUnlockCourse} disabled={isUnlockingCourse || !selectedPlan || !selectedTargetPlans.length}>
+                {isUnlockingCourse
+                  ? 'Processing...'
+                  : `Unlock ${selectedAccessTarget === ALL_MODULES ? 'All Modules' : 'This Module'} with ${selectedPlan === 'elite' ? 'Elite' : 'Pro'}`}
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : selectedModule && !moduleLocked && selectedModuleSection === 'lectures' && displayedVideos.length ? (
         // Video Grid View (within selected module)
@@ -1322,7 +2213,11 @@ export default function StudentDashboard() {
               <strong>Lecture Section</strong>
               <p>Open all videos for this module in a focused lecture layout.</p>
             </button>
-            <button type="button" className="module-section-card" onClick={() => setSelectedModuleSection('quiz')}>
+            <button
+              type="button"
+              className="module-section-card"
+              onClick={() => navigate(`/student/module/${encodeURIComponent(selectedModuleCourse || course || 'General')}/${encodeURIComponent(selectedModuleName || 'General')}/quizzes`)}
+            >
               <span className="module-section-icon" aria-hidden="true">📝</span>
               <strong>Quiz Section</strong>
               <p>Open assessment quizzes and track performance for this chapter.</p>
@@ -1334,6 +2229,30 @@ export default function StudentDashboard() {
           {activeCourseFilter ? `No modules available for ${activeCourseFilter}.` : 'No modules available yet.'}
         </p>
       )}
+
+      {!selectedModule ? (
+        <section id="section-community-chat" className="card student-community-launch-card">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow section-live-eyebrow">
+                Community Chat
+                <span className="live-badge" aria-hidden="true">
+                  <span className="live-badge-dot" />
+                  LIVE
+                </span>
+              </p>
+              <h2>Talk with admins and learners in real time</h2>
+              <p className="subtitle">Ask doubts, share tips, and stay connected with the whole Biomics community.</p>
+            </div>
+            <StatCard label="Status" value="Live" />
+          </div>
+          <div className="workspace-link-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/student/community-chat')}>
+              Open Community Chat
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {hasAnyUnlockedModule && !selectedModule && visibleModules.length ? (
         <section id="section-quiz-performance" className="card quiz-history-panel">
@@ -1888,7 +2807,7 @@ export default function StudentDashboard() {
       ) : null}
       
       {/* Student Chat Agent */}
-      <StudentChatAgent />
+      <StudentChatAgent hideAnnouncementFab />
     </>
   );
 }

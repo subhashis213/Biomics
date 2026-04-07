@@ -23,13 +23,14 @@ export function useCourseData() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['courseData'],
     queryFn: async () => {
-      const [allVideos, profileData, quizData, attemptData] = await Promise.all([
+      const [allVideos, profileData, quizData, attemptData, moduleCatalogData] = await Promise.all([
         requestJson('/videos'),
         requestJson('/videos/my-course'),
         fetchCourseQuizzes(),
-        fetchRecentQuizAttempts()
+        fetchRecentQuizAttempts(),
+        requestJson('/modules/catalog')
       ]);
-      return { allVideos, profileData, quizData, attemptData };
+      return { allVideos, profileData, quizData, attemptData, moduleCatalogData };
     },
     staleTime: 2 * 60 * 1000,
     retry: (failureCount, err) => {
@@ -92,6 +93,7 @@ export function useCourseData() {
     completedIds,
     quizzes: data?.quizData?.quizzes || [],
     quizAttempts: data?.attemptData?.attempts || [],
+    moduleCatalog: data?.moduleCatalogData?.modules || [],
     isLoading,
     loadError: error,
     toggleFavorite: (videoId) => favMutation.mutate(videoId),

@@ -70,7 +70,102 @@ function getLanguageLabel(lang) {
   return 'English';
 }
 
-export default function StudentChatAgent() {
+export default function StudentChatAgent({ hideAnnouncementFab = false }) {
+  return <StudentChatAgentPanel hideAnnouncementFab={hideAnnouncementFab} />;
+}
+
+export function StudentAnnouncementBell() {
+  const { session } = useSessionStore();
+  const isLoggedIn = !!session?.token;
+  const [open, setOpen] = useState(false);
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const activeAnnouncementCount = announcements.length;
+  const shouldRingAnnouncement = activeAnnouncementCount > 0 && !open;
+
+  const loadAnnouncements = useCallback(async () => {
+    if (!isLoggedIn) {
+      setAnnouncements([]);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchStudentAnnouncements();
+      setAnnouncements(Array.isArray(data?.announcements) ? data.announcements : []);
+    } catch (loadError) {
+      setError(loadError.message || 'Failed to load announcements.');
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, [loadAnnouncements]);
+
+  if (!isLoggedIn) return null;
+
+  return (
+    <div className="biotab-announcement-inline-wrap">
+      <button
+        type="button"
+        className={`biotab-announcement-header-btn${shouldRingAnnouncement ? ' biotab-announcement-fab-ringing' : ''}`}
+        title="View announcements"
+        aria-label="View admin announcements"
+        onClick={() => {
+          setOpen((current) => !current);
+          if (!open) loadAnnouncements();
+        }}
+      >
+        <Bell size={18} />
+        {activeAnnouncementCount > 0 ? (
+          <span className="biotab-announcement-count">{activeAnnouncementCount > 9 ? '9+' : activeAnnouncementCount}</span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <div className="biotab-announcement-panel biotab-announcement-panel-inline" role="dialog" aria-label="Student announcements">
+          <div className="biotab-announcement-head">
+            <strong>Announcements</strong>
+            <button
+              type="button"
+              className="biotab-announcement-close"
+              onClick={() => setOpen(false)}
+              aria-label="Close announcements"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {loading ? <p className="biotab-announcement-empty">Loading announcements...</p> : null}
+          {!loading && error ? <p className="biotab-announcement-empty">{error}</p> : null}
+
+          {!loading && !error ? (
+            announcements.length ? (
+              <div className="biotab-announcement-list">
+                {announcements.map((item) => (
+                  <article key={item._id} className="biotab-announcement-item">
+                    <h4>{item.title}</h4>
+                    <p>{item.message}</p>
+                    <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="biotab-announcement-empty">No announcements yet.</p>
+            )
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
   const { session } = useSessionStore();
   const isLoggedIn = !!session?.token;
 
@@ -265,7 +360,7 @@ export default function StudentChatAgent() {
       {/* ── Floating Action Button — always shows when panel is closed ── */}
       {!isOpen && (
         <>
-        {isLoggedIn ? (
+        {isLoggedIn && !hideAnnouncementFab ? (
           <button
             type="button"
             className={`biotab-announcement-fab${shouldRingAnnouncement ? ' biotab-announcement-fab-ringing' : ''}`}

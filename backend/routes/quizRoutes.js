@@ -45,8 +45,9 @@ function sanitizeQuestionsForStudent(questions = []) {
 
 function validateQuizPayload(payload) {
   if (!payload || typeof payload !== 'object') return 'Invalid quiz payload.';
-  const { category, module, title, questions, difficulty, timeLimitMinutes, requireExplanation } = payload;
+  const { category, module, title, questions, difficulty, timeLimitMinutes, requireExplanation, topic } = payload;
   if (!category || !module || !title) return 'Category, module and title are required.';
+  if (topic != null && typeof topic !== 'string') return 'Topic must be text.';
   if (!Array.isArray(questions) || questions.length === 0) return 'At least one question is required.';
   if (difficulty && !['easy', 'medium', 'hard'].includes(String(difficulty))) {
     return 'Difficulty must be easy, medium, or hard.';
@@ -85,6 +86,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
 
     const category = String(req.body.category).trim();
     const moduleName = String(req.body.module).trim();
+    const topicName = String(req.body.topic || 'General').trim() || 'General';
     const title = String(req.body.title).trim();
     const difficulty = req.body.difficulty ? String(req.body.difficulty).toLowerCase() : 'medium';
     const requireExplanation = Boolean(req.body.requireExplanation);
@@ -105,6 +107,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
           $set: {
             category,
             module: moduleName,
+            topic: topicName,
             title,
             difficulty,
             requireExplanation,
@@ -121,6 +124,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       quiz = await Quiz.create({
         category,
         module: moduleName,
+        topic: topicName,
         title,
         difficulty,
         requireExplanation,
@@ -142,7 +146,7 @@ router.get('/admin/analytics', authenticateToken('admin'), async (req, res) => {
   try {
     const category = String(req.query.category || '').trim();
     const quizFilter = category ? { category } : {};
-    const quizzes = await Quiz.find(quizFilter, { _id: 1, title: 1, category: 1, module: 1, difficulty: 1 }).lean();
+    const quizzes = await Quiz.find(quizFilter, { _id: 1, title: 1, category: 1, module: 1, topic: 1, difficulty: 1 }).lean();
     const quizIds = quizzes.map((q) => q._id);
 
     const attempts = await QuizAttempt.find({ quizId: { $in: quizIds } }, {
@@ -157,6 +161,7 @@ router.get('/admin/analytics', authenticateToken('admin'), async (req, res) => {
         title: q.title,
         category: q.category,
         module: q.module,
+        topic: q.topic || 'General',
         difficulty: q.difficulty,
         totalAttempts: 0,
         totalScore: 0,
@@ -236,6 +241,7 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
           _id: String(deletedObj._id),
           category: deletedObj.category,
           module: deletedObj.module,
+          topic: deletedObj.topic || 'General',
           title: deletedObj.title,
           difficulty: deletedObj.difficulty,
           requireExplanation: deletedObj.requireExplanation,
@@ -257,7 +263,7 @@ router.get('/', authenticateToken('admin'), async (req, res) => {
   try {
     const category = String(req.query.category || '').trim();
     const filter = category ? { category } : {};
-    const quizzes = await Quiz.find(filter).sort({ category: 1, module: 1, updatedAt: -1 }).lean();
+    const quizzes = await Quiz.find(filter).sort({ category: 1, module: 1, topic: 1, updatedAt: -1 }).lean();
     return res.json({ quizzes });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch quizzes.' });
@@ -272,7 +278,7 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
 
     const quizzes = await Quiz.find(
       { category: user.class },
-      { category: 1, module: 1, title: 1, difficulty: 1, requireExplanation: 1, timeLimitMinutes: 1, updatedAt: 1, questions: 1 }
+      { category: 1, module: 1, topic: 1, title: 1, difficulty: 1, requireExplanation: 1, timeLimitMinutes: 1, updatedAt: 1, questions: 1 }
     )
       .sort({ module: 1 })
       .lean();
@@ -289,6 +295,7 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
         _id: quiz._id,
         category: quiz.category,
         module: quiz.module,
+        topic: quiz.topic || 'General',
         title: quiz.title,
         difficulty: quiz.difficulty || 'medium',
         requireExplanation: quiz.requireExplanation,
@@ -323,6 +330,7 @@ router.get('/my-course/quiz/:id', authenticateToken('user'), async (req, res) =>
         _id: quiz._id,
         category: quiz.category,
         module: quiz.module,
+        topic: quiz.topic || 'General',
         title: quiz.title,
         difficulty: quiz.difficulty || 'medium',
         requireExplanation: Boolean(quiz.requireExplanation),
@@ -356,6 +364,7 @@ router.get('/my-course/:module', authenticateToken('user'), async (req, res) => 
         _id: quiz._id,
         category: quiz.category,
         module: quiz.module,
+        topic: quiz.topic || 'General',
         title: quiz.title,
         difficulty: quiz.difficulty || 'medium',
         requireExplanation: Boolean(quiz.requireExplanation),

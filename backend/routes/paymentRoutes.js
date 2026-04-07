@@ -32,13 +32,20 @@ const SUPPORTED_COURSES = [
   'GATE'
 ];
 
-const razorpayKeyId = String(process.env.RAZORPAY_KEY_ID || '').trim();
-const razorpayKeySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
-const hasRazorpayConfig = Boolean(razorpayKeyId && razorpayKeySecret);
-
-const razorpay = hasRazorpayConfig
-  ? new Razorpay({ key_id: razorpayKeyId, key_secret: razorpayKeySecret })
-  : null;
+function getRazorpayConfig() {
+  const keyId = String(process.env.RAZORPAY_KEY_ID || '').trim();
+  const keySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
+  const hasConfig = Boolean(keyId && keySecret);
+  const client = hasConfig
+    ? new Razorpay({ key_id: keyId, key_secret: keySecret })
+    : null;
+  return {
+    keyId,
+    keySecret,
+    hasConfig,
+    client
+  };
+}
 
 function isSupportedCourse(course) {
   return SUPPORTED_COURSES.includes(normalizeCourseName(course));
@@ -199,27 +206,119 @@ async function buildStudentPricingSnapshot(user, course) {
 
 router.get('/my-course', authenticateToken('user'), async (req, res) => {
   try {
+    const { keyId, hasConfig } = getRazorpayConfig();
     const { user, course } = await ensureUserAndCourse(req.user.username);
     if (!user || !course) return res.status(404).json({ error: 'Student profile not found.' });
 
     const access = await buildStudentPricingSnapshot(user, course);
     return res.json({
       ...access,
-      razorpayKeyId: access.purchaseRequired ? razorpayKeyId : '',
-      hasRazorpayConfig
+      razorpayKeyId: access.purchaseRequired ? keyId : '',
+      hasRazorpayConfig: hasConfig
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to load course payment info.' });
   }
 });
 
-router.post('/create-order', authenticateToken('user'), async (req, res) => {
+router.post('/preview-order', authenticateToken('user'), async (req, res) => {
   try {
     const { user, course } = await ensureUserAndCourse(req.user.username);
     if (!user || !course) return res.status(404).json({ error: 'Student profile not found.' });
 
+    const requestedCourse = normalizeCourseName(req.body?.course || '');
+    const targetCourse = requestedCourse || course;
+    if (!isSupportedCourse(targetCourse)) {
+      return res.status(400).json({ error: 'Unsupported course category.' });
+    }
+
     const targetModuleName = normalizeModuleName(req.body?.moduleName || ALL_MODULES);
-    const pricing = await getModulePricingDoc(course, targetModuleName);
+    const pricing = await getModulePricingDoc(targetCourse, targetModuleName);
+    const planType = String(req.body?.planType || '').trim().toLowerCase();
+    const selectedPlan = getMembershipPlan(planType);
+    if (!selectedPlan) {
+      return res.status(400).json({ error: 'Please choose a valid membership plan.' });
+    }
+
+    const originalAmountInPaise = getPlanPriceInPaise(pricing, selectedPlan.type);
+    if (!pricing || originalAmountInPaise <= 0) {
+      return res.json({
+        unlocked: true,
+        purchaseRequired: false,
+        pricing: {
+          moduleName: targetModuleName,
+          planType: selectedPlan.type,
+          durationMonths: selectedPlan.durationMonths,
+          originalAmountInPaise: 0,
+          discountInPaise: 0,
+          finalAmountInPaise: 0,
+          voucherCode: ''
+        }
+      });
+    }
+
+    const activeMembership = getActiveModuleMembership(user, targetCourse, targetModuleName);
+    if (activeMembership) {
+      return res.json({
+        unlocked: true,
+        purchaseRequired: true,
+        message: 'Course already unlocked for this account.',
+        pricing: {
+          moduleName: targetModuleName,
+          planType: selectedPlan.type,
+          durationMonths: selectedPlan.durationMonths,
+          originalAmountInPaise,
+          discountInPaise: 0,
+          finalAmountInPaise: 0,
+          voucherCode: ''
+        }
+      });
+    }
+
+    const voucherCode = String(req.body?.voucherCode || '').trim().toUpperCase();
+    let voucher = null;
+    let discountInPaise = 0;
+    if (voucherCode) {
+      voucher = await Voucher.findOne({ code: voucherCode }).lean();
+      if (!isVoucherApplicable(voucher, targetCourse)) {
+        return res.status(400).json({ error: 'Voucher is invalid, expired, or not applicable for this course.' });
+      }
+      discountInPaise = computeDiscountInPaise(originalAmountInPaise, voucher);
+    }
+
+    const finalAmountInPaise = Math.max(0, originalAmountInPaise - discountInPaise);
+    return res.json({
+      unlocked: false,
+      purchaseRequired: true,
+      pricing: {
+        moduleName: targetModuleName,
+        planType: selectedPlan.type,
+        durationMonths: selectedPlan.durationMonths,
+        originalAmountInPaise,
+        discountInPaise,
+        finalAmountInPaise,
+        voucherCode: voucherCode || ''
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to preview order pricing.' });
+  }
+});
+
+router.post('/create-order', authenticateToken('user'), async (req, res) => {
+  try {
+    const { keyId, client: razorpay, hasConfig } = getRazorpayConfig();
+    const { user, course } = await ensureUserAndCourse(req.user.username);
+    if (!user || !course) return res.status(404).json({ error: 'Student profile not found.' });
+
+    const requestedCourse = normalizeCourseName(req.body?.course || '');
+    const targetCourse = requestedCourse || course;
+    if (!isSupportedCourse(targetCourse)) {
+      return res.status(400).json({ error: 'Unsupported course category.' });
+    }
+
+    const targetModuleName = normalizeModuleName(req.body?.moduleName || ALL_MODULES);
+    const pricing = await getModulePricingDoc(targetCourse, targetModuleName);
     const planType = String(req.body?.planType || '').trim().toLowerCase();
     const selectedPlan = getMembershipPlan(planType);
     if (!selectedPlan) {
@@ -235,7 +334,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       });
     }
 
-    const activeMembership = getActiveModuleMembership(user, course, targetModuleName);
+    const activeMembership = getActiveModuleMembership(user, targetCourse, targetModuleName);
     const alreadyUnlocked = Boolean(activeMembership);
 
     if (alreadyUnlocked) {
@@ -250,7 +349,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       });
     }
 
-    if (!hasRazorpayConfig || !razorpay) {
+    if (!hasConfig || !razorpay) {
       return res.status(500).json({ error: 'Razorpay is not configured on the server.' });
     }
 
@@ -260,7 +359,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
 
     if (voucherCode) {
       voucher = await Voucher.findOne({ code: voucherCode }).lean();
-      if (!isVoucherApplicable(voucher, course)) {
+      if (!isVoucherApplicable(voucher, targetCourse)) {
         return res.status(400).json({ error: 'Voucher is invalid, expired, or not applicable for this course.' });
       }
       discountInPaise = computeDiscountInPaise(originalAmountInPaise, voucher);
@@ -273,7 +372,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       const expiresAt = addMonths(now, selectedPlan.durationMonths);
       const payment = await Payment.create({
         username: req.user.username,
-        course,
+        course: targetCourse,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
         durationMonths: selectedPlan.durationMonths,
@@ -294,7 +393,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       await User.updateOne(
         { username: req.user.username },
         {
-          $pull: { purchasedCourses: { course, moduleName: targetModuleName } }
+          $pull: { purchasedCourses: { course: targetCourse, moduleName: targetModuleName } }
         }
       );
       await User.updateOne(
@@ -302,7 +401,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
         {
           $push: {
             purchasedCourses: {
-              course,
+              course: targetCourse,
               moduleName: targetModuleName,
               planType: selectedPlan.type,
               unlockedAt: now,
@@ -320,7 +419,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       return res.json({
         unlocked: true,
         purchaseRequired: true,
-        message: `${targetModuleName === ALL_MODULES ? course : targetModuleName} unlocked successfully.`,
+        message: `${targetModuleName === ALL_MODULES ? targetCourse : targetModuleName} unlocked successfully.`,
         activeMembership: {
           moduleName: targetModuleName,
           planType: selectedPlan.type,
@@ -332,10 +431,10 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
     const order = await razorpay.orders.create({
       amount: amountInPaise,
       currency: String(pricing.currency || 'INR'),
-      receipt: buildRazorpayReceipt(course, targetModuleName),
+      receipt: buildRazorpayReceipt(targetCourse, targetModuleName),
       notes: {
         username: req.user.username,
-        course,
+        course: targetCourse,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
         voucherCode: voucherCode || ''
@@ -344,7 +443,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
 
     await Payment.create({
       username: req.user.username,
-      course,
+      course: targetCourse,
       moduleName: targetModuleName,
       planType: selectedPlan.type,
       durationMonths: selectedPlan.durationMonths,
@@ -378,7 +477,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
         finalAmountInPaise: amountInPaise,
         voucherCode: voucherCode || ''
       },
-      razorpayKeyId
+      razorpayKeyId: keyId
     });
   } catch (err) {
     const razorpayDescription = err?.error?.description || err?.description || err?.message || '';
@@ -399,6 +498,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
 
 router.post('/verify', authenticateToken('user'), async (req, res) => {
   try {
+    const { keySecret, hasConfig } = getRazorpayConfig();
     const razorpayOrderId = String(req.body?.razorpay_order_id || '').trim();
     const razorpayPaymentId = String(req.body?.razorpay_payment_id || '').trim();
     const razorpaySignature = String(req.body?.razorpay_signature || '').trim();
@@ -407,12 +507,12 @@ router.post('/verify', authenticateToken('user'), async (req, res) => {
       return res.status(400).json({ error: 'Missing payment verification fields.' });
     }
 
-    if (!hasRazorpayConfig) {
+    if (!hasConfig) {
       return res.status(500).json({ error: 'Razorpay is not configured on the server.' });
     }
 
     const expectedSignature = crypto
-      .createHmac('sha256', razorpayKeySecret)
+      .createHmac('sha256', keySecret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 

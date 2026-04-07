@@ -12,6 +12,7 @@ const COURSE_CATEGORIES = [
   'CSIR-NET Life Science',
   'GATE'
 ];
+const DEFAULT_COURSE = 'CSIR-NET Life Science';
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -19,8 +20,9 @@ function normalizeText(value) {
 
 export default function AdminQuizBuilderPage() {
   const navigate = useNavigate();
-  const [quizCategory, setQuizCategory] = useState(COURSE_CATEGORIES[0]);
+  const [quizCategory, setQuizCategory] = useState(DEFAULT_COURSE);
   const [quizModule, setQuizModule] = useState('');
+  const [quizTopic, setQuizTopic] = useState('General');
   const [quizTitle, setQuizTitle] = useState('');
   const [quizDifficulty, setQuizDifficulty] = useState('medium');
   const [quizRequireExplanation, setQuizRequireExplanation] = useState(false);
@@ -101,9 +103,57 @@ export default function AdminQuizBuilderPage() {
     ])).sort((a, b) => a.localeCompare(b));
   }, [modulesByCourseFromVideos, modulesByCourseFromQuizzes, quizCategory]);
 
+  const topicsByCourseModuleFromVideos = useMemo(() => {
+    const result = {};
+    videos.forEach((video) => {
+      const category = video.category || 'General';
+      const module = normalizeText(video.module || 'General') || 'General';
+      const topic = normalizeText(video.topic || 'General') || 'General';
+      const key = `${category}::${module}`;
+      if (!result[key]) result[key] = new Set();
+      result[key].add(topic);
+    });
+    return result;
+  }, [videos]);
+
+  const topicsByCourseModuleFromQuizzes = useMemo(() => {
+    const result = {};
+    allAdminQuizzes.forEach((quiz) => {
+      const category = quiz.category || 'General';
+      const module = normalizeText(quiz.module || 'General') || 'General';
+      const topic = normalizeText(quiz.topic || 'General') || 'General';
+      const key = `${category}::${module}`;
+      if (!result[key]) result[key] = new Set();
+      result[key].add(topic);
+    });
+    return result;
+  }, [allAdminQuizzes]);
+
+  const availableTopics = useMemo(() => {
+    const moduleKey = normalizeText(quizModule || '');
+    if (!moduleKey) return [];
+    const key = `${quizCategory}::${moduleKey}`;
+    return Array.from(new Set([
+      ...Array.from(topicsByCourseModuleFromVideos[key] || []),
+      ...Array.from(topicsByCourseModuleFromQuizzes[key] || []),
+      'General'
+    ])).sort((a, b) => a.localeCompare(b));
+  }, [quizCategory, quizModule, topicsByCourseModuleFromVideos, topicsByCourseModuleFromQuizzes]);
+
+  useEffect(() => {
+    if (!quizModule) {
+      setQuizTopic('General');
+      return;
+    }
+    if (!availableTopics.includes(quizTopic)) {
+      setQuizTopic(availableTopics[0] || 'General');
+    }
+  }, [quizModule, availableTopics, quizTopic]);
+
   function resetBuilder() {
     setEditingQuizId('');
     setQuizModule('');
+    setQuizTopic('General');
     setQuizTitle('');
     setQuizDifficulty('medium');
     setQuizRequireExplanation(false);
@@ -142,8 +192,9 @@ export default function AdminQuizBuilderPage() {
 
   function editQuiz(quiz) {
     setEditingQuizId(quiz._id);
-    setQuizCategory(quiz.category || COURSE_CATEGORIES[0]);
+    setQuizCategory(quiz.category || DEFAULT_COURSE);
     setQuizModule(quiz.module || '');
+    setQuizTopic(quiz.topic || 'General');
     setQuizTitle(quiz.title || '');
     setQuizDifficulty(quiz.difficulty || 'medium');
     setQuizRequireExplanation(Boolean(quiz.requireExplanation));
@@ -175,7 +226,7 @@ export default function AdminQuizBuilderPage() {
   async function handleSaveQuiz(event) {
     event.preventDefault();
     if (!quizCategory || !quizModule.trim() || !quizTitle.trim()) {
-      setQuizMessage({ type: 'error', text: 'Class, chapter and title are required.' });
+      setQuizMessage({ type: 'error', text: 'Course, chapter and title are required.' });
       return;
     }
 
@@ -202,6 +253,7 @@ export default function AdminQuizBuilderPage() {
         quizId: editingQuizId || undefined,
         category: quizCategory,
         module: normalizedModule,
+        topic: (quizTopic || 'General').trim() || 'General',
         title: quizTitle.trim(),
         difficulty: quizDifficulty,
         requireExplanation: quizRequireExplanation,
@@ -239,8 +291,8 @@ export default function AdminQuizBuilderPage() {
         <section className="workspace-hero workspace-hero-quiz">
           <div>
             <p className="eyebrow">Chapter-wise Quizzes</p>
-            <h2>Choose class, chapter and build questions</h2>
-            <p className="subtitle">A cleaner exam-builder interface for quiz authoring and management.</p>
+              <h2>Choose course, chapter and build questions</h2>
+              <p className="subtitle">A cleaner exam-builder interface for course-wise quiz authoring and management.</p>
           </div>
           <div className="workspace-hero-stats">
             <StatCard label={`${quizCategory} Quizzes`} value={adminQuizzes.length} />
@@ -252,7 +304,7 @@ export default function AdminQuizBuilderPage() {
           <form className="quiz-builder-form" onSubmit={handleSaveQuiz}>
             <div className="workspace-row-two">
               <label>
-                Class
+                Course
                 <select value={quizCategory} onChange={(event) => setQuizCategory(event.target.value)}>
                   {COURSE_CATEGORIES.map((course) => (
                     <option key={course} value={course}>{course}</option>
@@ -262,20 +314,34 @@ export default function AdminQuizBuilderPage() {
 
               <label>
                 Chapter / Module
-                <input
+                <select
                   value={quizModule}
                   onChange={(event) => setQuizModule(event.target.value)}
-                  placeholder={availableModules.length ? `Try: ${availableModules.slice(0, 3).join(', ')}` : 'Example: Genetics'}
-                  list="quiz-modules-list"
                   required
-                />
-                <datalist id="quiz-modules-list">
+                >
+                  <option value="" disabled>{availableModules.length ? 'Select created module' : 'No modules created yet'}</option>
                   {availableModules.map((moduleName) => (
-                    <option key={moduleName} value={moduleName} />
+                    <option key={moduleName} value={moduleName}>{moduleName}</option>
                   ))}
-                </datalist>
+                </select>
               </label>
             </div>
+
+            <label>
+              Topic
+              <select
+                value={quizTopic}
+                onChange={(event) => setQuizTopic(event.target.value)}
+                disabled={!quizModule || !availableTopics.length}
+              >
+                <option value="" disabled>
+                  {!quizModule ? 'Select module first' : availableTopics.length ? 'Select created topic' : 'No topics created yet'}
+                </option>
+                {availableTopics.map((topicName) => (
+                  <option key={topicName} value={topicName}>{topicName}</option>
+                ))}
+              </select>
+            </label>
 
             <label>
               Quiz title
@@ -409,7 +475,7 @@ export default function AdminQuizBuilderPage() {
                 <article key={quiz._id} className="quiz-admin-item">
                   <div className="quiz-admin-item-body">
                     <strong>{quiz.title || quiz.module}</strong>
-                    <p>{quiz.module} • {quiz.category}</p>
+                    <p>{quiz.module} • {quiz.topic || 'General'} • {quiz.category}</p>
                     <div className="quiz-admin-meta">
                       <span className="quiz-admin-meta-chip">{quiz.questions?.length || 0} questions</span>
                       <span className="quiz-admin-meta-chip">{quiz.timeLimitMinutes || 15} min</span>

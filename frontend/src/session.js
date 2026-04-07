@@ -1,10 +1,31 @@
 const SESSION_KEY = 'biomics_session';
 
+function getSessionStorage() {
+  return window.sessionStorage;
+}
+
+function getLegacyStorage() {
+  return window.localStorage;
+}
+
+function clearLegacySessionKeys() {
+  const legacyStorage = getLegacyStorage();
+  legacyStorage.removeItem(SESSION_KEY);
+  legacyStorage.removeItem('sessionRole');
+  legacyStorage.removeItem('adminSession');
+  legacyStorage.removeItem('userSession');
+}
+
 export function getSession() {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    const storage = getSessionStorage();
+    const raw = storage.getItem(SESSION_KEY);
+    if (raw) return JSON.parse(raw);
+
+    // Never hydrate auth state from shared localStorage.
+    // This guarantees each tab keeps an isolated identity.
+    clearLegacySessionKeys();
+    return null;
   } catch {
     return null;
   }
@@ -15,20 +36,26 @@ export function getToken() {
 }
 
 export function setSession(session) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  localStorage.setItem('sessionRole', session.role);
+  const storage = getSessionStorage();
+  storage.setItem(SESSION_KEY, JSON.stringify(session));
+  storage.setItem('sessionRole', session.role);
   if (session.role === 'admin') {
-    localStorage.setItem('adminSession', JSON.stringify({ username: session.username }));
-    localStorage.removeItem('userSession');
+    storage.setItem('adminSession', JSON.stringify({ username: session.username }));
+    storage.removeItem('userSession');
   } else {
-    localStorage.setItem('userSession', JSON.stringify({ username: session.username }));
-    localStorage.removeItem('adminSession');
+    storage.setItem('userSession', JSON.stringify({ username: session.username }));
+    storage.removeItem('adminSession');
   }
+
+  // Cleanup legacy global session to prevent cross-tab account override behavior.
+  clearLegacySessionKeys();
 }
 
 export function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem('sessionRole');
-  localStorage.removeItem('adminSession');
-  localStorage.removeItem('userSession');
+  const storage = getSessionStorage();
+  storage.removeItem(SESSION_KEY);
+  storage.removeItem('sessionRole');
+  storage.removeItem('adminSession');
+  storage.removeItem('userSession');
+  clearLegacySessionKeys();
 }

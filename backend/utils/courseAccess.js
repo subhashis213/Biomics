@@ -114,6 +114,15 @@ async function hasModuleAccess(userDoc, course, moduleName) {
   const normalizedModule = normalizeModuleName(moduleName);
   if (!userDoc || !normalizedCourse) return false;
 
+  const enrolledCourse = normalizeCourseName(userDoc.class);
+  const hasMembership = Boolean(getActiveModuleMembership(userDoc, normalizedCourse, normalizedModule));
+
+  // Prevent accidental cross-course access from being treated as free content.
+  // A different course requires an explicit active membership for that course.
+  if (enrolledCourse && enrolledCourse !== normalizedCourse && !hasMembership) {
+    return false;
+  }
+
   const pricingDoc = await getModulePricingDoc(normalizedCourse, normalizedModule);
   const isFree = !pricingDoc
     || (Number(pricingDoc.proPriceInPaise || 0) <= 0 && Number(pricingDoc.elitePriceInPaise || 0) <= 0);
@@ -124,7 +133,7 @@ async function hasModuleAccess(userDoc, course, moduleName) {
     return true;
   }
 
-  return Boolean(getActiveModuleMembership(userDoc, normalizedCourse, normalizedModule));
+  return hasMembership;
 }
 
 /**
@@ -136,13 +145,19 @@ async function hasCourseAccess(userDoc, course) {
   const normalizedCourse = normalizeCourseName(course);
   if (!userDoc || !normalizedCourse) return false;
 
+  const enrolledCourse = normalizeCourseName(userDoc.class);
+  const hasMembership = Boolean(getActiveCourseMembership(userDoc, normalizedCourse));
+  if (enrolledCourse && enrolledCourse !== normalizedCourse && !hasMembership) {
+    return false;
+  }
+
   const pricingDocs = await getCoursePricingDocs(normalizedCourse);
   const hasPricing = pricingDocs.some(
     (p) => Number(p.proPriceInPaise || 0) > 0 || Number(p.elitePriceInPaise || 0) > 0
   );
   if (!hasPricing) return true;
 
-  return Boolean(getActiveCourseMembership(userDoc, normalizedCourse));
+  return hasMembership;
 }
 
 // Keep legacy alias for backward compat with paymentRoutes

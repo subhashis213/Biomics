@@ -59,6 +59,47 @@ const COURSE_META = {
   'GATE':                  { icon: '💻', color: '#dc2626' },
 };
 
+const COURSE_MODAL_THEME = {
+  '11th': {
+    accent: '#2563eb',
+    accentAlt: '#0ea5e9',
+    glowA: '37, 99, 235',
+    glowB: '14, 165, 233'
+  },
+  '12th': {
+    accent: '#0f766e',
+    accentAlt: '#14b8a6',
+    glowA: '15, 118, 110',
+    glowB: '20, 184, 166'
+  },
+  'NEET': {
+    accent: '#16a34a',
+    accentAlt: '#84cc16',
+    glowA: '22, 163, 74',
+    glowB: '132, 204, 22'
+  },
+  'IIT-JAM': {
+    accent: '#d97706',
+    accentAlt: '#f59e0b',
+    glowA: '217, 119, 6',
+    glowB: '245, 158, 11'
+  },
+  'CSIR-NET Life Science': {
+    accent: '#0891b2',
+    accentAlt: '#06b6d4',
+    glowA: '8, 145, 178',
+    glowB: '6, 182, 212'
+  },
+  'GATE': {
+    accent: '#dc2626',
+    accentAlt: '#ef4444',
+    glowA: '220, 38, 38',
+    glowB: '239, 68, 68'
+  }
+};
+
+const CSIR_COURSE = 'CSIR-NET Life Science';
+
 export default function AdminDashboard() {
   const UNDO_DURATION_MS = 5000;
   const BANNER_VISIBLE_MS = 3000;
@@ -79,6 +120,12 @@ export default function AdminDashboard() {
   const [modalStep, setModalStep] = useState('module'); // 'module' or 'upload'
   const [courseModules, setCourseModules] = useState({}); // { courseName: ['Module1', 'Module2'] }
   const [selectedModule, setSelectedModule] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [moduleTopicsByKey, setModuleTopicsByKey] = useState({});
+  const [newTopicName, setNewTopicName] = useState('');
+  const [isTopicLoading, setIsTopicLoading] = useState(false);
+  const [isTopicSaving, setIsTopicSaving] = useState(false);
+  const [isTopicDeleting, setIsTopicDeleting] = useState('');
   const [modalNoteFile, setModalNoteFile] = useState(null);
   const [modalMessage, setModalMessage] = useState(null);
   const [modalUploadProgress, setModalUploadProgress] = useState(0);
@@ -785,6 +832,10 @@ export default function AdminDashboard() {
   async function handleCreateVideo(event) {
     event.preventDefault();
     if (!videoForm.title.trim() || !videoForm.url.trim() || !selectedCourse || !selectedModule) return;
+    if (selectedCourse === CSIR_COURSE && !selectedTopic) {
+      setModalMessage({ type: 'error', text: 'Please select or create a topic before uploading in CSIR module.' });
+      return;
+    }
 
     if (modalNoteFile) {
       const isPdf = modalNoteFile.type === 'application/pdf' || modalNoteFile.name.toLowerCase().endsWith('.pdf');
@@ -810,7 +861,8 @@ export default function AdminDashboard() {
           description: videoForm.description.trim(),
           url: videoForm.url.trim(),
           category: selectedCourse,
-          module: selectedModule
+          module: selectedModule,
+          topic: selectedCourse === CSIR_COURSE ? selectedTopic : 'General'
         })
       });
 
@@ -820,13 +872,15 @@ export default function AdminDashboard() {
         });
       }
 
-      const successText = `Lecture added to ${selectedModule} in ${selectedCourse}${modalNoteFile ? ' with notes.' : '.'}`;
+      const topicSegment = selectedCourse === CSIR_COURSE && selectedTopic ? ` / ${selectedTopic}` : '';
+      const successText = `Lecture added to ${selectedModule}${topicSegment} in ${selectedCourse}${modalNoteFile ? ' with notes.' : '.'}`;
       setVideoForm({ title: '', description: '', url: '' });
       setModalNoteFile(null);
       setPublishingForCourse(false);
       setCourseModalOpen(false);
       setModalStep('module');
       setSelectedModule(null);
+      setSelectedTopic(null);
       await refreshData();
       setBanner({ type: 'success', text: successText });
     } catch (error) {
@@ -848,7 +902,13 @@ export default function AdminDashboard() {
         [selectedCourse]: Array.from(new Set([...(prev[selectedCourse] || []), moduleName]))
       }));
       setSelectedModule(moduleName);
-      setModalStep('upload');
+      if (selectedCourse === CSIR_COURSE) {
+        setSelectedTopic(null);
+        setModalStep('topic');
+        await loadTopicsForModule(selectedCourse, moduleName);
+      } else {
+        setModalStep('upload');
+      }
       setModalMessage(null);
       if (expandedPricingCourse === selectedCourse) {
         await loadModulePricing(selectedCourse);
@@ -859,14 +919,113 @@ export default function AdminDashboard() {
     }
   }
 
-  function handleModuleSelect(moduleName) {
+  async function handleModuleSelect(moduleName) {
     setSelectedModule(moduleName);
-    setModalStep('upload');
+    if (selectedCourse === CSIR_COURSE) {
+      setSelectedTopic(null);
+      setModalStep('topic');
+      await loadTopicsForModule(selectedCourse, moduleName);
+    } else {
+      setModalStep('upload');
+    }
   }
 
   function goBackToModuleStep() {
     setModalStep('module');
     setSelectedModule(null);
+    setSelectedTopic(null);
+    setNewTopicName('');
+    setVideoForm({ title: '', description: '', url: '' });
+    setModalNoteFile(null);
+    setModalMessage(null);
+  }
+
+  function getTopicBucketKey(courseName, moduleName) {
+    return `${String(courseName || '').trim()}::${String(moduleName || '').trim()}`;
+  }
+
+  async function loadTopicsForModule(courseName, moduleName) {
+    if (!courseName || !moduleName) return;
+    setIsTopicLoading(true);
+    try {
+      const query = `?category=${encodeURIComponent(courseName)}&module=${encodeURIComponent(moduleName)}`;
+      const response = await requestJson(`/modules/topics${query}`);
+      const topics = Array.isArray(response?.topics)
+        ? response.topics.map((entry) => String(entry?.name || '').trim()).filter(Boolean)
+        : [];
+      const bucketKey = getTopicBucketKey(courseName, moduleName);
+      setModuleTopicsByKey((prev) => ({ ...prev, [bucketKey]: topics }));
+    } catch (error) {
+      setModalMessage({ type: 'error', text: error.message || 'Failed to load topics.' });
+    } finally {
+      setIsTopicLoading(false);
+    }
+  }
+
+  async function handleTopicCreate() {
+    const topicName = newTopicName.trim();
+    if (!selectedCourse || !selectedModule || !topicName) return;
+    const bucketKey = getTopicBucketKey(selectedCourse, selectedModule);
+    const existingTopics = moduleTopicsByKey[bucketKey] || [];
+    if (existingTopics.some((item) => item.toLowerCase() === topicName.toLowerCase())) {
+      setModalMessage({ type: 'error', text: 'Topic already exists in this module.' });
+      return;
+    }
+
+    setIsTopicSaving(true);
+    setModalMessage(null);
+    try {
+      await requestJson('/modules/topics', {
+        method: 'POST',
+        body: JSON.stringify({ category: selectedCourse, module: selectedModule, name: topicName })
+      });
+      setModuleTopicsByKey((prev) => ({
+        ...prev,
+        [bucketKey]: Array.from(new Set([...(prev[bucketKey] || []), topicName])).sort((a, b) => a.localeCompare(b))
+      }));
+      setSelectedTopic(topicName);
+      setNewTopicName('');
+      setModalMessage({ type: 'success', text: `Topic "${topicName}" created.` });
+    } catch (error) {
+      setModalMessage({ type: 'error', text: error.message || 'Failed to create topic.' });
+    } finally {
+      setIsTopicSaving(false);
+    }
+  }
+
+  function handleTopicSelect(topicName) {
+    setSelectedTopic(topicName);
+    setModalStep('upload');
+    setModalMessage(null);
+  }
+
+  async function handleTopicDelete(topicName) {
+    if (!selectedCourse || !selectedModule || !topicName) return;
+    const bucketKey = getTopicBucketKey(selectedCourse, selectedModule);
+    setIsTopicDeleting(topicName);
+    try {
+      await requestJson('/modules/topics', {
+        method: 'DELETE',
+        body: JSON.stringify({ category: selectedCourse, module: selectedModule, name: topicName })
+      });
+      setModuleTopicsByKey((prev) => ({
+        ...prev,
+        [bucketKey]: (prev[bucketKey] || []).filter((entry) => entry !== topicName)
+      }));
+      if (selectedTopic === topicName) {
+        setSelectedTopic(null);
+      }
+      setModalMessage({ type: 'success', text: `Topic "${topicName}" removed.` });
+    } catch (error) {
+      setModalMessage({ type: 'error', text: error.message || 'Failed to delete topic.' });
+    } finally {
+      setIsTopicDeleting('');
+    }
+  }
+
+  function goBackToTopicStep() {
+    setModalStep('topic');
+    setSelectedTopic(null);
     setVideoForm({ title: '', description: '', url: '' });
     setModalNoteFile(null);
     setModalMessage(null);
@@ -942,6 +1101,8 @@ export default function AdminDashboard() {
     setCourseModalOpen(true);
     setModalStep('module');
     setSelectedModule(null);
+    setSelectedTopic(null);
+    setNewTopicName('');
     setModalMessage(null);
     setModalUploadProgress(0);
     setModalNoteFile(null);
@@ -953,6 +1114,8 @@ export default function AdminDashboard() {
     setCourseModalOpen(false);
     setModalStep('module');
     setSelectedModule(null);
+    setSelectedTopic(null);
+    setNewTopicName('');
     setModalMessage(null);
     setModalUploadProgress(0);
     setModalNoteFile(null);
@@ -2042,6 +2205,9 @@ export default function AdminDashboard() {
 
   const adminNavItems = [
     { id: 'section-live-class', label: 'Live Class', icon: '🔴' },
+    { id: 'section-course-manager', label: 'Course Manager', icon: '📚' },
+    { id: 'section-registered-users', label: 'Learners', icon: '👥' },
+    { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
     {
       id: 'section-community-chat',
       label: (
@@ -2055,9 +2221,6 @@ export default function AdminDashboard() {
       ),
       icon: '💬'
     },
-    { id: 'section-course-manager', label: 'Course Manager', icon: '📚' },
-    { id: 'section-registered-users', label: 'Learners', icon: '👥' },
-    { id: 'section-content-library', label: 'Content Library', icon: '🎬' },
     { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
     { id: 'section-monthly-mock-exam', label: 'Monthly Exam', icon: '📅' },
     { id: 'section-announcements', label: 'Announcements', icon: '📢' },
@@ -2074,6 +2237,22 @@ export default function AdminDashboard() {
     ? (/^https?:\/\//i.test(rawAdminAvatarUrl) ? rawAdminAvatarUrl : `${getApiBase()}${rawAdminAvatarUrl}`)
     : '';
   const adminInitial = (adminProfile?.username || 'A').trim().charAt(0).toUpperCase();
+  const isCsirModuleFlow = selectedCourse === CSIR_COURSE;
+  const topicBucketKey = getTopicBucketKey(selectedCourse, selectedModule);
+  const currentModuleTopics = moduleTopicsByKey[topicBucketKey] || [];
+  const selectedCourseTheme = COURSE_MODAL_THEME[selectedCourse] || COURSE_MODAL_THEME['11th'];
+  const courseModalStyle = {
+    '--course-modal-accent': selectedCourseTheme.accent,
+    '--course-modal-accent-alt': selectedCourseTheme.accentAlt,
+    '--course-modal-glow-a': selectedCourseTheme.glowA,
+    '--course-modal-glow-b': selectedCourseTheme.glowB
+  };
+  const courseModalSteps = [
+    { id: 'module', label: 'Module' },
+    { id: 'topic', label: 'Topic' },
+    { id: 'upload', label: 'Upload' }
+  ];
+  const activeCourseModalStepIndex = courseModalSteps.findIndex((step) => step.id === modalStep);
 
   return (
     <AppShell
@@ -2383,7 +2562,7 @@ export default function AdminDashboard() {
                     type="button"
                     className="course-tile"
                     style={{ '--tile-accent': meta.color }}
-                    onClick={() => openCourseModal(course)}
+                    onClick={() => navigate(`/admin/course-workspace/${encodeURIComponent(course)}`)}
                   >
                     <span className="course-tile-icon">{meta.icon}</span>
                     <span className="course-tile-body">
@@ -2785,42 +2964,150 @@ export default function AdminDashboard() {
         <div className="course-modal-backdrop" role="presentation" onClick={(event) => {
           if (event.target === event.currentTarget) closeCourseModal();
         }}>
-          <section className="course-modal card" role="dialog" aria-modal="true" aria-label={modalStep === 'module' ? 'Select or create module' : 'Add lecture and notes'}>
+          <section
+            className={`course-modal card course-modal-themed${isCsirModuleFlow ? ' csir-course-modal' : ''} course-modal-step-${modalStep}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={modalStep === 'module' ? 'Select or create module' : modalStep === 'topic' ? 'Select or create topic' : 'Add lecture and notes'}
+            style={courseModalStyle}
+          >
             <div className="section-header modal-header">
               <div>
                 <p className="eyebrow">Course</p>
                 <h2>{selectedCourse}</h2>
-                {modalStep === 'upload' && selectedModule && (
-                  <p className="module-breadcrumb">→ <strong>{selectedModule}</strong></p>
+                {(modalStep === 'upload' || modalStep === 'topic') && selectedModule && (
+                  <p className="module-breadcrumb">
+                    → <strong>{selectedModule}</strong>
+                    {modalStep === 'upload' && selectedTopic ? <> / <strong>{selectedTopic}</strong></> : null}
+                  </p>
                 )}
               </div>
               <button type="button" className="secondary-btn" onClick={closeCourseModal}>Close</button>
             </div>
 
+            <div className="course-modal-stagebar" role="list" aria-label="Course creation steps">
+              {courseModalSteps.map((step, index) => {
+                const isActive = step.id === modalStep;
+                const isDone = activeCourseModalStepIndex > index;
+                return (
+                  <div key={step.id} className={`course-modal-stage-pill${isActive ? ' active' : ''}${isDone ? ' done' : ''}`} role="listitem">
+                    <span className="course-modal-stage-index">{isDone ? '✓' : index + 1}</span>
+                    <span>{step.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+
             {modalStep === 'module' ? (
-              <ModuleManager
-                course={selectedCourse}
-                modules={courseModules[selectedCourse] || []}
-                selectedModule={selectedModule}
-                onModuleSelect={handleModuleSelect}
-                onModuleCreate={handleModuleCreate}
-                onModuleDelete={handleModuleDelete}
-                isProcessing={publishingForCourse}
-                modalMessage={modalMessage}
-                onClearMessage={() => setModalMessage(null)}
-              />
-            ) : (
-              <form className="course-modal-form" onSubmit={handleCreateVideo}>
+              <section className="course-modal-step-shell module-step-shell" aria-label="Module workspace">
+                <div className="course-modal-step-head">
+                  <p className="eyebrow">Step 1</p>
+                  <h3>Create or pick a module</h3>
+                  <p className="subtitle">Start with a module bucket. The next screen opens topic creation for that module.</p>
+                </div>
+                <ModuleManager
+                  course={selectedCourse}
+                  modules={courseModules[selectedCourse] || []}
+                  selectedModule={selectedModule}
+                  onModuleSelect={handleModuleSelect}
+                  onModuleCreate={handleModuleCreate}
+                  onModuleDelete={handleModuleDelete}
+                  isProcessing={publishingForCourse}
+                  modalMessage={modalMessage}
+                  onClearMessage={() => setModalMessage(null)}
+                />
+              </section>
+            ) : modalStep === 'topic' ? (
+              <section className="course-modal-step-shell topic-step-shell" aria-label="Topic workspace">
+                <div className="csir-topic-manager">
                 <div className="upload-form-header">
                   <button
                     type="button"
                     className="back-btn"
                     onClick={goBackToModuleStep}
-                    disabled={publishingForCourse}
+                    disabled={isTopicLoading || isTopicSaving}
                     title="Go back to module selection"
                   >
                     ← Back to Modules
                   </button>
+                </div>
+
+                <div className="csir-topic-header">
+                  <div>
+                    <p className="eyebrow">Step 2</p>
+                    <h3>Choose topic folder for {selectedModule}</h3>
+                    <p className="subtitle">Create topic folders and upload learning videos + PDFs inside each topic.</p>
+                  </div>
+                </div>
+
+                <div className="csir-topic-create-row">
+                  <input
+                    type="text"
+                    value={newTopicName}
+                    onChange={(event) => setNewTopicName(event.target.value)}
+                    placeholder="Create topic name (e.g., Cell Signaling)"
+                    disabled={isTopicSaving || isTopicLoading}
+                  />
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    onClick={handleTopicCreate}
+                    disabled={isTopicSaving || isTopicLoading || !newTopicName.trim()}
+                  >
+                    {isTopicSaving ? 'Creating...' : 'Create Topic'}
+                  </button>
+                </div>
+
+                {modalMessage ? <p className={`inline-message ${modalMessage.type}`}>{modalMessage.text}</p> : null}
+
+                {isTopicLoading ? <p className="empty-note">Loading topic folders...</p> : null}
+
+                {!isTopicLoading && currentModuleTopics.length ? (
+                  <div className="csir-topic-grid">
+                    {currentModuleTopics.map((topicName) => (
+                      <article key={topicName} className={`csir-topic-card${selectedTopic === topicName ? ' active' : ''}`}>
+                        <button type="button" className="csir-topic-open" onClick={() => handleTopicSelect(topicName)}>
+                          <span className="csir-topic-icon" aria-hidden="true">📁</span>
+                          <span className="csir-topic-name">{topicName}</span>
+                          <span className="csir-topic-hint">Open Folder</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="csir-topic-delete"
+                          onClick={() => handleTopicDelete(topicName)}
+                          disabled={isTopicDeleting === topicName}
+                          title={`Delete topic ${topicName}`}
+                        >
+                          {isTopicDeleting === topicName ? 'Deleting...' : '🗑'}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+
+                {!isTopicLoading && !currentModuleTopics.length ? (
+                  <p className="empty-note">No topics yet. Create your first topic folder to start uploading content.</p>
+                ) : null}
+              </div>
+              </section>
+            ) : (
+              <form className="course-modal-form course-upload-shell" onSubmit={handleCreateVideo}>
+                <div className="upload-form-header">
+                  <button
+                    type="button"
+                    className="back-btn"
+                    onClick={isCsirModuleFlow ? goBackToTopicStep : goBackToModuleStep}
+                    disabled={publishingForCourse}
+                    title={isCsirModuleFlow ? 'Go back to topic selection' : 'Go back to module selection'}
+                  >
+                    {isCsirModuleFlow ? '← Back to Topics' : '← Back to Modules'}
+                  </button>
+                </div>
+
+                <div className="course-modal-step-head">
+                  <p className="eyebrow">Step 3</p>
+                  <h3>Upload lecture video and notes</h3>
+                  <p className="subtitle">Publish content into the selected folder with optional PDF notes.</p>
                 </div>
 
                 <label>

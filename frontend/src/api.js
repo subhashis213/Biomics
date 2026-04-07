@@ -201,10 +201,17 @@ export function fetchMyCoursePaymentInfo() {
   return requestJson('/payments/my-course');
 }
 
-export function createCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES') {
+export function createCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES', course = '') {
   return requestJson('/payments/create-order', {
     method: 'POST',
-    body: JSON.stringify({ planType, voucherCode, moduleName })
+    body: JSON.stringify({ planType, voucherCode, moduleName, course })
+  });
+}
+
+export function previewCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES', course = '') {
+  return requestJson('/payments/preview-order', {
+    method: 'POST',
+    body: JSON.stringify({ planType, voucherCode, moduleName, course })
   });
 }
 

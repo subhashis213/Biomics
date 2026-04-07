@@ -17,6 +17,7 @@ const quizQuestionSchema = new mongoose.Schema({
 const quizSchema = new mongoose.Schema({
   category: { type: String, required: true, trim: true },
   module: { type: String, required: true, trim: true },
+  topic: { type: String, trim: true, default: 'General' },
   title: { type: String, required: true, trim: true },
   difficulty: {
     type: String,

@@ -6,6 +6,7 @@ const videoSchema = new mongoose.Schema({
   url: { type: String, required: true },
   category: { type: String, default: 'General' },
   module: { type: String, default: 'General' },
+  topic: { type: String, default: 'General' },
   uploadedAt: { type: Date, default: Date.now },
   materials: [
     {

@@ -223,14 +223,22 @@ router.post('/:id/progress', authenticateToken('user'), async (req, res) => {
 
 // Upload a new video — admin only
 router.post('/', authenticateToken('admin'), async (req, res) => {
-  const { title, description, url, category, module } = req.body;
+  const { title, description, url, category, module, topic } = req.body;
   if (!title || !url) return res.status(400).json({ error: 'Title and URL required' });
   if (!category || !ALLOWED_CATEGORIES.includes(category)) {
     return res.status(400).json({ error: 'Valid course category is required' });
   }
   try {
     const normalizedModule = String(module || 'General').trim() || 'General';
-    const video = new Video({ title, description, url, category, module: normalizedModule });
+    const normalizedTopic = String(topic || 'General').trim() || 'General';
+    const video = new Video({
+      title,
+      description,
+      url,
+      category,
+      module: normalizedModule,
+      topic: normalizedTopic
+    });
     await video.save();
     await Module.findOneAndUpdate(
       { category, name: normalizedModule },
@@ -241,7 +249,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       action: 'video.create',
       targetType: 'video',
       targetId: String(video._id),
-      details: { title: video.title, category: video.category, module: video.module }
+      details: { title: video.title, category: video.category, module: video.module, topic: video.topic }
     });
     res.status(201).json(video);
   } catch (err) {
@@ -314,6 +322,7 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
           url: videoObj.url,
           category: videoObj.category,
           module: videoObj.module,
+          topic: videoObj.topic,
           uploadedAt: videoObj.uploadedAt,
           materials: Array.isArray(videoObj.materials) ? videoObj.materials : []
         }
