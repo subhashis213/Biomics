@@ -19,6 +19,10 @@ frontend/.env
 
 # Runtime uploads and temp files
 backend/uploads/
+backend/.mongodb-data/
+backend/.mongodb-data.bak.*/
+backend/.mongodb-log/
+backend/.mongodb-sock/
 tmp/
 temp/
 
