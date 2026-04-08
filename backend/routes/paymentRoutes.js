@@ -660,9 +660,11 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
     );
     const moduleNames = Array.from(new Set([
       ALL_MODULES,
-      ...modules.map((entry) => normalizeModuleName(entry.name)),
-      ...pricingDocs.map((entry) => normalizeModuleName(entry.moduleName))
+      ...modules.map((entry) => normalizeModuleName(entry.name))
     ]));
+
+    // Cleanup stale pricing rows left behind by older module deletions.
+    await ModulePricing.deleteMany({ category, moduleName: { $nin: moduleNames } });
 
     return res.json({
       category,

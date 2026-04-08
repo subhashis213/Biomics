@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Module = require('../models/Module');
 const Topic = require('../models/Topic');
+const ModulePricing = require('../models/ModulePricing');
 const { authenticateToken } = require('../middleware/auth');
 
 function normalizeValue(value) {
@@ -130,6 +131,7 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
   try {
     await Module.deleteOne({ category, name });
     await Topic.deleteMany({ category, module: name });
+    await ModulePricing.deleteOne({ category, moduleName: name });
     return res.json({ message: 'Module removed' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove module' });

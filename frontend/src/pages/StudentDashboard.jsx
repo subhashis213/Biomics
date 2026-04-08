@@ -950,12 +950,26 @@ export default function StudentDashboard() {
     }
   });
 
+  const catalogModuleKeySet = new Set(
+    (Array.isArray(moduleCatalog) ? moduleCatalog : [])
+      .map((entry) => {
+        const category = normalizeCourseName(entry?.category || '');
+        const displayModule = normalizeModuleName(entry?.name || '');
+        if (!category || !displayModule) return '';
+        return resolveModuleKey(category, displayModule);
+      })
+      .filter(Boolean)
+  );
+
   // Keep purchasable modules discoverable even when no visible content is returned yet.
   Object.keys(moduleAccessMap).forEach((moduleName) => {
     const normalizedModule = normalizeModuleName(moduleName);
     if (!normalizedModule || normalizedModule === ALL_MODULES) return;
     const category = normalizeCourseName(course || 'General');
     const moduleKey = resolveModuleKey(category, normalizedModule);
+    const hasContentSignals = Boolean(videosByModule[moduleKey]?.length || quizzesByModule[moduleKey]?.length);
+    const existsInCatalog = catalogModuleKeySet.has(moduleKey);
+    if (!existsInCatalog && !hasContentSignals) return;
     if (!moduleMetaByKey[moduleKey]) {
       moduleMetaByKey[moduleKey] = { module: normalizedModule, category };
     }
