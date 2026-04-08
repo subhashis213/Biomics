@@ -1769,18 +1769,20 @@ html[data-theme='light'] .field-hint {
     radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 46%),
     linear-gradient(165deg, color-mix(in srgb, var(--bg-card) 95%, transparent), color-mix(in srgb, var(--bg-card-soft) 90%, transparent));
   box-shadow: 0 32px 56px rgba(0, 0, 0, 0.4), inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent);
-  transform: translateX(calc(-100% - 28px));
+  transform: translate3d(calc(-100% - 28px), 0, 0);
   opacity: 0;
   pointer-events: none;
   z-index: 4000;
-  transition: transform 280ms cubic-bezier(0.22, 0.9, 0.2, 1), opacity 220ms ease;
+  transition: transform 320ms cubic-bezier(0.2, 0.9, 0.2, 1), opacity 260ms ease;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .hub-side-panel.open {
-  transform: translateX(0);
+  transform: translate3d(0, 0, 0);
   opacity: 1;
   pointer-events: auto;
 }
@@ -1838,7 +1840,24 @@ html[data-theme='light'] .field-hint {
   flex-direction: column;
   gap: 10px;
   padding: 14px;
+  flex: 1;
+  min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   overflow-y: auto;
+}
+
+.hub-side-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.hub-side-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 36%, transparent);
+  border-radius: 999px;
+}
+
+.hub-side-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .hub-side-link {
@@ -1856,6 +1875,7 @@ html[data-theme='light'] .field-hint {
   position: relative;
   overflow: hidden;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  will-change: transform;
 }
 
 .hub-side-link::before {
@@ -1961,8 +1981,8 @@ html[data-theme='light'] .field-hint {
 }
 
 .hub-side-panel.open .hub-side-link {
-  animation: hub-menu-item-in var(--menu-item-enter-duration) cubic-bezier(0.22, 0.9, 0.2, 1) both;
-  animation-delay: calc(var(--menu-index, 0) * var(--menu-item-enter-step) + var(--menu-item-enter-base-delay));
+  animation: hub-menu-item-in 220ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation-delay: calc(var(--menu-index, 0) * 14ms + 8ms);
 }
 
 @keyframes hub-menu-item-in {
@@ -2011,12 +2031,14 @@ html[data-theme='light'] .field-hint {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+  overflow: visible;
 }
 
 .topbar-user-actions {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  overflow: visible;
 }
 
 .student-cart-header-btn {
@@ -2473,6 +2495,58 @@ html[data-theme='light'] .field-hint {
   gap: 14px;
   min-width: 0;
 }
+
+.topbar-logo-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  line-height: 0;
+  border-radius: 14px;
+}
+
+.topbar-logo-btn.is-refresh-enabled {
+  cursor: pointer;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.topbar-logo-btn.is-refresh-enabled:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+.topbar-logo-btn.is-refresh-enabled:active {
+  transform: translateY(0);
+}
+
+.topbar-logo-btn.is-refreshing {
+  pointer-events: none;
+}
+
+.topbar-logo-btn.is-refreshing .topbar-logo {
+  animation: topbar-logo-refresh-spin 360ms cubic-bezier(0.22, 0.9, 0.2, 1) both;
+}
+
+.topbar-logo-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline-offset: 2px;
+}
+
+@keyframes topbar-logo-refresh-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+    filter: saturate(1);
+  }
+  60% {
+    transform: rotate(180deg) scale(1.06);
+    filter: saturate(1.18);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    filter: saturate(1);
+  }
+}
+
 .topbar-logo {
   width: 88px;
   height: 52px;
@@ -5667,6 +5741,101 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 
 .workspace-panel {
   margin-top: 0;
+}
+
+.admin-workspace-page .workspace-panel .analytics-filters {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-workspace-page .workspace-panel .analytics-filter-input,
+.admin-workspace-page .workspace-panel .analytics-filter-select {
+  grid-column: span 3;
+  min-height: 42px;
+}
+
+.admin-workspace-page .workspace-panel .analytics-filters .primary-btn,
+.admin-workspace-page .workspace-panel .analytics-filters .secondary-btn {
+  grid-column: span 2;
+  min-height: 42px;
+  padding: 0 16px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.workspace-refresh-btn {
+  min-width: 134px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 200ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.workspace-refresh-btn-icon {
+  display: inline-block;
+  line-height: 1;
+  font-size: 1rem;
+}
+
+.workspace-refresh-btn.is-loading .workspace-refresh-btn-icon {
+  animation: workspace-refresh-spin 820ms linear infinite;
+}
+
+.workspace-refresh-btn.is-done {
+  border-color: color-mix(in srgb, #22c55e 52%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, #22c55e 16%, transparent);
+}
+
+.workspace-refresh-btn.is-done .workspace-refresh-btn-icon {
+  animation: workspace-refresh-pop 560ms cubic-bezier(0.22, 0.9, 0.2, 1) both;
+}
+
+@keyframes workspace-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes workspace-refresh-pop {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(135deg) scale(1.16);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-workspace-page .workspace-panel .analytics-filters {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .admin-workspace-page .workspace-panel .analytics-filter-input,
+  .admin-workspace-page .workspace-panel .analytics-filter-select,
+  .admin-workspace-page .workspace-panel .analytics-filters .primary-btn,
+  .admin-workspace-page .workspace-panel .analytics-filters .secondary-btn {
+    grid-column: span 3;
+  }
+}
+
+@media (max-width: 680px) {
+  .admin-workspace-page .workspace-panel .analytics-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-workspace-page .workspace-panel .analytics-filter-input,
+  .admin-workspace-page .workspace-panel .analytics-filter-select,
+  .admin-workspace-page .workspace-panel .analytics-filters .primary-btn,
+  .admin-workspace-page .workspace-panel .analytics-filters .secondary-btn {
+    grid-column: auto;
+    width: 100%;
+  }
 }
 
 .workspace-row-two {
