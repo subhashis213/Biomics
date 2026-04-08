@@ -20,7 +20,38 @@ const chatRoutes = require('./routes/chatRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
-const corsOrigin = process.env.CORS_ORIGIN || true;
+const rawCorsOrigin = String(process.env.CORS_ORIGIN || '').trim();
+
+function buildCorsOriginResolver(rawValue) {
+  if (!rawValue) return true;
+
+  const lowered = rawValue.toLowerCase();
+  if (lowered === 'true' || rawValue === '*') return true;
+
+  const allowedOrigins = rawValue
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (!allowedOrigins.length) return true;
+
+  return function resolveCorsOrigin(requestOrigin, callback) {
+    // Allow same-origin/curl/server-to-server requests with no Origin header.
+    if (!requestOrigin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedOrigins.includes(requestOrigin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS blocked for origin: ${requestOrigin}`));
+  };
+}
+
+const corsOrigin = buildCorsOriginResolver(rawCorsOrigin);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 120,

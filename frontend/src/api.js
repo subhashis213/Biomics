@@ -64,7 +64,9 @@ export async function requestJson(path, options = {}) {
       headers
     });
   } catch {
-    throw new Error(`Cannot reach API server at ${buildUrl(path)}. Ensure backend is running on port 5002.`);
+    throw new Error(
+      `Cannot reach API server at ${buildUrl(path)}. Ensure backend is running and CORS allows this website origin.`
+    );
   }
   return parseJsonResponse(response);
 }
