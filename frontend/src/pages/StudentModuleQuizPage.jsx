@@ -96,14 +96,7 @@ export default function StudentModuleQuizPage() {
   }, [allModuleQuizzes, hasTopicFolders, selectedTopic, searchQuery]);
 
   function handleBackToDashboard() {
-    navigate('/student', {
-      state: {
-        restoreModule: {
-          name: decodedModuleName,
-          category: decodedCourseName
-        }
-      }
-    });
+    navigate(`/student/module/${encodeURIComponent(decodedCourseName || 'General')}/${encodeURIComponent(decodedModuleName || 'General')}`);
   }
 
   return (

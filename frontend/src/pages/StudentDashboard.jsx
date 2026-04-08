@@ -2050,8 +2050,7 @@ export default function StudentDashboard() {
                       type="button"
                       className="primary-btn module-open-btn"
                       onClick={() => {
-                        setSelectedModule({ name: module, category: moduleCourse });
-                        setSelectedModuleSection('');
+                        navigate(`/student/module/${encodeURIComponent(moduleCourse || 'General')}/${encodeURIComponent(module || 'General')}`);
                       }}
                     >
                       {moduleIsLocked ? 'View Lock Details' : 'Open Module'}

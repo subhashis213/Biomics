@@ -14,13 +14,14 @@ import AdminRecoveryCenterPage from './pages/AdminRecoveryCenterPage';
 import AdminRevenueTrackingPage from './pages/AdminRevenueTrackingPage';
 import AdminVoucherWorkspacePage from './pages/AdminVoucherWorkspacePage';
 import AuthPage from './pages/AuthPage';
-import StudentDashboard from './pages/StudentDashboard';
-import StudentLecturePage from './pages/StudentLecturePage';
-import StudentMockExamPage from './pages/StudentMockExamPage';
-import StudentModuleQuizPage from './pages/StudentModuleQuizPage';
-import StudentQuizPage from './pages/StudentQuizPage';
 
 const CommunityChatPage = lazy(() => import('./pages/CommunityChatPage'));
+const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const StudentLecturePage = lazy(() => import('./pages/StudentLecturePage'));
+const StudentModuleDetailsPage = lazy(() => import('./pages/StudentModuleDetailsPage'));
+const StudentMockExamPage = lazy(() => import('./pages/StudentMockExamPage'));
+const StudentModuleQuizPage = lazy(() => import('./pages/StudentModuleQuizPage'));
+const StudentQuizPage = lazy(() => import('./pages/StudentQuizPage'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -143,7 +144,9 @@ export default function App() {
         path="/student"
         element={(
           <ProtectedRoute role="user">
-            <StudentDashboard />
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading student dashboard...</div>}>
+              <StudentDashboard />
+            </Suspense>
           </ProtectedRoute>
         )}
       />
@@ -161,7 +164,19 @@ export default function App() {
         path="/student/quiz/:quizId"
         element={(
           <ProtectedRoute role="user">
-            <StudentQuizPage />
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading quiz page...</div>}>
+              <StudentQuizPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/module/:courseName/:moduleName"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading module details...</div>}>
+              <StudentModuleDetailsPage />
+            </Suspense>
           </ProtectedRoute>
         )}
       />
@@ -169,7 +184,9 @@ export default function App() {
         path="/student/module/:courseName/:moduleName/lectures"
         element={(
           <ProtectedRoute role="user">
-            <StudentLecturePage />
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading lecture workspace...</div>}>
+              <StudentLecturePage />
+            </Suspense>
           </ProtectedRoute>
         )}
       />
@@ -177,7 +194,9 @@ export default function App() {
         path="/student/module/:courseName/:moduleName/quizzes"
         element={(
           <ProtectedRoute role="user">
-            <StudentModuleQuizPage />
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading module quizzes...</div>}>
+              <StudentModuleQuizPage />
+            </Suspense>
           </ProtectedRoute>
         )}
       />
@@ -185,7 +204,9 @@ export default function App() {
         path="/student/mock-exam/:examId"
         element={(
           <ProtectedRoute role="user">
-            <StudentMockExamPage />
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading mock exam...</div>}>
+              <StudentMockExamPage />
+            </Suspense>
           </ProtectedRoute>
         )}
       />

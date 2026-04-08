@@ -194,7 +194,7 @@ export default function AppShell({
     setIsBrandRefreshing(true);
     window.setTimeout(() => {
       window.location.reload();
-    }, 360);
+    }, 560);
   }
 
   const shellPad = viewportWidth <= 375 ? 8 : viewportWidth <= 720 ? 12 : 24;
