@@ -1527,6 +1527,7 @@ export default function StudentDashboard() {
       title="Student Dashboard"
       roleLabel="Student"
       showThemeSwitch={false}
+      refreshOnBrandIconClick
       navTitle="Student Sections"
       navItems={studentNavItems}
       actions={(

@@ -13,7 +13,8 @@ export default function AppShell({
   navTitle = 'Menu',
   showThemeSwitch = true,
   activeNavItemId,
-  onNavItemClick
+  onNavItemClick,
+  refreshOnBrandIconClick = false
 }) {
   const { theme, toggleTheme } = useThemeStore();
   const isLightTheme = theme === 'light';
@@ -22,9 +23,11 @@ export default function AppShell({
   );
   const [activeNavId, setActiveNavId] = useState(navItems[0]?.id || '');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isBrandRefreshing, setIsBrandRefreshing] = useState(false);
   const [topbarHeight, setTopbarHeight] = useState(104);
   const topbarRef = useRef(null);
   const menuScrollLockRef = useRef(0);
+  const pendingNavTargetRef = useRef(null);
   const hasSideNav = navItems.length > 0;
   const isNavControlled = typeof activeNavItemId === 'string' && activeNavItemId.length > 0;
   const currentActiveNavId = isNavControlled ? activeNavItemId : activeNavId;
@@ -107,13 +110,7 @@ export default function AppShell({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isMenuOpen]);
 
-  function handleNavClick(id) {
-    if (!isNavControlled) {
-      setActiveNavId(id);
-    }
-
-    setIsMenuOpen(false);
-
+  function runNavigationTarget(id) {
     if (typeof onNavItemClick === 'function') {
       onNavItemClick(id);
     } else {
@@ -126,6 +123,34 @@ export default function AppShell({
         return;
       }
     }
+  }
+
+  useEffect(() => {
+    if (isMenuOpen) return;
+    const pendingId = pendingNavTargetRef.current;
+    if (!pendingId) return;
+    pendingNavTargetRef.current = null;
+
+    // Wait until layout/scroll lock cleanup is applied before scrolling to section.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        runNavigationTarget(pendingId);
+      });
+    });
+  }, [isMenuOpen]);
+
+  function handleNavClick(id) {
+    if (!isNavControlled) {
+      setActiveNavId(id);
+    }
+
+    if (isMenuOpen) {
+      pendingNavTargetRef.current = id;
+      setIsMenuOpen(false);
+      return;
+    }
+
+    runNavigationTarget(id);
 
   }
 
@@ -161,6 +186,15 @@ export default function AppShell({
         })}
       </nav>
     );
+  }
+
+  function handleBrandIconClick() {
+    if (!refreshOnBrandIconClick) return;
+    if (isBrandRefreshing) return;
+    setIsBrandRefreshing(true);
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 360);
   }
 
   const shellPad = viewportWidth <= 375 ? 8 : viewportWidth <= 720 ? 12 : 24;
@@ -223,7 +257,15 @@ export default function AppShell({
                 <span className="hub-menu-trigger-label">Menu</span>
               </button>
             ) : null}
-            <img src={logoImg} alt="Biomics Hub logo" className="topbar-logo" />
+            <button
+              type="button"
+              className={`topbar-logo-btn${refreshOnBrandIconClick ? ' is-refresh-enabled' : ''}${isBrandRefreshing ? ' is-refreshing' : ''}`}
+              onClick={handleBrandIconClick}
+              aria-label={refreshOnBrandIconClick ? 'Refresh dashboard' : 'Biomics Hub logo'}
+              title={refreshOnBrandIconClick ? 'Refresh dashboard' : 'Biomics Hub'}
+            >
+              <img src={logoImg} alt="Biomics Hub logo" className="topbar-logo" />
+            </button>
             <div className="topbar-brand-text">
               <span className="topbar-site-name">Biomics Hub</span>
               <h1 className="topbar-title">{title}</h1>

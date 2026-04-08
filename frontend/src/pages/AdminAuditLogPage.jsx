@@ -11,6 +11,7 @@ export default function AdminAuditLogPage() {
   const [auditLogPagination, setAuditLogPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [auditLogFilter, setAuditLogFilter] = useState({ action: '', actor: '' });
   const [auditLogLoading, setAuditLogLoading] = useState(false);
+  const [refreshPulse, setRefreshPulse] = useState(false);
   const [banner, setBanner] = useState(null);
 
   useAutoDismissMessage(banner, setBanner);
@@ -56,6 +57,19 @@ export default function AdminAuditLogPage() {
     return () => clearInterval(timer);
   }, [auditLogPagination.page, auditLogFilter]);
 
+  function triggerRefreshPulse() {
+    setRefreshPulse(false);
+    window.requestAnimationFrame(() => {
+      setRefreshPulse(true);
+      window.setTimeout(() => setRefreshPulse(false), 720);
+    });
+  }
+
+  async function handleManualRefresh() {
+    await loadAuditLogs(auditLogPagination.page, auditLogFilter);
+    triggerRefreshPulse();
+  }
+
   return (
     <AppShell
       title="Audit Log"
@@ -66,11 +80,12 @@ export default function AdminAuditLogPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            className="secondary-btn"
-            onClick={() => loadAuditLogs(auditLogPagination.page, auditLogFilter)}
+            className={`secondary-btn workspace-refresh-btn${auditLogLoading ? ' is-loading' : ''}${refreshPulse ? ' is-done' : ''}`}
+            onClick={handleManualRefresh}
             disabled={auditLogLoading}
           >
-            {auditLogLoading ? 'Refreshing...' : 'Refresh'}
+            <span className="workspace-refresh-btn-icon" aria-hidden="true">↻</span>
+            {auditLogLoading ? 'Refreshing...' : refreshPulse ? 'Updated' : 'Refresh'}
           </button>
           <button type="button" className="secondary-btn" onClick={() => navigate(-1)}>
             ← Back

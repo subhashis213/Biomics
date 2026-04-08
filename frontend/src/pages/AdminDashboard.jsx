@@ -2259,6 +2259,7 @@ export default function AdminDashboard() {
       title="Admin Dashboard"
       roleLabel="Admin"
       showThemeSwitch={false}
+      refreshOnBrandIconClick
       navTitle="Admin Sections"
       navItems={adminNavItems}
       onNavItemClick={handleAdminNavItemClick}

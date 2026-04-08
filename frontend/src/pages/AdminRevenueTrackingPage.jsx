@@ -20,6 +20,7 @@ export default function AdminRevenueTrackingPage() {
   const [paymentHistoryPagination, setPaymentHistoryPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [paymentHistoryFilter, setPaymentHistoryFilter] = useState({ course: '', status: '', username: '' });
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
+  const [refreshPulse, setRefreshPulse] = useState(false);
   const [banner, setBanner] = useState(null);
 
   useAutoDismissMessage(banner, setBanner);
@@ -65,6 +66,19 @@ export default function AdminRevenueTrackingPage() {
     return () => clearInterval(timer);
   }, [paymentHistoryPagination.page, paymentHistoryFilter]);
 
+  function triggerRefreshPulse() {
+    setRefreshPulse(false);
+    window.requestAnimationFrame(() => {
+      setRefreshPulse(true);
+      window.setTimeout(() => setRefreshPulse(false), 720);
+    });
+  }
+
+  async function handleManualRefresh() {
+    await loadPaymentHistory(paymentHistoryPagination.page, paymentHistoryFilter);
+    triggerRefreshPulse();
+  }
+
   return (
     <AppShell
       title="Revenue Tracking"
@@ -75,11 +89,12 @@ export default function AdminRevenueTrackingPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            className="secondary-btn"
-            onClick={() => loadPaymentHistory(paymentHistoryPagination.page, paymentHistoryFilter)}
+            className={`secondary-btn workspace-refresh-btn${paymentHistoryLoading ? ' is-loading' : ''}${refreshPulse ? ' is-done' : ''}`}
+            onClick={handleManualRefresh}
             disabled={paymentHistoryLoading}
           >
-            {paymentHistoryLoading ? 'Refreshing...' : 'Refresh'}
+            <span className="workspace-refresh-btn-icon" aria-hidden="true">↻</span>
+            {paymentHistoryLoading ? 'Refreshing...' : refreshPulse ? 'Updated' : 'Refresh'}
           </button>
           <button type="button" className="secondary-btn" onClick={() => navigate(-1)}>
             ← Back
