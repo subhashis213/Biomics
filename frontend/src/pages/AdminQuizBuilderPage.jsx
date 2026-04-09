@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { deleteQuiz, fetchAdminQuizzes, requestJson, saveModuleQuiz } from '../api';
 import AppShell from '../components/AppShell';
@@ -36,6 +37,15 @@ export default function AdminQuizBuilderPage() {
   const [adminQuizzes, setAdminQuizzes] = useState([]);
   const [allAdminQuizzes, setAllAdminQuizzes] = useState([]);
   const [videos, setVideos] = useState([]);
+  const [moduleCatalog, setModuleCatalog] = useState([]);
+  const [topicsByModuleKey, setTopicsByModuleKey] = useState({});
+  const [quizDeleteDialog, setQuizDeleteDialog] = useState({ open: false, quiz: null });
+  const [isDeletingQuiz, setIsDeletingQuiz] = useState(false);
+
+  function closeQuizDeleteDialog() {
+    if (isDeletingQuiz) return;
+    setQuizDeleteDialog({ open: false, quiz: null });
+  }
 
   useEffect(() => {
     let ignore = false;
@@ -56,6 +66,62 @@ export default function AdminQuizBuilderPage() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadModuleCatalog() {
+      try {
+        const response = await requestJson('/modules');
+        if (!ignore) {
+          setModuleCatalog(Array.isArray(response?.modules) ? response.modules : []);
+        }
+      } catch {
+        if (!ignore) setModuleCatalog([]);
+      }
+    }
+
+    loadModuleCatalog();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const moduleName = normalizeText(quizModule || '');
+    const category = normalizeText(quizCategory || '');
+    if (!moduleName || !category) return;
+
+    const key = `${category}::${moduleName}`;
+    if (topicsByModuleKey[key]) return;
+
+    let cancelled = false;
+
+    requestJson(`/modules/topics?category=${encodeURIComponent(category)}&module=${encodeURIComponent(moduleName)}`)
+      .then((response) => {
+        if (cancelled) return;
+        const topics = Array.isArray(response?.topics)
+          ? response.topics
+            .map((item) => normalizeText(item?.name || ''))
+            .filter(Boolean)
+          : [];
+        setTopicsByModuleKey((current) => ({
+          ...current,
+          [key]: topics
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTopicsByModuleKey((current) => ({
+          ...current,
+          [key]: []
+        }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quizCategory, quizModule, topicsByModuleKey]);
 
   async function loadAdminQuizzes(category = quizCategory) {
     try {
@@ -96,12 +162,25 @@ export default function AdminQuizBuilderPage() {
     return result;
   }, [allAdminQuizzes]);
 
+  const modulesByCourseFromCatalog = useMemo(() => {
+    const result = {};
+    moduleCatalog.forEach((entry) => {
+      const category = normalizeText(entry?.category || '');
+      const moduleName = normalizeText(entry?.name || '');
+      if (!category || !moduleName) return;
+      if (!result[category]) result[category] = new Set();
+      result[category].add(moduleName);
+    });
+    return result;
+  }, [moduleCatalog]);
+
   const availableModules = useMemo(() => {
     return Array.from(new Set([
+      ...Array.from(modulesByCourseFromCatalog[quizCategory] || []),
       ...Array.from(modulesByCourseFromVideos[quizCategory] || []),
       ...Array.from(modulesByCourseFromQuizzes[quizCategory] || [])
     ])).sort((a, b) => a.localeCompare(b));
-  }, [modulesByCourseFromVideos, modulesByCourseFromQuizzes, quizCategory]);
+  }, [modulesByCourseFromCatalog, modulesByCourseFromVideos, modulesByCourseFromQuizzes, quizCategory]);
 
   const topicsByCourseModuleFromVideos = useMemo(() => {
     const result = {};
@@ -134,11 +213,12 @@ export default function AdminQuizBuilderPage() {
     if (!moduleKey) return [];
     const key = `${quizCategory}::${moduleKey}`;
     return Array.from(new Set([
+      ...Array.from(topicsByModuleKey[key] || []),
       ...Array.from(topicsByCourseModuleFromVideos[key] || []),
       ...Array.from(topicsByCourseModuleFromQuizzes[key] || []),
       'General'
     ])).sort((a, b) => a.localeCompare(b));
-  }, [quizCategory, quizModule, topicsByCourseModuleFromVideos, topicsByCourseModuleFromQuizzes]);
+  }, [quizCategory, quizModule, topicsByModuleKey, topicsByCourseModuleFromVideos, topicsByCourseModuleFromQuizzes]);
 
   useEffect(() => {
     if (!quizModule) {
@@ -149,6 +229,21 @@ export default function AdminQuizBuilderPage() {
       setQuizTopic(availableTopics[0] || 'General');
     }
   }, [quizModule, availableTopics, quizTopic]);
+
+  useEffect(() => {
+    if (!quizDeleteDialog.open) return undefined;
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        closeQuizDeleteDialog();
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [quizDeleteDialog.open, isDeletingQuiz]);
 
   function resetBuilder() {
     setEditingQuizId('');
@@ -210,16 +305,23 @@ export default function AdminQuizBuilderPage() {
   }
 
   async function handleDeleteQuiz(quiz) {
-    const ok = window.confirm(`Delete quiz for ${quiz.module} (${quiz.category})?`);
-    if (!ok) return;
+    setQuizDeleteDialog({ open: true, quiz });
+  }
+
+  async function confirmDeleteQuiz() {
+    if (!quizDeleteDialog.quiz?._id || isDeletingQuiz) return;
 
     try {
-      await deleteQuiz(quiz._id);
+      setIsDeletingQuiz(true);
+      await deleteQuiz(quizDeleteDialog.quiz._id);
       await loadAdminQuizzes(quizCategory);
       setQuizMessage({ type: 'success', text: 'Quiz deleted.' });
-      if (editingQuizId === quiz._id) resetBuilder();
+      if (editingQuizId === quizDeleteDialog.quiz._id) resetBuilder();
+      setQuizDeleteDialog({ open: false, quiz: null });
     } catch (error) {
       setQuizMessage({ type: 'error', text: error.message || 'Failed to delete quiz.' });
+    } finally {
+      setIsDeletingQuiz(false);
     }
   }
 
@@ -276,7 +378,8 @@ export default function AdminQuizBuilderPage() {
   }
 
   return (
-    <AppShell
+    <>
+      <AppShell
       title="Chapter Quiz Workspace"
       subtitle="Create class-wise chapter quizzes in a dedicated page"
       roleLabel="Admin"
@@ -494,6 +597,56 @@ export default function AdminQuizBuilderPage() {
           )}
         </section>
       </main>
-    </AppShell>
+      </AppShell>
+
+      {quizDeleteDialog.open ? createPortal(
+        <div
+          className="confirm-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeQuizDeleteDialog();
+          }}
+        >
+          <section className="confirm-modal card quiz-delete-confirm-modal" role="dialog" aria-modal="true" aria-label="Delete quiz confirmation">
+            <p className="eyebrow">Delete Quiz</p>
+            <h2>Delete this quiz?</h2>
+            <p className="subtitle">
+              {quizDeleteDialog.quiz?.title || quizDeleteDialog.quiz?.module || 'Selected quiz'} will be permanently removed from
+              {' '}
+              {quizDeleteDialog.quiz?.category || 'this course'}.
+            </p>
+            <div className="quiz-delete-confirm-meta">
+              <span>{quizDeleteDialog.quiz?.module || 'General'}</span>
+              <span>{quizDeleteDialog.quiz?.topic || 'General'}</span>
+            </div>
+            <div className="confirm-modal-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeQuizDeleteDialog();
+                }}
+                disabled={isDeletingQuiz}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  confirmDeleteQuiz();
+                }}
+                disabled={isDeletingQuiz}
+              >
+                {isDeletingQuiz ? 'Deleting...' : 'Delete Quiz'}
+              </button>
+            </div>
+          </section>
+        </div>,
+        document.body
+      ) : null}
+    </>
   );
 }

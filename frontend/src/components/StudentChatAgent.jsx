@@ -107,18 +107,30 @@ export function StudentAnnouncementBell() {
     loadAnnouncements();
   }, [loadAnnouncements]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
   if (!isLoggedIn) return null;
 
   return (
-    <div className="biotab-announcement-inline-wrap">
+    <div className={`biotab-announcement-inline-wrap${open ? ' is-open' : ''}`}>
       <button
         type="button"
         className={`biotab-announcement-header-btn${shouldRingAnnouncement ? ' biotab-announcement-fab-ringing' : ''}`}
         title="View announcements"
         aria-label="View admin announcements"
         onClick={() => {
-          setOpen((current) => !current);
-          if (!open) loadAnnouncements();
+          setOpen((current) => {
+            const nextOpen = !current;
+            if (nextOpen) loadAnnouncements();
+            return nextOpen;
+          });
         }}
       >
         <Bell size={18} />
@@ -128,38 +140,46 @@ export function StudentAnnouncementBell() {
       </button>
 
       {open ? (
-        <div className="biotab-announcement-panel biotab-announcement-panel-inline" role="dialog" aria-label="Student announcements">
-          <div className="biotab-announcement-head">
-            <strong>Announcements</strong>
-            <button
-              type="button"
-              className="biotab-announcement-close"
-              onClick={() => setOpen(false)}
-              aria-label="Close announcements"
-            >
-              <X size={14} />
-            </button>
+        <>
+          <button
+            type="button"
+            className="biotab-announcement-inline-backdrop"
+            aria-label="Close announcements"
+            onClick={() => setOpen(false)}
+          />
+          <div className="biotab-announcement-panel biotab-announcement-panel-inline" role="dialog" aria-label="Student announcements">
+            <div className="biotab-announcement-head">
+              <strong>Announcements</strong>
+              <button
+                type="button"
+                className="biotab-announcement-close"
+                onClick={() => setOpen(false)}
+                aria-label="Close announcements"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {loading ? <p className="biotab-announcement-empty">Loading announcements...</p> : null}
+            {!loading && error ? <p className="biotab-announcement-empty">{error}</p> : null}
+
+            {!loading && !error ? (
+              announcements.length ? (
+                <div className="biotab-announcement-list">
+                  {announcements.map((item) => (
+                    <article key={item._id} className="biotab-announcement-item">
+                      <h4>{item.title}</h4>
+                      <p>{item.message}</p>
+                      <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="biotab-announcement-empty">No announcements yet.</p>
+              )
+            ) : null}
           </div>
-
-          {loading ? <p className="biotab-announcement-empty">Loading announcements...</p> : null}
-          {!loading && error ? <p className="biotab-announcement-empty">{error}</p> : null}
-
-          {!loading && !error ? (
-            announcements.length ? (
-              <div className="biotab-announcement-list">
-                {announcements.map((item) => (
-                  <article key={item._id} className="biotab-announcement-item">
-                    <h4>{item.title}</h4>
-                    <p>{item.message}</p>
-                    <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="biotab-announcement-empty">No announcements yet.</p>
-            )
-          ) : null}
-        </div>
+        </>
       ) : null}
     </div>
   );

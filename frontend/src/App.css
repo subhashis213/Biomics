@@ -5027,6 +5027,37 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   color: color-mix(in srgb, #ef4444 75%, var(--text-main));
 }
 
+.quiz-delete-confirm-modal {
+  border: 1px solid color-mix(in srgb, #ef4444 30%, var(--line));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, #ef4444 10%, transparent), transparent 56%),
+    linear-gradient(160deg, var(--surface-start) 0%, var(--surface-end) 100%);
+}
+
+.quiz-delete-confirm-modal h2 {
+  margin: 0;
+  color: color-mix(in srgb, #ef4444 70%, var(--text-main));
+}
+
+.quiz-delete-confirm-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quiz-delete-confirm-meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+  border: 1px solid color-mix(in srgb, #ef4444 26%, var(--line));
+  background: color-mix(in srgb, #ef4444 8%, transparent);
+}
+
 .profile-modal-backdrop {
   position: fixed;
   inset: 0;
