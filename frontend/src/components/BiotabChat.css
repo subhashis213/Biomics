@@ -222,6 +222,8 @@
   padding: 9px;
   display: grid;
   gap: 9px;
+  flex: 1;
+  min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(245, 158, 11, 0.35) rgba(148, 163, 184, 0.14);
 }
@@ -845,7 +847,9 @@ html[data-theme='light'] .biotab-announcement-item span {
     right: max(var(--shell-pad, 12px), 12px);
     left: max(var(--shell-pad, 12px), 12px);
     width: auto;
-    max-height: calc(100dvh - var(--app-shell-topbar-clearance, 96px) - 16px - env(safe-area-inset-bottom));
+    height: clamp(240px, 62dvh, calc(100dvh - var(--app-shell-topbar-clearance, 96px) - 16px - env(safe-area-inset-bottom)));
+    max-height: none;
+    min-height: 240px;
     border-radius: 18px;
     animation-duration: 200ms;
   }
@@ -860,7 +864,9 @@ html[data-theme='light'] .biotab-announcement-item span {
     top: max(calc(var(--app-shell-topbar-clearance, 88px) + 6px), calc(env(safe-area-inset-top) + 2px));
     right: 8px;
     left: 8px;
-    max-height: calc(100dvh - var(--app-shell-topbar-clearance, 88px) - 10px - env(safe-area-inset-bottom));
+    height: clamp(220px, 60dvh, calc(100dvh - var(--app-shell-topbar-clearance, 88px) - 10px - env(safe-area-inset-bottom)));
+    max-height: none;
+    min-height: 220px;
     border-radius: 14px;
   }
 }
