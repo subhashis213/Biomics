@@ -442,3 +442,64 @@ export function clearAiTutorHistoryAdmin() {
     method: 'DELETE'
   });
 }
+
+// ── Test Series ──────────────────────────────────────────────────────────────
+
+export function fetchTestSeriesPricingAdmin() {
+  return requestJson('/test-series/pricing/admin');
+}
+
+export function saveTestSeriesPricingAdmin(payload) {
+  return requestJson('/test-series/pricing', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchTopicTestsAdmin(category = '') {
+  return requestJson(`/test-series/topic-tests/admin${category ? `?category=${encodeURIComponent(category)}` : ''}`);
+}
+
+export function saveTopicTestAdmin(payload) {
+  return requestJson('/test-series/topic-tests', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteTopicTestAdmin(testId) {
+  return requestJson(`/test-series/topic-tests/${testId}`, { method: 'DELETE' });
+}
+
+export function fetchFullMocksAdmin(category = '') {
+  return requestJson(`/test-series/full-mocks/admin${category ? `?category=${encodeURIComponent(category)}` : ''}`);
+}
+
+export function saveFullMockAdmin(payload) {
+  return requestJson('/test-series/full-mocks', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteFullMockAdmin(mockId) {
+  return requestJson(`/test-series/full-mocks/${mockId}`, { method: 'DELETE' });
+}
+
+export function fetchTestSeriesStudentAccess() {
+  return requestJson('/test-series/pricing/student');
+}
+
+export function createTestSeriesOrder(seriesType) {
+  return requestJson('/test-series/payment/create-order', {
+    method: 'POST',
+    body: JSON.stringify({ seriesType })
+  });
+}
+
+export function verifyTestSeriesPayment(payload) {
+  return requestJson('/test-series/payment/verify', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}

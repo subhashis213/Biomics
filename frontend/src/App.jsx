@@ -13,6 +13,9 @@ import AdminQuizBuilderPage from './pages/AdminQuizBuilderPage';
 import AdminRecoveryCenterPage from './pages/AdminRecoveryCenterPage';
 import AdminRevenueTrackingPage from './pages/AdminRevenueTrackingPage';
 import AdminVoucherWorkspacePage from './pages/AdminVoucherWorkspacePage';
+import AdminTestSeriesHubPage from './pages/AdminTestSeriesHubPage';
+import AdminTopicTestBuilderPage from './pages/AdminTopicTestBuilderPage';
+import AdminFullMockTestBuilderPage from './pages/AdminFullMockTestBuilderPage';
 import AuthPage from './pages/AuthPage';
 
 const CommunityChatPage = lazy(() => import('./pages/CommunityChatPage'));
@@ -22,6 +25,7 @@ const StudentModuleDetailsPage = lazy(() => import('./pages/StudentModuleDetails
 const StudentMockExamPage = lazy(() => import('./pages/StudentMockExamPage'));
 const StudentModuleQuizPage = lazy(() => import('./pages/StudentModuleQuizPage'));
 const StudentQuizPage = lazy(() => import('./pages/StudentQuizPage'));
+const StudentTestSeriesPage = lazy(() => import('./pages/StudentTestSeriesPage'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -141,6 +145,30 @@ export default function App() {
         )}
       />
       <Route
+        path="/admin/test-series"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminTestSeriesHubPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/test-series/topic-tests"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminTopicTestBuilderPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/test-series/full-mocks"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminFullMockTestBuilderPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/student"
         element={(
           <ProtectedRoute role="user">
@@ -206,6 +234,16 @@ export default function App() {
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading mock exam...</div>}>
               <StudentMockExamPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/test-series"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading test series...</div>}>
+              <StudentTestSeriesPage />
             </Suspense>
           </ProtectedRoute>
         )}

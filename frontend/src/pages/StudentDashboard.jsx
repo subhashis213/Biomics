@@ -1529,6 +1529,7 @@ export default function StudentDashboard() {
       { id: 'section-quiz-performance', label: 'Quiz Performance', icon: '📊' },
       { id: 'section-leaderboard', label: 'Leaderboard', icon: '🏆' },
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
+      { id: 'section-test-series', label: 'Test Series', icon: '📝' },
       { id: 'section-exam-leaderboard', label: 'Exam Leaderboard', icon: '🥇' },
       { id: 'section-feedback', label: 'Feedback', icon: '💬' },
       { id: 'section-connect', label: 'Connect', icon: '🔗' }
@@ -2428,6 +2429,27 @@ export default function StudentDashboard() {
               ))}
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {!selectedModule ? (
+        <section id="section-test-series" className="card ts-student-entry-card">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Premium Add-on</p>
+              <h2>Test Series</h2>
+              <p className="subtitle">Topic-wise tests and full-length mock exams — purchased separately from your course plan.</p>
+            </div>
+            <div className="quiz-count-cards">
+              <StatCard label="Topic Tests" value="∞" />
+              <StatCard label="Full Mocks" value="∞" />
+            </div>
+          </div>
+          <div className="workspace-link-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series')}>
+              Go to Test Series →
+            </button>
+          </div>
         </section>
       ) : null}
 

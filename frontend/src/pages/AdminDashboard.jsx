@@ -2746,6 +2746,25 @@ export default function AdminDashboard() {
         </div>
       </section>
 
+      <section id="section-test-series" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card ts-link-card">
+        <div className="section-header compact quiz-builder-heading-row">
+          <div>
+            <p className="eyebrow">Test Series</p>
+            <h2>Test Series workspace</h2>
+            <p className="subtitle">Create topic-wise tests and full-length mock tests sold as separate add-ons. Manage pricing per course independently of Pro and Elite plans.</p>
+          </div>
+          <div className="quiz-count-cards">
+            <StatCard label="Topic Tests" value="—" />
+            <StatCard label="Full Mocks" value="—" />
+          </div>
+        </div>
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/test-series')}>
+            Open Test Series Workspace
+          </button>
+        </div>
+      </section>
+
       <section id="section-announcements" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card announcements-link-card">
         <div className="section-header compact quiz-builder-heading-row">
           <div>
