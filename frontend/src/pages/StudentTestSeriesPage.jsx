@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { requestJson } from '../api';
 import AppShell from '../components/AppShell';
-import StatCard from '../components/StatCard';
 import { useSessionStore } from '../stores/sessionStore';
 
 function loadRazorpayCheckoutScript() {
@@ -17,42 +17,32 @@ function loadRazorpayCheckoutScript() {
 }
 
 function rupees(paise) {
-  return `₹${(Number(paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`;
+  const n = Number(paise || 0) / 100;
+  return '\u20b9' + n.toLocaleString('en-IN', { minimumFractionDigits: 0 });
 }
 
-function difficultyColor(d) {
-  if (d === 'easy') return '#16a34a';
-  if (d === 'hard') return '#dc2626';
-  return '#d97706';
-}
-
-const MOCK_TIMER_TICK = 1000;
+const DIFFICULTY_COLOR = { easy: '#16a34a', hard: '#dc2626', medium: '#d97706' };
 
 export default function StudentTestSeriesPage() {
   const navigate = useNavigate();
   const { session } = useSessionStore();
 
-  // access & pricing
-  const [accessData, setAccessData] = useState(null);
-  const [loadingAccess, setLoadingAccess] = useState(true);
-
-  // lists
-  const [topicTests, setTopicTests] = useState([]);
-  const [fullMocks, setFullMocks] = useState([]);
-  const [loadingTests, setLoadingTests] = useState(false);
-
-  // active tab
-  const [activeTab, setActiveTab] = useState('topic'); // 'topic' | 'mock'
-
-  // payment
-  const [purchasingType, setPurchasingType] = useState(''); // 'topic_test' | 'full_mock'
-  const [banner, setBanner] = useState(null);
-
-  // active test session: { type: 'topic'|'mock', test, questions, answers, startedAt, timeLeft, submitted, result }
-  const [testSession, setTestSession] = useState(null);
+  const [accessData, setAccessData]         = useState(null);
+  const [loadingAccess, setLoadingAccess]   = useState(true);
+  const [topicTests, setTopicTests]         = useState([]);
+  const [fullMocks,  setFullMocks]          = useState([]);
+  const [loadingTests, setLoadingTests]     = useState(false);
+  const [activeTab, setActiveTab]           = useState('topic');
+  const [purchasingType, setPurchasingType] = useState('');
+  const [banner, setBanner]                 = useState(null);
+  const [testSession, setTestSession]       = useState(null);
+  const [showReview, setShowReview]         = useState(false);
+  // syllabusView: null | { type:'topic'|'mock', items:[], hasAccess:bool, course:string }
+  const [syllabusView, setSyllabusView]     = useState(null);
+  const [loadingSyllabus, setLoadingSyllabus] = useState(false);
   const timerRef = useRef(null);
 
-  // ── load access & pricing ─────────────────────────────────────────────────
+  // ── Access & test loading ─────────────────────────────────────────────────
 
   async function loadAccess() {
     setLoadingAccess(true);
@@ -66,8 +56,8 @@ export default function StudentTestSeriesPage() {
     }
   }
 
-  async function loadTests() {
-    const access = accessData?.access;
+  async function loadTests(data) {
+    const access = data?.access ?? accessData?.access;
     const jobs = [];
     if (access?.hasTopicTest) {
       jobs.push(
@@ -75,18 +65,14 @@ export default function StudentTestSeriesPage() {
           .then((r) => setTopicTests(Array.isArray(r?.tests) ? r.tests : []))
           .catch(() => setTopicTests([]))
       );
-    } else {
-      setTopicTests([]);
-    }
+    } else { setTopicTests([]); }
     if (access?.hasFullMock) {
       jobs.push(
         requestJson('/test-series/full-mocks/student')
           .then((r) => setFullMocks(Array.isArray(r?.mocks) ? r.mocks : []))
           .catch(() => setFullMocks([]))
       );
-    } else {
-      setFullMocks([]);
-    }
+    } else { setFullMocks([]); }
     if (jobs.length) {
       setLoadingTests(true);
       await Promise.all(jobs);
@@ -95,9 +81,34 @@ export default function StudentTestSeriesPage() {
   }
 
   useEffect(() => { loadAccess(); }, []);
-  useEffect(() => { if (accessData) loadTests(); }, [accessData]);
+  useEffect(() => { if (accessData) loadTests(accessData); }, [accessData]);
 
-  // ── payment ───────────────────────────────────────────────────────────────
+  // ── Syllabus preview ─────────────────────────────────────────────────────
+
+  async function openSyllabus(type) {
+    setLoadingSyllabus(true);
+    setSyllabusView({ type, items: [], hasAccess: false, course: '', loading: true });
+    try {
+      const endpoint = type === 'topic'
+        ? '/test-series/topic-tests/syllabus'
+        : '/test-series/full-mocks/syllabus';
+      const res = await requestJson(endpoint);
+      setSyllabusView({
+        type,
+        items:     res.items     || [],
+        hasAccess: type === 'topic' ? Boolean(res.hasTopicTest) : Boolean(res.hasFullMock),
+        course:    res.course    || '',
+        loading:   false
+      });
+    } catch (e) {
+      setBanner({ type: 'error', text: e.message || 'Failed to load syllabus.' });
+      setSyllabusView(null);
+    } finally {
+      setLoadingSyllabus(false);
+    }
+  }
+
+  // ── Payment ───────────────────────────────────────────────────────────────
 
   async function handlePurchase(seriesType) {
     if (purchasingType) return;
@@ -108,463 +119,897 @@ export default function StudentTestSeriesPage() {
         method: 'POST',
         body: JSON.stringify({ seriesType })
       });
-
       if (orderRes?.alreadyOwned) {
-        setBanner({ type: 'success', text: 'Already purchased — refreshing access.' });
+        setBanner({ type: 'success', text: 'Already purchased — refreshing your access.' });
         await loadAccess();
         return;
       }
-
       if (orderRes?.free) {
-        setBanner({ type: 'success', text: 'Access granted (free)!' });
+        setBanner({
+          type: 'success',
+          text: seriesType === 'topic_test'
+            ? 'Access granted! Topic Tests and Full Mocks are now unlocked.'
+            : 'Access granted! Full Mock Tests are now unlocked.'
+        });
         await loadAccess();
         return;
       }
-
       const scriptReady = await loadRazorpayCheckoutScript();
-      if (!scriptReady || !window.Razorpay) {
-        throw new Error('Unable to load Razorpay checkout. Please try again.');
-      }
-
+      if (!scriptReady || !window.Razorpay) throw new Error('Unable to load Razorpay. Please try again.');
       await new Promise((resolve, reject) => {
         let settled = false;
-        let paymentHandlerStarted = false;
-
-        const safeResolve = (v) => { if (!settled) { settled = true; resolve(v); } };
-        const safeReject = (e) => { if (!settled) { settled = true; reject(e); } };
-
-        const options = {
+        let handlerStarted = false;
+        const ok  = (v) => { if (!settled) { settled = true; resolve(v); } };
+        const err = (e) => { if (!settled) { settled = true; reject(e); } };
+        const rz = new window.Razorpay({
           key: orderRes.keyId,
           amount: orderRes.razorpayOrder?.amount,
           currency: orderRes.currency || 'INR',
           name: 'Biomics Hub',
-          description: seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Test Series',
+          description: seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Series',
           order_id: orderRes.razorpayOrder?.id,
+          prefill: { name: session?.username || '' },
+          theme: { color: '#0f766e' },
           handler: async (response) => {
-            paymentHandlerStarted = true;
+            handlerStarted = true;
             try {
               await requestJson('/test-series/payment/verify', {
                 method: 'POST',
                 body: JSON.stringify({
-                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayOrderId:   response.razorpay_order_id,
                   razorpayPaymentId: response.razorpay_payment_id,
                   razorpaySignature: response.razorpay_signature,
                   seriesType
                 })
               });
-              setBanner({ type: 'success', text: `${seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Series'} unlocked!` });
+              setBanner({ type: 'success', text: (seriesType === 'topic_test' ? 'Topic Test Series (+ Full Mocks)' : 'Full Mock Series') + ' unlocked!' });
               await loadAccess();
-              safeResolve({ status: 'paid' });
-            } catch (verifyErr) {
-              safeReject(new Error(verifyErr.message || 'Payment verification failed.'));
-            }
+              ok({ status: 'paid' });
+            } catch (e) { err(new Error(e.message || 'Payment verification failed.')); }
           },
-          prefill: { name: session?.username || '' },
-          theme: { color: '#0f766e' },
           modal: {
-            ondismiss: () => {
-              window.setTimeout(() => {
-                if (paymentHandlerStarted) return;
-                setBanner({ type: 'error', text: 'Payment cancelled.' });
-                safeResolve({ status: 'cancelled' });
-              }, 450);
-            }
+            ondismiss: () => window.setTimeout(() => {
+              if (handlerStarted) return;
+              setBanner({ type: 'warn', text: 'Payment was cancelled.' });
+              ok({ status: 'cancelled' });
+            }, 450)
           }
-        };
-
-        const rz = new window.Razorpay(options);
+        });
         rz.open();
       });
-    } catch (err) {
-      setBanner({ type: 'error', text: err.message || 'Failed to start payment.' });
+    } catch (e) {
+      setBanner({ type: 'error', text: e.message || 'Payment failed. Please try again.' });
     } finally {
       setPurchasingType('');
     }
   }
 
-  // ── test session ──────────────────────────────────────────────────────────
+  // ── Test session ──────────────────────────────────────────────────────────
 
   async function startTest(testId, type) {
+    setBanner(null);
     try {
       const endpoint = type === 'topic'
-        ? `/test-series/topic-tests/student/${testId}`
-        : `/test-series/full-mocks/student/${testId}`;
+        ? '/test-series/topic-tests/student/' + testId
+        : '/test-series/full-mocks/student/' + testId;
       const res = await requestJson(endpoint);
-      const totalSeconds = (res.durationMinutes || 30) * 60;
+      const qCount = res.questions?.length || 0;
+      setShowReview(false);
       setTestSession({
-        type,
-        test: res,
-        questions: res.questions || [],
-        answers: new Array(res.questions?.length || 0).fill(-1),
-        startedAt: Date.now(),
-        timeLeft: totalSeconds,
-        submitted: false,
-        result: null
+        type, test: res,
+        questions:       res.questions || [],
+        answers:         new Array(qCount).fill(-1),
+        markedForReview: new Array(qCount).fill(false),
+        timeLeft:        (res.durationMinutes || 30) * 60,
+        submitted: false, result: null,
+        currentQ: 0, showQuitConfirm: false
       });
-    } catch (err) {
-      setBanner({ type: 'error', text: err.message || 'Failed to load test.' });
+    } catch (e) {
+      setBanner({ type: 'error', text: e.message || 'Failed to load test.' });
     }
   }
 
-  // timer
+  // Timer
   useEffect(() => {
     if (!testSession || testSession.submitted) return undefined;
     timerRef.current = window.setInterval(() => {
       setTestSession((prev) => {
         if (!prev || prev.submitted) return prev;
         const next = prev.timeLeft - 1;
-        if (next <= 0) {
-          submitTest(prev);
-          return { ...prev, timeLeft: 0 };
-        }
+        if (next <= 0) { handleSubmitTest(prev); return { ...prev, timeLeft: 0 }; }
         return { ...prev, timeLeft: next };
       });
-    }, MOCK_TIMER_TICK);
+    }, 1000);
     return () => window.clearInterval(timerRef.current);
   }, [testSession?.test?._id, testSession?.submitted]);
 
-  async function submitTest(session = testSession) {
-    if (!session || session.submitted) return;
+  async function handleSubmitTest(snap = testSession) {
+    if (!snap || snap.submitted) return;
     window.clearInterval(timerRef.current);
-    const { test, type, answers } = session;
     try {
-      const endpoint = type === 'topic'
-        ? `/test-series/topic-tests/student/${test._id}/submit`
-        : `/test-series/full-mocks/student/${test._id}/submit`;
+      const endpoint = snap.type === 'topic'
+        ? '/test-series/topic-tests/student/' + snap.test._id + '/submit'
+        : '/test-series/full-mocks/student/' + snap.test._id + '/submit';
       const result = await requestJson(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ answers })
+        body: JSON.stringify({ answers: snap.answers })
       });
-      setTestSession((prev) => prev ? { ...prev, submitted: true, result } : prev);
-    } catch (err) {
-      setBanner({ type: 'error', text: err.message || 'Failed to submit test.' });
+      setShowReview(false);
+      setTestSession((prev) => prev ? { ...prev, submitted: true, result, showQuitConfirm: false } : prev);
+    } catch (e) {
+      setBanner({ type: 'error', text: e.message || 'Failed to submit test.' });
     }
   }
 
-  function exitTest() {
+  function quitTest() {
     window.clearInterval(timerRef.current);
     setTestSession(null);
+    setShowReview(false);
   }
 
-  // ── render: active test ───────────────────────────────────────────────────
+  function setAnswer(qi, oi) {
+    setTestSession((prev) => {
+      if (!prev) return prev;
+      const answers = [...prev.answers];
+      answers[qi] = oi;
+      return { ...prev, answers };
+    });
+  }
 
-  if (testSession) {
-    const { test, questions, answers, timeLeft, submitted, result } = testSession;
+  function toggleMarkForReview(qi) {
+    setTestSession((prev) => {
+      if (!prev) return prev;
+      const markedForReview = [...prev.markedForReview];
+      markedForReview[qi] = !markedForReview[qi];
+      return { ...prev, markedForReview };
+    });
+  }
 
-    if (submitted && result) {
-      return (
-        <AppShell title="Test Result" roleLabel="Student" showThemeSwitch>
-          <main className="admin-workspace-page">
-            <section className="ts-result-hero card">
-              <h2>{test.title}</h2>
-              <div className="ts-result-score-row">
-                <div className="ts-result-score-circle">
-                  <span className="ts-result-score-pct">{result.percentage}%</span>
-                </div>
-                <div className="ts-result-score-details">
-                  <p><strong>{result.score}</strong> / {result.total} correct</p>
-                  <p className="subtitle">{test.durationMinutes} minute test</p>
+  // ══════════════════════════════════════════════════════════
+  // RENDER: Result
+  // ══════════════════════════════════════════════════════════
+  if (testSession?.submitted && testSession.result) {
+    const { test, result } = testSession;
+    const pct = Number(result.percentage);
+    const grade = pct >= 80 ? { label: 'Excellent', color: '#16a34a' }
+                : pct >= 60 ? { label: 'Good',      color: '#0f766e' }
+                : pct >= 40 ? { label: 'Average',   color: '#d97706' }
+                :             { label: 'Needs Work', color: '#dc2626' };
+    const skipped = result.review?.filter((r) => r.selectedIndex === -1).length || 0;
+
+    return (
+      <AppShell title="Test Result" subtitle={test.title} roleLabel="Student" showThemeSwitch
+        actions={<button type="button" className="secondary-btn" onClick={quitTest}>← Back to Tests</button>}
+      >
+        <main className="admin-workspace-page">
+
+          <section className="card ts-result-score-card">
+            <div className="ts-result-score-left">
+              <div className="ts-result-ring" style={{ '--ring-color': grade.color, '--ring-deg': ((pct / 100) * 360) + 'deg' }}>
+                <div className="ts-result-ring-inner">
+                  <span className="ts-result-ring-pct">{pct}<span className="ts-result-ring-symbol">%</span></span>
+                  <span className="ts-result-ring-label" style={{ color: grade.color }}>{grade.label}</span>
                 </div>
               </div>
-              <button type="button" className="secondary-btn" onClick={exitTest}>← Back to Test Series</button>
-            </section>
+            </div>
+            <div className="ts-result-score-right">
+              <h2 className="ts-result-title">{test.title}</h2>
+              <p className="eyebrow">{test.category}{test.module ? ' · ' + test.module : ''}</p>
+              <div className="ts-result-stats-row">
+                <div className="ts-result-stat correct-stat">
+                  <span className="ts-result-stat-val">{result.score}</span>
+                  <span className="ts-result-stat-key">Correct</span>
+                </div>
+                <div className="ts-result-stat wrong-stat">
+                  <span className="ts-result-stat-val">{result.total - result.score - skipped}</span>
+                  <span className="ts-result-stat-key">Wrong</span>
+                </div>
+                <div className="ts-result-stat skip-stat">
+                  <span className="ts-result-stat-val">{skipped}</span>
+                  <span className="ts-result-stat-key">Skipped</span>
+                </div>
+                <div className="ts-result-stat total-stat">
+                  <span className="ts-result-stat-val">{result.total}</span>
+                  <span className="ts-result-stat-key">Total</span>
+                </div>
+              </div>
+              <div className="ts-result-actions">
+                <button type="button" className="primary-btn" onClick={() => setShowReview((v) => !v)}>
+                  {showReview ? '▲ Hide Answer Review' : '▼ View Answer Review'}
+                </button>
+                <button type="button" className="secondary-btn" onClick={quitTest}>← Back to Tests</button>
+              </div>
+            </div>
+          </section>
 
+          {showReview && (
             <section className="card workspace-panel">
-              <h3 className="ts-review-heading">Answer Review</h3>
+              <h3 className="ts-review-heading">Answer Review — {result.review.length} Questions</h3>
               {result.review.map((item, i) => (
-                <article key={`rev-${i}`} className={`ts-review-item ${item.isCorrect ? 'correct' : 'incorrect'}`}>
-                  <p className="ts-review-q"><span className="ts-review-num">Q{i + 1}</span> {item.question}</p>
+                <article key={i} className={'ts-review-item ' + (item.isCorrect ? 'ts-ri-correct' : item.selectedIndex === -1 ? 'ts-ri-skip' : 'ts-ri-wrong')}>
+                  <div className="ts-review-q-row">
+                    <span className={'ts-review-status-dot ' + (item.isCorrect ? 'dot-correct' : item.selectedIndex === -1 ? 'dot-skip' : 'dot-wrong')} />
+                    <span className="ts-review-num">Q{i + 1}</span>
+                    <p className="ts-review-q-text">{item.question}</p>
+                  </div>
                   <div className="ts-review-options">
                     {item.options.map((opt, oi) => (
-                      <div
-                        key={oi}
-                        className={`ts-review-option${oi === item.correctIndex ? ' correct-opt' : ''}${oi === item.selectedIndex && !item.isCorrect ? ' wrong-opt' : ''}`}
-                      >
-                        <span className="ts-review-opt-marker">{['A', 'B', 'C', 'D'][oi]}</span>
-                        {opt}
+                      <div key={oi} className={['ts-review-option', oi === item.correctIndex ? 'correct-opt' : '', oi === item.selectedIndex && !item.isCorrect ? 'wrong-opt' : ''].filter(Boolean).join(' ')}>
+                        <span className="ts-review-opt-marker">{['A','B','C','D'][oi]}</span>
+                        <span className="ts-review-opt-text">{opt}</span>
+                        {oi === item.correctIndex && <span className="ts-review-opt-badge correct-badge">✓ Answer</span>}
+                        {oi === item.selectedIndex && !item.isCorrect && <span className="ts-review-opt-badge wrong-badge">✗ Yours</span>}
                       </div>
                     ))}
                   </div>
-                  {item.explanation ? <p className="ts-review-explanation">💡 {item.explanation}</p> : null}
+                  {item.explanation && <p className="ts-review-explanation">💡 {item.explanation}</p>}
                 </article>
               ))}
             </section>
-          </main>
-        </AppShell>
-      );
-    }
+          )}
 
-    const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
-    const secs = String(timeLeft % 60).padStart(2, '0');
-    const isUrgent = timeLeft < 120;
-
-    return (
-      <AppShell
-        title={test.title}
-        roleLabel="Student"
-        showThemeSwitch
-        actions={(
-          <div className="ts-timer-topbar">
-            <span className={`ts-timer-badge${isUrgent ? ' urgent' : ''}`}>⏱ {mins}:{secs}</span>
-            <button type="button" className="danger-btn" onClick={() => submitTest()}>Submit Now</button>
-          </div>
-        )}
-      >
-        <main className="admin-workspace-page">
-          <section className="ts-exam-header card">
-            <p className="eyebrow">{test.category}{test.module ? ` · ${test.module}` : ''}{test.topic && test.topic !== 'General' ? ` · ${test.topic}` : ''}</p>
-            <h2>{test.title}</h2>
-            <p className="subtitle">{questions.length} questions · {test.durationMinutes} min</p>
-          </section>
-
-          <div className="ts-question-list">
-            {questions.map((q, qi) => (
-              <article key={`q-${qi}`} className="ts-question-card card">
-                <p className="ts-question-num">Q{qi + 1}</p>
-                <p className="ts-question-text">{q.question}</p>
-                <div className="ts-options-grid">
-                  {q.options.map((opt, oi) => (
-                    <button
-                      key={oi}
-                      type="button"
-                      className={`ts-option-btn${answers[qi] === oi ? ' selected' : ''}`}
-                      onClick={() => setTestSession((prev) => {
-                        if (!prev) return prev;
-                        const next = [...prev.answers];
-                        next[qi] = oi;
-                        return { ...prev, answers: next };
-                      })}
-                    >
-                      <span className="ts-opt-label">{['A', 'B', 'C', 'D'][oi]}</span>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="ts-submit-row">
-            <button type="button" className="primary-btn large-btn" onClick={() => submitTest()}>
-              Submit Test ({answers.filter((a) => a >= 0).length}/{questions.length} answered)
-            </button>
-          </div>
         </main>
       </AppShell>
     );
   }
 
-  // ── render: main hub ──────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+  // RENDER: Active test
+  // ══════════════════════════════════════════════════════════
+  if (testSession && !testSession.submitted) {
+    const { test, questions, answers, markedForReview, timeLeft, currentQ, showQuitConfirm } = testSession;
+    const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+    const secs = String(timeLeft % 60).padStart(2, '0');
+    const isUrgent        = timeLeft < 120;
+    const answeredCount   = answers.filter((a) => a >= 0).length;
+    const markedCount     = markedForReview.filter(Boolean).length;
+    const unansweredCount = answers.length - answeredCount;
+    const q               = questions[currentQ];
+    const isCurrentMarked = markedForReview[currentQ];
 
-  const hasTopicTest = accessData?.access?.hasTopicTest;
-  const hasFullMock = accessData?.access?.hasFullMock;
-  const pricing = accessData?.pricing || {};
-  const course = accessData?.course || '';
+    return (
+      <AppShell
+        title={test.title}
+        subtitle={test.category + (test.module ? ' · ' + test.module : '')}
+        roleLabel="Student" showThemeSwitch
+        actions={(
+          <div className="ts-timer-topbar">
+            <div className="ts-timer-counts">
+              <span className="ts-tc-item ts-tc-answered">{answeredCount} ans</span>
+              <span className="ts-tc-sep">·</span>
+              <span className="ts-tc-item">{unansweredCount} left</span>
+              {markedCount > 0 && (
+                <>
+                  <span className="ts-tc-sep">·</span>
+                  <span className="ts-tc-item ts-tc-marked">{markedCount} marked</span>
+                </>
+              )}
+            </div>
+            <span className={'ts-timer-badge' + (isUrgent ? ' urgent' : '')}>⏱ {mins}:{secs}</span>
+            <button type="button" className="danger-outline-btn"
+              onClick={() => setTestSession((p) => ({ ...p, showQuitConfirm: true }))}>
+              Quit
+            </button>
+          </div>
+        )}
+      >
+        <main className="ts-exam-layout">
+
+          {/* Question panel */}
+          <div className="ts-exam-main">
+            <div className="card ts-question-card">
+
+              <div className="ts-question-header">
+                <div className="ts-qh-left">
+                  <span className="ts-q-counter">
+                    Q <strong>{currentQ + 1}</strong>
+                    <span className="ts-q-total"> / {questions.length}</span>
+                  </span>
+                  {isCurrentMarked && <span className="ts-marked-pill">🟣 Marked for Review</span>}
+                </div>
+                <span className={'ts-timer-mobile' + (isUrgent ? ' urgent' : '')}>⏱ {mins}:{secs}</span>
+              </div>
+
+              <p className="ts-question-text">{q.question}</p>
+
+              <div className="ts-options-list">
+                {q.options.map((opt, oi) => (
+                  <button key={oi} type="button"
+                    className={'ts-option-btn' + (answers[currentQ] === oi ? ' selected' : '')}
+                    onClick={() => setAnswer(currentQ, oi)}
+                  >
+                    <span className="ts-opt-label">{['A','B','C','D'][oi]}</span>
+                    <span className="ts-opt-text">{opt}</span>
+                    {answers[currentQ] === oi && <span className="ts-opt-check">✓</span>}
+                  </button>
+                ))}
+              </div>
+
+              <div className="ts-question-actions">
+                <button type="button"
+                  className={'ts-mark-review-btn' + (isCurrentMarked ? ' active' : '')}
+                  onClick={() => toggleMarkForReview(currentQ)}
+                >
+                  {isCurrentMarked ? '🟣 Unmark Review' : '🔖 Mark for Review'}
+                </button>
+                <div className="ts-nav-prev-next">
+                  <button type="button" className="secondary-btn ts-nav-btn" disabled={currentQ === 0}
+                    onClick={() => setTestSession((p) => ({ ...p, currentQ: p.currentQ - 1 }))}>
+                    ← Prev
+                  </button>
+                  {currentQ < questions.length - 1 ? (
+                    <button type="button" className="primary-btn ts-nav-btn"
+                      onClick={() => setTestSession((p) => ({ ...p, currentQ: p.currentQ + 1 }))}>
+                      Next →
+                    </button>
+                  ) : (
+                    <button type="button" className="primary-btn ts-nav-btn"
+                      onClick={() => handleSubmitTest()}>
+                      Submit Test
+                    </button>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Navigator sidebar */}
+          <aside className="ts-exam-sidebar">
+            <div className="card ts-nav-panel">
+              <p className="ts-nav-panel-title">Question Navigator</p>
+
+              <div className="ts-nav-legend">
+                <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-answered" /><span>Answered</span></div>
+                <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-marked"  /><span>Review</span></div>
+                <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-blank"   /><span>Not Done</span></div>
+              </div>
+
+              <div className="ts-nav-grid">
+                {questions.map((_, qi) => {
+                  const isAnswered = answers[qi] >= 0;
+                  const isMarked   = markedForReview[qi];
+                  const isCurrent  = qi === currentQ;
+                  return (
+                    <button key={qi} type="button"
+                      className={['ts-nav-dot', isMarked ? 'marked' : isAnswered ? 'answered' : '', isCurrent ? 'current' : ''].filter(Boolean).join(' ')}
+                      onClick={() => setTestSession((p) => ({ ...p, currentQ: qi }))}
+                      title={'Q' + (qi + 1) + (isAnswered ? ' \u2713' : '') + (isMarked ? ' \uD83D\uDFE3' : '')}
+                    >
+                      {qi + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="ts-nav-summary">
+                <span className="ts-nav-sum-item ts-sum-answered">{answeredCount} Answered</span>
+                {markedCount > 0 && <span className="ts-nav-sum-item ts-sum-marked">{markedCount} Review</span>}
+                <span className="ts-nav-sum-item ts-sum-blank">{unansweredCount} Left</span>
+              </div>
+
+              <button type="button" className="primary-btn ts-nav-submit-btn" onClick={() => handleSubmitTest()}>
+                Submit Test ({answeredCount}/{questions.length})
+              </button>
+              <button type="button" className="danger-outline-btn ts-nav-quit-btn"
+                onClick={() => setTestSession((p) => ({ ...p, showQuitConfirm: true }))}>
+                Quit Test
+              </button>
+            </div>
+          </aside>
+
+        </main>
+
+        {/* Quit confirmation modal */}
+        {showQuitConfirm && createPortal(
+          <div className="ts-quit-backdrop" role="dialog" aria-modal="true" aria-label="Quit test confirmation">
+            <div className="ts-quit-modal">
+              <div className="ts-quit-icon-wrap"><span className="ts-quit-icon">⚠️</span></div>
+              <h3 className="ts-quit-title">Quit this test?</h3>
+              <p className="ts-quit-body">
+                Your progress will be <strong>permanently lost</strong>. This attempt will not be scored or saved.
+              </p>
+              <div className="ts-quit-stats">
+                <div className="ts-quit-stat">
+                  <span className="ts-qs-val ts-qs-answered">{answeredCount}</span>
+                  <span className="ts-qs-key">Answered</span>
+                </div>
+                <div className="ts-quit-stat">
+                  <span className="ts-qs-val ts-qs-blank">{unansweredCount}</span>
+                  <span className="ts-qs-key">Left</span>
+                </div>
+                {markedCount > 0 && (
+                  <div className="ts-quit-stat">
+                    <span className="ts-qs-val ts-qs-marked">{markedCount}</span>
+                    <span className="ts-qs-key">Marked</span>
+                  </div>
+                )}
+              </div>
+              <div className="ts-quit-actions">
+                <button type="button" className="secondary-btn"
+                  onClick={() => setTestSession((p) => ({ ...p, showQuitConfirm: false }))}>
+                  Continue Test
+                </button>
+                <button type="button" className="danger-btn" onClick={quitTest}>Yes, Quit Test</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      </AppShell>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // RENDER: Syllabus preview page
+  // ══════════════════════════════════════════════════════════
+  if (syllabusView) {
+    const { type, items, hasAccess, course: svCourse, loading: svLoading } = syllabusView;
+    const isTopicType = type === 'topic';
+    const typeLabel   = isTopicType ? 'Topic Tests' : 'Full Mock Tests';
+    const typeIcon    = isTopicType ? '📖' : '🗒️';
+
+    return (
+      <AppShell
+        title={typeLabel + ' — Syllabus'}
+        subtitle={svCourse ? svCourse + ' course content' : 'Course content overview'}
+        roleLabel="Student"
+        showThemeSwitch
+        actions={(
+          <button type="button" className="secondary-btn" onClick={() => setSyllabusView(null)}>
+            ← Back
+          </button>
+        )}
+      >
+        <main className="admin-workspace-page">
+
+          {/* Syllabus Hero */}
+          <section className={'workspace-hero ' + (isTopicType ? 'workspace-hero-testseries' : 'workspace-hero-fullmock')}>
+            <div className="ts-hero-content">
+              <p className="eyebrow ts-hero-eyebrow">{typeIcon} {typeLabel}</p>
+              <h2 className="ts-hero-heading">
+                {isTopicType ? 'Complete Topic-wise Test Catalog' : 'Full-Length Mock Exam Catalog'}
+              </h2>
+              <p className="subtitle ts-hero-subtitle">
+                {hasAccess
+                  ? '✅ Purchased — all tests below are unlocked.'
+                  : '🔒 Locked — purchase to unlock all tests and start practicing.'}
+              </p>
+            </div>
+            <div className="ts-hero-stats-row">
+              <div className="ts-hero-stat-box ts-hero-stat-box-hero">
+                <span className="ts-hero-stat-val-hero">{items.length}</span>
+                <span className="ts-hero-stat-key-hero">{typeLabel}</span>
+              </div>
+              {isTopicType && (
+                <div className="ts-hero-stat-box ts-hero-stat-box-hero">
+                  <span className="ts-hero-stat-val-hero">
+                    {[...new Set(items.map((t) => t.module))].length}
+                  </span>
+                  <span className="ts-hero-stat-key-hero">Modules</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* lock / unlock notice */}
+          {!hasAccess && (
+            <div className="ts-syllabus-lock-notice">
+              <span className="ts-sln-icon">🔒</span>
+              <div className="ts-sln-text">
+                <strong>These tests are locked.</strong>{' '}
+                Purchase the{' '}
+                {isTopicType
+                  ? <strong>Topic Test Series</strong>
+                  : <strong>Full Mock Series</strong>}{' '}
+                to unlock all {items.length} tests and start practising.
+              </div>
+              <button
+                type="button"
+                className="primary-btn ts-sln-buy-btn"
+                onClick={() => { setSyllabusView(null); handlePurchase(isTopicType ? 'topic_test' : 'full_mock'); }}
+              >
+                {isTopicType ? 'Buy Topic Test Series' : 'Buy Full Mock Series'}
+              </button>
+            </div>
+          )}
+
+          {svLoading ? (
+            <div className="ts-loading-state">
+              <div className="ts-loading-spinner" />
+              <p>Loading syllabus…</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="ts-empty-state">
+              <span className="ts-empty-icon">{typeIcon}</span>
+              <p>No {typeLabel.toLowerCase()} have been added yet.</p>
+              <p className="subtitle">Check back soon.</p>
+            </div>
+          ) : (
+            <div className="ts-syllabus-grid">
+              {items.map((item, idx) => (
+                <article
+                  key={item._id || idx}
+                  className={'ts-syllabus-card card' + (hasAccess ? ' ts-syllabus-unlocked' : ' ts-syllabus-locked')}
+                >
+                  {/* lock overlay */}
+                  {!hasAccess && (
+                    <div className="ts-syllabus-lock-overlay">
+                      <span className="ts-syllabus-lock-icon">🔒</span>
+                      <span className="ts-syllabus-lock-label">Locked</span>
+                    </div>
+                  )}
+
+                  <div className="ts-syllabus-card-head">
+                    {isTopicType ? (
+                      <span className="ts-module-chip">{item.module}</span>
+                    ) : (
+                      <span className="ts-module-chip ts-mock-chip">Full Mock</span>
+                    )}
+                    {isTopicType && item.difficulty && (
+                      <span
+                        className="ts-difficulty-chip"
+                        style={{ color: DIFFICULTY_COLOR[item.difficulty] || '#d97706' }}
+                      >
+                        {item.difficulty}
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 className={'ts-test-title' + (hasAccess ? '' : ' ts-title-blurred')}>
+                    {item.title}
+                  </h4>
+
+                  {isTopicType && item.topic && item.topic !== 'General' && (
+                    <p className={'ts-test-topic' + (hasAccess ? '' : ' ts-blurred')}>
+                      {item.topic}
+                    </p>
+                  )}
+                  {!isTopicType && item.description && (
+                    <p className={'ts-test-topic' + (hasAccess ? '' : ' ts-blurred')}>
+                      {item.description}
+                    </p>
+                  )}
+
+                  <div className="ts-test-meta">
+                    <span className="ts-meta-chip">📝 {item.questionCount} Qs</span>
+                    <span className="ts-meta-chip">⏱ {item.durationMinutes} min</span>
+                  </div>
+
+                  {hasAccess ? (
+                    <button
+                      type="button"
+                      className="primary-btn ts-start-btn"
+                      onClick={() => { setSyllabusView(null); startTest(item._id, type); }}
+                    >
+                      Start Test →
+                    </button>
+                  ) : (
+                    <div className="ts-syllabus-locked-cta">
+                      <span className="ts-locked-cta-text">🔒 Purchase to unlock</span>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+
+          {/* Bottom CTA for locked state */}
+          {!hasAccess && !svLoading && items.length > 0 && (
+            <div className="ts-syllabus-bottom-cta">
+              <p>Ready to unlock all {items.length} {typeLabel.toLowerCase()}?</p>
+              <button
+                type="button"
+                className="primary-btn ts-sln-buy-btn ts-bottom-buy-btn"
+                onClick={() => { setSyllabusView(null); handlePurchase(isTopicType ? 'topic_test' : 'full_mock'); }}
+              >
+                {isTopicType
+                  ? `Buy Topic Test Series — Unlock ${items.length} Tests + Full Mocks`
+                  : `Buy Full Mock Series — Unlock ${items.length} Mocks`}
+              </button>
+            </div>
+          )}
+
+        </main>
+      </AppShell>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // RENDER: Hub / Paywall / Test list
+  // ══════════════════════════════════════════════════════════
+  const hasTopicTest  = Boolean(accessData?.access?.hasTopicTest);
+  const hasFullMock   = Boolean(accessData?.access?.hasFullMock);
+  const pricing       = accessData?.pricing || {};
+  const course        = accessData?.course || '';
+  const hasAnyAccess  = hasTopicTest || hasFullMock;
+  const topicIsFree   = !(pricing.topicTestPriceInPaise > 0);
+  const mockIsFree    = !(pricing.fullMockPriceInPaise > 0);
 
   return (
     <AppShell
       title="Test Series"
-      subtitle="Topic tests and full-length mock exams — purchased separately"
-      roleLabel="Student"
-      showThemeSwitch
-      actions={(
-        <button type="button" className="secondary-btn" onClick={() => navigate('/student')}>
-          ← Dashboard
-        </button>
-      )}
+      subtitle="Premium topic tests and full-length mock exams — purchased separately"
+      roleLabel="Student" showThemeSwitch
+      actions={<button type="button" className="secondary-btn" onClick={() => navigate('/student')}>← Dashboard</button>}
     >
       <main className="admin-workspace-page">
-        {/* hero */}
+
+        {/* Hero */}
         <section className="workspace-hero workspace-hero-testseries">
-          <div>
-            <p className="eyebrow">Test Series — {course || 'your course'}</p>
+          <div className="ts-hero-content">
+            <p className="eyebrow">Test Series{course ? ' — ' + course : ''}</p>
             <h2>Sharpen your exam preparation</h2>
-            <p className="subtitle">Test Series is a separate premium add-on. Purchase the plan that fits your goals.</p>
+            <p className="subtitle">
+              {hasAnyAccess
+                ? 'You have active access. Start a test below.'
+                : 'Choose a plan to unlock high-quality tests for your exam.'}
+            </p>
           </div>
-          <div className="workspace-hero-stats">
-            <StatCard label="Topic Tests" value={topicTests.length} />
-            <StatCard label="Full Mocks" value={fullMocks.length} />
+          <div className="ts-hero-stats-row">
+            <div className="ts-hero-stat-box">
+              <span className="ts-hero-stat-val">{hasAnyAccess ? topicTests.length : '—'}</span>
+              <span className="ts-hero-stat-key">Topic Tests</span>
+            </div>
+            <div className="ts-hero-stat-box">
+              <span className="ts-hero-stat-val">{hasAnyAccess ? fullMocks.length : '—'}</span>
+              <span className="ts-hero-stat-key">Full Mocks</span>
+            </div>
           </div>
         </section>
 
-        {banner ? <p className={`inline-message page-banner ${banner.type}`}>{banner.text}</p> : null}
+        {banner && (
+          <div className={'ts-top-banner ts-top-banner-' + banner.type}>{banner.text}</div>
+        )}
 
         {loadingAccess ? (
-          <p className="empty-note">Loading your access…</p>
+          <div className="ts-loading-state">
+            <div className="ts-loading-spinner" />
+            <p>Checking your access…</p>
+          </div>
         ) : (
           <>
-            {/* ── purchase cards (if not owned) ── */}
-            {(!hasTopicTest || !hasFullMock) ? (
-              <section className="ts-purchase-grid">
-                {!hasTopicTest ? (
-                  <article className="card ts-purchase-card ts-purchase-topic">
-                    <div className="ts-purchase-badge">📖 Topic Test Series</div>
-                    <h3>Module / Topic-wise Tests</h3>
-                    <p className="subtitle">Get access to all topic-specific tests for your course <strong>plus</strong> all Full Mocks as a bonus.</p>
-                    <ul className="ts-hub-feature-list">
-                      <li>Chapter and topic-level tests</li>
-                      <li>Immediate result with answer review</li>
-                      <li>Includes Full Mock Tests free</li>
-                    </ul>
-                    <div className="ts-purchase-price-row">
-                      {pricing.topicTestPriceInPaise > 0 ? (
-                        <span className="ts-purchase-price">{rupees(pricing.topicTestPriceInPaise)}</span>
-                      ) : (
-                        <span className="ts-purchase-price free">Free</span>
-                      )}
-                      <button
-                        type="button"
-                        className="primary-btn"
-                        onClick={() => handlePurchase('topic_test')}
-                        disabled={Boolean(purchasingType)}
-                      >
-                        {purchasingType === 'topic_test' ? 'Processing…' : 'Buy Topic Test Series'}
-                      </button>
-                    </div>
-                  </article>
-                ) : (
-                  <article className="card ts-purchase-card ts-owned-card">
-                    <div className="ts-owned-badge">✅ Topic Test Series</div>
-                    <p className="subtitle">You have access to all topic tests for {course}.</p>
-                  </article>
-                )}
-
-                {!hasFullMock ? (
-                  <article className="card ts-purchase-card ts-purchase-mock">
-                    <div className="ts-purchase-badge">🗒️ Full Mock Series</div>
-                    <h3>Full Length Mock Tests</h3>
-                    <p className="subtitle">Get access to all full-length mock tests for your course only.</p>
-                    <ul className="ts-hub-feature-list">
-                      <li>Full-length exam simulation</li>
-                      <li>Detailed answer review after submission</li>
-                      <li>Unlimited attempts per test</li>
-                    </ul>
-                    <div className="ts-purchase-price-row">
-                      {pricing.fullMockPriceInPaise > 0 ? (
-                        <span className="ts-purchase-price">{rupees(pricing.fullMockPriceInPaise)}</span>
-                      ) : (
-                        <span className="ts-purchase-price free">Free</span>
-                      )}
-                      <button
-                        type="button"
-                        className="secondary-btn ts-mock-buy-btn"
-                        onClick={() => handlePurchase('full_mock')}
-                        disabled={Boolean(purchasingType)}
-                      >
-                        {purchasingType === 'full_mock' ? 'Processing…' : 'Buy Mock Series Only'}
-                      </button>
-                    </div>
-                    <p className="ts-purchase-note">Note: Buying the Topic Test Series above includes Full Mocks free.</p>
-                  </article>
-                ) : (
-                  !hasTopicTest ? (
-                    <article className="card ts-purchase-card ts-owned-card">
-                      <div className="ts-owned-badge">✅ Full Mock Series</div>
-                      <p className="subtitle">You have access to full mock tests for {course}.</p>
-                    </article>
-                  ) : null
-                )}
-              </section>
-            ) : null}
-
-            {/* ── content tabs (only if any access) ── */}
-            {(hasTopicTest || hasFullMock) ? (
-              <>
-                <div className="ts-tabs">
-                  {hasTopicTest ? (
-                    <button
-                      type="button"
-                      className={`ts-tab-btn${activeTab === 'topic' ? ' active' : ''}`}
-                      onClick={() => setActiveTab('topic')}
-                    >
-                      📖 Topic Tests
-                    </button>
-                  ) : null}
-                  {hasFullMock ? (
-                    <button
-                      type="button"
-                      className={`ts-tab-btn${activeTab === 'mock' ? ' active' : ''}`}
-                      onClick={() => setActiveTab('mock')}
-                    >
-                      🗒️ Full Mock Tests
-                    </button>
-                  ) : null}
+            {/* ─── LOCKED: Two plan banners ─── */}
+            {!hasAnyAccess && (
+              <section className="ts-paywall-section">
+                <div className="ts-paywall-intro">
+                  <span className="ts-lock-icon">🔒</span>
+                  <div>
+                    <h2 className="ts-paywall-title">Unlock Test Series for {course || 'your course'}</h2>
+                    <p className="ts-paywall-desc">
+                      Test Series is a premium add-on, separate from your course plan.
+                      Pick the option that matches your preparation level.
+                    </p>
+                  </div>
                 </div>
 
-                {loadingTests ? (
-                  <p className="empty-note">Loading tests…</p>
-                ) : null}
+                <div className="ts-plan-banners">
 
-                {/* Topic Tests tab */}
-                {activeTab === 'topic' && hasTopicTest && !loadingTests ? (
+                  {/* ── Banner 1: Topic Test Series (Recommended) ── */}
+                  <article className="ts-plan-banner ts-plan-topic">
+                    <div className="ts-plan-banner-badge">⭐ RECOMMENDED</div>
+                    <div className="ts-plan-banner-inner">
+                      <div className="ts-plan-banner-iconside">
+                        <div className="ts-plan-banner-icon-circle topic-circle">📖</div>
+                        <div className="ts-plan-price-box">
+                          <span className="ts-plan-price-val">
+                            {topicIsFree ? 'Free' : rupees(pricing.topicTestPriceInPaise)}
+                          </span>
+                          <span className="ts-plan-price-period">one-time · lifetime</span>
+                        </div>
+                      </div>
+                      <div className="ts-plan-banner-details">
+                        <h3 className="ts-plan-banner-name">Topic Test Series</h3>
+                        <p className="ts-plan-banner-tagline">
+                          Chapter &amp; topic-wise tests to build strong conceptual foundations —
+                          perfect for systematic, step-by-step preparation.
+                        </p>
+                        <div className="ts-plan-feat-grid">
+                          <div className="ts-plan-feat-col">
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> All module &amp; topic-wise tests for {course || 'your course'}</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Instant result with detailed answer key</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Easy, Medium &amp; Hard difficulty levels</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Question navigator with mark-for-review</div>
+                          </div>
+                          <div className="ts-plan-feat-col">
+                            <div className="ts-plan-feat ts-plan-feat-bonus">
+                              <span className="ts-feat-check bonus-check">✓</span>
+                              <strong>Full Mock Tests included free</strong> — bonus
+                            </div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Score breakdown: correct, wrong, skipped</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Explanation for every question</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Lifetime access — no expiry, no renewal</div>
+                          </div>
+                        </div>
+                        <div className="ts-plan-cta-row">
+                          <button type="button" className="primary-btn ts-plan-cta-btn"
+                            onClick={() => handlePurchase('topic_test')}
+                            disabled={Boolean(purchasingType)}>
+                            {purchasingType === 'topic_test'
+                              ? 'Processing…'
+                              : topicIsFree
+                                ? 'Enroll Free — Topic Tests + Full Mocks'
+                                : 'Buy Topic Test Series — ' + rupees(pricing.topicTestPriceInPaise)}
+                          </button>
+                          <button type="button" className="secondary-btn ts-plan-syllabus-btn"
+                            onClick={() => openSyllabus('topic')}
+                            disabled={loadingSyllabus}>
+                            {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
+                          </button>
+                          {topicIsFree && <span className="ts-free-badge">🎉 No payment required</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <div className="ts-plan-banners-or">
+                    <span className="ts-or-text">OR, if you only need mock tests</span>
+                  </div>
+
+                  {/* ── Banner 2: Full Mock Series ── */}
+                  <article className="ts-plan-banner ts-plan-mock">
+                    <div className="ts-plan-banner-badge ts-mock-badge">MOCK ONLY</div>
+                    <div className="ts-plan-banner-inner">
+                      <div className="ts-plan-banner-iconside">
+                        <div className="ts-plan-banner-icon-circle mock-circle">{'\uD83D\uDDD2\uFE0F'}</div>
+                        <div className="ts-plan-price-box">
+                          <span className="ts-plan-price-val ts-mock-price-val">
+                            {mockIsFree ? 'Free' : rupees(pricing.fullMockPriceInPaise)}
+                          </span>
+                          <span className="ts-plan-price-period">one-time · lifetime</span>
+                        </div>
+                      </div>
+                      <div className="ts-plan-banner-details">
+                        <h3 className="ts-plan-banner-name">
+                          Full Mock Series <span className="ts-mock-only-tag">Mock Only</span>
+                        </h3>
+                        <p className="ts-plan-banner-tagline">
+                          Simulate the real exam with full-length timed tests —
+                          ideal for final-stage revision and self-assessment.
+                        </p>
+                        <div className="ts-plan-feat-grid">
+                          <div className="ts-plan-feat-col">
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Full-length timed exam simulations</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Detailed answer review after submission</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Question navigator with mark-for-review</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Lifetime access — no expiry</div>
+                          </div>
+                          <div className="ts-plan-feat-col">
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Score breakdown with percentage grade</div>
+                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Explanation for every answer</div>
+                            <div className="ts-plan-feat ts-feat-cross"><span className="ts-feat-x">✗</span> Topic-wise tests not included</div>
+                            <div className="ts-plan-feat ts-feat-cross"><span className="ts-feat-x">✗</span> Module-level tests not included</div>
+                          </div>
+                        </div>
+                        <div className="ts-plan-cta-row">
+                          <button type="button" className="secondary-btn ts-plan-cta-btn ts-mock-cta-btn"
+                            onClick={() => handlePurchase('full_mock')}
+                            disabled={Boolean(purchasingType)}>
+                            {purchasingType === 'full_mock'
+                              ? 'Processing…'
+                              : mockIsFree
+                                ? 'Enroll Free — Full Mock Tests'
+                                : 'Buy Full Mock Series — ' + rupees(pricing.fullMockPriceInPaise)}
+                          </button>
+                          <button type="button" className="secondary-btn ts-plan-syllabus-btn"
+                            onClick={() => openSyllabus('mock')}
+                            disabled={loadingSyllabus}>
+                            {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
+                          </button>
+                          <p className="ts-plan-upsell-note">
+                            💡 The <strong>Topic Test Series</strong> above includes Full Mocks{' '}
+                            {topicIsFree ? 'at no extra cost' : 'as a free bonus'}.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                </div>{/* /ts-plan-banners */}
+              </section>
+            )}
+
+            {/* ─── UNLOCKED: Tests ─── */}
+            {hasAnyAccess && (
+              <>
+                <div className="ts-access-badges">
+                  {hasTopicTest && <span className="ts-access-badge ts-badge-topic">✅ Topic Tests Unlocked</span>}
+                  {hasFullMock  && <span className="ts-access-badge ts-badge-mock">✅ Full Mocks Unlocked</span>}
+                </div>
+
+                <div className="ts-tabs">
+                  {hasTopicTest && (
+                    <button type="button"
+                      className={'ts-tab-btn' + (activeTab === 'topic' ? ' active' : '')}
+                      onClick={() => setActiveTab('topic')}>
+                      📖 Topic Tests <span className="ts-tab-count">{topicTests.length}</span>
+                    </button>
+                  )}
+                  {hasFullMock && (
+                    <button type="button"
+                      className={'ts-tab-btn' + (activeTab === 'mock' ? ' active' : '')}
+                      onClick={() => setActiveTab('mock')}>
+                      🗒️ Full Mock Tests <span className="ts-tab-count">{fullMocks.length}</span>
+                    </button>
+                  )}
+                </div>
+
+                {loadingTests && (
+                  <div className="ts-loading-state">
+                    <div className="ts-loading-spinner" />
+                    <p>Loading tests…</p>
+                  </div>
+                )}
+
+                {activeTab === 'topic' && hasTopicTest && !loadingTests && (
                   <div className="ts-test-grid">
                     {topicTests.length ? topicTests.map((test) => (
                       <article key={test._id} className="card ts-test-card">
-                        <div className="ts-test-card-head">
-                          <span className="ts-test-module">{test.module}</span>
-                          <span
-                            className="ts-test-difficulty"
-                            style={{ color: difficultyColor(test.difficulty) }}
-                          >
+                        <div className="ts-test-card-top">
+                          <span className="ts-module-chip">{test.module}</span>
+                          <span className="ts-difficulty-chip"
+                            style={{ color: DIFFICULTY_COLOR[test.difficulty] || '#d97706' }}>
                             {test.difficulty}
                           </span>
                         </div>
-                        <h4>{test.title}</h4>
-                        <p className="subtitle">{test.topic !== 'General' ? test.topic : 'General topic'}</p>
-                        <div className="ts-test-meta-row">
-                          <span className="quiz-admin-meta-chip">{test.questionCount} questions</span>
-                          <span className="quiz-admin-meta-chip">{test.durationMinutes} min</span>
+                        <h4 className="ts-test-title">{test.title}</h4>
+                        {test.topic && test.topic !== 'General' && (
+                          <p className="ts-test-topic">{test.topic}</p>
+                        )}
+                        <div className="ts-test-meta">
+                          <span className="ts-meta-chip">📝 {test.questionCount} Qs</span>
+                          <span className="ts-meta-chip">⏱ {test.durationMinutes} min</span>
                         </div>
-                        <button
-                          type="button"
-                          className="primary-btn ts-start-btn"
-                          onClick={() => startTest(test._id, 'topic')}
-                        >
+                        <button type="button" className="primary-btn ts-start-btn"
+                          onClick={() => startTest(test._id, 'topic')}>
                           Start Test →
                         </button>
                       </article>
                     )) : (
-                      <p className="empty-note">No topic tests available for {course} yet.</p>
+                      <div className="ts-empty-state">
+                        <span className="ts-empty-icon">📖</span>
+                        <p>No topic tests for <strong>{course}</strong> yet.</p>
+                        <p className="subtitle">Check back soon.</p>
+                      </div>
                     )}
                   </div>
-                ) : null}
+                )}
 
-                {/* Full Mock Tests tab */}
-                {activeTab === 'mock' && hasFullMock && !loadingTests ? (
+                {activeTab === 'mock' && hasFullMock && !loadingTests && (
                   <div className="ts-test-grid">
                     {fullMocks.length ? fullMocks.map((mock) => (
-                      <article key={mock._id} className="card ts-test-card ts-mock-card">
-                        <div className="ts-test-card-head">
-                          <span className="ts-test-module">Full Mock</span>
-                          <span className="quiz-admin-meta-chip">{mock.questionCount} questions</span>
+                      <article key={mock._id} className="card ts-test-card ts-mock-test-card">
+                        <div className="ts-test-card-top">
+                          <span className="ts-module-chip ts-mock-chip">Full Mock</span>
+                          <span className="ts-meta-chip">📝 {mock.questionCount} Qs</span>
                         </div>
-                        <h4>{mock.title}</h4>
-                        {mock.description ? <p className="subtitle">{mock.description}</p> : null}
-                        <div className="ts-test-meta-row">
-                          <span className="quiz-admin-meta-chip">{mock.durationMinutes} min</span>
-                          <span className="quiz-admin-meta-chip">{mock.category}</span>
+                        <h4 className="ts-test-title">{mock.title}</h4>
+                        {mock.description && <p className="ts-test-topic">{mock.description}</p>}
+                        <div className="ts-test-meta">
+                          <span className="ts-meta-chip">⏱ {mock.durationMinutes} min</span>
+                          <span className="ts-meta-chip">{mock.category}</span>
                         </div>
-                        <button
-                          type="button"
-                          className="primary-btn ts-start-btn"
-                          onClick={() => startTest(mock._id, 'mock')}
-                        >
+                        <button type="button" className="primary-btn ts-start-btn"
+                          onClick={() => startTest(mock._id, 'mock')}>
                           Start Mock Test →
                         </button>
                       </article>
                     )) : (
-                      <p className="empty-note">No full mock tests available for {course} yet.</p>
+                      <div className="ts-empty-state">
+                        <span className="ts-empty-icon">🗒️</span>
+                        <p>No full mock tests for <strong>{course}</strong> yet.</p>
+                        <p className="subtitle">Check back soon.</p>
+                      </div>
                     )}
                   </div>
-                ) : null}
+                )}
+
               </>
-            ) : (
-              !loadingAccess ? (
-                <p className="empty-note ts-no-access-note">Purchase a Test Series plan above to access tests.</p>
-              ) : null
             )}
           </>
         )}
+
       </main>
     </AppShell>
   );

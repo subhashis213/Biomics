@@ -41,6 +41,16 @@ export default function AdminQuizBuilderPage() {
   const [topicsByModuleKey, setTopicsByModuleKey] = useState({});
   const [quizDeleteDialog, setQuizDeleteDialog] = useState({ open: false, quiz: null });
   const [isDeletingQuiz, setIsDeletingQuiz] = useState(false);
+  const [expandedQuestions, setExpandedQuestions] = useState({});
+
+  function toggleExpand(qi) {
+    setExpandedQuestions((prev) => ({ ...prev, [qi]: !prev[qi] }));
+  }
+
+  function handleAutoResize(e) {
+    e.target.style.height = 'auto';
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  }
 
   function closeQuizDeleteDialog() {
     if (isDeletingQuiz) return;
@@ -492,19 +502,31 @@ export default function AdminQuizBuilderPage() {
                 <article key={`quiz-question-${questionIndex}`} className="quiz-editor-card">
                   <div className="quiz-editor-head">
                     <strong>Question {questionIndex + 1}</strong>
-                    {quizQuestions.length > 1 ? (
-                      <button type="button" className="danger-text-btn" onClick={() => removeQuestion(questionIndex)}>
-                        Remove
+                    <div className="qe-head-actions">
+                      <button
+                        type="button"
+                        className="qe-expand-btn"
+                        onClick={() => toggleExpand(questionIndex)}
+                        title={expandedQuestions[questionIndex] ? 'Collapse fields' : 'Expand fields for long text'}
+                      >
+                        {expandedQuestions[questionIndex] ? '↑ Show less' : '↕ Expand fields'}
                       </button>
-                    ) : null}
+                      {quizQuestions.length > 1 ? (
+                        <button type="button" className="danger-text-btn" onClick={() => removeQuestion(questionIndex)}>
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <label>
                     Question text
-                    <input
+                    <textarea
+                      className={`qe-textarea${expandedQuestions[questionIndex] ? ' qe-textarea-expanded' : ' qe-textarea-collapsed'}`}
                       value={question.question}
                       onChange={(event) => updateQuestion(questionIndex, 'question', event.target.value)}
-                      placeholder="Enter question"
+                      onInput={expandedQuestions[questionIndex] ? handleAutoResize : undefined}
+                      placeholder="Enter question text here…"
                       required
                     />
                   </label>
@@ -512,11 +534,13 @@ export default function AdminQuizBuilderPage() {
                   <div className="quiz-options-list">
                     {question.options.map((option, optionIndex) => (
                       <label key={`quiz-option-${questionIndex}-${optionIndex}`}>
-                        Option {optionIndex + 1}
-                        <input
+                        Option {['A', 'B', 'C', 'D'][optionIndex]}
+                        <textarea
+                          className={`qe-textarea qe-textarea-option${expandedQuestions[questionIndex] ? ' qe-textarea-expanded' : ' qe-textarea-collapsed'}`}
                           value={option}
                           onChange={(event) => updateOption(questionIndex, optionIndex, event.target.value)}
-                          placeholder={`Option ${optionIndex + 1}`}
+                          onInput={expandedQuestions[questionIndex] ? handleAutoResize : undefined}
+                          placeholder={`Option ${['A', 'B', 'C', 'D'][optionIndex]}`}
                           required
                         />
                       </label>
@@ -529,19 +553,20 @@ export default function AdminQuizBuilderPage() {
                       value={question.correctIndex}
                       onChange={(event) => updateQuestion(questionIndex, 'correctIndex', Number(event.target.value))}
                     >
-                      <option value={0}>Option 1</option>
-                      <option value={1}>Option 2</option>
-                      <option value={2}>Option 3</option>
-                      <option value={3}>Option 4</option>
+                      <option value={0}>Option A</option>
+                      <option value={1}>Option B</option>
+                      <option value={2}>Option C</option>
+                      <option value={3}>Option D</option>
                     </select>
                   </label>
 
                   <label>
                     Explanation
                     <textarea
-                      rows="2"
+                      className={`qe-textarea${expandedQuestions[questionIndex] ? ' qe-textarea-expanded' : ' qe-textarea-collapsed'}`}
                       value={question.explanation || ''}
                       onChange={(event) => updateQuestion(questionIndex, 'explanation', event.target.value)}
+                      onInput={expandedQuestions[questionIndex] ? handleAutoResize : undefined}
                       placeholder={quizRequireExplanation ? 'Required explanation' : 'Optional explanation'}
                     />
                   </label>

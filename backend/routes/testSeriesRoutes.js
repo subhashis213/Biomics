@@ -284,6 +284,56 @@ router.delete('/full-mocks/:mockId', authenticateToken('admin'), async (req, res
   }
 });
 
+// ─── Student: Syllabus Preview (no purchase required) ───────────────────────
+
+// GET /test-series/topic-tests/syllabus — metadata only, visible to any authenticated student
+router.get('/topic-tests/syllabus', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const course = normalizeCourse(user.class);
+    const { hasTopicTest } = await resolveStudentAccess(req.user.username, course);
+    const tests = await TopicTest.find({ category: course })
+      .sort({ module: 1, topic: 1 })
+      .lean();
+    const items = tests.map((t) => ({
+      _id: t._id,
+      module: t.module,
+      topic: t.topic,
+      title: t.title,
+      difficulty: t.difficulty,
+      durationMinutes: t.durationMinutes,
+      questionCount: t.questions.length
+    }));
+    return res.json({ items, hasTopicTest, course });
+  } catch {
+    return res.status(500).json({ error: 'Failed to fetch topic test syllabus.' });
+  }
+});
+
+// GET /test-series/full-mocks/syllabus — metadata only, visible to any authenticated student
+router.get('/full-mocks/syllabus', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const course = normalizeCourse(user.class);
+    const { hasFullMock } = await resolveStudentAccess(req.user.username, course);
+    const mocks = await FullMockTest.find({ category: course })
+      .sort({ updatedAt: -1 })
+      .lean();
+    const items = mocks.map((m) => ({
+      _id: m._id,
+      title: m.title,
+      description: m.description,
+      durationMinutes: m.durationMinutes,
+      questionCount: m.questions.length
+    }));
+    return res.json({ items, hasFullMock, course });
+  } catch {
+    return res.status(500).json({ error: 'Failed to fetch full mock syllabus.' });
+  }
+});
+
 // ─── Student: Pricing & Access ───────────────────────────────────────────────
 
 // GET /test-series/pricing/student — returns pricing + access status for the student's course

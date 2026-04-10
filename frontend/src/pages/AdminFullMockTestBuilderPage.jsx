@@ -35,6 +35,18 @@ export default function AdminFullMockTestBuilderPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, mock: null });
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // expand/collapse per question card
+  const [expandedQuestions, setExpandedQuestions] = useState({});
+
+  function toggleExpand(qi) {
+    setExpandedQuestions((prev) => ({ ...prev, [qi]: !prev[qi] }));
+  }
+
+  function handleAutoResize(e) {
+    e.target.style.height = 'auto';
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  }
+
   async function loadMocks() {
     try {
       const [filtered, all] = await Promise.all([
@@ -243,29 +255,43 @@ export default function AdminFullMockTestBuilderPage() {
                   <article key={`fm-q-${qi}`} className="quiz-editor-card">
                     <div className="quiz-editor-head">
                       <strong>Question {qi + 1}</strong>
-                      {questions.length > 1 ? (
-                        <button type="button" className="danger-text-btn" onClick={() => removeQuestion(qi)}>
-                          Remove
+                      <div className="qe-head-actions">
+                        <button
+                          type="button"
+                          className="qe-expand-btn"
+                          onClick={() => toggleExpand(qi)}
+                          title={expandedQuestions[qi] ? 'Collapse fields' : 'Expand fields for long text'}
+                        >
+                          {expandedQuestions[qi] ? '↑ Show less' : '↕ Expand fields'}
                         </button>
-                      ) : null}
+                        {questions.length > 1 ? (
+                          <button type="button" className="danger-text-btn" onClick={() => removeQuestion(qi)}>
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     <label>
                       Question text
-                      <input
+                      <textarea
+                        className={`qe-textarea${expandedQuestions[qi] ? ' qe-textarea-expanded' : ' qe-textarea-collapsed'}`}
                         value={q.question}
                         onChange={(e) => updateQuestion(qi, 'question', e.target.value)}
-                        placeholder="Enter question"
+                        onInput={expandedQuestions[qi] ? handleAutoResize : undefined}
+                        placeholder="Enter question text here…"
                         required
                       />
                     </label>
                     <div className="quiz-options-list">
                       {q.options.map((opt, oi) => (
                         <label key={`fm-opt-${qi}-${oi}`}>
-                          Option {oi + 1}
-                          <input
+                          Option {['A', 'B', 'C', 'D'][oi]}
+                          <textarea
+                            className={`qe-textarea qe-textarea-option${expandedQuestions[qi] ? ' qe-textarea-expanded' : ' qe-textarea-collapsed'}`}
                             value={opt}
                             onChange={(e) => updateOption(qi, oi, e.target.value)}
-                            placeholder={`Option ${oi + 1}`}
+                            onInput={expandedQuestions[qi] ? handleAutoResize : undefined}
+                            placeholder={`Option ${['A', 'B', 'C', 'D'][oi]}`}
                             required
                           />
                         </label>
@@ -277,18 +303,19 @@ export default function AdminFullMockTestBuilderPage() {
                         value={q.correctIndex}
                         onChange={(e) => updateQuestion(qi, 'correctIndex', Number(e.target.value))}
                       >
-                        <option value={0}>Option 1</option>
-                        <option value={1}>Option 2</option>
-                        <option value={2}>Option 3</option>
-                        <option value={3}>Option 4</option>
+                        <option value={0}>Option A</option>
+                        <option value={1}>Option B</option>
+                        <option value={2}>Option C</option>
+                        <option value={3}>Option D</option>
                       </select>
                     </label>
                     <label>
                       Explanation (optional)
                       <textarea
-                        rows="2"
+                        className={`qe-textarea${expandedQuestions[qi] ? ' qe-textarea-expanded' : ' qe-textarea-collapsed'}`}
                         value={q.explanation || ''}
                         onChange={(e) => updateQuestion(qi, 'explanation', e.target.value)}
+                        onInput={expandedQuestions[qi] ? handleAutoResize : undefined}
                         placeholder="Shown after submission"
                       />
                     </label>
