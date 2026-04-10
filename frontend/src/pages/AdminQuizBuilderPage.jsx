@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { deleteQuiz, fetchAdminQuizzes, requestJson, saveModuleQuiz } from '../api';
 import AppShell from '../components/AppShell';
+import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
+import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -42,6 +44,46 @@ export default function AdminQuizBuilderPage() {
   const [quizDeleteDialog, setQuizDeleteDialog] = useState({ open: false, quiz: null });
   const [isDeletingQuiz, setIsDeletingQuiz] = useState(false);
   const [expandedQuestions, setExpandedQuestions] = useState({});
+  const [clipboardModalOpen, setClipboardModalOpen] = useState(false);
+  const [clipboardCount, setClipboardCount] = useState(() => readClipboard()?.questions?.length || 0);
+  const [copyToast, setCopyToast] = useState(null);
+
+  function refreshClipboardCount() {
+    setClipboardCount(readClipboard()?.questions?.length || 0);
+  }
+
+  function handleCopyQuestions() {
+    if (!quizQuestions.some((q) => q.question.trim())) {
+      setCopyToast({ type: 'error', text: 'No questions to copy — add at least one question first.' });
+      window.setTimeout(() => setCopyToast(null), 3000);
+      return;
+    }
+    copyQuestionsToClipboard(quizQuestions, 'Quiz Builder', quizTitle || 'Untitled Quiz');
+    setClipboardCount(quizQuestions.length);
+    setCopyToast({ type: 'success', text: `${quizQuestions.length} question${quizQuestions.length !== 1 ? 's' : ''} copied to clipboard!` });
+    window.setTimeout(() => setCopyToast(null), 3000);
+  }
+
+  function handlePasteQuestions(questions, pasteMode) {
+    const normalized = questions.map((q) => ({
+      question: q.question,
+      options: Array.isArray(q.options) ? [...q.options] : ['', '', '', ''],
+      correctIndex: Number(q.correctIndex ?? 0),
+      explanation: q.explanation || ''
+    }));
+    if (pasteMode === 'replace') {
+      setQuizQuestions(normalized);
+    } else {
+      setQuizQuestions((prev) => [
+        ...prev.filter((q) => q.question.trim()),
+        ...normalized
+      ]);
+    }
+    setExpandedQuestions({});
+    refreshClipboardCount();
+    setCopyToast({ type: 'success', text: `${questions.length} question${questions.length !== 1 ? 's' : ''} pasted!` });
+    window.setTimeout(() => setCopyToast(null), 3000);
+  }
 
   function toggleExpand(qi) {
     setExpandedQuestions((prev) => ({ ...prev, [qi]: !prev[qi] }));
@@ -576,10 +618,23 @@ export default function AdminQuizBuilderPage() {
 
             <div className="workspace-inline-actions">
               <button type="button" className="secondary-btn" onClick={addQuestion}>+ Add Question</button>
+              <button type="button" className="qcb-copy-btn" onClick={handleCopyQuestions} title="Copy all current questions to clipboard">
+                📋 Copy Questions
+              </button>
+              <button
+                type="button"
+                className="qcb-paste-btn"
+                onClick={() => { refreshClipboardCount(); setClipboardModalOpen(true); }}
+                title="Paste questions from clipboard"
+              >
+                📥 Paste
+                {clipboardCount > 0 ? <span className="qcb-badge">{clipboardCount}</span> : null}
+              </button>
               {editingQuizId ? (
                 <button type="button" className="secondary-btn" onClick={resetBuilder}>Cancel Edit</button>
               ) : null}
             </div>
+            {copyToast ? <p className={`inline-message ${copyToast.type} qcb-toast`}>{copyToast.text}</p> : null}
 
             {quizMessage ? <p className={`inline-message ${quizMessage.type}`}>{quizMessage.text}</p> : null}
 
@@ -672,6 +727,11 @@ export default function AdminQuizBuilderPage() {
         </div>,
         document.body
       ) : null}
+      <QuestionClipboardModal
+        open={clipboardModalOpen}
+        onClose={() => setClipboardModalOpen(false)}
+        onPaste={handlePasteQuestions}
+      />
     </>
   );
 }

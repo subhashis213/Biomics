@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { requestJson } from '../api';
 import AppShell from '../components/AppShell';
+import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
+import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
 
 const COURSE_CATEGORIES = [
   '11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
@@ -37,6 +39,46 @@ export default function AdminFullMockTestBuilderPage() {
 
   // expand/collapse per question card
   const [expandedQuestions, setExpandedQuestions] = useState({});
+  const [clipboardModalOpen, setClipboardModalOpen] = useState(false);
+  const [clipboardCount, setClipboardCount] = useState(() => readClipboard()?.questions?.length || 0);
+  const [copyToast, setCopyToast] = useState(null);
+
+  function refreshClipboardCount() {
+    setClipboardCount(readClipboard()?.questions?.length || 0);
+  }
+
+  function handleCopyQuestions() {
+    if (!questions.some((q) => q.question.trim())) {
+      setCopyToast({ type: 'error', text: 'No questions to copy — add at least one question first.' });
+      window.setTimeout(() => setCopyToast(null), 3000);
+      return;
+    }
+    copyQuestionsToClipboard(questions, 'Full Mock Builder', title || 'Untitled Full Mock');
+    setClipboardCount(questions.length);
+    setCopyToast({ type: 'success', text: `${questions.length} question${questions.length !== 1 ? 's' : ''} copied to clipboard!` });
+    window.setTimeout(() => setCopyToast(null), 3000);
+  }
+
+  function handlePasteQuestions(pasted, pasteMode) {
+    const normalized = pasted.map((q) => ({
+      question: q.question,
+      options: Array.isArray(q.options) ? [...q.options] : ['', '', '', ''],
+      correctIndex: Number(q.correctIndex ?? 0),
+      explanation: q.explanation || ''
+    }));
+    if (pasteMode === 'replace') {
+      setQuestions(normalized);
+    } else {
+      setQuestions((prev) => [
+        ...prev.filter((q) => q.question.trim()),
+        ...normalized
+      ]);
+    }
+    setExpandedQuestions({});
+    refreshClipboardCount();
+    setCopyToast({ type: 'success', text: `${pasted.length} question${pasted.length !== 1 ? 's' : ''} pasted!` });
+    window.setTimeout(() => setCopyToast(null), 3000);
+  }
 
   function toggleExpand(qi) {
     setExpandedQuestions((prev) => ({ ...prev, [qi]: !prev[qi] }));
@@ -325,10 +367,23 @@ export default function AdminFullMockTestBuilderPage() {
 
               <div className="workspace-inline-actions">
                 <button type="button" className="secondary-btn" onClick={addQuestion}>+ Add Question</button>
+                <button type="button" className="qcb-copy-btn" onClick={handleCopyQuestions} title="Copy all current questions to clipboard">
+                  📋 Copy Questions
+                </button>
+                <button
+                  type="button"
+                  className="qcb-paste-btn"
+                  onClick={() => { refreshClipboardCount(); setClipboardModalOpen(true); }}
+                  title="Paste questions from clipboard"
+                >
+                  📥 Paste
+                  {clipboardCount > 0 ? <span className="qcb-badge">{clipboardCount}</span> : null}
+                </button>
                 {editingId ? (
                   <button type="button" className="secondary-btn" onClick={resetBuilder}>Cancel Edit</button>
                 ) : null}
               </div>
+              {copyToast ? <p className={`inline-message ${copyToast.type} qcb-toast`}>{copyToast.text}</p> : null}
 
               {message ? <p className={`inline-message ${message.type}`}>{message.text}</p> : null}
 
@@ -397,6 +452,11 @@ export default function AdminFullMockTestBuilderPage() {
         </div>,
         document.body
       ) : null}
+      <QuestionClipboardModal
+        open={clipboardModalOpen}
+        onClose={() => setClipboardModalOpen(false)}
+        onPaste={handlePasteQuestions}
+      />
     </>
   );
 }

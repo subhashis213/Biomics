@@ -8,7 +8,9 @@ import {
   toggleMockExamNoticeAdmin
 } from '../api';
 import AppShell from '../components/AppShell';
+import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
+import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -43,6 +45,46 @@ export default function AdminMockExamPage() {
   const [editingMockExamId, setEditingMockExamId] = useState('');
   const [mockExamMessage, setMockExamMessage] = useState(null);
   const [expandedQuestions, setExpandedQuestions] = useState({});
+  const [clipboardModalOpen, setClipboardModalOpen] = useState(false);
+  const [clipboardCount, setClipboardCount] = useState(() => readClipboard()?.questions?.length || 0);
+  const [copyToast, setCopyToast] = useState(null);
+
+  function refreshClipboardCount() {
+    setClipboardCount(readClipboard()?.questions?.length || 0);
+  }
+
+  function handleCopyQuestions() {
+    if (!mockExamQuestions.some((q) => q.question.trim())) {
+      setCopyToast({ type: 'error', text: 'No questions to copy — add at least one question first.' });
+      window.setTimeout(() => setCopyToast(null), 3000);
+      return;
+    }
+    copyQuestionsToClipboard(mockExamQuestions, 'Monthly Mock Exam', mockExamTitle || 'Untitled Exam');
+    setClipboardCount(mockExamQuestions.length);
+    setCopyToast({ type: 'success', text: `${mockExamQuestions.length} question${mockExamQuestions.length !== 1 ? 's' : ''} copied to clipboard!` });
+    window.setTimeout(() => setCopyToast(null), 3000);
+  }
+
+  function handlePasteQuestions(questions, pasteMode) {
+    const normalized = questions.map((q) => ({
+      question: q.question,
+      options: Array.isArray(q.options) ? [...q.options] : ['', '', '', ''],
+      correctIndex: Number(q.correctIndex ?? 0),
+      explanation: q.explanation || ''
+    }));
+    if (pasteMode === 'replace') {
+      setMockExamQuestions(normalized);
+    } else {
+      setMockExamQuestions((prev) => [
+        ...prev.filter((q) => q.question.trim()),
+        ...normalized
+      ]);
+    }
+    setExpandedQuestions({});
+    refreshClipboardCount();
+    setCopyToast({ type: 'success', text: `${questions.length} question${questions.length !== 1 ? 's' : ''} pasted!` });
+    window.setTimeout(() => setCopyToast(null), 3000);
+  }
 
   function toggleExpand(qi) {
     setExpandedQuestions((prev) => ({ ...prev, [qi]: !prev[qi] }));
@@ -226,6 +268,7 @@ export default function AdminMockExamPage() {
   }
 
   return (
+    <>
     <AppShell
       title="Monthly Mock Test Workspace"
       subtitle="Create and manage monthly exams in a dedicated page"
@@ -395,10 +438,23 @@ export default function AdminMockExamPage() {
 
             <div className="workspace-inline-actions">
               <button type="button" className="secondary-btn" onClick={addQuestion}>+ Add Question</button>
+              <button type="button" className="qcb-copy-btn" onClick={handleCopyQuestions} title="Copy all current questions to clipboard">
+                📋 Copy Questions
+              </button>
+              <button
+                type="button"
+                className="qcb-paste-btn"
+                onClick={() => { refreshClipboardCount(); setClipboardModalOpen(true); }}
+                title="Paste questions from clipboard"
+              >
+                📥 Paste
+                {clipboardCount > 0 ? <span className="qcb-badge">{clipboardCount}</span> : null}
+              </button>
               {editingMockExamId ? (
                 <button type="button" className="secondary-btn" onClick={resetBuilder}>Cancel Edit</button>
               ) : null}
             </div>
+            {copyToast ? <p className={`inline-message ${copyToast.type} qcb-toast`}>{copyToast.text}</p> : null}
 
             {mockExamMessage ? <p className={`inline-message ${mockExamMessage.type}`}>{mockExamMessage.text}</p> : null}
 
@@ -510,5 +566,11 @@ export default function AdminMockExamPage() {
         </section>
       </main>
     </AppShell>
+    <QuestionClipboardModal
+      open={clipboardModalOpen}
+      onClose={() => setClipboardModalOpen(false)}
+      onPaste={handlePasteQuestions}
+    />
+    </>
   );
 }
