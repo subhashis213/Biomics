@@ -2223,6 +2223,7 @@ export default function AdminDashboard() {
     },
     { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
     { id: 'section-monthly-mock-exam', label: 'Monthly Exam', icon: '📅' },
+    { id: 'section-test-series', label: 'Test Series', icon: '🧪' },
     { id: 'section-announcements', label: 'Announcements', icon: '📢' },
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
