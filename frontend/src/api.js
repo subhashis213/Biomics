@@ -41,7 +41,16 @@ function buildApiBaseCandidates() {
 
 const API_BASES = buildApiBaseCandidates();
 const API_BASE = API_BASES[0] || '';
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = isLocalhostClient ? 15000 : 65000;
+
+// Keep Render backend warm — ping /health every 14 min so it doesn't cold-start on first user action.
+// Only runs in the browser (not SSR) and only in production.
+if (typeof window !== 'undefined' && !isLocalhostClient) {
+  const pingUrl = `${DEFAULT_REMOTE_API}/health`;
+  const ping = () => fetch(pingUrl, { method: 'GET', cache: 'no-store' }).catch(() => {});
+  ping(); // immediate ping on page load
+  setInterval(ping, 14 * 60 * 1000); // then every 14 minutes
+}
 
 export function getApiBase() {
   return API_BASE;
@@ -124,7 +133,7 @@ export async function requestJson(path, options = {}) {
   }
 
   const timeoutHint = lastNetworkError?.name === 'AbortError'
-    ? `Request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s.`
+    ? 'Server is waking up (Render cold start). Please wait ~30s and try again.'
     : 'Network/CORS handshake failed.';
 
   throw new Error(

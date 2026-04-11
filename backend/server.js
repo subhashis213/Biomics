@@ -133,6 +133,9 @@ app.use('/chat', chatRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/test-series', testSeriesRoutes);
 
+// Health check — used by keep-alive ping and uptime monitors
+app.get('/health', (req, res) => res.json({ status: 'ok', ts: Date.now() }));
+
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
