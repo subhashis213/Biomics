@@ -11139,6 +11139,32 @@ html[data-theme='light'] .empty-note {
     font-size: 0.82rem;
   }
 
+  .course-modules-page .modules-grid-student {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .course-modules-page .module-card-btn {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .course-modules-page .module-card-title {
+    font-size: 0.88rem;
+  }
+
+  .course-modules-page .module-card-subtitle,
+  .course-modules-page .module-card-progress,
+  .course-modules-page .module-card-quiz-score {
+    font-size: 0.74rem;
+  }
+
+  .course-modules-page .module-card-count {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
   .quiz-meta-strip {
     flex-direction: column;
     align-items: stretch;

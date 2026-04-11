@@ -36,6 +36,25 @@ function buildCorsOriginResolver(rawValue) {
 
   if (!allowedOrigins.length) return true;
 
+  function normalizeHost(hostname) {
+    const value = String(hostname || '').toLowerCase();
+    return value.startsWith('www.') ? value.slice(4) : value;
+  }
+
+  const parsedAllowedOrigins = allowedOrigins.map((origin) => {
+    try {
+      const parsed = new URL(origin);
+      return {
+        exact: origin,
+        protocol: parsed.protocol,
+        host: normalizeHost(parsed.hostname),
+        port: parsed.port || ''
+      };
+    } catch {
+      return { exact: origin, protocol: '', host: normalizeHost(origin), port: '' };
+    }
+  });
+
   return function resolveCorsOrigin(requestOrigin, callback) {
     // Allow same-origin/curl/server-to-server requests with no Origin header.
     if (!requestOrigin) {
@@ -46,6 +65,28 @@ function buildCorsOriginResolver(rawValue) {
     if (allowedOrigins.includes(requestOrigin)) {
       callback(null, true);
       return;
+    }
+
+    try {
+      const parsedRequest = new URL(requestOrigin);
+      const requestProtocol = parsedRequest.protocol;
+      const requestHost = normalizeHost(parsedRequest.hostname);
+      const requestPort = parsedRequest.port || '';
+
+      const hasHostMatch = parsedAllowedOrigins.some((allowed) => {
+        if (!allowed.host) return false;
+        if (allowed.host !== requestHost) return false;
+        if (allowed.protocol && allowed.protocol !== requestProtocol) return false;
+        if (allowed.port && allowed.port !== requestPort) return false;
+        return true;
+      });
+
+      if (hasHostMatch) {
+        callback(null, true);
+        return;
+      }
+    } catch {
+      // Fall through to explicit block error.
     }
 
     callback(new Error(`CORS blocked for origin: ${requestOrigin}`));

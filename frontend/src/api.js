@@ -3,20 +3,56 @@ import { getToken } from './session';
 const isLocalhostClient = typeof window !== 'undefined'
   && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
+const DEFAULT_REMOTE_API = 'https://biomicshub-backend.onrender.com';
+
 // In local development, always use local backend to avoid stale remote env mismatch.
-const API_BASE = isLocalhostClient
-  ? `${window.location.protocol}//${window.location.hostname}:5002`
-  : (import.meta.env.VITE_API_URL
-    || (typeof window !== 'undefined' && window.location.port !== '5002'
-      ? `${window.location.protocol}//${window.location.hostname}:5002`
-      : ''));
+function normalizeBaseUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+  return value.replace(/\/+$/, '');
+}
+
+function buildApiBaseCandidates() {
+  if (typeof window === 'undefined') {
+    return [normalizeBaseUrl(import.meta.env.VITE_API_URL)].filter(Boolean);
+  }
+
+  if (isLocalhostClient) {
+    return [`${window.location.protocol}//${window.location.hostname}:5002`];
+  }
+
+  const bases = [];
+  const envPrimary = normalizeBaseUrl(import.meta.env.VITE_API_URL);
+  const envFallbackRaw = String(import.meta.env.VITE_API_FALLBACK_URLS || '').trim();
+  const envFallbacks = envFallbackRaw
+    ? envFallbackRaw.split(',').map((entry) => normalizeBaseUrl(entry)).filter(Boolean)
+    : [];
+
+  if (envPrimary) bases.push(envPrimary);
+
+  // Same-origin fallback supports monolithic deployments where frontend and API share host.
+  bases.push(normalizeBaseUrl(window.location.origin));
+
+  // Keep a resilient managed-host fallback for production when env config is stale or unavailable.
+  if (!envPrimary || /biomicshub\.com$/i.test(window.location.hostname)) {
+    bases.push(DEFAULT_REMOTE_API);
+  }
+
+  bases.push(...envFallbacks);
+
+  return Array.from(new Set(bases.filter(Boolean)));
+}
+
+const API_BASES = buildApiBaseCandidates();
+const API_BASE = API_BASES[0] || '';
+const REQUEST_TIMEOUT_MS = 15000;
 
 export function getApiBase() {
   return API_BASE;
 }
 
-function buildUrl(path) {
-  return `${API_BASE}${path}`;
+function buildUrl(path, base = API_BASE) {
+  return `${base}${path}`;
 }
 
 async function parseJsonResponse(response) {
@@ -57,18 +93,43 @@ export async function requestJson(path, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  let response;
-  try {
-    response = await fetch(buildUrl(path), {
-      ...options,
-      headers
-    });
-  } catch {
-    throw new Error(
-      `Cannot reach API server at ${buildUrl(path)}. Ensure backend is running and CORS allows this website origin.`
-    );
+  const basesToTry = API_BASES.length ? API_BASES : [API_BASE];
+  let lastNetworkError = null;
+  let lastNetworkUrl = buildUrl(path);
+
+  for (const base of basesToTry) {
+    const controller = new AbortController();
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(buildUrl(path, base), {
+        ...options,
+        headers,
+        signal: controller.signal
+      });
+      globalThis.clearTimeout(timeoutId);
+      return parseJsonResponse(response);
+    } catch (error) {
+      globalThis.clearTimeout(timeoutId);
+
+      // API responded with HTTP error -> do not try alternate bases.
+      if (error instanceof Error && !/abort/i.test(error.name || '')) {
+        const likelyHttpError = /Request failed|Authentication required|not authorized|API route not found/i.test(error.message || '');
+        if (likelyHttpError) throw error;
+      }
+
+      lastNetworkError = error;
+      lastNetworkUrl = buildUrl(path, base);
+    }
   }
-  return parseJsonResponse(response);
+
+  const timeoutHint = lastNetworkError?.name === 'AbortError'
+    ? `Request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s.`
+    : 'Network/CORS handshake failed.';
+
+  throw new Error(
+    `Cannot reach API server at ${lastNetworkUrl}. ${timeoutHint} Please retry in a moment.`
+  );
 }
 
 export function uploadMaterial(videoId, file, onProgress) {

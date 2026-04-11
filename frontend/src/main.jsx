@@ -5,6 +5,41 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './App.css';
 
+const CHUNK_RELOAD_GUARD_KEY = 'biomicshub:chunk-reload-once';
+
+function isChunkLoadError(error) {
+  const message = String(error?.message || error || '');
+  return /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk [\w-]+ failed/i.test(message);
+}
+
+function recoverFromChunkError() {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY) === '1') return;
+    sessionStorage.setItem(CHUNK_RELOAD_GUARD_KEY, '1');
+  } catch {
+    // If storage is unavailable, still attempt a reload.
+  }
+  window.location.reload();
+}
+
+window.addEventListener('vite:preloadError', () => {
+  recoverFromChunkError();
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  if (!isChunkLoadError(event.reason)) return;
+  event.preventDefault();
+  recoverFromChunkError();
+});
+
+window.addEventListener('load', () => {
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_GUARD_KEY);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+}, { once: true });
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { refetchOnWindowFocus: false }
