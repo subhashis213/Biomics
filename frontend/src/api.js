@@ -30,11 +30,16 @@ function buildApiBaseCandidates() {
 
   if (envPrimary) bases.push(envPrimary);
 
-  // Same-origin fallback supports monolithic deployments where frontend and API share host.
-  bases.push(normalizeBaseUrl(window.location.origin));
+  // Only add same-origin fallback for monolithic deployments (frontend+backend on same host).
+  // Skip it on Vercel (*.vercel.app) since backend is on a separate Render domain — sending
+  // API POST requests to the Vercel frontend URL causes 405 Method Not Allowed.
+  const isVercel = /\.vercel\.app$/i.test(window.location.hostname);
+  if (!isVercel) {
+    bases.push(normalizeBaseUrl(window.location.origin));
+  }
 
-  // Keep a resilient managed-host fallback for production when env config is stale or unavailable.
-  if (!envPrimary || /biomicshub\.com$/i.test(window.location.hostname)) {
+  // Always keep the Render backend as a resilient fallback.
+  if (!envPrimary || /biomicshub\.com$/i.test(window.location.hostname) || isVercel) {
     bases.push(DEFAULT_REMOTE_API);
   }
 
