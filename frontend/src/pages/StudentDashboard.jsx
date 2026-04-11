@@ -43,6 +43,7 @@ export default function StudentDashboard() {
 
   const [selectedModule, setSelectedModule] = useState(null);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
+  const [pickerCourse, setPickerCourse] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('latest');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
@@ -51,6 +52,9 @@ export default function StudentDashboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [leaderboardModules, setLeaderboardModules] = useState([]);
   const [leaderboardModuleFilter, setLeaderboardModuleFilter] = useState('all');
+  const [leaderboardTopicFilter, setLeaderboardTopicFilter] = useState('all');
+  const [performanceTopicFilter, setPerformanceTopicFilter] = useState('all');
+  const [performanceModuleFilter, setPerformanceModuleFilter] = useState('all');
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
@@ -253,6 +257,16 @@ export default function StudentDashboard() {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return '';
     return parsed.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function toLocalDateKey(value) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   function buildLockedCartKey(moduleName, moduleCourse) {
@@ -1078,13 +1092,23 @@ export default function StudentDashboard() {
     }
   });
 
-  const availableCourses = Array.from(new Set([
+  const availableCourseMap = new Map();
+  [
     ...videos.map((video) => normalizeCourseName(video.category || '')).filter(Boolean),
     ...quizzes.map((quiz) => normalizeCourseName(quiz.category || '')).filter(Boolean),
     ...quizAttempts.map((attempt) => normalizeCourseName(attempt.category || '')).filter(Boolean),
     ...Object.values(moduleMetaByKey).map((meta) => normalizeCourseName(meta?.category || '')).filter(Boolean),
     normalizeCourseName(course || '')
-  ])).sort((a, b) => a.localeCompare(b));
+  ].forEach((courseName) => {
+    const key = String(courseName || '').toLowerCase();
+    if (!key) return;
+    if (!availableCourseMap.has(key)) {
+      availableCourseMap.set(key, courseName);
+    }
+  });
+
+  const availableCourses = Array.from(availableCourseMap.values())
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   const modules = Object.keys(moduleMetaByKey)
     .filter((moduleKey) => {
@@ -1138,17 +1162,6 @@ export default function StudentDashboard() {
     });
 
   const favoriteVideos = videos.filter((video) => favoriteIds.has(normalizeId(video._id)));
-  const videosForActiveFilter = activeCourseFilter
-    ? videos.filter((video) => normalizeCourseName(video.category || 'General') === activeCourseFilter)
-    : videos;
-  const progressScopeVideos = selectedModule ? selectedModuleVideos : videosForActiveFilter;
-  const progressScopeCompletedCount = progressScopeVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
-  const progressScopePercent = progressScopeVideos.length
-    ? Math.round((progressScopeCompletedCount / progressScopeVideos.length) * 100)
-    : 0;
-  const progressScopeLabel = selectedModule
-    ? `${selectedModuleCourse} • ${selectedModuleName}`
-    : (activeCourseFilter || 'All Courses');
   const selectedModuleAttempts = selectedModule
     ? quizAttempts.filter((attempt) => {
       const sameModule = normalizeModuleName(attempt.module) === normalizeModuleName(selectedModuleName);
@@ -1156,6 +1169,58 @@ export default function StudentDashboard() {
       return sameModule && sameCategory;
     })
     : [];
+
+  const quizTopicMetadata = useMemo(() => {
+    const topics = new Set();
+    const moduleTopicsByKey = {};
+    const moduleTopicsByName = {};
+
+    function addTopic(categoryName, moduleName, topicName) {
+      const normalizedCategory = normalizeCourseName(categoryName || course || 'General');
+      if (activeCourseFilter && normalizedCategory !== activeCourseFilter) return;
+
+      const normalizedModule = normalizeModuleName(moduleName || 'General');
+      const normalizedTopic = normalizeModuleName(topicName || 'General');
+      if (!normalizedModule || !normalizedTopic) return;
+
+      const moduleKey = resolveModuleKey(normalizedCategory, normalizedModule);
+      if (!moduleTopicsByKey[moduleKey]) moduleTopicsByKey[moduleKey] = new Set();
+      moduleTopicsByKey[moduleKey].add(normalizedTopic);
+
+      const moduleNameKey = normalizedModule.toLowerCase();
+      if (!moduleTopicsByName[moduleNameKey]) moduleTopicsByName[moduleNameKey] = new Set();
+      moduleTopicsByName[moduleNameKey].add(normalizedTopic);
+
+      topics.add(normalizedTopic);
+    }
+
+    quizzes.forEach((quiz) => {
+      addTopic(quiz?.category, quiz?.module, quiz?.topic);
+    });
+
+    quizAttempts.forEach((attempt) => {
+      addTopic(attempt?.category, attempt?.module, attempt?.topic);
+    });
+
+    const options = Array.from(topics).sort((a, b) => a.localeCompare(b));
+    return { options, moduleTopicsByKey, moduleTopicsByName };
+  }, [quizzes, quizAttempts, activeCourseFilter, course]);
+
+  const quizTopicOptions = quizTopicMetadata.options;
+
+  const performanceModuleOptions = Array.from(new Set(
+    visibleModules.map((moduleKey) => moduleMetaByKey[moduleKey]?.module).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b));
+
+  const filteredQuizPerformanceModules = visibleModules.filter((moduleKey) => {
+    const moduleName = normalizeModuleName(moduleMetaByKey[moduleKey]?.module || 'General');
+    if (performanceModuleFilter !== 'all' && moduleName !== normalizeModuleName(performanceModuleFilter)) {
+      return false;
+    }
+    if (performanceTopicFilter === 'all') return true;
+    const topicSet = quizTopicMetadata.moduleTopicsByKey[moduleKey];
+    return Boolean(topicSet && topicSet.has(performanceTopicFilter));
+  });
 
   const latestAttemptByModule = quizAttempts.reduce((acc, attempt) => {
     const moduleKey = resolveModuleKey(attempt.category || course || 'General', attempt.module || 'General');
@@ -1166,6 +1231,30 @@ export default function StudentDashboard() {
     return acc;
   }, {});
 
+  const quizStreakDays = useMemo(() => {
+    const attemptedDayKeys = new Set();
+    quizAttempts.forEach((attempt) => {
+      const dateKey = toLocalDateKey(attempt?.submittedAt || attempt?.attemptedAt || attempt?.createdAt);
+      if (dateKey) attemptedDayKeys.add(dateKey);
+    });
+
+    if (!attemptedDayKeys.size) return 0;
+
+    const today = new Date();
+    const todayKey = toLocalDateKey(today);
+    if (!attemptedDayKeys.has(todayKey)) {
+      return 0;
+    }
+
+    let streak = 0;
+    const cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    while (attemptedDayKeys.has(toLocalDateKey(cursor))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }, [quizAttempts]);
+
   const fallbackLeaderboardModules = Array.from(new Set(
     visibleModules.map((moduleKey) => moduleMetaByKey[moduleKey]?.module).filter(Boolean)
   )).sort((a, b) => a.localeCompare(b));
@@ -1175,13 +1264,58 @@ export default function StudentDashboard() {
     ...fallbackLeaderboardModules
   ])).sort((a, b) => a.localeCompare(b));
 
-  const leaderboardChampion = leaderboard[0] || null;
+  const filteredLeaderboard = leaderboard.filter((entry) => {
+    if (leaderboardTopicFilter === 'all') return true;
+    const moduleNameKey = normalizeModuleName(entry?.module || 'General').toLowerCase();
+    const topicSet = quizTopicMetadata.moduleTopicsByName[moduleNameKey];
+    return Boolean(topicSet && topicSet.has(leaderboardTopicFilter));
+  });
+
+  const leaderboardChampion = filteredLeaderboard[0] || null;
 
   useEffect(() => {
     if (selectedCourseFilter === 'all') return;
     if (availableCourses.includes(selectedCourseFilter)) return;
     setSelectedCourseFilter('all');
   }, [availableCourses, selectedCourseFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const prefetch = () => {
+      if (cancelled) return;
+      import('./StudentCourseModulesPage');
+      import('./StudentInsightsPage');
+    };
+
+    let cleanup = () => {};
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(prefetch, { timeout: 1200 });
+      cleanup = () => window.cancelIdleCallback(idleId);
+    } else {
+      const timeoutId = window.setTimeout(prefetch, 650);
+      cleanup = () => window.clearTimeout(timeoutId);
+    }
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (performanceTopicFilter !== 'all' && !quizTopicOptions.includes(performanceTopicFilter)) {
+      setPerformanceTopicFilter('all');
+    }
+    if (leaderboardTopicFilter !== 'all' && !quizTopicOptions.includes(leaderboardTopicFilter)) {
+      setLeaderboardTopicFilter('all');
+    }
+  }, [performanceTopicFilter, leaderboardTopicFilter, quizTopicOptions]);
+
+  useEffect(() => {
+    if (performanceModuleFilter === 'all') return;
+    if (performanceModuleOptions.includes(performanceModuleFilter)) return;
+    setPerformanceModuleFilter('all');
+  }, [performanceModuleFilter, performanceModuleOptions]);
 
   useEffect(() => {
     if (!loadError) return;
@@ -1611,6 +1745,7 @@ export default function StudentDashboard() {
   const studentNavItems = useMemo(() => {
     const baseItems = [
       { id: 'section-overview', label: 'Overview', icon: '🏠' },
+      { id: 'route-student-insights', label: 'Insights', icon: '📈' },
       { id: 'section-learning', label: 'Learning', icon: '📘' }
     ];
     if (selectedModule) return [...baseItems, { id: 'section-connect', label: 'Connect', icon: '🔗' }];
@@ -1639,6 +1774,20 @@ export default function StudentDashboard() {
     ];
   }, [selectedModule]);
 
+  function handleStudentNavClick(id) {
+    if (id === 'route-student-insights') {
+      navigate('/student/insights');
+      return;
+    }
+
+    const target = document.getElementById(id);
+    if (!target) return;
+    const rootStyles = window.getComputedStyle(document.documentElement);
+    const clearance = parseFloat(rootStyles.getPropertyValue('--app-shell-topbar-clearance')) || 96;
+    const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - clearance - 12);
+    window.scrollTo({ top, behavior: 'smooth' });
+  }
+
   return (
     <>
     <AppShell
@@ -1648,6 +1797,7 @@ export default function StudentDashboard() {
       refreshOnBrandIconClick
       navTitle="Student Sections"
       navItems={studentNavItems}
+      onNavItemClick={handleStudentNavClick}
       actions={(
         <div className="topbar-user-actions">
           <StudentAnnouncementBell />
@@ -1680,6 +1830,15 @@ export default function StudentDashboard() {
               <strong>{profile?.username || session?.username || 'Student'}</strong>
               <span>{profile?.class || course || 'Course unavailable'}</span>
               <span>{profile?.city || 'City unavailable'}</span>
+              <div
+                className={`profile-streak-chip profile-streak-chip-compact ${quizStreakDays > 0 ? 'is-active' : ''}`}
+                role="status"
+                aria-live="polite"
+                aria-label={`${quizStreakDays} day${quizStreakDays === 1 ? '' : 's'} streak`}
+              >
+                <span className="profile-streak-fire" aria-hidden="true">🔥</span>
+                <span className="profile-streak-count" aria-hidden="true">{quizStreakDays}</span>
+              </div>
               {visibleMembership ? (
                 <div className="profile-membership-card" role="status" aria-live="polite">
                   <div className="profile-membership-head">
@@ -1953,52 +2112,6 @@ export default function StudentDashboard() {
           </section>
         ) : null}
 
-      <section className="student-tools-row card">
-        <label>
-          Search modules or lectures
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by module name, lecture title, or description"
-          />
-        </label>
-        <label>
-          Filter by course
-          <select
-            value={selectedCourseFilter}
-            onChange={(event) => {
-              setSelectedCourseFilter(event.target.value);
-              setSelectedModule(null);
-            }}
-          >
-            <option value="all">All Courses</option>
-            {availableCourses.map((courseName) => (
-              <option key={courseName} value={courseName}>{courseName}</option>
-            ))}
-          </select>
-        </label>
-        {selectedModule && selectedModuleSection === 'lectures' ? (
-          <>
-            <label>
-              Sort lectures
-              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-                <option value="latest">Latest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="title">Title A-Z</option>
-              </select>
-            </label>
-            <button type="button" className={`secondary-btn ${showSavedOnly ? 'active' : ''}`} onClick={() => setShowSavedOnly((current) => !current)}>
-              {showSavedOnly ? 'Showing Saved Only' : 'Filter Saved Only'}
-            </button>
-          </>
-        ) : null}
-
-        <div className="progress-summary-box">
-          <strong>{progressScopeCompletedCount}/{progressScopeVideos.length} complete</strong>
-          <span>{progressScopeLabel} progress: {progressScopePercent}%</span>
-        </div>
-      </section>
-
       {hasAnyUnlockedModule && !selectedModule && favoriteVideos.length ? (
         <section className="card favorites-panel">
           <div className="section-header compact">
@@ -2035,24 +2148,24 @@ export default function StudentDashboard() {
           <p className="eyebrow">Learning Content</p>
           {selectedModule ? (
             <>
-              <h2>{selectedModuleCourse} - {selectedModuleName}</h2>
+              <h2>Unlock {selectedModuleName}</h2>
               <button
                 className="back-btn small"
                 onClick={() => {
+                  navigate(`/student/course/${encodeURIComponent(selectedModuleCourse || course || 'General')}/modules`);
                   setSelectedModule(null);
                   setSelectedModuleSection('');
                 }}
-                title="Back to modules"
               >
-                ← Back to Modules
+                ← Back to {selectedModuleCourse || 'Course'}
               </button>
             </>
           ) : (
-            <h2>{activeCourseFilter ? `${activeCourseFilter} Modules` : 'All Course Modules'}</h2>
+            <h2>Choose your course to continue</h2>
           )}
         </div>
-        {selectedModule && <StatCard label="Lectures in Module" value={displayedVideos.length} />}
-        {!selectedModule && <StatCard label="Total Modules" value={visibleModules.length} />}
+        {selectedModule && <StatCard label="Module" value={selectedModuleName} />}
+        {!selectedModule && <StatCard label="Courses" value={availableCourses.length} />}
       </section>
 
       {!selectedModule && bundlePlanOptions.some((plan) => plan.amountInPaise > 0) && !allModulesUnlocked ? (
@@ -2126,90 +2239,98 @@ export default function StudentDashboard() {
             </article>
           ))}
         </div>
-      ) : !selectedModule && visibleModules.length ? (
-        // Module Selection View
-        <div className="modules-view-container">
-          <div className="modules-grid-student">
-            {visibleModules.map((moduleKey) => {
-              const moduleMeta = moduleMetaByKey[moduleKey];
-              const module = moduleMeta.module;
-              const moduleCourse = moduleMeta.category;
-              const moduleAccessInfo = getModuleAccessInfo(module, moduleCourse);
-              const moduleIsLocked = Boolean(moduleAccessInfo.purchaseRequired && !moduleAccessInfo.unlocked);
-              const cartItemKey = buildLockedCartKey(module, moduleCourse);
-              const isInLockedCart = lockedModuleCart.some((item) => item.key === cartItemKey);
-              const isJustAddedToCart = recentlyAddedCartKey === cartItemKey;
-              const moduleVideos = videosByModule[moduleKey] || [];
-              const completedInModule = moduleVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
-              const moduleQuizCount = (quizzesByModule[moduleKey] || []).length;
-              const hasQuizAttempt = Boolean(latestAttemptByModule[moduleKey]);
-              const lectureProgress = moduleVideos.length
-                ? Math.round((completedInModule / moduleVideos.length) * 100)
-                : 0;
-              let moduleProgressPercent = lectureProgress;
-              if (!moduleVideos.length && moduleQuizCount) {
-                moduleProgressPercent = hasQuizAttempt ? 100 : 0;
-              } else if (moduleVideos.length && moduleQuizCount) {
-                moduleProgressPercent = Math.round((lectureProgress + (hasQuizAttempt ? 100 : 0)) / 2);
-              }
-              return (
-                <article key={moduleKey} className={`module-card-btn${moduleIsLocked ? ' module-card-btn-locked' : ''}`}>
-                  <div className="module-card-header">
-                    <span className="module-card-icon">📚</span>
-                    <span className="module-card-count">{moduleVideos.length}</span>
+      ) : !selectedModule ? (
+        // Single course chooser card
+        availableCourses.length ? (() => {
+          const activeCourse = pickerCourse || availableCourses[0] || '';
+          const activeCourseKey = normalizeCourseName(activeCourse).toLowerCase();
+          const activeModuleNameSet = new Set(
+            Object.values(moduleMetaByKey)
+              .filter((meta) => normalizeCourseName(meta?.category || '').toLowerCase() === activeCourseKey)
+              .map((meta) => normalizeModuleName(meta?.module || '').toLowerCase())
+              .filter(Boolean)
+          );
+          const activeModuleCount = activeModuleNameSet.size;
+          const activeVideos = videos.filter(
+            (v) => normalizeCourseName(v.category || '').toLowerCase() === activeCourseKey
+          );
+          const activeQuizCount = quizzes.filter(
+            (q) => normalizeCourseName(q.category || '').toLowerCase() === activeCourseKey
+          ).length;
+          const activeCompleted = activeVideos.filter((v) =>
+            completedIds.has(normalizeId(v._id))
+          ).length;
+          const activeProgress = activeVideos.length
+            ? Math.round((activeCompleted / activeVideos.length) * 100)
+            : 0;
+
+          return (
+            <div className="course-chooser-wrap">
+              <div className="course-chooser-card">
+                <div className="course-chooser-top">
+                  <span className="course-chooser-icon" aria-hidden="true">🎓</span>
+                  <div className="course-chooser-intro">
+                    <h3 className="course-chooser-title">Select a Course</h3>
+                    <p className="course-chooser-subtitle">Pick one below, then tap Go to explore its modules</p>
                   </div>
-                  <div className="module-card-body">
-                    <h3 className="module-card-title">{module}</h3>
-                    {selectedCourseFilter === 'all' ? <p className="module-card-course">{moduleCourse}</p> : null}
-                    <p className="module-card-subtitle">
-                      {moduleVideos.length} {moduleVideos.length === 1 ? 'lecture' : 'lectures'}
-                      {moduleQuizCount ? ` • ${moduleQuizCount} ${moduleQuizCount === 1 ? 'quiz' : 'quizzes'}` : ''}
-                    </p>
-                    <p className="module-card-progress">
-                      {moduleIsLocked
-                        ? (moduleAccessInfo.crossCourse
-                            ? 'Locked • Separate course purchase required'
-                            : `Locked • ${formatPriceInPaise(moduleAccessInfo.pricing?.plans?.[0]?.amountInPaise || 0)} Pro`)
-                        : `Progress: ${moduleProgressPercent}%`}
-                    </p>
-                    {latestAttemptByModule[moduleKey] ? (
-                      <p className="module-card-quiz-score">
-                        Quiz: {latestAttemptByModule[moduleKey].score}/{latestAttemptByModule[moduleKey].total}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="module-card-actions">
+                </div>
+
+                <div className="course-chooser-pills" role="group" aria-label="Available courses">
+                  {availableCourses.map((cName) => (
+                    <button
+                      key={cName}
+                      type="button"
+                      className={`course-chooser-pill${normalizeCourseName(cName).toLowerCase() === activeCourseKey ? ' active' : ''}`}
+                      onClick={() => setPickerCourse(cName)}
+                    >
+                      {cName}
+                    </button>
+                  ))}
+                </div>
+
+                {activeCourse && (
+                  <div className="course-chooser-details">
+                    <div className="course-chooser-stats-row">
+                      <span className="course-chooser-stat">
+                        <strong>{activeModuleCount}</strong> module{activeModuleCount === 1 ? '' : 's'}
+                      </span>
+                      <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
+                      <span className="course-chooser-stat">
+                        <strong>{activeVideos.length}</strong> lecture{activeVideos.length === 1 ? '' : 's'}
+                      </span>
+                      {activeQuizCount > 0 && (
+                        <>
+                          <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
+                          <span className="course-chooser-stat">
+                            <strong>{activeQuizCount}</strong> quiz{activeQuizCount === 1 ? '' : 'zes'}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="course-chooser-progress-row">
+                      <span className="course-chooser-progress-label">Progress</span>
+                      <div className="course-chooser-progress-track" role="progressbar" aria-valuenow={activeProgress} aria-valuemin={0} aria-valuemax={100}>
+                        <div className="course-chooser-progress-fill" style={{ width: `${activeProgress}%` }} />
+                      </div>
+                      <span className="course-chooser-progress-pct">{activeProgress}%</span>
+                    </div>
+
                     <button
                       type="button"
-                      className="primary-btn module-open-btn"
-                      onClick={() => {
-                        navigate(`/student/module/${encodeURIComponent(moduleCourse || 'General')}/${encodeURIComponent(module || 'General')}`);
-                      }}
+                      className="course-chooser-go-btn"
+                      onClick={() => navigate(`/student/course/${encodeURIComponent(activeCourse)}/modules`)}
                     >
-                      {moduleIsLocked ? 'View Lock Details' : 'Open Module'}
+                      Go <span aria-hidden="true">→</span>
                     </button>
-                    {moduleIsLocked ? (
-                      <button
-                        type="button"
-                        className={`secondary-btn module-cart-btn${isInLockedCart ? ' in-cart go-cart' : ''}${isJustAddedToCart ? ' just-added' : ''}`}
-                        onClick={(event) => {
-                          if (isInLockedCart) {
-                            setCartOpen(true);
-                            return;
-                          }
-                          addLockedModuleToCart(module, moduleCourse, moduleAccessInfo, event.currentTarget);
-                        }}
-                      >
-                        {isInLockedCart ? (isJustAddedToCart ? 'Added ✓' : 'Go to Cart') : 'Add to Cart'}
-                      </button>
-                    ) : null}
                   </div>
-                  <span className="module-card-arrow">{moduleIsLocked ? '🔒' : '→'}</span>
-                </article>
-              );
-            })}
-          </div>
-        </div>
+                )}
+              </div>
+            </div>
+          );
+        })() : (
+          <p className="empty-state">No courses available yet.</p>
+        )
       ) : selectedModule && moduleLocked ? (
         <section className="card membership-lock-panel module-membership-lock-panel">
           <div className="section-header compact">
@@ -2320,61 +2441,8 @@ export default function StudentDashboard() {
             </div>
           ) : null}
         </section>
-      ) : selectedModule && !moduleLocked && selectedModuleSection === 'lectures' && displayedVideos.length ? (
-        // Video Grid View (within selected module)
-        <div className="module-videos-scroll">
-          <div className="compact-premium-video-grid">
-            {displayedVideos.map((video) => (
-              <FinalWorkingVideoCard
-                key={video._id}
-                video={video}
-                adminMode={false}
-                downloadProgress={downloadProgress}
-                onDownloadMaterial={handleDownload}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={favoriteIds.has(normalizeId(video._id))}
-                onToggleCompleted={toggleCompleted}
-                isCompleted={completedIds.has(normalizeId(video._id))}
-              />
-            ))}
-          </div>
-        </div>
-      ) : selectedModule && !moduleLocked && selectedModuleSection === 'lectures' ? (
-        <p className="empty-state">No lectures available in {selectedModuleName}.</p>
-      ) : selectedModule && !moduleLocked ? (
-        <section className="card module-section-chooser">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Module Workspace</p>
-              <h2>Choose section to continue</h2>
-            </div>
-            <StatCard label="Module" value={selectedModuleName || 'Selected'} />
-          </div>
-          <div className="module-section-grid">
-            <button
-              type="button"
-              className="module-section-card"
-              onClick={() => navigate(`/student/module/${encodeURIComponent(selectedModuleCourse || course || 'General')}/${encodeURIComponent(selectedModuleName || 'General')}/lectures`)}
-            >
-              <span className="module-section-icon" aria-hidden="true">🎬</span>
-              <strong>Lecture Section</strong>
-              <p>Open all videos for this module in a focused lecture layout.</p>
-            </button>
-            <button
-              type="button"
-              className="module-section-card"
-              onClick={() => navigate(`/student/module/${encodeURIComponent(selectedModuleCourse || course || 'General')}/${encodeURIComponent(selectedModuleName || 'General')}/quizzes`)}
-            >
-              <span className="module-section-icon" aria-hidden="true">📝</span>
-              <strong>Quiz Section</strong>
-              <p>Open assessment quizzes and track performance for this chapter.</p>
-            </button>
-          </div>
-        </section>
       ) : (
-        <p className="empty-state">
-          {activeCourseFilter ? `No modules available for ${activeCourseFilter}.` : 'No modules available yet.'}
-        </p>
+        <p className="empty-state">No courses available yet.</p>
       )}
 
       {!selectedModule ? (
@@ -2409,8 +2477,35 @@ export default function StudentDashboard() {
               <h2>Last score by module</h2>
             </div>
           </div>
+          <div className="quiz-filter-bar" role="group" aria-label="Quiz performance filters">
+            <span className="quiz-filter-icon" aria-hidden="true">⚙️</span>
+            <label className="quiz-filter-field">
+              Module
+              <select
+                value={performanceModuleFilter}
+                onChange={(event) => setPerformanceModuleFilter(event.target.value)}
+              >
+                <option value="all">All Modules</option>
+                {performanceModuleOptions.map((moduleName) => (
+                  <option key={`perf-module-${moduleName}`} value={moduleName}>{moduleName}</option>
+                ))}
+              </select>
+            </label>
+            <label className="quiz-filter-field">
+              Topic
+              <select
+                value={performanceTopicFilter}
+                onChange={(event) => setPerformanceTopicFilter(event.target.value)}
+              >
+                <option value="all">All Topics</option>
+                {quizTopicOptions.map((topic) => (
+                  <option key={`perf-topic-${topic}`} value={topic}>{topic}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="quiz-history-grid">
-            {visibleModules.map((moduleKey) => {
+            {filteredQuizPerformanceModules.map((moduleKey) => {
               const moduleMeta = moduleMetaByKey[moduleKey];
               const module = moduleMeta.module;
               const moduleCourse = moduleMeta.category;
@@ -2431,6 +2526,9 @@ export default function StudentDashboard() {
               );
             })}
           </div>
+          {!filteredQuizPerformanceModules.length ? (
+            <p className="empty-note">No modules found for this topic filter.</p>
+          ) : null}
         </section>
       ) : null}
 
@@ -2441,7 +2539,12 @@ export default function StudentDashboard() {
               <p className="eyebrow">Quiz Leaderboard</p>
               <h2>Top Performers</h2>
             </div>
-            <label className="quiz-leaderboard-filter">
+            <div className="quiz-leaderboard-controls" />
+          </div>
+
+          <div className="quiz-filter-bar" role="group" aria-label="Quiz leaderboard filters">
+            <span className="quiz-filter-icon" aria-hidden="true">🏅</span>
+            <label className="quiz-filter-field">
               Module
               <select
                 value={leaderboardModuleFilter}
@@ -2453,13 +2556,25 @@ export default function StudentDashboard() {
                 ))}
               </select>
             </label>
+            <label className="quiz-filter-field">
+              Topic
+              <select
+                value={leaderboardTopicFilter}
+                onChange={(event) => setLeaderboardTopicFilter(event.target.value)}
+              >
+                <option value="all">All Topics</option>
+                {quizTopicOptions.map((topic) => (
+                  <option key={`leader-topic-${topic}`} value={topic}>{topic}</option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {leaderboardLoading ? <p className="empty-note">Loading leaderboard...</p> : null}
           {!leaderboardLoading && leaderboardError ? <p className="inline-message error">{leaderboardError}</p> : null}
 
           {!leaderboardLoading && !leaderboardError ? (
-            leaderboard.length ? (
+            filteredLeaderboard.length ? (
               <>
                 {leaderboardChampion ? (
                   <article className="leaderboard-champion-card">
@@ -2485,7 +2600,7 @@ export default function StudentDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {leaderboard.map((entry, index) => (
+                      {filteredLeaderboard.map((entry, index) => (
                         <tr key={`${entry.username || 'candidate'}-${entry.module || 'General'}-${entry.rank || index + 1}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
                           <td>#{entry.rank || index + 1}</td>
                           <td>{entry.username || 'Anonymous'}</td>
@@ -2499,7 +2614,7 @@ export default function StudentDashboard() {
                 </div>
               </>
             ) : (
-              <p className="empty-note">No leaderboard data yet for this module. Submit a quiz attempt to appear here.</p>
+              <p className="empty-note">No leaderboard data found for this topic filter. Try a different topic or select All.</p>
             )
           ) : null}
         </section>
@@ -2885,6 +3000,10 @@ export default function StudentDashboard() {
                     <div><span>Phone</span><strong>{profile?.phone || '-'}</strong></div>
                     <div><span>Course</span><strong>{profile?.class || '-'}</strong></div>
                     <div><span>City</span><strong>{profile?.city || '-'}</strong></div>
+                  </div>
+                  <div className={`profile-streak-chip ${quizStreakDays > 0 ? 'is-active' : ''}`} role="status" aria-live="polite">
+                    <span className="profile-streak-fire" aria-hidden="true">🔥</span>
+                    <span className="profile-streak-text">{quizStreakDays} day{quizStreakDays === 1 ? '' : 's'} streak</span>
                   </div>
                   {visibleMembership ? (
                     <div className="profile-membership-card" role="status" aria-live="polite">

@@ -244,7 +244,7 @@ export default function StudentQuizPage() {
     await submitCurrentQuiz(true);
   }
 
-  function handleBackToDashboard() {
+  function handleBackToPrevious() {
     if (isExiting) return;
     const quizInProgress = quiz && !result && !isLoading;
     if (quizInProgress && !isSubmitting) {
@@ -253,23 +253,19 @@ export default function StudentQuizPage() {
     }
     setIsExiting(true);
     exitTimerRef.current = window.setTimeout(() => {
-      navigate('/student', {
-        state: moduleNameParam
-          ? {
-              restoreModule: {
-                name: moduleNameParam
-              }
-            }
-          : null
-      });
+      if (typeof window !== 'undefined' && window.history.length > 1) {
+        navigate(-1);
+        return;
+      }
+      navigate('/student');
     }, 320);
   }
 
   return (
     <main className={`quiz-exam-page page-exit-transition${isExiting ? ' is-exiting' : ''}`}>
       <header className="quiz-exam-header">
-        <button type="button" className="secondary-btn" onClick={handleBackToDashboard}>
-          ← Back To Dashboard
+        <button type="button" className="secondary-btn" onClick={handleBackToPrevious}>
+          ← Back
         </button>
         <div className="quiz-exam-title-wrap">
           <p className="eyebrow">Exam Mode</p>
@@ -396,8 +392,8 @@ export default function StudentQuizPage() {
             <button type="button" className="secondary-btn" onClick={() => setShowReview((current) => !current)}>
               {showReview ? 'Hide Review' : 'Review Answers'}
             </button>
-            <button type="button" className="primary-btn" onClick={handleBackToDashboard} disabled={isExiting}>
-              Back To Dashboard
+            <button type="button" className="primary-btn" onClick={handleBackToPrevious} disabled={isExiting}>
+              Back
             </button>
           </div>
 
@@ -464,15 +460,11 @@ export default function StudentQuizPage() {
                   setExitConfirmOpen(false);
                   setIsExiting(true);
                   exitTimerRef.current = window.setTimeout(() => {
-                    navigate('/student', {
-                      state: moduleNameParam
-                        ? {
-                            restoreModule: {
-                              name: moduleNameParam
-                            }
-                          }
-                        : null
-                    });
+                    if (typeof window !== 'undefined' && window.history.length > 1) {
+                      navigate(-1);
+                      return;
+                    }
+                    navigate('/student');
                   }, 320);
                 }}
               >
@@ -514,7 +506,7 @@ export default function StudentQuizPage() {
       <button
         type="button"
         className={`quiz-floating-back${isFloatingBackVisible ? '' : ' is-hidden'}`}
-        onClick={handleBackToDashboard}
+        onClick={handleBackToPrevious}
         disabled={isExiting}
         aria-label="Go to previous page"
       >

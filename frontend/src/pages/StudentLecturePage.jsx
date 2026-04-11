@@ -30,6 +30,7 @@ export default function StudentLecturePage() {
 
   const {
     videos,
+    quizzes,
     access,
     favoriteIds,
     completedIds,
@@ -58,6 +59,14 @@ export default function StudentLecturePage() {
       return sameCourse && sameModule;
     });
   }, [videos, decodedCourseName, decodedModuleName]);
+
+  const moduleQuizzes = useMemo(() => {
+    return quizzes.filter((quiz) => {
+      const sameCourse = normalizeText(quiz?.category) === decodedCourseName;
+      const sameModule = normalizeText(quiz?.module || 'General') === decodedModuleName;
+      return sameCourse && sameModule;
+    });
+  }, [quizzes, decodedCourseName, decodedModuleName]);
 
   const videoTopics = useMemo(() => {
     return Array.from(new Set(
@@ -172,6 +181,22 @@ export default function StudentLecturePage() {
     return topicFolders.filter((topic) => topic.toLowerCase().includes(query));
   }, [searchQuery, topicFolders]);
 
+  const videoCountByTopic = useMemo(() => {
+    return moduleVideos.reduce((acc, video) => {
+      const topic = normalizeText(video?.topic || 'General');
+      acc[topic] = (acc[topic] || 0) + 1;
+      return acc;
+    }, {});
+  }, [moduleVideos]);
+
+  const quizCountByTopic = useMemo(() => {
+    return moduleQuizzes.reduce((acc, quiz) => {
+      const topic = normalizeText(quiz?.topic || 'General');
+      acc[topic] = (acc[topic] || 0) + 1;
+      return acc;
+    }, {});
+  }, [moduleQuizzes]);
+
   async function handleDownload(material) {
     setDownloadProgress((current) => ({ ...current, [material.filename]: 0 }));
     try {
@@ -275,6 +300,14 @@ export default function StudentLecturePage() {
                     >
                       <span className="lecture-topic-icon" aria-hidden="true">📁</span>
                       <strong>{topic}</strong>
+                      <div className="lecture-topic-badges">
+                        <span className="lecture-topic-badge lecture-topic-badge-videos">
+                          {videoCountByTopic[topic] || 0} {(videoCountByTopic[topic] || 0) === 1 ? 'video' : 'videos'}
+                        </span>
+                        <span className="lecture-topic-badge lecture-topic-badge-quizzes">
+                          {quizCountByTopic[topic] || 0} {(quizCountByTopic[topic] || 0) === 1 ? 'quiz set' : 'quiz sets'}
+                        </span>
+                      </div>
                       <span>Open chapter</span>
                     </button>
                   ))}

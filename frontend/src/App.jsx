@@ -26,6 +26,8 @@ const StudentMockExamPage = lazy(() => import('./pages/StudentMockExamPage'));
 const StudentModuleQuizPage = lazy(() => import('./pages/StudentModuleQuizPage'));
 const StudentQuizPage = lazy(() => import('./pages/StudentQuizPage'));
 const StudentTestSeriesPage = lazy(() => import('./pages/StudentTestSeriesPage'));
+const StudentCourseModulesPage = lazy(() => import('./pages/StudentCourseModulesPage'));
+const StudentInsightsPage = lazy(() => import('./pages/StudentInsightsPage'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -199,6 +201,16 @@ export default function App() {
         )}
       />
       <Route
+        path="/student/course/:courseName/modules"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading course modules...</div>}>
+              <StudentCourseModulesPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/student/module/:courseName/:moduleName"
         element={(
           <ProtectedRoute role="user">
@@ -244,6 +256,16 @@ export default function App() {
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading test series...</div>}>
               <StudentTestSeriesPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/insights"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading student insights...</div>}>
+              <StudentInsightsPage />
             </Suspense>
           </ProtectedRoute>
         )}

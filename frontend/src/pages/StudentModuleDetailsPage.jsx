@@ -95,7 +95,7 @@ export default function StudentModuleDetailsPage() {
   }, [moduleVideos]);
 
   function handleBack() {
-    navigate('/student');
+    navigate(`/student/course/${encodeURIComponent(decodedCourseName)}/modules`);
   }
 
   const primaryPlan = Array.isArray(moduleAccess?.pricing?.plans)
@@ -116,7 +116,7 @@ export default function StudentModuleDetailsPage() {
         </div>
         <div className="lecture-page-hero-actions">
           <button type="button" className="secondary-btn module-detail-back-btn" onClick={handleBack}>
-            ← Back to Dashboard
+            ← Back to Modules
           </button>
           <span className="lecture-total-chip module-detail-chip">
             {moduleLocked ? 'Locked Module' : 'Ready to Learn'}
@@ -162,14 +162,7 @@ export default function StudentModuleDetailsPage() {
           <button
             type="button"
             className="primary-btn"
-            onClick={() => navigate('/student', {
-              state: {
-                restoreModule: {
-                  name: decodedModuleName,
-                  category: decodedCourseName
-                }
-              }
-            })}
+            onClick={() => navigate(`/student/course/${encodeURIComponent(decodedCourseName)}/modules`)}
           >
             Open Unlock Panel
           </button>

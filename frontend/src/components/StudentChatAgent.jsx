@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bell,
   BookOpen,
@@ -81,6 +82,7 @@ export function StudentAnnouncementBell() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const openedAtRef = useRef(0);
 
   const activeAnnouncementCount = announcements.length;
   const shouldRingAnnouncement = activeAnnouncementCount > 0 && !open;
@@ -118,6 +120,60 @@ export function StudentAnnouncementBell() {
 
   if (!isLoggedIn) return null;
 
+  const announcementOverlay = open && typeof document !== 'undefined'
+    ? createPortal(
+      <>
+        <button
+          type="button"
+          className="biotab-announcement-inline-backdrop"
+          aria-label="Close announcements"
+          onClick={() => {
+            if (Date.now() - openedAtRef.current < 180) return;
+            setOpen(false);
+          }}
+        />
+        <div
+          className="biotab-announcement-panel biotab-announcement-panel-inline"
+          role="dialog"
+          aria-label="Student announcements"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="biotab-announcement-head">
+            <strong>Announcements</strong>
+            <button
+              type="button"
+              className="biotab-announcement-close"
+              onClick={() => setOpen(false)}
+              aria-label="Close announcements"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {loading ? <p className="biotab-announcement-empty">Loading announcements...</p> : null}
+          {!loading && error ? <p className="biotab-announcement-empty">{error}</p> : null}
+
+          {!loading && !error ? (
+            announcements.length ? (
+              <div className="biotab-announcement-list">
+                {announcements.map((item) => (
+                  <article key={item._id} className="biotab-announcement-item">
+                    <h4>{item.title}</h4>
+                    <p>{item.message}</p>
+                    <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="biotab-announcement-empty">No announcements yet.</p>
+            )
+          ) : null}
+        </div>
+      </>,
+      document.body
+    )
+    : null;
+
   return (
     <div className={`biotab-announcement-inline-wrap${open ? ' is-open' : ''}`}>
       <button
@@ -125,10 +181,14 @@ export function StudentAnnouncementBell() {
         className={`biotab-announcement-header-btn${shouldRingAnnouncement ? ' biotab-announcement-fab-ringing' : ''}`}
         title="View announcements"
         aria-label="View admin announcements"
-        onClick={() => {
+        onClick={(event) => {
+          event.stopPropagation();
           setOpen((current) => {
             const nextOpen = !current;
-            if (nextOpen) loadAnnouncements();
+            if (nextOpen) {
+              openedAtRef.current = Date.now();
+              loadAnnouncements();
+            }
             return nextOpen;
           });
         }}
@@ -138,49 +198,7 @@ export function StudentAnnouncementBell() {
           <span className="biotab-announcement-count">{activeAnnouncementCount > 9 ? '9+' : activeAnnouncementCount}</span>
         ) : null}
       </button>
-
-      {open ? (
-        <>
-          <button
-            type="button"
-            className="biotab-announcement-inline-backdrop"
-            aria-label="Close announcements"
-            onClick={() => setOpen(false)}
-          />
-          <div className="biotab-announcement-panel biotab-announcement-panel-inline" role="dialog" aria-label="Student announcements">
-            <div className="biotab-announcement-head">
-              <strong>Announcements</strong>
-              <button
-                type="button"
-                className="biotab-announcement-close"
-                onClick={() => setOpen(false)}
-                aria-label="Close announcements"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            {loading ? <p className="biotab-announcement-empty">Loading announcements...</p> : null}
-            {!loading && error ? <p className="biotab-announcement-empty">{error}</p> : null}
-
-            {!loading && !error ? (
-              announcements.length ? (
-                <div className="biotab-announcement-list">
-                  {announcements.map((item) => (
-                    <article key={item._id} className="biotab-announcement-item">
-                      <h4>{item.title}</h4>
-                      <p>{item.message}</p>
-                      <span>{item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</span>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="biotab-announcement-empty">No announcements yet.</p>
-              )
-            ) : null}
-          </div>
-        </>
-      ) : null}
+      {announcementOverlay}
     </div>
   );
 }

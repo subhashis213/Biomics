@@ -156,9 +156,12 @@ export default function StudentModuleQuizPage() {
                 >
                   <span className="lecture-topic-icon" aria-hidden="true">🧪</span>
                   <strong>{topic}</strong>
-                  <span>
-                    {quizCountByTopic[topic] || 0} {(quizCountByTopic[topic] || 0) === 1 ? 'quiz' : 'quizzes'}
-                  </span>
+                  <div className="lecture-topic-badges">
+                    <span className="lecture-topic-badge lecture-topic-badge-quizzes">
+                      {quizCountByTopic[topic] || 0} {(quizCountByTopic[topic] || 0) === 1 ? 'quiz set' : 'quiz sets'}
+                    </span>
+                  </div>
+                  <span>Open quizzes</span>
                 </button>
               ))}
             </div>
