@@ -269,7 +269,6 @@ export default function AppShell({
             <div className="topbar-brand-text">
               <span className="topbar-site-name">Biomics Hub</span>
               <h1 className="topbar-title">{title}</h1>
-              {subtitle ? <p className="subtitle">{subtitle}</p> : null}
             </div>
           </div>
           <div className="topbar-actions">

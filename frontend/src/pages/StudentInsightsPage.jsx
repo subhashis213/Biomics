@@ -49,7 +49,7 @@ function getRangeDays(range) {
 
 export default function StudentInsightsPage() {
   const navigate = useNavigate();
-  const { session, logout } = useSessionStore();
+  const { session } = useSessionStore();
   const {
     course,
     videos,
@@ -543,11 +543,6 @@ export default function StudentInsightsPage() {
     window.scrollTo({ top, behavior: 'smooth' });
   }
 
-  function handleLogout() {
-    logout();
-    navigate('/', { replace: true });
-  }
-
   const moduleCount = Array.from(new Set(
     moduleCatalog
       .map((entry) => normalizeText(entry?.name || ''))
@@ -566,12 +561,11 @@ export default function StudentInsightsPage() {
       onNavItemClick={handleNavClick}
       actions={(
         <div className="topbar-user-actions">
-          <button type="button" className="secondary-btn" onClick={() => navigate('/student')}>
-            Back to Dashboard
+          <button type="button" className="secondary-btn" onClick={() => navigate('/')}>
+            Back
           </button>
         </div>
       )}
-      onLogout={handleLogout}
     >
       <div className={`student-insights-page${showInsightsSkeleton ? ' is-loading' : ''}`}>
         {loadError ? <p className="inline-message error">{loadError.message || 'Failed to load analytics.'}</p> : null}

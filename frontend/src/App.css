@@ -7545,6 +7545,32 @@ html[data-theme='light'] .student-insights-page .insights-pill-item span {
   color: color-mix(in srgb, var(--ins-blue) 80%, #111827 20%);
 }
 
+html[data-theme='light'] .student-insights-page #insights-purchases .insights-purchase-card {
+  border-color: color-mix(in srgb, #96bc73 56%, #e7efd8 44%);
+  background:
+    radial-gradient(420px 170px at -8% -20%, color-mix(in srgb, #edf4df 72%, transparent), transparent 62%),
+    linear-gradient(160deg, #f8fbf2, #eef5e4);
+  box-shadow: 0 10px 22px color-mix(in srgb, #9fbc7f 20%, transparent);
+}
+
+html[data-theme='light'] .student-insights-page #insights-purchases .insights-purchase-card h3 {
+  color: #6f9250;
+}
+
+html[data-theme='light'] .student-insights-page #insights-purchases .insights-pill-item:not(.purchased) {
+  border-color: color-mix(in srgb, #b5d29a 72%, #e8f0dd 28%);
+  background: #f2f7ea;
+}
+
+html[data-theme='light'] .student-insights-page #insights-purchases .insights-pill-item.purchased {
+  border-color: color-mix(in srgb, #83ab62 72%, #d7e7c3 28%);
+  background: #e7f0d8;
+}
+
+html[data-theme='light'] .student-insights-page #insights-purchases .insights-pill-item span {
+  color: #658a45;
+}
+
 html[data-theme='light'] .student-insights-page .insights-fire-badge.active {
   border-color: color-mix(in srgb, var(--ins-yellow) 62%, var(--ins-red) 38%);
   background: linear-gradient(145deg, color-mix(in srgb, var(--ins-yellow) 34%, transparent), color-mix(in srgb, var(--ins-red) 20%, transparent));
@@ -7803,6 +7829,17 @@ html[data-theme='light'] .student-insights-page .insights-fire-badge.active {
   gap: 10px;
 }
 
+#insights-purchases .insights-purchase-card {
+  border-color: color-mix(in srgb, #9bbf78 42%, var(--ins-border));
+  background:
+    radial-gradient(460px 190px at -6% -18%, color-mix(in srgb, #dfeccf 22%, transparent), transparent 62%),
+    linear-gradient(155deg, color-mix(in srgb, #f3f8e9 10%, var(--ins-bg-alt) 90%), color-mix(in srgb, #e9f2dd 8%, var(--ins-bg-soft) 92%));
+}
+
+#insights-purchases .insights-purchase-card h3 {
+  color: color-mix(in srgb, #86a95f 72%, var(--ins-text-main));
+}
+
 .insights-detail-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7983,9 +8020,19 @@ html[data-theme='light'] .student-insights-page .insights-fire-badge.active {
   background: color-mix(in srgb, var(--ins-warning) 12%, var(--ins-bg-soft));
 }
 
+#insights-purchases .insights-pill-item:not(.purchased) {
+  border-color: color-mix(in srgb, #b8d59a 66%, var(--ins-border));
+  background: color-mix(in srgb, #e6efd7 26%, var(--ins-bg-soft));
+}
+
 .insights-pill-item.purchased {
   border-color: color-mix(in srgb, var(--ins-positive) 60%, var(--ins-border));
   background: color-mix(in srgb, var(--ins-positive) 12%, var(--ins-bg-soft));
+}
+
+#insights-purchases .insights-pill-item.purchased {
+  border-color: color-mix(in srgb, #88b36b 72%, var(--ins-border));
+  background: color-mix(in srgb, #dcebc8 34%, var(--ins-bg-soft));
 }
 
 .insights-pill-item strong {
@@ -7997,6 +8044,10 @@ html[data-theme='light'] .student-insights-page .insights-fire-badge.active {
   color: color-mix(in srgb, var(--ins-accent) 70%, var(--ins-text-main));
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+#insights-purchases .insights-pill-item span {
+  color: color-mix(in srgb, #769b54 82%, var(--ins-text-main));
 }
 
 .insights-pill-item small {
