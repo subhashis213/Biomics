@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
 const path = require('path');
 const { v2: cloudinary } = require('cloudinary');
 const { z } = require('zod');
@@ -234,6 +235,50 @@ const verifyOtpSchema = z.object({
   phone: z.string().min(10, 'Valid phone number is required').max(20),
   otp: z.string().length(6, 'OTP must be 6 digits')
 });
+
+const sendEmailOtpSchema = z.object({
+  email: z.string().email('Valid Gmail address is required').max(254)
+});
+
+const verifyEmailOtpSchema = z.object({
+  email: z.string().email('Valid email is required').max(254),
+  otp: z.string().length(6, 'OTP must be 6 digits')
+});
+
+function buildMailTransporter() {
+  // Prefer explicit Gmail App Password config; fall back to generic SMTP env vars.
+  const user = process.env.GMAIL_USER || process.env.SMTP_USER || '';
+  const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass }
+  });
+}
+
+async function sendOtpEmail(email, otp) {
+  const transporter = buildMailTransporter();
+  if (!transporter) {
+    console.log(`[DEV] Email OTP for ${email}: ${otp}`);
+    return;
+  }
+  const from = process.env.GMAIL_USER || process.env.SMTP_FROM || process.env.SMTP_USER;
+  await transporter.sendMail({
+    from: `"Biomics Hub" <${from}>`,
+    to: email,
+    subject: 'Your Biomics Hub Login OTP',
+    html: `
+      <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0b0e14;color:#e4e9f8;border-radius:16px;">
+        <h2 style="margin:0 0 8px;color:#6ee7b7;font-size:1.4rem;">Biomics Hub</h2>
+        <p style="margin:0 0 24px;color:#9aa5c2;font-size:0.9rem;">Your one-time login code</p>
+        <div style="background:#1d2335;border:1px solid rgba(110,231,183,0.25);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+          <span style="font-size:2.4rem;font-weight:800;letter-spacing:0.18em;color:#6ee7b7;">${otp}</span>
+        </div>
+        <p style="margin:0;font-size:0.82rem;color:#5f6b85;">This OTP expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone.</p>
+      </div>
+    `
+  });
+}
 
 const forgotPasswordSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -996,8 +1041,7 @@ router.post('/send-otp', validate(sendOtpSchema), async (req, res) => {
     await sendOtpSms(phone, otp);
     return res.json({
       message: 'OTP sent successfully',
-      cooldownSeconds: OTP_COOLDOWN_SECONDS,
-      ...(process.env.NODE_ENV !== 'production' ? { devOtp: otp } : {})
+      cooldownSeconds: OTP_COOLDOWN_SECONDS
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to send OTP' });
@@ -1054,6 +1098,88 @@ router.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
         class: user.class,
         city: user.city
       }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'OTP verification failed' });
+  }
+});
+
+// ── Email OTP: send ──────────────────────────────────────────
+router.post('/send-email-otp', validate(sendEmailOtpSchema), async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  try {
+    const user = await User.findOne({ email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }).lean();
+    if (!user) return res.status(404).json({ error: 'No account found with this email address' });
+
+    const now = new Date();
+    const existing = await LoginOtp.findOne({ email });
+    if (existing?.lastSentAt) {
+      const diffSeconds = Math.floor((now.getTime() - existing.lastSentAt.getTime()) / 1000);
+      if (diffSeconds < OTP_COOLDOWN_SECONDS) {
+        return res.status(429).json({ error: `Please wait ${OTP_COOLDOWN_SECONDS - diffSeconds}s before requesting another OTP` });
+      }
+    }
+
+    const otp = generateOtp();
+    const otpHash = hashOtp(email, otp);
+    const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+    await LoginOtp.findOneAndUpdate(
+      { email },
+      { $set: { otpHash, expiresAt, attempts: 0, lastSentAt: now, used: false }, $inc: { resendCount: 1 } },
+      { new: true, upsert: true }
+    );
+
+    await sendOtpEmail(email, otp);
+    return res.json({
+      message: 'OTP sent to your Gmail',
+      cooldownSeconds: OTP_COOLDOWN_SECONDS
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to send OTP email' });
+  }
+});
+
+// ── Email OTP: verify ────────────────────────────────────────
+router.post('/verify-email-otp', validate(verifyEmailOtpSchema), async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const otp = String(req.body.otp || '').trim();
+
+  try {
+    const user = await User.findOne({ email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+    if (!user) return res.status(400).json({ error: 'User not found' });
+
+    const otpRecord = await LoginOtp.findOne({ email });
+    if (!otpRecord || otpRecord.used) {
+      return res.status(400).json({ error: 'OTP not found. Please request a new OTP' });
+    }
+    if (otpRecord.expiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ error: 'OTP expired. Please request a new OTP' });
+    }
+    if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({ error: 'Too many invalid attempts. Request a new OTP' });
+    }
+
+    const incomingHash = hashOtp(email, otp);
+    if (incomingHash !== otpRecord.otpHash) {
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+
+    otpRecord.used = true;
+    await otpRecord.save();
+
+    const token = jwt.sign(
+      { username: user.username, role: 'user' },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    return res.json({
+      message: 'Login successful',
+      token,
+      user: { username: user.username, email: user.email, phone: user.phone, class: user.class, city: user.city }
     });
   } catch (err) {
     return res.status(500).json({ error: 'OTP verification failed' });

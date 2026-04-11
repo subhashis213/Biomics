@@ -18,7 +18,7 @@ export default function AuthPage() {
   const [loginRole, setLoginRole] = useState('user');
   const [loginMethod, setLoginMethod] = useState('password');
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [otpForm, setOtpForm] = useState({ phone: '', otp: '' });
+  const [otpForm, setOtpForm] = useState({ email: '', otp: '' });
   const [forgotForm, setForgotForm] = useState({ username: '', birthDate: '', password: '', confirmPassword: '' });
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginMessage, setLoginMessage] = useState(null);
@@ -108,10 +108,11 @@ export default function AuthPage() {
   }, [otpCooldown]);
 
   const isOtpMode = loginRole === 'user' && loginMethod === 'otp';
+  const isValidEmailForOtp = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(otpForm.email.trim());
   const canLogin = isOtpMode
-    ? /^\d{10}$/.test(otpForm.phone.trim()) && /^\d{6}$/.test(otpForm.otp.trim())
+    ? isValidEmailForOtp && /^\d{6}$/.test(otpForm.otp.trim())
     : loginForm.username.trim().length >= 3 && loginForm.password.length >= 6;
-  const canSendOtp = /^\d{10}$/.test(otpForm.phone.trim()) && otpCooldown === 0;
+  const canSendOtp = isValidEmailForOtp && otpCooldown === 0;
   const regEmailHint =
     registerForm.email.length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(registerForm.email.trim())
       ? 'Enter a valid email address.'
@@ -141,9 +142,9 @@ export default function AuthPage() {
       ? 'Password is too short — must be at least 6 characters.'
       : null;
 
-  const otpPhoneHint =
-    otpForm.phone.length > 0 && !/^\d{10}$/.test(otpForm.phone.trim())
-      ? 'Must be exactly 10 digits (numbers only).'
+  const otpEmailHint =
+    otpForm.email.length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(otpForm.email.trim())
+      ? 'Enter a valid Gmail/email address.'
       : null;
 
   const otpHint =
@@ -204,10 +205,10 @@ export default function AuthPage() {
     try {
       const endpoint = loginRole === 'admin'
         ? '/auth/admin-login'
-        : (isOtpMode ? '/auth/verify-otp' : '/auth/login');
+        : (isOtpMode ? '/auth/verify-email-otp' : '/auth/login');
       const body = loginRole === 'admin' || !isOtpMode
         ? loginForm
-        : { phone: otpForm.phone.trim(), otp: otpForm.otp.trim() };
+        : { email: otpForm.email.trim(), otp: otpForm.otp.trim() };
       const response = await requestJson(endpoint, {
         method: 'POST',
         body: JSON.stringify(body),
@@ -215,7 +216,7 @@ export default function AuthPage() {
       const identity = loginRole === 'admin' ? response.admin : response.user;
       const session = {
         role: loginRole === 'admin' ? 'admin' : 'user',
-        username: identity?.username || (isOtpMode ? otpForm.phone.trim() : loginForm.username.trim()),
+        username: identity?.username || (isOtpMode ? otpForm.email.trim() : loginForm.username.trim()),
         token: response.token,
       };
       login(session);
@@ -232,17 +233,15 @@ export default function AuthPage() {
     setIsSendingOtp(true);
     setLoginMessage(null);
     try {
-      const response = await requestJson('/auth/send-otp', {
+      const response = await requestJson('/auth/send-email-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone: otpForm.phone.trim() })
+        body: JSON.stringify({ email: otpForm.email.trim() })
       });
       setOtpSent(true);
       setOtpCooldown(Number(response.cooldownSeconds || 45));
       setLoginMessage({
         type: 'success',
-        text: response.devOtp
-          ? `OTP sent. Dev OTP: ${response.devOtp}`
-          : 'OTP sent to your mobile number.'
+        text: `OTP sent to ${otpForm.email.trim()}. Check your inbox.`
       });
     } catch (error) {
       setLoginMessage({ type: 'error', text: error.message });
@@ -452,50 +451,67 @@ export default function AuthPage() {
                       setLoginMessage(null);
                     }}
                   >
-                    Mobile + OTP
+                    Gmail + OTP
                   </button>
                 </div>
               ) : null}
 
               {isOtpMode ? (
-                <>
+                <div className="email-otp-block">
+                  <div className="email-otp-icon-row" aria-hidden="true">
+                    <span className="email-otp-envelope">✉️</span>
+                    <span className="email-otp-label">We&apos;ll send a 6-digit OTP to your Gmail</span>
+                  </div>
+
                   <label>
-                    Mobile Number
+                    Gmail Address
                     <div className="otp-input-row">
                       <input
-                        type="text"
-                        value={otpForm.phone}
-                        onChange={(e) => setOtpForm((f) => ({ ...f, phone: e.target.value }))}
-                        placeholder="Enter 10-digit mobile"
-                        inputMode="numeric"
-                        maxLength={10}
+                        type="email"
+                        value={otpForm.email}
+                        onChange={(e) => setOtpForm((f) => ({ ...f, email: e.target.value }))}
+                        placeholder="yourname@gmail.com"
+                        autoComplete="email"
+                        inputMode="email"
                       />
                       <button
                         type="button"
-                        className="secondary-btn otp-send-btn"
+                        className={`otp-send-btn ${otpSent ? 'otp-sent' : ''}`}
                         onClick={handleSendOtp}
                         disabled={!canSendOtp || isSendingOtp}
                       >
-                        {isSendingOtp ? 'Sending...' : (otpCooldown > 0 ? `Resend ${otpCooldown}s` : 'Send OTP')}
+                        {isSendingOtp
+                          ? <><span className="otp-spinner" />Sending…</>
+                          : otpCooldown > 0
+                            ? `Resend in ${otpCooldown}s`
+                            : otpSent ? '✓ Resend OTP' : 'Send OTP'}
                       </button>
                     </div>
-                    {otpPhoneHint ? <small className="field-hint">⚠ {otpPhoneHint}</small> : null}
+                    {otpEmailHint ? <small className="field-hint">⚠ {otpEmailHint}</small> : null}
                   </label>
 
+                  {otpSent ? (
+                    <div className="otp-sent-banner">
+                      <span className="otp-sent-icon">📬</span>
+                      <span>OTP sent! Check your inbox (and spam folder).</span>
+                    </div>
+                  ) : null}
+
                   <label>
-                    OTP
+                    Enter OTP
                     <input
+                      className="otp-digit-input"
                       type="text"
                       value={otpForm.otp}
-                      onChange={(e) => setOtpForm((f) => ({ ...f, otp: e.target.value }))}
-                      placeholder="Enter 6-digit OTP"
+                      onChange={(e) => setOtpForm((f) => ({ ...f, otp: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                      placeholder="• • • • • •"
                       inputMode="numeric"
                       maxLength={6}
+                      autoComplete="one-time-code"
                     />
                     {otpHint ? <small className="field-hint">⚠ {otpHint}</small> : null}
-                    {otpSent ? <small className="field-hint">OTP sent. Enter it to continue.</small> : null}
                   </label>
-                </>
+                </div>
               ) : (
                 <>
                   <label>
