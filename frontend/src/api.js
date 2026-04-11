@@ -113,8 +113,12 @@ export async function requestJson(path, options = {}) {
       globalThis.clearTimeout(timeoutId);
 
       // API responded with HTTP error -> do not try alternate bases.
+      // Exception: 405 (Method Not Allowed) means this host has no API endpoint
+      // (e.g. Vercel SPA rewrite), so fall through and try the next base.
       if (error instanceof Error && !/abort/i.test(error.name || '')) {
-        const likelyHttpError = /Request failed|Authentication required|not authorized|API route not found/i.test(error.message || '');
+        const isMethodNotAllowed = /\(405\)/.test(error.message || '');
+        const likelyHttpError = !isMethodNotAllowed &&
+          /Request failed|Authentication required|not authorized|API route not found/i.test(error.message || '');
         if (likelyHttpError) throw error;
       }
 
