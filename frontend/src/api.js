@@ -21,29 +21,20 @@ function buildApiBaseCandidates() {
     return [`${window.location.protocol}//${window.location.hostname}:5002`];
   }
 
-  const bases = [];
+  // Production (Vercel frontend + Render backend):
+  // If VITE_API_URL is explicitly set, use it. Otherwise go straight to the
+  // known Render backend. Never use window.location.origin here — the frontend
+  // and backend are on separate hosts; routing POST requests to the Vercel URL
+  // causes 405 Method Not Allowed on every API call.
   const envPrimary = normalizeBaseUrl(import.meta.env.VITE_API_URL);
   const envFallbackRaw = String(import.meta.env.VITE_API_FALLBACK_URLS || '').trim();
   const envFallbacks = envFallbackRaw
     ? envFallbackRaw.split(',').map((entry) => normalizeBaseUrl(entry)).filter(Boolean)
     : [];
 
-  if (envPrimary) bases.push(envPrimary);
-
-  // Only add same-origin fallback for monolithic deployments (frontend+backend on same host).
-  // Skip it on Vercel (*.vercel.app) since backend is on a separate Render domain — sending
-  // API POST requests to the Vercel frontend URL causes 405 Method Not Allowed.
-  const isVercel = /\.vercel\.app$/i.test(window.location.hostname);
-  if (!isVercel) {
-    bases.push(normalizeBaseUrl(window.location.origin));
-  }
-
-  // Always keep the Render backend as a resilient fallback.
-  if (!envPrimary || /biomicshub\.com$/i.test(window.location.hostname) || isVercel) {
-    bases.push(DEFAULT_REMOTE_API);
-  }
-
-  bases.push(...envFallbacks);
+  const bases = envPrimary
+    ? [envPrimary, ...envFallbacks]
+    : [DEFAULT_REMOTE_API, ...envFallbacks];
 
   return Array.from(new Set(bases.filter(Boolean)));
 }
