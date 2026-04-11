@@ -12,6 +12,7 @@ const voucherSchema = new mongoose.Schema({
   usageLimit: { type: Number, min: 1, default: null },
   usedCount: { type: Number, min: 0, default: 0 },
   applicableCourses: [{ type: String, trim: true }],
+  applicableTestSeries: [{ type: String, enum: ['topic_test', 'full_mock'], trim: true }],
   createdBy: { type: String, trim: true, default: '' }
 }, { timestamps: true });
 

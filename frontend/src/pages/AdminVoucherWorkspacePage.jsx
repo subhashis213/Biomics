@@ -30,7 +30,8 @@ export default function AdminVoucherWorkspacePage() {
     maxDiscountInPaise: '',
     usageLimit: '',
     validUntil: '',
-    applicableCourses: []
+    applicableCourses: [],
+    applicableTestSeries: []
   });
 
   useAutoDismissMessage(banner, setBanner);
@@ -101,7 +102,8 @@ export default function AdminVoucherWorkspacePage() {
         maxDiscountInPaise: voucherForm.maxDiscountInPaise ? Math.round(Number(voucherForm.maxDiscountInPaise) * 100) : null,
         usageLimit: voucherForm.usageLimit ? Number(voucherForm.usageLimit) : null,
         validUntil: voucherForm.validUntil || null,
-        applicableCourses: voucherForm.applicableCourses
+        applicableCourses: voucherForm.applicableCourses,
+        applicableTestSeries: voucherForm.applicableTestSeries
       });
 
       setVoucherForm({
@@ -112,7 +114,8 @@ export default function AdminVoucherWorkspacePage() {
         maxDiscountInPaise: '',
         usageLimit: '',
         validUntil: '',
-        applicableCourses: []
+        applicableCourses: [],
+        applicableTestSeries: []
       });
       await loadVouchers();
       setBanner({ type: 'success', text: 'Voucher created successfully.' });
@@ -286,6 +289,31 @@ export default function AdminVoucherWorkspacePage() {
               })}
             </div>
 
+            <div className="quiz-builder-header-checkbox">
+              <span>Applicable test series</span>
+              {[{ value: 'topic_test', label: 'Topic Test Series' }, { value: 'full_mock', label: 'Full Mock Series' }].map((opt) => {
+                const selected = voucherForm.applicableTestSeries.includes(opt.value);
+                return (
+                  <label key={`voucher-ts-${opt.value}`} className="quiz-inline-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setVoucherForm((current) => ({
+                          ...current,
+                          applicableTestSeries: checked
+                            ? [...current.applicableTestSeries, opt.value]
+                            : current.applicableTestSeries.filter((v) => v !== opt.value)
+                        }));
+                      }}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+
             <button className="primary-btn" type="submit" disabled={isSavingVoucher}>
               {isSavingVoucher ? 'Creating...' : 'Create Voucher'}
             </button>
@@ -324,6 +352,11 @@ export default function AdminVoucherWorkspacePage() {
                         {voucher.applicableCourses?.length > 0 ? (
                           <span className="quiz-admin-meta-chip chip-courses">
                             {voucher.applicableCourses.join(', ')}
+                          </span>
+                        ) : null}
+                        {voucher.applicableTestSeries?.length > 0 ? (
+                          <span className="quiz-admin-meta-chip chip-ts">
+                            {voucher.applicableTestSeries.map((v) => (v === 'topic_test' ? 'Topic Tests' : 'Full Mocks')).join(', ')}
                           </span>
                         ) : null}
                       </div>

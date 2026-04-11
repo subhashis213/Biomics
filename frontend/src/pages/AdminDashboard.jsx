@@ -126,6 +126,8 @@ export default function AdminDashboard() {
   const [isTopicLoading, setIsTopicLoading] = useState(false);
   const [isTopicSaving, setIsTopicSaving] = useState(false);
   const [isTopicDeleting, setIsTopicDeleting] = useState('');
+  const [renamingTopic, setRenamingTopic] = useState(null);
+  const [renameTopicValue, setRenameTopicValue] = useState('');
   const [modalNoteFile, setModalNoteFile] = useState(null);
   const [modalMessage, setModalMessage] = useState(null);
   const [modalUploadProgress, setModalUploadProgress] = useState(0);
@@ -448,6 +450,12 @@ export default function AdminDashboard() {
     const timer = window.setTimeout(() => setAdminProfileMessage(null), 3000);
     return () => window.clearTimeout(timer);
   }, [adminProfileMessage]);
+
+  useEffect(() => {
+    if (!modalMessage) return undefined;
+    const timer = window.setTimeout(() => setModalMessage(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [modalMessage]);
 
   async function loadPaymentSettings() {
     try {
@@ -832,8 +840,8 @@ export default function AdminDashboard() {
   async function handleCreateVideo(event) {
     event.preventDefault();
     if (!videoForm.title.trim() || !videoForm.url.trim() || !selectedCourse || !selectedModule) return;
-    if (selectedCourse === CSIR_COURSE && !selectedTopic) {
-      setModalMessage({ type: 'error', text: 'Please select or create a topic before uploading in CSIR module.' });
+    if (!selectedTopic) {
+      setModalMessage({ type: 'error', text: 'Please select or create a topic before uploading.' });
       return;
     }
 
@@ -862,7 +870,7 @@ export default function AdminDashboard() {
           url: videoForm.url.trim(),
           category: selectedCourse,
           module: selectedModule,
-          topic: selectedCourse === CSIR_COURSE ? selectedTopic : 'General'
+          topic: selectedTopic || 'General'
         })
       });
 
@@ -872,7 +880,7 @@ export default function AdminDashboard() {
         });
       }
 
-      const topicSegment = selectedCourse === CSIR_COURSE && selectedTopic ? ` / ${selectedTopic}` : '';
+      const topicSegment = selectedTopic ? ` / ${selectedTopic}` : '';
       const successText = `Lecture added to ${selectedModule}${topicSegment} in ${selectedCourse}${modalNoteFile ? ' with notes.' : '.'}`;
       setVideoForm({ title: '', description: '', url: '' });
       setModalNoteFile(null);
@@ -902,13 +910,9 @@ export default function AdminDashboard() {
         [selectedCourse]: Array.from(new Set([...(prev[selectedCourse] || []), moduleName]))
       }));
       setSelectedModule(moduleName);
-      if (selectedCourse === CSIR_COURSE) {
-        setSelectedTopic(null);
-        setModalStep('topic');
-        await loadTopicsForModule(selectedCourse, moduleName);
-      } else {
-        setModalStep('upload');
-      }
+      setSelectedTopic(null);
+      setModalStep('topic');
+      await loadTopicsForModule(selectedCourse, moduleName);
       setModalMessage(null);
       if (expandedPricingCourse === selectedCourse) {
         await loadModulePricing(selectedCourse);
@@ -921,13 +925,9 @@ export default function AdminDashboard() {
 
   async function handleModuleSelect(moduleName) {
     setSelectedModule(moduleName);
-    if (selectedCourse === CSIR_COURSE) {
-      setSelectedTopic(null);
-      setModalStep('topic');
-      await loadTopicsForModule(selectedCourse, moduleName);
-    } else {
-      setModalStep('upload');
-    }
+    setSelectedTopic(null);
+    setModalStep('topic');
+    await loadTopicsForModule(selectedCourse, moduleName);
   }
 
   function goBackToModuleStep() {
@@ -1021,6 +1021,36 @@ export default function AdminDashboard() {
     } finally {
       setIsTopicDeleting('');
     }
+  }
+
+  async function handleTopicRename(oldName, newName) {
+    if (!selectedCourse || !selectedModule) return;
+    const bucketKey = getTopicBucketKey(selectedCourse, selectedModule);
+    await requestJson('/modules/topics/rename', {
+      method: 'PUT',
+      body: JSON.stringify({ category: selectedCourse, module: selectedModule, oldName, newName })
+    });
+    setModuleTopicsByKey((prev) => ({
+      ...prev,
+      [bucketKey]: (prev[bucketKey] || []).map((t) => (t === oldName ? newName : t)).sort((a, b) => a.localeCompare(b))
+    }));
+    if (selectedTopic === oldName) setSelectedTopic(newName);
+    setModalMessage({ type: 'success', text: `Topic renamed to "${newName}".` });
+  }
+
+  async function handleModuleRename(oldName, newName) {
+    if (!selectedCourse) return;
+    await requestJson('/modules/rename', {
+      method: 'PUT',
+      body: JSON.stringify({ category: selectedCourse, oldName, newName })
+    });
+    setCourseModules((prev) => ({
+      ...prev,
+      [selectedCourse]: (prev[selectedCourse] || []).map((m) => (m === oldName ? newName : m)).sort((a, b) => a.localeCompare(b))
+    }));
+    if (selectedModule === oldName) setSelectedModule(newName);
+    await refreshData();
+    setModalMessage({ type: 'success', text: `Module renamed to "${newName}".` });
   }
 
   function goBackToTopicStep() {
@@ -2238,7 +2268,7 @@ export default function AdminDashboard() {
     ? (/^https?:\/\//i.test(rawAdminAvatarUrl) ? rawAdminAvatarUrl : `${getApiBase()}${rawAdminAvatarUrl}`)
     : '';
   const adminInitial = (adminProfile?.username || 'A').trim().charAt(0).toUpperCase();
-  const isCsirModuleFlow = selectedCourse === CSIR_COURSE;
+  const isCsirModuleFlow = true;
   const topicBucketKey = getTopicBucketKey(selectedCourse, selectedModule);
   const currentModuleTopics = moduleTopicsByKey[topicBucketKey] || [];
   const selectedCourseTheme = COURSE_MODAL_THEME[selectedCourse] || COURSE_MODAL_THEME['11th'];
@@ -3033,6 +3063,7 @@ export default function AdminDashboard() {
                   onModuleSelect={handleModuleSelect}
                   onModuleCreate={handleModuleCreate}
                   onModuleDelete={handleModuleDelete}
+                  onModuleRename={handleModuleRename}
                   isProcessing={publishingForCourse}
                   modalMessage={modalMessage}
                   onClearMessage={() => setModalMessage(null)}
@@ -3086,21 +3117,63 @@ export default function AdminDashboard() {
                 {!isTopicLoading && currentModuleTopics.length ? (
                   <div className="csir-topic-grid">
                     {currentModuleTopics.map((topicName) => (
-                      <article key={topicName} className={`csir-topic-card${selectedTopic === topicName ? ' active' : ''}`}>
-                        <button type="button" className="csir-topic-open" onClick={() => handleTopicSelect(topicName)}>
-                          <span className="csir-topic-icon" aria-hidden="true">📁</span>
-                          <span className="csir-topic-name">{topicName}</span>
-                          <span className="csir-topic-hint">Open Folder</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="csir-topic-delete"
-                          onClick={() => handleTopicDelete(topicName)}
-                          disabled={isTopicDeleting === topicName}
-                          title={`Delete topic ${topicName}`}
-                        >
-                          {isTopicDeleting === topicName ? 'Deleting...' : '🗑'}
-                        </button>
+                      <article key={topicName} className={`csir-topic-card${selectedTopic === topicName ? ' active' : ''}${renamingTopic === topicName ? ' renaming' : ''}`}>
+                        {renamingTopic === topicName ? (
+                          <div className="csir-topic-rename-row">
+                            <input
+                              className="csir-topic-rename-input"
+                              value={renameTopicValue}
+                              onChange={(e) => setRenameTopicValue(e.target.value)}
+                              onKeyDown={async (e) => {
+                                if (e.key === 'Enter') {
+                                  const trimmed = renameTopicValue.trim();
+                                  if (!trimmed) return;
+                                  if (trimmed === renamingTopic) { setRenamingTopic(null); return; }
+                                  try { await handleTopicRename(renamingTopic, trimmed); setRenamingTopic(null); } catch {}
+                                }
+                                if (e.key === 'Escape') setRenamingTopic(null);
+                              }}
+                              autoFocus
+                              aria-label={`Rename topic ${topicName}`}
+                            />
+                            <button
+                              type="button"
+                              className="csir-topic-rename-save"
+                              title="Save rename"
+                              onClick={async () => {
+                                const trimmed = renameTopicValue.trim();
+                                if (!trimmed) return;
+                                if (trimmed === renamingTopic) { setRenamingTopic(null); return; }
+                                try { await handleTopicRename(renamingTopic, trimmed); setRenamingTopic(null); } catch {}
+                              }}
+                            >✓</button>
+                            <button type="button" className="csir-topic-rename-cancel" title="Cancel" onClick={() => setRenamingTopic(null)}>✕</button>
+                          </div>
+                        ) : (
+                          <>
+                            <button type="button" className="csir-topic-open" onClick={() => handleTopicSelect(topicName)}>
+                              <span className="csir-topic-icon" aria-hidden="true">📁</span>
+                              <span className="csir-topic-name">{topicName}</span>
+                              <span className="csir-topic-hint">Open Folder</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="csir-topic-rename-btn"
+                              title={`Rename topic "${topicName}"`}
+                              onClick={() => { setRenamingTopic(topicName); setRenameTopicValue(topicName); setModalMessage(null); }}
+                              disabled={!!isTopicDeleting}
+                            >✏️</button>
+                            <button
+                              type="button"
+                              className="csir-topic-delete"
+                              onClick={() => handleTopicDelete(topicName)}
+                              disabled={isTopicDeleting === topicName}
+                              title={`Delete topic ${topicName}`}
+                            >
+                              {isTopicDeleting === topicName ? 'Deleting...' : '🗑'}
+                            </button>
+                          </>
+                        )}
                       </article>
                     ))}
                   </div>

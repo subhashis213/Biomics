@@ -81,6 +81,10 @@ export default function StudentDashboard() {
   const [cartOpen, setCartOpen] = useState(false);
   const [isBulkCheckoutRunning, setIsBulkCheckoutRunning] = useState(false);
   const [cartItemCheckoutKey, setCartItemCheckoutKey] = useState('');
+  const [tsCartCheckoutKey, setTsCartCheckoutKey] = useState(''); // seriesType being paid for test series
+  const [tsCartItems, setTsCartItems] = useState(() => {
+    try { const s = localStorage.getItem('ts_cart'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
   const [isCartHydrated, setIsCartHydrated] = useState(false);
   const [mockExams, setMockExams] = useState([]);
   const [mockExamNotices, setMockExamNotices] = useState([]);
@@ -96,6 +100,26 @@ export default function StudentDashboard() {
   const cartIconButtonRef = useRef(null);
   const cartPulseTimerRef = useRef(null);
   const cartVoucherRequestRef = useRef(0);
+
+  // Sync test-series cart across tabs / pages via storage event
+  useEffect(() => {
+    function onStorage(event) {
+      if (event.key === 'ts_cart') {
+        try { setTsCartItems(event.newValue ? JSON.parse(event.newValue) : []); } catch { setTsCartItems([]); }
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Also re-read ts_cart when the page gains focus (same-tab navigation back from test series page)
+  useEffect(() => {
+    function onFocus() {
+      try { const s = localStorage.getItem('ts_cart'); setTsCartItems(s ? JSON.parse(s) : []); } catch { setTsCartItems([]); }
+    }
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   const allModulesUnlocked = Boolean(access?.allModulesUnlocked || access?.unlocked);
   const bundlePlanOptions = Array.isArray(access?.bundlePricing?.plans) ? access.bundlePricing.plans : [];
@@ -739,8 +763,8 @@ export default function StudentDashboard() {
   async function handlePayNowForCart() {
     if (isBulkCheckoutRunning || isUnlockingCourse) return;
 
-    if (!payableCartItems.length) {
-      setBanner({ type: 'error', text: 'No payable modules in cart for this account.' });
+    if (!payableCartItems.length && !tsCartItems.length) {
+      setBanner({ type: 'error', text: 'No items in cart.' });
       return;
     }
 
@@ -751,6 +775,7 @@ export default function StudentDashboard() {
     let cancelled = false;
 
     try {
+      // Process module items first
       for (const item of payableCartItems) {
         const result = await startMembershipCheckout({
           targetCourse: item.moduleCourse,
@@ -774,27 +799,105 @@ export default function StudentDashboard() {
 
       if (purchasedKeys.length) {
         setLockedModuleCart((current) => current.filter((item) => !purchasedKeys.includes(item.key)));
-        if (cancelled) {
-          setBanner({
-            type: 'success',
-            text: `${purchasedKeys.length} module${purchasedKeys.length === 1 ? '' : 's'} unlocked. Checkout was stopped for remaining items.`
-          });
-        } else {
-          setBanner({ type: 'success', text: `${purchasedKeys.length} module${purchasedKeys.length === 1 ? '' : 's'} unlocked successfully.` });
-        }
-        if (lockedModuleCart.length === purchasedKeys.length || !cancelled) {
-          setCartOpen(false);
-        }
-        return;
       }
 
-      if (cancelled) {
+      // Process test series items (sequentially via Razorpay) if not cancelled
+      if (!cancelled) {
+        for (const tsItem of tsCartItems) {
+          await handleCheckoutTsCartItem(tsItem, true);
+          // handleCheckoutTsCartItem manages its own state; just iterate
+        }
+      }
+
+      const totalPurchased = purchasedKeys.length;
+      if (totalPurchased > 0 && !cancelled) {
+        setBanner({ type: 'success', text: `${totalPurchased} module${totalPurchased === 1 ? '' : 's'} unlocked successfully.` });
+        setCartOpen(false);
+      } else if (totalPurchased > 0 && cancelled) {
+        setBanner({ type: 'success', text: `${totalPurchased} module${totalPurchased === 1 ? '' : 's'} unlocked. Checkout stopped for remaining items.` });
+      } else if (cancelled) {
         setBanner({ type: 'error', text: 'Checkout was cancelled. No payment was made.' });
       }
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Bulk checkout failed.' });
     } finally {
       setIsBulkCheckoutRunning(false);
+    }
+  }
+
+  async function handleCheckoutTsCartItem(item, skipMutex = false) {
+    if (!item || (!skipMutex && tsCartCheckoutKey)) return;
+    const seriesType = item.seriesType;
+    const voucherCode = item.voucherCode || '';
+    if (!skipMutex) setTsCartCheckoutKey(seriesType);
+    setBanner(null);
+    try {
+      const orderRes = await requestJson('/test-series/payment/create-order', {
+        method: 'POST',
+        body: JSON.stringify({ seriesType, ...(voucherCode ? { voucherCode } : {}) })
+      });
+      if (orderRes?.alreadyOwned || orderRes?.free) {
+        const label = seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Series';
+        setBanner({ type: 'success', text: `${label} access granted!` });
+        setTsCartItems((prev) => {
+          const next = prev.filter((i) => i.seriesType !== seriesType);
+          try { localStorage.setItem('ts_cart', JSON.stringify(next)); } catch {}
+          return next;
+        });
+        return;
+      }
+      const scriptReady = await loadRazorpayCheckoutScript();
+      if (!scriptReady || !window.Razorpay) throw new Error('Unable to load Razorpay. Please try again.');
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        let handlerStarted = false;
+        const ok  = (v) => { if (!settled) { settled = true; resolve(v); } };
+        const err = (e) => { if (!settled) { settled = true; reject(e); } };
+        const rz = new window.Razorpay({
+          key: orderRes.keyId,
+          amount: orderRes.razorpayOrder?.amount,
+          currency: orderRes.currency || 'INR',
+          name: 'Biomics Hub',
+          description: seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Series',
+          order_id: orderRes.razorpayOrder?.id,
+          prefill: { name: session?.username || '' },
+          theme: { color: '#0f766e' },
+          handler: async (response) => {
+            handlerStarted = true;
+            try {
+              await requestJson('/test-series/payment/verify', {
+                method: 'POST',
+                body: JSON.stringify({
+                  razorpayOrderId:   response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  seriesType
+                })
+              });
+              const label = seriesType === 'topic_test' ? 'Topic Test Series (+ Full Mocks)' : 'Full Mock Series';
+              setBanner({ type: 'success', text: `${label} unlocked!` });
+              setTsCartItems((prev) => {
+                const next = prev.filter((i) => i.seriesType !== seriesType);
+                try { localStorage.setItem('ts_cart', JSON.stringify(next)); } catch {}
+                return next;
+              });
+              ok({ status: 'paid' });
+            } catch (e) { err(new Error(e.message || 'Payment verification failed.')); }
+          },
+          modal: {
+            ondismiss: () => window.setTimeout(() => {
+              if (handlerStarted) return;
+              setBanner({ type: 'warn', text: 'Payment was cancelled.' });
+              ok({ status: 'cancelled' });
+            }, 450)
+          }
+        });
+        rz.open();
+      });
+    } catch (e) {
+      setBanner({ type: 'error', text: e.message || 'Payment failed. Please try again.' });
+    } finally {
+      if (!skipMutex) setTsCartCheckoutKey('');
     }
   }
 
@@ -1557,7 +1660,7 @@ export default function StudentDashboard() {
             onClick={() => setCartOpen((current) => !current)}
           >
             <span aria-hidden="true">🛒</span>
-            {lockedModuleCart.length ? <span className="student-cart-header-count">{lockedModuleCart.length > 9 ? '9+' : lockedModuleCart.length}</span> : null}
+            {(lockedModuleCart.length + tsCartItems.length) > 0 ? <span className="student-cart-header-count">{(lockedModuleCart.length + tsCartItems.length) > 9 ? '9+' : (lockedModuleCart.length + tsCartItems.length)}</span> : null}
           </button>
           <div className="profile-trigger-wrap">
             <button
@@ -1615,7 +1718,7 @@ export default function StudentDashboard() {
               <header className="student-cart-drawer-head">
                 <div>
                   <p className="eyebrow">Checkout Cart</p>
-                  <h3>{lockedModuleCart.length} item{lockedModuleCart.length === 1 ? '' : 's'} in cart</h3>
+                  <h3>{lockedModuleCart.length + tsCartItems.length} item{(lockedModuleCart.length + tsCartItems.length) === 1 ? '' : 's'} in cart</h3>
                 </div>
                 <button type="button" className="student-cart-close-btn" onClick={() => setCartOpen(false)} aria-label="Close cart">
                   ×
@@ -1679,10 +1782,39 @@ export default function StudentDashboard() {
                   <p className="student-cart-voucher-note" role="status" aria-live="polite">{cartPriceSyncMessage}</p>
                 ) : null}
 
-                {!lockedModuleCart.length ? (
+                {!lockedModuleCart.length && !tsCartItems.length ? (
                   <p className="empty-state">Your cart is empty. Add locked modules from cards.</p>
                 ) : (
                   <div className="student-cart-items">
+                    {tsCartItems.map((item) => (
+                      <article key={item.seriesType} className="student-cart-drawer-item">
+                        <div>
+                          <div className="student-cart-item-headline">
+                            <strong>{item.label}</strong>
+                            <span className="student-cart-course-chip tone-default">Test Series</span>
+                          </div>
+                          {item.voucherCode && <p style={{fontSize:'0.78rem',color:'var(--accent)',marginTop:'2px'}}>🏷 {item.voucherCode} applied</p>}
+                          <span>{item.discountPaise > 0 ? <s style={{opacity:0.5,marginRight:'6px'}}>{formatPriceInPaise(item.originalPaise)}</s> : null}{formatPriceInPaise(item.finalPaise)}</span>
+                        </div>
+                        <div className="student-cart-item-actions">
+                          <button
+                            type="button"
+                            className="link-btn"
+                            disabled={Boolean(tsCartCheckoutKey)}
+                            onClick={() => handleCheckoutTsCartItem(item)}
+                          >
+                            {tsCartCheckoutKey === item.seriesType ? 'Processing...' : 'Pay Now'}
+                          </button>
+                          <button type="button" className="secondary-btn" onClick={() => {
+                            setTsCartItems((prev) => {
+                              const next = prev.filter((i) => i.seriesType !== item.seriesType);
+                              try { localStorage.setItem('ts_cart', JSON.stringify(next)); } catch {}
+                              return next;
+                            });
+                          }}>Remove</button>
+                        </div>
+                      </article>
+                    ))}
                     {lockedModuleCart.map((item) => (
                       <article key={item.key} className="student-cart-drawer-item">
                         <div>
@@ -1717,7 +1849,7 @@ export default function StudentDashboard() {
               <footer className="student-cart-drawer-foot">
                 <div>
                   <small>{appliedCartVoucherCode ? 'Estimated total (voucher applied)' : 'Estimated total'}</small>
-                  <strong>{formatPriceInPaise(payableCartEstimate)}</strong>
+                  <strong>{formatPriceInPaise(payableCartEstimate + tsCartItems.reduce((s, i) => s + i.finalPaise, 0))}</strong>
                   {appliedCartVoucherCode && payableCartDiscountTotal > 0 ? (
                     <span className="student-cart-savings-note">You save {formatPriceInPaise(payableCartDiscountTotal)}</span>
                   ) : null}
@@ -1726,9 +1858,9 @@ export default function StudentDashboard() {
                   type="button"
                   className="primary-btn"
                   onClick={handlePayNowForCart}
-                  disabled={isBulkCheckoutRunning || isUnlockingCourse || !payableCartItems.length}
+                  disabled={isBulkCheckoutRunning || isUnlockingCourse || (!payableCartItems.length && !tsCartItems.length)}
                 >
-                  {isBulkCheckoutRunning ? 'Processing Cart...' : `Pay Now (${payableCartItems.length})`}
+                  {isBulkCheckoutRunning ? 'Processing Cart...' : `Pay Now (${payableCartItems.length + tsCartItems.length})`}
                 </button>
               </footer>
             </aside>

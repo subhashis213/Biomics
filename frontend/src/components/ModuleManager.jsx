@@ -7,6 +7,7 @@ export default function ModuleManager({
   onModuleSelect,
   onModuleCreate,
   onModuleDelete,
+  onModuleRename,
   isProcessing = false,
   modalMessage,
   onClearMessage
@@ -16,6 +17,10 @@ export default function ModuleManager({
   const [createError, setCreateError] = useState(null);
   const [confirmDeleteModule, setConfirmDeleteModule] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [renamingModule, setRenamingModule] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState(null);
+  const [isRenaming, setIsRenaming] = useState(false);
 
   async function handleCreateModule(e) {
     e.preventDefault();
@@ -41,6 +46,40 @@ export default function ModuleManager({
     } finally {
       setIsDeleting(false);
       setConfirmDeleteModule(null);
+    }
+  }
+
+  function startRename(moduleName) {
+    setRenamingModule(moduleName);
+    setRenameValue(moduleName);
+    setRenameError(null);
+    if (onClearMessage) onClearMessage();
+  }
+
+  function cancelRename() {
+    setRenamingModule(null);
+    setRenameValue('');
+    setRenameError(null);
+  }
+
+  async function confirmRename() {
+    const trimmed = renameValue.trim();
+    if (!trimmed) { setRenameError('Name cannot be empty'); return; }
+    if (trimmed === renamingModule) { cancelRename(); return; }
+    if (modules.some((m) => m.toLowerCase() === trimmed.toLowerCase() && m !== renamingModule)) {
+      setRenameError('A module with this name already exists');
+      return;
+    }
+    if (!onModuleRename) return;
+    setIsRenaming(true);
+    setRenameError(null);
+    try {
+      await onModuleRename(renamingModule, trimmed);
+      cancelRename();
+    } catch (err) {
+      setRenameError(err?.message || 'Rename failed');
+    } finally {
+      setIsRenaming(false);
     }
   }
 
@@ -98,26 +137,61 @@ export default function ModuleManager({
             <div className="modules-grid">
               {modules.map((module) => (
                 <div key={module} className="module-chip-wrap">
-                  <button
-                    type="button"
-                    className={`module-chip ${selectedModule === module ? 'module-chip-active' : ''}`}
-                    onClick={() => onModuleSelect(module)}
-                    disabled={isProcessing}
-                  >
-                    <span className="module-chip-icon">📚</span>
-                    <span className="module-chip-label">{module}</span>
-                    {selectedModule === module && <span className="module-chip-checkmark">✓</span>}
-                  </button>
-                  <button
-                    type="button"
-                    className="module-chip-delete"
-                    title={`Delete module "${module}"`}
-                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteModule(module); if (onClearMessage) onClearMessage(); }}
-                    disabled={isProcessing}
-                    aria-label={`Delete module ${module}`}
-                  >
-                    🗑
-                  </button>
+                  {renamingModule === module ? (
+                    <div className="module-rename-row">
+                      <input
+                        className="module-rename-input"
+                        value={renameValue}
+                        onChange={(e) => { setRenameValue(e.target.value); setRenameError(null); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') confirmRename(); if (e.key === 'Escape') cancelRename(); }}
+                        autoFocus
+                        disabled={isRenaming}
+                        aria-label={`Rename module ${module}`}
+                      />
+                      <button type="button" className="module-rename-save" onClick={confirmRename} disabled={isRenaming} title="Save">
+                        {isRenaming ? '…' : '✓'}
+                      </button>
+                      <button type="button" className="module-rename-cancel" onClick={cancelRename} disabled={isRenaming} title="Cancel">
+                        ✕
+                      </button>
+                      {renameError && <span className="module-rename-error">{renameError}</span>}
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={`module-chip ${selectedModule === module ? 'module-chip-active' : ''}`}
+                        onClick={() => onModuleSelect(module)}
+                        disabled={isProcessing}
+                      >
+                        <span className="module-chip-icon">📚</span>
+                        <span className="module-chip-label">{module}</span>
+                        {selectedModule === module && <span className="module-chip-checkmark">✓</span>}
+                      </button>
+                      {onModuleRename && (
+                        <button
+                          type="button"
+                          className="module-chip-rename"
+                          title={`Rename module "${module}"`}
+                          onClick={(e) => { e.stopPropagation(); startRename(module); }}
+                          disabled={isProcessing}
+                          aria-label={`Rename module ${module}`}
+                        >
+                          ✏️
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="module-chip-delete"
+                        title={`Delete module "${module}"`}
+                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteModule(module); if (onClearMessage) onClearMessage(); }}
+                        disabled={isProcessing}
+                        aria-label={`Delete module ${module}`}
+                      >
+                        🗑
+                      </button>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

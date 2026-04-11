@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { requestJson } from '../api';
+import { previewTestSeriesVoucher, requestJson } from '../api';
 import AppShell from '../components/AppShell';
 import { useSessionStore } from '../stores/sessionStore';
 
@@ -23,6 +23,200 @@ function rupees(paise) {
 
 const DIFFICULTY_COLOR = { easy: '#16a34a', hard: '#dc2626', medium: '#d97706' };
 
+// ── Inline cart button + drawer for Test Series page ─────────────────────────
+function TsCartButton({ session }) {
+  const [items, setItems] = useState(() => {
+    try { const s = localStorage.getItem('ts_cart'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [open, setOpen] = useState(false);
+  const [checkoutKey, setCheckoutKey] = useState('');
+
+  // Re-read cart when localStorage changes (cross-tab or after add-to-cart)
+  useEffect(() => {
+    function sync() {
+      try { const s = localStorage.getItem('ts_cart'); setItems(s ? JSON.parse(s) : []); } catch { setItems([]); }
+    }
+    window.addEventListener('storage', sync);
+    window.addEventListener('ts-cart-updated', sync);
+    return () => { window.removeEventListener('storage', sync); window.removeEventListener('ts-cart-updated', sync); };
+  }, []);
+
+  // Scroll-lock when open
+  useEffect(() => {
+    if (!open) return undefined;
+    const body = document.body;
+    const html = document.documentElement;
+    const y = window.scrollY;
+    body.dataset.tsCartScrollY = String(y);
+    body.style.position = 'fixed';
+    body.style.top = `-${y}px`;
+    body.style.left = '0'; body.style.right = '0'; body.style.width = '100%'; body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+    return () => {
+      const savedY = Number(body.dataset.tsCartScrollY || '0');
+      body.style.position = ''; body.style.top = ''; body.style.left = ''; body.style.right = '';
+      body.style.width = ''; body.style.overflow = ''; html.style.overflow = '';
+      delete body.dataset.tsCartScrollY;
+      window.scrollTo(0, savedY);
+    };
+  }, [open]);
+
+  function remove(seriesType) {
+    setItems((prev) => {
+      const next = prev.filter((i) => i.seriesType !== seriesType);
+      try { localStorage.setItem('ts_cart', JSON.stringify(next)); } catch {}
+      window.dispatchEvent(new Event('ts-cart-updated'));
+      return next;
+    });
+  }
+
+  async function checkout(item) {
+    if (checkoutKey) return;
+    setCheckoutKey(item.seriesType);
+    try {
+      const orderRes = await requestJson('/test-series/payment/create-order', {
+        method: 'POST',
+        body: JSON.stringify({ seriesType: item.seriesType, ...(item.voucherCode ? { voucherCode: item.voucherCode } : {}) })
+      });
+      if (orderRes?.alreadyOwned || orderRes?.free) {
+        remove(item.seriesType);
+        return;
+      }
+      const ready = await loadRazorpayCheckoutScript();
+      if (!ready || !window.Razorpay) throw new Error('Unable to load Razorpay.');
+      await new Promise((resolve, reject) => {
+        let settled = false; let started = false;
+        const ok = (v) => { if (!settled) { settled = true; resolve(v); } };
+        const err = (e) => { if (!settled) { settled = true; reject(e); } };
+        const rz = new window.Razorpay({
+          key: orderRes.keyId,
+          amount: orderRes.razorpayOrder?.amount,
+          currency: orderRes.currency || 'INR',
+          name: 'Biomics Hub',
+          description: item.seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Series',
+          order_id: orderRes.razorpayOrder?.id,
+          prefill: { name: session?.username || '' },
+          theme: { color: '#0f766e' },
+          handler: async (response) => {
+            started = true;
+            try {
+              await requestJson('/test-series/payment/verify', {
+                method: 'POST',
+                body: JSON.stringify({
+                  razorpayOrderId:   response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  seriesType: item.seriesType
+                })
+              });
+              remove(item.seriesType);
+              setOpen(false);
+              // Reload access on the parent page via a custom event
+              window.dispatchEvent(new Event('ts-access-refresh'));
+              ok({ status: 'paid' });
+            } catch (e) { err(new Error(e.message || 'Verification failed.')); }
+          },
+          modal: {
+            ondismiss: () => window.setTimeout(() => { if (!started) ok({ status: 'cancelled' }); }, 450)
+          }
+        });
+        rz.open();
+      });
+    } catch (e) {
+      alert(e.message || 'Payment failed.');
+    } finally {
+      setCheckoutKey('');
+    }
+  }
+
+  const total = items.reduce((s, i) => s + i.finalPaise, 0);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="student-cart-header-btn"
+        title="Open test series cart"
+        aria-label="Open test series cart"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span aria-hidden="true">🛒</span>
+        {items.length > 0 && (
+          <span className="student-cart-header-count">{items.length > 9 ? '9+' : items.length}</span>
+        )}
+      </button>
+
+      {open && createPortal(
+        <div className="student-cart-overlay" role="presentation" onClick={() => setOpen(false)}>
+          <aside
+            className="student-cart-drawer student-cart-drawer-floating"
+            role="dialog"
+            aria-label="Test series cart"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="student-cart-drawer-head">
+              <div>
+                <p className="eyebrow">Test Series Cart</p>
+                <h3>{items.length} item{items.length === 1 ? '' : 's'} in cart</h3>
+              </div>
+              <button type="button" className="student-cart-close-btn" onClick={() => setOpen(false)} aria-label="Close cart">×</button>
+            </header>
+
+            <div className="student-cart-drawer-body">
+              {!items.length ? (
+                <p className="empty-state">Your test series cart is empty.</p>
+              ) : (
+                <div className="student-cart-items">
+                  {items.map((item) => (
+                    <article key={item.seriesType} className="student-cart-drawer-item">
+                      <div>
+                        <div className="student-cart-item-headline">
+                          <strong>{item.label}</strong>
+                          <span className="student-cart-course-chip tone-default">Test Series</span>
+                        </div>
+                        {item.voucherCode && (
+                          <p style={{ fontSize: '0.78rem', color: 'var(--accent)', marginTop: '2px' }}>🏷 {item.voucherCode} applied</p>
+                        )}
+                        <span>
+                          {item.discountPaise > 0 && <s style={{ opacity: 0.5, marginRight: '6px' }}>{rupees(item.originalPaise)}</s>}
+                          {rupees(item.finalPaise)}
+                        </span>
+                      </div>
+                      <div className="student-cart-item-actions">
+                        <button type="button" className="secondary-btn" onClick={() => remove(item.seriesType)}>
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <footer className="student-cart-drawer-foot">
+              <div>
+                <small>Total</small>
+                <strong>{rupees(total)}</strong>
+              </div>
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  className="primary-btn"
+                  disabled={Boolean(checkoutKey)}
+                  onClick={() => items.forEach((item) => checkout(item))}
+                >
+                  {checkoutKey ? 'Processing…' : `Pay Now (${items.length})`}
+                </button>
+              )}
+            </footer>
+          </aside>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 export default function StudentTestSeriesPage() {
   const navigate = useNavigate();
   const { session } = useSessionStore();
@@ -40,6 +234,31 @@ export default function StudentTestSeriesPage() {
   // syllabusView: null | { type:'topic'|'mock', items:[], hasAccess:bool, course:string }
   const [syllabusView, setSyllabusView]     = useState(null);
   const [loadingSyllabus, setLoadingSyllabus] = useState(false);
+
+  // Voucher state — keyed by seriesType: 'topic_test' | 'full_mock'
+  const [voucherInputs,   setVoucherInputs]   = useState({ topic_test: '', full_mock: '' });
+  const [voucherPreviews, setVoucherPreviews] = useState({ topic_test: null, full_mock: null });
+  const [voucherErrors,   setVoucherErrors]   = useState({ topic_test: '', full_mock: '' });
+  const [voucherLoading,  setVoucherLoading]  = useState({ topic_test: false, full_mock: false });
+
+  // Cart state — { seriesType, label, originalPaise, finalPaise, voucherCode }
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ts_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [cartCheckoutST, setCartCheckoutST] = useState(''); // which cart item is being checked out
+
+  // Persist cart to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('ts_cart', JSON.stringify(cartItems));
+    } catch { /* storage full or unavailable */ }
+  }, [cartItems]);
+
   const timerRef = useRef(null);
 
   // ── Access & test loading ─────────────────────────────────────────────────
@@ -49,6 +268,13 @@ export default function StudentTestSeriesPage() {
     try {
       const res = await requestJson('/test-series/pricing/student');
       setAccessData(res || null);
+      // Remove already-owned series from the cart
+      const access = res?.access || {};
+      setCartItems((prev) => prev.filter((item) => {
+        if (item.seriesType === 'topic_test' && access.hasTopicTest) return false;
+        if (item.seriesType === 'full_mock'  && access.hasFullMock)  return false;
+        return true;
+      }));
     } catch {
       setAccessData(null);
     } finally {
@@ -83,6 +309,13 @@ export default function StudentTestSeriesPage() {
   useEffect(() => { loadAccess(); }, []);
   useEffect(() => { if (accessData) loadTests(accessData); }, [accessData]);
 
+  // Reload access after checkout from the in-page cart button
+  useEffect(() => {
+    function onRefresh() { loadAccess(); }
+    window.addEventListener('ts-access-refresh', onRefresh);
+    return () => window.removeEventListener('ts-access-refresh', onRefresh);
+  }, []);
+
   // ── Syllabus preview ─────────────────────────────────────────────────────
 
   async function openSyllabus(type) {
@@ -108,16 +341,90 @@ export default function StudentTestSeriesPage() {
     }
   }
 
+  // ── Voucher ───────────────────────────────────────────────────────────────
+
+  async function handleApplyVoucher(seriesType) {
+    const code = (voucherInputs[seriesType] || '').trim().toUpperCase();
+    if (!code) return;
+    setVoucherLoading((prev) => ({ ...prev, [seriesType]: true }));
+    setVoucherErrors((prev) => ({ ...prev, [seriesType]: '' }));
+    setVoucherPreviews((prev) => ({ ...prev, [seriesType]: null }));
+    try {
+      const res = await previewTestSeriesVoucher(seriesType, code);
+      if (!res?.valid) {
+        setVoucherErrors((prev) => ({ ...prev, [seriesType]: res?.reason || 'Invalid or expired voucher.' }));
+      } else {
+        setVoucherPreviews((prev) => ({ ...prev, [seriesType]: res }));
+        // Update cart item if already in cart
+        setCartItems((prev) => prev.map((item) =>
+          item.seriesType === seriesType
+            ? { ...item, finalPaise: res.finalAmountInPaise, voucherCode: res.voucherCode, discountPaise: res.discountInPaise }
+            : item
+        ));
+      }
+    } catch (e) {
+      setVoucherErrors((prev) => ({ ...prev, [seriesType]: e.message || 'Failed to apply voucher.' }));
+    } finally {
+      setVoucherLoading((prev) => ({ ...prev, [seriesType]: false }));
+    }
+  }
+
+  function handleRemoveVoucher(seriesType) {
+    setVoucherPreviews((prev) => ({ ...prev, [seriesType]: null }));
+    setVoucherInputs((prev) => ({ ...prev, [seriesType]: '' }));
+    setVoucherErrors((prev) => ({ ...prev, [seriesType]: '' }));
+    setCartItems((prev) => prev.map((item) =>
+      item.seriesType === seriesType
+        ? { ...item, finalPaise: item.originalPaise, voucherCode: null, discountPaise: 0 }
+        : item
+    ));
+  }
+
+  function handleAddToCart(seriesType) {
+    const label = seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Series';
+    const priceKey = seriesType === 'topic_test' ? 'topicTestPriceInPaise' : 'fullMockPriceInPaise';
+    const pricingData = accessData?.pricing || {};
+    const originalPaise = Number(pricingData[priceKey] || 0);
+    const preview = voucherPreviews[seriesType];
+    const finalPaise = preview ? preview.finalAmountInPaise : originalPaise;
+    const voucherCode = preview ? preview.voucherCode : null;
+    const discountPaise = preview ? preview.discountInPaise : 0;
+
+    // Build the new cart value synchronously BEFORE touching React state
+    let current = [];
+    try { current = JSON.parse(localStorage.getItem('ts_cart') || '[]'); } catch {}
+    const next = [
+      ...current.filter((item) => item.seriesType !== seriesType),
+      { seriesType, label, originalPaise, finalPaise, voucherCode, discountPaise }
+    ];
+    // Write to localStorage FIRST so TsCartButton reads the correct value when the event fires
+    try { localStorage.setItem('ts_cart', JSON.stringify(next)); } catch {}
+    // Notify TsCartButton (and dashboard) immediately — localStorage is already updated
+    window.dispatchEvent(new Event('ts-cart-updated'));
+    // Sync React state (the useEffect persist is now a no-op because localStorage is already current)
+    setCartItems(next);
+    setBanner({ type: 'success', text: `${label} added to cart!` });
+  }
+
+  function handleRemoveFromCart(seriesType) {
+    let current = [];
+    try { current = JSON.parse(localStorage.getItem('ts_cart') || '[]'); } catch {}
+    const next = current.filter((item) => item.seriesType !== seriesType);
+    try { localStorage.setItem('ts_cart', JSON.stringify(next)); } catch {}
+    window.dispatchEvent(new Event('ts-cart-updated'));
+    setCartItems(next);
+  }
+
   // ── Payment ───────────────────────────────────────────────────────────────
 
-  async function handlePurchase(seriesType) {
+  async function handlePurchase(seriesType, voucherCode) {
     if (purchasingType) return;
     setPurchasingType(seriesType);
     setBanner(null);
     try {
       const orderRes = await requestJson('/test-series/payment/create-order', {
         method: 'POST',
-        body: JSON.stringify({ seriesType })
+        body: JSON.stringify({ seriesType, ...(voucherCode ? { voucherCode } : {}) })
       });
       if (orderRes?.alreadyOwned) {
         setBanner({ type: 'success', text: 'Already purchased — refreshing your access.' });
@@ -131,6 +438,7 @@ export default function StudentTestSeriesPage() {
             ? 'Access granted! Topic Tests and Full Mocks are now unlocked.'
             : 'Access granted! Full Mock Tests are now unlocked.'
         });
+        setCartItems((prev) => prev.filter((item) => item.seriesType !== seriesType));
         await loadAccess();
         return;
       }
@@ -163,6 +471,7 @@ export default function StudentTestSeriesPage() {
                 })
               });
               setBanner({ type: 'success', text: (seriesType === 'topic_test' ? 'Topic Test Series (+ Full Mocks)' : 'Full Mock Series') + ' unlocked!' });
+              setCartItems((prev) => prev.filter((item) => item.seriesType !== seriesType));
               await loadAccess();
               ok({ status: 'paid' });
             } catch (e) { err(new Error(e.message || 'Payment verification failed.')); }
@@ -181,6 +490,7 @@ export default function StudentTestSeriesPage() {
       setBanner({ type: 'error', text: e.message || 'Payment failed. Please try again.' });
     } finally {
       setPurchasingType('');
+      setCartCheckoutST('');
     }
   }
 
@@ -608,7 +918,7 @@ export default function StudentTestSeriesPage() {
               <button
                 type="button"
                 className="primary-btn ts-sln-buy-btn"
-                onClick={() => { setSyllabusView(null); handlePurchase(isTopicType ? 'topic_test' : 'full_mock'); }}
+                onClick={() => { const st = isTopicType ? 'topic_test' : 'full_mock'; setSyllabusView(null); handlePurchase(st, voucherPreviews[st]?.voucherCode || undefined); }}
               >
                 {isTopicType ? 'Buy Topic Test Series' : 'Buy Full Mock Series'}
               </button>
@@ -702,7 +1012,7 @@ export default function StudentTestSeriesPage() {
               <button
                 type="button"
                 className="primary-btn ts-sln-buy-btn ts-bottom-buy-btn"
-                onClick={() => { setSyllabusView(null); handlePurchase(isTopicType ? 'topic_test' : 'full_mock'); }}
+                onClick={() => { const st = isTopicType ? 'topic_test' : 'full_mock'; setSyllabusView(null); handlePurchase(st, voucherPreviews[st]?.voucherCode || undefined); }}
               >
                 {isTopicType
                   ? `Buy Topic Test Series — Unlock ${items.length} Tests + Full Mocks`
@@ -732,7 +1042,12 @@ export default function StudentTestSeriesPage() {
       title="Test Series"
       subtitle="Premium topic tests and full-length mock exams — purchased separately"
       roleLabel="Student" showThemeSwitch
-      actions={<button type="button" className="secondary-btn" onClick={() => navigate('/student')}>← Dashboard</button>}
+      actions={
+        <>
+          <TsCartButton session={session} />
+          <button type="button" className="secondary-btn" onClick={() => navigate('/student')}>← Dashboard</button>
+        </>
+      }
     >
       <main className="admin-workspace-page">
 
@@ -823,21 +1138,78 @@ export default function StudentTestSeriesPage() {
                           </div>
                         </div>
                         <div className="ts-plan-cta-row">
-                          <button type="button" className="primary-btn ts-plan-cta-btn"
-                            onClick={() => handlePurchase('topic_test')}
-                            disabled={Boolean(purchasingType)}>
-                            {purchasingType === 'topic_test'
-                              ? 'Processing…'
-                              : topicIsFree
-                                ? 'Enroll Free — Topic Tests + Full Mocks'
-                                : 'Buy Topic Test Series — ' + rupees(pricing.topicTestPriceInPaise)}
-                          </button>
-                          <button type="button" className="secondary-btn ts-plan-syllabus-btn"
-                            onClick={() => openSyllabus('topic')}
-                            disabled={loadingSyllabus}>
-                            {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
-                          </button>
-                          {topicIsFree && <span className="ts-free-badge">🎉 No payment required</span>}
+                          {!topicIsFree && (
+                            <div className="ts-voucher-row">
+                              <div className="ts-voucher-input-group">
+                                <input
+                                  className="ts-voucher-input"
+                                  type="text"
+                                  placeholder="Have a voucher code?"
+                                  value={voucherInputs.topic_test}
+                                  onChange={(e) => {
+                                    const v = e.target.value.toUpperCase();
+                                    setVoucherInputs((prev) => ({ ...prev, topic_test: v }));
+                                    if (!v) {
+                                      setVoucherPreviews((prev) => ({ ...prev, topic_test: null }));
+                                      setVoucherErrors((prev) => ({ ...prev, topic_test: '' }));
+                                    }
+                                  }}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') handleApplyVoucher('topic_test'); }}
+                                  maxLength={30}
+                                />
+                                {voucherPreviews.topic_test ? (
+                                  <button type="button" className="ts-voucher-remove-btn" onClick={() => handleRemoveVoucher('topic_test')}>✕ Remove</button>
+                                ) : (
+                                  <button type="button" className="ts-voucher-apply-btn" onClick={() => handleApplyVoucher('topic_test')} disabled={voucherLoading.topic_test || !voucherInputs.topic_test}>
+                                    {voucherLoading.topic_test ? '…' : 'Apply'}
+                                  </button>
+                                )}
+                              </div>
+                              {voucherErrors.topic_test && <p className="ts-voucher-error">{voucherErrors.topic_test}</p>}
+                              {voucherPreviews.topic_test && (
+                                <div className="ts-voucher-preview-box">
+                                  <span className="ts-voucher-check">✓</span>
+                                  <span className="ts-voucher-preview-text">
+                                    <strong>{voucherPreviews.topic_test.voucherCode}</strong> applied — save {rupees(voucherPreviews.topic_test.discountInPaise)}
+                                    {' '}→ final price: <strong>{rupees(voucherPreviews.topic_test.finalAmountInPaise)}</strong>
+                                    {voucherPreviews.topic_test.description ? <em className="ts-voucher-desc-note"> ({voucherPreviews.topic_test.description})</em> : null}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="ts-cta-buttons">
+                            {!topicIsFree && (
+                              <>
+                                <button type="button" className="ts-add-to-cart-btn"
+                                  onClick={() => handleAddToCart('topic_test')}
+                                  disabled={Boolean(purchasingType)}
+                                >
+                                  {cartItems.some((i) => i.seriesType === 'topic_test') ? '✓ In Cart' : '🛒 Add to Cart'}
+                                </button>
+                                {cartItems.some((i) => i.seriesType === 'topic_test') && (
+                                  <span className="ts-go-to-cart-hint">↑ tap 🛒 to checkout</span>
+                                )}
+                              </>
+                            )}
+                            <button type="button" className="primary-btn ts-plan-cta-btn"
+                              onClick={() => handlePurchase('topic_test', voucherPreviews.topic_test?.voucherCode || undefined)}
+                              disabled={Boolean(purchasingType)}>
+                              {purchasingType === 'topic_test'
+                                ? 'Processing…'
+                                : topicIsFree
+                                  ? 'Enroll Free — Topic Tests + Full Mocks'
+                                  : voucherPreviews.topic_test
+                                    ? 'Buy Now — ' + rupees(voucherPreviews.topic_test.finalAmountInPaise)
+                                    : 'Buy Topic Test Series — ' + rupees(pricing.topicTestPriceInPaise)}
+                            </button>
+                            <button type="button" className="secondary-btn ts-plan-syllabus-btn"
+                              onClick={() => openSyllabus('topic')}
+                              disabled={loadingSyllabus}>
+                              {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
+                            </button>
+                            {topicIsFree && <span className="ts-free-badge">🎉 No payment required</span>}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -883,24 +1255,81 @@ export default function StudentTestSeriesPage() {
                           </div>
                         </div>
                         <div className="ts-plan-cta-row">
-                          <button type="button" className="secondary-btn ts-plan-cta-btn ts-mock-cta-btn"
-                            onClick={() => handlePurchase('full_mock')}
-                            disabled={Boolean(purchasingType)}>
-                            {purchasingType === 'full_mock'
-                              ? 'Processing…'
-                              : mockIsFree
-                                ? 'Enroll Free — Full Mock Tests'
-                                : 'Buy Full Mock Series — ' + rupees(pricing.fullMockPriceInPaise)}
-                          </button>
-                          <button type="button" className="secondary-btn ts-plan-syllabus-btn"
-                            onClick={() => openSyllabus('mock')}
-                            disabled={loadingSyllabus}>
-                            {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
-                          </button>
-                          <p className="ts-plan-upsell-note">
-                            💡 The <strong>Topic Test Series</strong> above includes Full Mocks{' '}
-                            {topicIsFree ? 'at no extra cost' : 'as a free bonus'}.
-                          </p>
+                          {!mockIsFree && (
+                            <div className="ts-voucher-row">
+                              <div className="ts-voucher-input-group">
+                                <input
+                                  className="ts-voucher-input"
+                                  type="text"
+                                  placeholder="Have a voucher code?"
+                                  value={voucherInputs.full_mock}
+                                  onChange={(e) => {
+                                    const v = e.target.value.toUpperCase();
+                                    setVoucherInputs((prev) => ({ ...prev, full_mock: v }));
+                                    if (!v) {
+                                      setVoucherPreviews((prev) => ({ ...prev, full_mock: null }));
+                                      setVoucherErrors((prev) => ({ ...prev, full_mock: '' }));
+                                    }
+                                  }}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') handleApplyVoucher('full_mock'); }}
+                                  maxLength={30}
+                                />
+                                {voucherPreviews.full_mock ? (
+                                  <button type="button" className="ts-voucher-remove-btn" onClick={() => handleRemoveVoucher('full_mock')}>✕ Remove</button>
+                                ) : (
+                                  <button type="button" className="ts-voucher-apply-btn" onClick={() => handleApplyVoucher('full_mock')} disabled={voucherLoading.full_mock || !voucherInputs.full_mock}>
+                                    {voucherLoading.full_mock ? '…' : 'Apply'}
+                                  </button>
+                                )}
+                              </div>
+                              {voucherErrors.full_mock && <p className="ts-voucher-error">{voucherErrors.full_mock}</p>}
+                              {voucherPreviews.full_mock && (
+                                <div className="ts-voucher-preview-box">
+                                  <span className="ts-voucher-check">✓</span>
+                                  <span className="ts-voucher-preview-text">
+                                    <strong>{voucherPreviews.full_mock.voucherCode}</strong> applied — save {rupees(voucherPreviews.full_mock.discountInPaise)}
+                                    {' '}→ final price: <strong>{rupees(voucherPreviews.full_mock.finalAmountInPaise)}</strong>
+                                    {voucherPreviews.full_mock.description ? <em className="ts-voucher-desc-note"> ({voucherPreviews.full_mock.description})</em> : null}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="ts-cta-buttons">
+                            {!mockIsFree && (
+                              <>
+                                <button type="button" className="ts-add-to-cart-btn"
+                                  onClick={() => handleAddToCart('full_mock')}
+                                  disabled={Boolean(purchasingType)}
+                                >
+                                  {cartItems.some((i) => i.seriesType === 'full_mock') ? '✓ In Cart' : '🛒 Add to Cart'}
+                                </button>
+                                {cartItems.some((i) => i.seriesType === 'full_mock') && (
+                                  <span className="ts-go-to-cart-hint">↑ tap 🛒 to checkout</span>
+                                )}
+                              </>
+                            )}
+                            <button type="button" className="secondary-btn ts-plan-cta-btn ts-mock-cta-btn"
+                              onClick={() => handlePurchase('full_mock', voucherPreviews.full_mock?.voucherCode || undefined)}
+                              disabled={Boolean(purchasingType)}>
+                              {purchasingType === 'full_mock'
+                                ? 'Processing…'
+                                : mockIsFree
+                                  ? 'Enroll Free — Full Mock Tests'
+                                  : voucherPreviews.full_mock
+                                    ? 'Buy Now — ' + rupees(voucherPreviews.full_mock.finalAmountInPaise)
+                                    : 'Buy Full Mock Series — ' + rupees(pricing.fullMockPriceInPaise)}
+                            </button>
+                            <button type="button" className="secondary-btn ts-plan-syllabus-btn"
+                              onClick={() => openSyllabus('mock')}
+                              disabled={loadingSyllabus}>
+                              {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
+                            </button>
+                            <p className="ts-plan-upsell-note">
+                              💡 The <strong>Topic Test Series</strong> above includes Full Mocks{' '}
+                              {topicIsFree ? 'at no extra cost' : 'as a free bonus'}.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>

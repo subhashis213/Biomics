@@ -4678,12 +4678,14 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 
 .module-chip-wrap .module-chip {
   width: 100%;
+  padding-right: 70px; /* room for 2 icon buttons */
 }
 
 .module-chip-delete {
   position: absolute;
-  top: 6px;
+  top: 50%;
   right: 6px;
+  transform: translateY(-50%) scale(0.7);
   width: 26px;
   height: 26px;
   border-radius: 8px;
@@ -4696,7 +4698,27 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   justify-content: center;
   cursor: pointer;
   opacity: 0;
-  transform: scale(0.7);
+  transition: opacity 160ms ease, transform 160ms cubic-bezier(0.34,1.56,0.64,1), background 140ms ease;
+  z-index: 2;
+}
+
+.module-chip-rename {
+  position: absolute;
+  top: 50%;
+  right: 38px; /* sits left of the delete button (26px + 6px gap + 6px right) */
+  transform: translateY(-50%) scale(0.7);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: none;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
   transition: opacity 160ms ease, transform 160ms cubic-bezier(0.34,1.56,0.64,1), background 140ms ease;
   z-index: 2;
 }
@@ -4704,16 +4726,28 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 .module-chip-wrap:hover .module-chip-delete,
 .module-chip-wrap:focus-within .module-chip-delete {
   opacity: 1;
-  transform: scale(1);
+  transform: translateY(-50%) scale(1);
+}
+
+.module-chip-wrap:hover .module-chip-rename,
+.module-chip-wrap:focus-within .module-chip-rename {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+.module-chip-rename:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translateY(-50%) scale(1.12) !important;
 }
 
 .module-chip-delete:hover {
   background: color-mix(in srgb, var(--danger) 22%, transparent);
-  transform: scale(1.12) !important;
+  transform: translateY(-50%) scale(1.12) !important;
 }
 
-.module-chip-delete:active {
-  transform: scale(0.95) !important;
+.module-chip-delete:active,
+.module-chip-rename:active {
+  transform: translateY(-50%) scale(0.95) !important;
 }
 
 /* ── Delete confirmation panel ── */
@@ -16095,6 +16129,11 @@ html[data-theme='light'] .premium-materials-panel {
 
 .ts-plan-cta-row {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ts-cta-buttons {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
@@ -16112,6 +16151,272 @@ html[data-theme='light'] .premium-materials-panel {
   background: #dcfce7;
   padding: 5px 12px;
   border-radius: 20px;
+}
+
+/* ── Voucher row ── */
+.ts-voucher-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ts-voucher-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+}
+.ts-voucher-input {
+  flex: 1;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-main, var(--card-bg));
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  transition: border-color 0.18s;
+  outline: none;
+}
+.ts-voucher-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.ts-voucher-apply-btn {
+  padding: 9px 20px;
+  border-radius: 10px;
+  border: 1.5px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+.ts-voucher-apply-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+.ts-voucher-apply-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ts-voucher-remove-btn {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--danger, #dc2626);
+  background: transparent;
+  color: var(--danger, #dc2626);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+.ts-voucher-remove-btn:hover {
+  background: var(--danger, #dc2626);
+  color: #fff;
+}
+.ts-voucher-error {
+  font-size: 0.82rem;
+  color: var(--danger, #dc2626);
+  margin: 0;
+}
+.ts-voucher-preview-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #16a34a 10%, var(--card-bg));
+  border: 1.5px solid color-mix(in srgb, #16a34a 35%, transparent);
+  max-width: 500px;
+}
+.ts-voucher-check {
+  font-size: 1rem;
+  color: #16a34a;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.ts-voucher-preview-text {
+  font-size: 0.85rem;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+.ts-voucher-desc-note {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Add to cart button ── */
+.ts-add-to-cart-btn {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1.5px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+.ts-add-to-cart-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.ts-add-to-cart-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.ts-go-to-cart-hint {
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 600;
+  animation: tsGoCartPulse 1.4s ease-in-out infinite;
+  white-space: nowrap;
+}
+@keyframes tsGoCartPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ── Cart drawer ── */
+.ts-cart-drawer {
+  margin-top: 28px;
+  border-radius: 18px;
+  border: 2px solid var(--accent);
+  background: var(--card-bg);
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--accent) 12%, transparent);
+  overflow: hidden;
+  animation: cartSlideIn 0.25s ease;
+}
+@keyframes cartSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ts-cart-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1.5px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
+}
+.ts-cart-icon { font-size: 1.3rem; }
+.ts-cart-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  flex: 1;
+}
+.ts-cart-count {
+  font-size: 0.8rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.ts-cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.ts-cart-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ts-cart-item:last-child { border-bottom: none; }
+.ts-cart-item-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ts-cart-item-label {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-main);
+}
+.ts-cart-voucher-tag {
+  font-size: 0.78rem;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-weight: 600;
+}
+.ts-cart-item-price {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.ts-cart-original-price {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.ts-cart-final-price {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.ts-cart-remove-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.ts-cart-remove-btn:hover { color: var(--danger, #dc2626); background: color-mix(in srgb, var(--danger, #dc2626) 10%, transparent); }
+.ts-cart-footer {
+  padding: 16px 20px;
+  background: color-mix(in srgb, var(--accent) 4%, var(--card-bg));
+  border-top: 1.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ts-cart-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ts-cart-total-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.ts-cart-total-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+.ts-cart-checkout-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ts-cart-checkout-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* chip for test series in admin voucher list */
+.chip-ts {
+  background: color-mix(in srgb, #7c3aed 12%, var(--card-bg));
+  color: #7c3aed;
+  border: 1px solid color-mix(in srgb, #7c3aed 30%, transparent);
 }
 .ts-mock-only-tag {
   font-size: 0.72rem;
@@ -17248,5 +17553,135 @@ html[data-theme='light'] .qcb-modal {
   .qcb-mode-row      { gap: 7px; }
   .qcb-copy-btn,
   .qcb-paste-btn     { font-size: 0.82rem; padding: 7px 12px; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MODULE & TOPIC INLINE RENAME
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Module inline rename row ── */
+.module-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.module-rename-input {
+  flex: 1;
+  min-width: 100px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent);
+  background: var(--bg-card, #1d2335);
+  color: var(--text-main, var(--text));
+  font-size: 0.9rem;
+  outline: none;
+}
+.module-rename-save,
+.module-rename-cancel {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.module-rename-save {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+.module-rename-save:hover {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.module-rename-cancel {
+  background: color-mix(in srgb, var(--danger, #f43f5e) 12%, transparent);
+  color: var(--danger, #f43f5e);
+}
+.module-rename-cancel:hover {
+  background: color-mix(in srgb, var(--danger, #f43f5e) 22%, transparent);
+}
+.module-rename-error {
+  width: 100%;
+  font-size: 0.78rem;
+  color: var(--danger, #f43f5e);
+  padding: 2px 4px;
+}
+
+/* ── Topic rename button (pencil) ── */
+.csir-topic-rename-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  transition: background 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.csir-topic-rename-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* ── Topic card rename mode ── */
+.csir-topic-card.renaming {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 10px 12px;
+}
+.csir-topic-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.csir-topic-rename-input {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent);
+  background: var(--bg-card, #1d2335);
+  color: var(--text-main, var(--text));
+  font-size: 0.88rem;
+  outline: none;
+}
+.csir-topic-rename-save,
+.csir-topic-rename-cancel {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.csir-topic-rename-save {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+.csir-topic-rename-save:hover {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+.csir-topic-rename-cancel {
+  background: color-mix(in srgb, var(--danger, #f43f5e) 12%, transparent);
+  color: var(--danger, #f43f5e);
+}
+.csir-topic-rename-cancel:hover {
+  background: color-mix(in srgb, var(--danger, #f43f5e) 22%, transparent);
 }
 

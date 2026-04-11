@@ -159,6 +159,10 @@ export function fetchCourseQuizzes() {
   return requestJson('/quizzes/my-course');
 }
 
+export function fetchModuleTopics(courseName, moduleName) {
+  return requestJson(`/modules/topics/for-student?category=${encodeURIComponent(courseName)}&module=${encodeURIComponent(moduleName)}`);
+}
+
 export function fetchModuleQuiz(moduleName) {
   return requestJson(`/quizzes/my-course/${encodeURIComponent(moduleName)}`);
 }
@@ -490,10 +494,17 @@ export function fetchTestSeriesStudentAccess() {
   return requestJson('/test-series/pricing/student');
 }
 
-export function createTestSeriesOrder(seriesType) {
+export function createTestSeriesOrder(seriesType, voucherCode) {
   return requestJson('/test-series/payment/create-order', {
     method: 'POST',
-    body: JSON.stringify({ seriesType })
+    body: JSON.stringify({ seriesType, ...(voucherCode ? { voucherCode } : {}) })
+  });
+}
+
+export function previewTestSeriesVoucher(seriesType, voucherCode) {
+  return requestJson('/test-series/payment/preview-voucher', {
+    method: 'POST',
+    body: JSON.stringify({ seriesType, voucherCode })
   });
 }
 

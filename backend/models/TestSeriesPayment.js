@@ -22,6 +22,8 @@ const testSeriesPaymentSchema = new mongoose.Schema({
   amountInPaise: { type: Number, required: true, min: 0 },
   originalAmountInPaise: { type: Number, required: true, min: 0 },
   discountInPaise: { type: Number, default: 0, min: 0 },
+  voucherCode: { type: String, trim: true, default: null },
+  appliedVoucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher', default: null },
   currency: { type: String, default: 'INR', uppercase: true, trim: true },
   razorpayOrderId: { type: String, trim: true, default: '', index: true },
   razorpayPaymentId: { type: String, trim: true, default: '' },

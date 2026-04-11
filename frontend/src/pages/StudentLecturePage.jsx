@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FinalWorkingVideoCard from '../components/FinalWorkingVideoCard';
-import { downloadMaterial } from '../api';
+import { downloadMaterial, fetchModuleTopics } from '../api';
 import { useCourseData } from '../hooks/useCourseData';
 
 function normalizeText(value) {
@@ -47,11 +47,10 @@ export default function StudentLecturePage() {
   const [isExiting, setIsExiting] = useState(false);
   const [isFloatingBackVisible, setIsFloatingBackVisible] = useState(true);
   const [selectedTopicFolder, setSelectedTopicFolder] = useState('');
+  const [allTopics, setAllTopics] = useState([]);
 
   const moduleAccess = access?.moduleAccess?.[decodedModuleName] || null;
   const moduleLocked = Boolean(moduleAccess?.purchaseRequired && !moduleAccess?.unlocked);
-  const isCsirCourse = normalizeText(decodedCourseName).toLowerCase() === 'csir-net life science';
-
   const moduleVideos = useMemo(() => {
     return videos.filter((video) => {
       const sameCourse = normalizeText(video?.category) === decodedCourseName;
@@ -60,15 +59,26 @@ export default function StudentLecturePage() {
     });
   }, [videos, decodedCourseName, decodedModuleName]);
 
-  const topicFolders = useMemo(() => {
+  const videoTopics = useMemo(() => {
     return Array.from(new Set(
       moduleVideos
         .map((video) => normalizeText(video?.topic || 'General'))
         .filter(Boolean)
-    )).sort((a, b) => a.localeCompare(b));
+    ));
   }, [moduleVideos]);
 
-  const hasTopicFolders = isCsirCourse && topicFolders.some((topic) => topic.toLowerCase() !== 'general');
+  // Merge backend topics with any video-derived topics (fallback),
+  // excluding 'general' placeholder entries.
+  const topicFolders = useMemo(() => {
+    const backendNames = allTopics.map((t) => normalizeText(t.name));
+    const merged = Array.from(new Set([
+      ...backendNames,
+      ...videoTopics
+    ])).filter((name) => name.toLowerCase() !== 'general');
+    return merged.sort((a, b) => a.localeCompare(b));
+  }, [allTopics, videoTopics]);
+
+  const hasTopicFolders = topicFolders.length > 0;
 
   useEffect(() => {
     return () => {
@@ -77,6 +87,19 @@ export default function StudentLecturePage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAllTopics([]);
+    fetchModuleTopics(decodedCourseName, decodedModuleName)
+      .then((data) => {
+        if (!cancelled) setAllTopics(Array.isArray(data?.topics) ? data.topics : []);
+      })
+      .catch(() => {
+        // silently fall back to video-derived topics
+      });
+    return () => { cancelled = true; };
+  }, [decodedCourseName, decodedModuleName]);
 
   useEffect(() => {
     setSelectedTopicFolder('');
@@ -109,7 +132,13 @@ export default function StudentLecturePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  function handleBackToDashboard() {
+  function handleBack() {
+    if (selectedTopicFolder) {
+      setSelectedTopicFolder('');
+      setSearchQuery('');
+      setShowSavedOnly(false);
+      return;
+    }
     if (isExiting) return;
     setIsExiting(true);
     exitTimerRef.current = window.setTimeout(() => {
@@ -171,8 +200,8 @@ export default function StudentLecturePage() {
           </p>
         </div>
         <div className="lecture-page-hero-actions">
-          <button type="button" className="secondary-btn" onClick={handleBackToDashboard} disabled={isExiting}>
-            ← Back To Module Sections
+          <button type="button" className="secondary-btn" onClick={handleBack} disabled={isExiting}>
+            {selectedTopicFolder ? '← Back to Chapter Folders' : '← Back to Module Sections'}
           </button>
           {hasTopicFolders && !selectedTopicFolder ? (
             <span className="lecture-total-chip">{visibleTopicFolders.length} chapter folder{visibleTopicFolders.length === 1 ? '' : 's'}</span>
@@ -189,7 +218,7 @@ export default function StudentLecturePage() {
         <section className="lecture-locked-card lecture-enter-stage-2">
           <h3>Module access is locked</h3>
           <p>Unlock this module from dashboard to view all lecture videos.</p>
-          <button type="button" className="primary-btn" onClick={handleBackToDashboard} disabled={isExiting}>
+          <button type="button" className="primary-btn" onClick={handleBack} disabled={isExiting}>
             Go Back
           </button>
         </section>
@@ -271,21 +300,6 @@ export default function StudentLecturePage() {
             </div>
           ) : (!hasTopicFolders || selectedTopicFolder) && filteredVideos.length ? (
             <section className="lecture-video-stage lecture-enter-stage-3">
-              {hasTopicFolders && selectedTopicFolder ? (
-                <div className="upload-form-header">
-                  <button
-                    type="button"
-                    className="back-btn"
-                    onClick={() => {
-                      setSelectedTopicFolder('');
-                      setSearchQuery('');
-                      setShowSavedOnly(false);
-                    }}
-                  >
-                    ← Back to Chapter Folders
-                  </button>
-                </div>
-              ) : null}
               <div className="compact-premium-video-grid">
                 {filteredVideos.map((video) => (
                   <FinalWorkingVideoCard
@@ -311,11 +325,11 @@ export default function StudentLecturePage() {
       <button
         type="button"
         className={`lecture-floating-back${isFloatingBackVisible ? '' : ' is-hidden'}`}
-        onClick={handleBackToDashboard}
+        onClick={handleBack}
         disabled={isExiting}
         aria-label="Go to previous page"
       >
-        ← Previous Page
+        {selectedTopicFolder ? '← Back to Chapter Folders' : '← Back to Module Sections'}
       </button>
     </main>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { requestJson, uploadMaterial } from '../api';
 import AppShell from '../components/AppShell';
@@ -38,8 +39,43 @@ export default function AdminContentLibraryPage() {
   const [uploadFiles, setUploadFiles] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
   const [materialMessages, setMaterialMessages] = useState({});
+  const [pendingDelete, setPendingDelete] = useState(null); // { type: 'video'|'material', videoId, label, material? }
 
   useAutoDismissMessage(banner, setBanner);
+
+  useEffect(() => {
+    if (!pendingDelete) return undefined;
+    const body = document.body;
+    const html = document.documentElement;
+    const scrollY = window.scrollY;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPosition = body.style.position;
+    const prevBodyTop = body.style.top;
+    const prevBodyLeft = body.style.left;
+    const prevBodyRight = body.style.right;
+    const prevBodyWidth = body.style.width;
+    const prevBodyTouchAction = body.style.touchAction;
+    const prevHtmlOverflow = html.style.overflow;
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    body.style.touchAction = 'none';
+    html.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      body.style.position = prevBodyPosition;
+      body.style.top = prevBodyTop;
+      body.style.left = prevBodyLeft;
+      body.style.right = prevBodyRight;
+      body.style.width = prevBodyWidth;
+      body.style.touchAction = prevBodyTouchAction;
+      html.style.overflow = prevHtmlOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [pendingDelete]);
 
   useEffect(() => {
     let ignore = false;
@@ -92,9 +128,11 @@ export default function AdminContentLibraryPage() {
   }
 
   async function handleDeleteVideo(videoId) {
-    const ok = window.confirm('Delete this lecture permanently?');
-    if (!ok) return;
+    const video = videos.find((v) => v._id === videoId);
+    setPendingDelete({ type: 'video', videoId, label: video?.title || 'this lecture' });
+  }
 
+  async function executeDeleteVideo(videoId) {
     try {
       await requestJson(`/videos/${videoId}`, { method: 'DELETE' });
       setVideos((current) => current.filter((video) => video._id !== videoId));
@@ -149,10 +187,12 @@ export default function AdminContentLibraryPage() {
   async function handleRemoveMaterial(videoId, material) {
     const filename = material?.filename;
     if (!filename) return;
+    setPendingDelete({ type: 'material', videoId, label: material?.name || filename, material });
+  }
 
-    const ok = window.confirm(`Remove material "${material?.name || filename}"?`);
-    if (!ok) return;
-
+  async function executeRemoveMaterial(videoId, material) {
+    const filename = material?.filename;
+    if (!filename) return;
     try {
       const response = await requestJson(
         `/videos/${videoId}/materials/${encodeURIComponent(filename)}`,
@@ -301,6 +341,47 @@ export default function AdminContentLibraryPage() {
           </div>
         </section>
       </main>
+
+      {pendingDelete ? createPortal(
+        <div
+          className="confirm-modal-backdrop"
+          role="presentation"
+          onClick={(e) => { if (e.target === e.currentTarget) setPendingDelete(null); }}
+        >
+          <section className="confirm-modal card" role="dialog" aria-modal="true" aria-label="Confirm delete">
+            <p className="eyebrow">Confirmation</p>
+            <h2>
+              {pendingDelete.type === 'video' ? 'Delete Lecture?' : 'Remove Material?'}
+            </h2>
+            <p className="subtitle">
+              {pendingDelete.type === 'video'
+                ? (<>Permanently delete <strong>{pendingDelete.label}</strong>? This action cannot be undone.</>)
+                : (<>Remove material <strong>{pendingDelete.label}</strong>? This action cannot be undone.</>)}
+            </p>
+            <div className="confirm-modal-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setPendingDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={() => {
+                  const snap = pendingDelete;
+                  setPendingDelete(null);
+                  if (snap.type === 'video') executeDeleteVideo(snap.videoId);
+                  else executeRemoveMaterial(snap.videoId, snap.material);
+                }}
+              >
+                {pendingDelete.type === 'video' ? 'Delete Lecture' : 'Remove Material'}
+              </button>
+            </div>
+          </section>
+        </div>
+      , document.body) : null}
     </AppShell>
   );
 }

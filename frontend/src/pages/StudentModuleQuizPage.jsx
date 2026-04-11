@@ -95,7 +95,12 @@ export default function StudentModuleQuizPage() {
     });
   }, [allModuleQuizzes, hasTopicFolders, selectedTopic, searchQuery]);
 
-  function handleBackToDashboard() {
+  function handleBack() {
+    if (selectedTopic) {
+      setSelectedTopic('');
+      setSearchQuery('');
+      return;
+    }
     navigate(`/student/module/${encodeURIComponent(decodedCourseName || 'General')}/${encodeURIComponent(decodedModuleName || 'General')}`);
   }
 
@@ -110,8 +115,8 @@ export default function StudentModuleQuizPage() {
           </p>
         </div>
         <div className="lecture-page-hero-actions">
-          <button type="button" className="secondary-btn" onClick={handleBackToDashboard}>
-            ← Back To Module Sections
+          <button type="button" className="secondary-btn" onClick={handleBack}>
+            {selectedTopic ? '← Back to Topic Folders' : '← Back to Module Sections'}
           </button>
           <span className="lecture-total-chip">
             {hasTopicFolders && !selectedTopic
@@ -165,21 +170,6 @@ export default function StudentModuleQuizPage() {
 
       {!isLoading && !loadError && (!hasTopicFolders || selectedTopic) ? (
         <section className="card quiz-panel lecture-enter-stage-3">
-          {hasTopicFolders && selectedTopic ? (
-            <div className="quiz-picker-back">
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => {
-                  setSelectedTopic('');
-                  setSearchQuery('');
-                }}
-              >
-                ← Back to Topic Folders
-              </button>
-            </div>
-          ) : null}
-
           {filteredQuizzes.length ? (
             <div className="quiz-picker-list">
               <p className="quiz-picker-prompt">

@@ -8,6 +8,7 @@ const TopicTest = require('../models/TopicTest');
 const FullMockTest = require('../models/FullMockTest');
 const TestSeriesPayment = require('../models/TestSeriesPayment');
 const User = require('../models/User');
+const Voucher = require('../models/Voucher');
 
 const router = express.Router();
 
@@ -594,6 +595,88 @@ router.get('/payment/preview', authenticateToken('user'), async (req, res) => {
   }
 });
 
+// POST /test-series/payment/preview-voucher
+router.post('/payment/preview-voucher', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const course = normalizeCourse(user.class);
+
+    const seriesType = String(req.body?.seriesType || '').trim();
+    const voucherCode = String(req.body?.voucherCode || '').trim().toUpperCase();
+
+    if (!SERIES_TYPES.includes(seriesType)) {
+      return res.status(400).json({ error: 'seriesType must be topic_test or full_mock.' });
+    }
+    if (!voucherCode) {
+      return res.status(400).json({ error: 'Voucher code is required.' });
+    }
+
+    const pricing = await TestSeriesPricing.findOne({ category: course }).lean();
+    const priceKey = seriesType === 'topic_test' ? 'topicTestPriceInPaise' : 'fullMockPriceInPaise';
+    const originalAmountInPaise = Math.max(0, Number(pricing?.[priceKey] || 0));
+
+    const voucher = await Voucher.findOne({ code: voucherCode }).lean();
+    if (!voucher || !voucher.active) {
+      return res.status(400).json({ error: 'Invalid or inactive voucher code.' });
+    }
+
+    // Check expiry & usage limit
+    const now = Date.now();
+    if (voucher.validUntil && new Date(voucher.validUntil).getTime() < now) {
+      return res.status(400).json({ error: 'This voucher has expired.' });
+    }
+    if (voucher.validFrom && new Date(voucher.validFrom).getTime() > now) {
+      return res.status(400).json({ error: 'This voucher is not yet active.' });
+    }
+    if (Number.isFinite(voucher.usageLimit) && voucher.usageLimit > 0 && voucher.usedCount >= voucher.usageLimit) {
+      return res.status(400).json({ error: 'This voucher has reached its usage limit.' });
+    }
+
+    // Check if voucher is applicable to test series
+    const hasTestSeriesRestriction = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0;
+    if (hasTestSeriesRestriction && !voucher.applicableTestSeries.includes(seriesType)) {
+      return res.status(400).json({ error: 'This voucher is not applicable for this test series type.' });
+    }
+
+    // Check course restriction
+    if (Array.isArray(voucher.applicableCourses) && voucher.applicableCourses.length > 0) {
+      const normalizedCourse = normalizeCourse(course);
+      const applicable = voucher.applicableCourses.some(
+        (c) => normalizeCourse(c) === normalizedCourse
+      );
+      if (!applicable) {
+        return res.status(400).json({ error: 'This voucher is not applicable for your course.' });
+      }
+    }
+
+    // Compute discount
+    let discountInPaise = 0;
+    if (voucher.discountType === 'percent') {
+      discountInPaise = Math.floor((originalAmountInPaise * Math.max(0, Number(voucher.discountValue || 0))) / 100);
+    } else {
+      discountInPaise = Math.floor(Math.max(0, Number(voucher.discountValue || 0)));
+    }
+    if (Number.isFinite(voucher.maxDiscountInPaise) && voucher.maxDiscountInPaise > 0) {
+      discountInPaise = Math.min(discountInPaise, Math.floor(voucher.maxDiscountInPaise));
+    }
+    discountInPaise = Math.max(0, Math.min(originalAmountInPaise, discountInPaise));
+    const finalAmountInPaise = Math.max(0, originalAmountInPaise - discountInPaise);
+
+    return res.json({
+      valid: true,
+      originalAmountInPaise,
+      discountInPaise,
+      finalAmountInPaise,
+      currency: pricing?.currency || 'INR',
+      voucherCode: voucher.code,
+      description: voucher.description || ''
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || 'Failed to preview voucher.' });
+  }
+});
+
 // POST /test-series/payment/create-order
 router.post('/payment/create-order', authenticateToken('user'), async (req, res) => {
   try {
@@ -603,6 +686,7 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
     const course = normalizeCourse(user.class);
 
     const seriesType = String(req.body?.seriesType || '').trim();
+    const voucherCode = String(req.body?.voucherCode || '').trim().toUpperCase();
     if (!SERIES_TYPES.includes(seriesType)) {
       return res.status(400).json({ error: 'seriesType must be topic_test or full_mock.' });
     }
@@ -617,18 +701,51 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
     const priceKey = seriesType === 'topic_test' ? 'topicTestPriceInPaise' : 'fullMockPriceInPaise';
     const originalAmountInPaise = Math.max(0, Number(pricing?.[priceKey] || 0));
 
-    if (originalAmountInPaise <= 0) {
-      // Free — grant access immediately
+    // Apply voucher discount if provided
+    let discountInPaise = 0;
+    let appliedVoucherId = null;
+    if (voucherCode && originalAmountInPaise > 0) {
+      const voucher = await Voucher.findOne({ code: voucherCode, active: true }).lean();
+      if (voucher) {
+        const now = Date.now();
+        const notExpired = !voucher.validUntil || new Date(voucher.validUntil).getTime() >= now;
+        const notBeforeStart = !voucher.validFrom || new Date(voucher.validFrom).getTime() <= now;
+        const withinLimit = !Number.isFinite(voucher.usageLimit) || voucher.usageLimit <= 0 || voucher.usedCount < voucher.usageLimit;
+        const tsApplicable = !Array.isArray(voucher.applicableTestSeries) || voucher.applicableTestSeries.length === 0 || voucher.applicableTestSeries.includes(seriesType);
+        const courseApplicable = !Array.isArray(voucher.applicableCourses) || voucher.applicableCourses.length === 0 || voucher.applicableCourses.some((c) => normalizeCourse(c) === course);
+        if (notExpired && notBeforeStart && withinLimit && tsApplicable && courseApplicable) {
+          if (voucher.discountType === 'percent') {
+            discountInPaise = Math.floor((originalAmountInPaise * Math.max(0, Number(voucher.discountValue || 0))) / 100);
+          } else {
+            discountInPaise = Math.floor(Math.max(0, Number(voucher.discountValue || 0)));
+          }
+          if (Number.isFinite(voucher.maxDiscountInPaise) && voucher.maxDiscountInPaise > 0) {
+            discountInPaise = Math.min(discountInPaise, Math.floor(voucher.maxDiscountInPaise));
+          }
+          discountInPaise = Math.max(0, Math.min(originalAmountInPaise, discountInPaise));
+          appliedVoucherId = voucher._id;
+        }
+      }
+    }
+    const finalAmountInPaise = Math.max(0, originalAmountInPaise - discountInPaise);
+
+    if (originalAmountInPaise <= 0 || finalAmountInPaise <= 0) {
+      // Free or fully discounted — grant access immediately
       await TestSeriesPayment.create({
         username: req.user.username,
         course,
         seriesType,
         status: 'paid',
         amountInPaise: 0,
-        originalAmountInPaise: 0,
+        originalAmountInPaise,
+        discountInPaise,
+        voucherCode: voucherCode || null,
         currency: pricing?.currency || 'INR',
         paidAt: new Date()
       });
+      if (appliedVoucherId) {
+        await Voucher.findByIdAndUpdate(appliedVoucherId, { $inc: { usedCount: 1 } });
+      }
       return res.json({ free: true, alreadyOwned: false });
     }
 
@@ -638,7 +755,7 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
 
     const receipt = buildReceipt(course, seriesType);
     const razorpayOrder = await razorpay.orders.create({
-      amount: originalAmountInPaise,
+      amount: finalAmountInPaise,
       currency: pricing?.currency || 'INR',
       receipt
     });
@@ -648,8 +765,11 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
       course,
       seriesType,
       status: 'created',
-      amountInPaise: originalAmountInPaise,
+      amountInPaise: finalAmountInPaise,
       originalAmountInPaise,
+      discountInPaise,
+      voucherCode: voucherCode || null,
+      appliedVoucherId: appliedVoucherId || null,
       currency: pricing?.currency || 'INR',
       razorpayOrderId: razorpayOrder.id
     });
@@ -657,7 +777,9 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
     return res.json({
       razorpayOrder,
       keyId,
-      amountInPaise: originalAmountInPaise,
+      amountInPaise: finalAmountInPaise,
+      originalAmountInPaise,
+      discountInPaise,
       currency: pricing?.currency || 'INR',
       seriesType,
       course
@@ -698,7 +820,7 @@ router.post('/payment/verify', authenticateToken('user'), async (req, res) => {
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
     const course = normalizeCourse(user.class);
 
-    await TestSeriesPayment.findOneAndUpdate(
+    const paymentRecord = await TestSeriesPayment.findOneAndUpdate(
       { razorpayOrderId, username: req.user.username },
       {
         $set: {
@@ -707,8 +829,14 @@ router.post('/payment/verify', authenticateToken('user'), async (req, res) => {
           status: 'paid',
           paidAt: new Date()
         }
-      }
+      },
+      { new: false }
     );
+
+    // Increment voucher usage count if a voucher was applied
+    if (paymentRecord?.appliedVoucherId) {
+      await Voucher.findByIdAndUpdate(paymentRecord.appliedVoucherId, { $inc: { usedCount: 1 } });
+    }
 
     // Also mark the complementary full_mock if topic_test was purchased,
     // by checking it is not already an independent record.

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Module = require('../models/Module');
 const Topic = require('../models/Topic');
+const Video = require('../models/Video');
 const ModulePricing = require('../models/ModulePricing');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -21,6 +22,20 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
 });
 
 router.get('/topics', authenticateToken('admin'), async (req, res) => {
+  try {
+    const category = normalizeValue(req.query.category || '');
+    const moduleName = normalizeValue(req.query.module || '');
+    if (!category || !moduleName) {
+      return res.status(400).json({ error: 'category and module are required' });
+    }
+    const topics = await Topic.find({ category, module: moduleName }).sort({ name: 1 }).lean();
+    return res.json({ topics });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch topics' });
+  }
+});
+
+router.get('/topics/for-student', authenticateToken('user'), async (req, res) => {
   try {
     const category = normalizeValue(req.query.category || '');
     const moduleName = normalizeValue(req.query.module || '');
@@ -135,6 +150,51 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
     return res.json({ message: 'Module removed' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove module' });
+  }
+});
+
+router.put('/topics/rename', authenticateToken('admin'), async (req, res) => {
+  const category = normalizeValue(req.body.category || '');
+  const moduleName = normalizeValue(req.body.module || '');
+  const oldName = normalizeValue(req.body.oldName || '');
+  const newName = normalizeValue(req.body.newName || '');
+  if (!category || !moduleName || !oldName || !newName) {
+    return res.status(400).json({ error: 'category, module, oldName and newName are required' });
+  }
+  if (oldName === newName) return res.json({ message: 'No change' });
+
+  try {
+    const existing = await Topic.findOne({ category, module: moduleName, name: newName }).lean();
+    if (existing) return res.status(409).json({ error: 'A topic with this name already exists in this module' });
+
+    await Topic.updateOne({ category, module: moduleName, name: oldName }, { $set: { name: newName } });
+    await Video.updateMany({ category, module: moduleName, topic: oldName }, { $set: { topic: newName } });
+    return res.json({ message: 'Topic renamed' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to rename topic' });
+  }
+});
+
+router.put('/rename', authenticateToken('admin'), async (req, res) => {
+  const category = normalizeValue(req.body.category || '');
+  const oldName = normalizeValue(req.body.oldName || '');
+  const newName = normalizeValue(req.body.newName || '');
+  if (!category || !oldName || !newName) {
+    return res.status(400).json({ error: 'category, oldName and newName are required' });
+  }
+  if (oldName === newName) return res.json({ message: 'No change' });
+
+  try {
+    const existing = await Module.findOne({ category, name: newName }).lean();
+    if (existing) return res.status(409).json({ error: 'A module with this name already exists' });
+
+    await Module.updateOne({ category, name: oldName }, { $set: { name: newName } });
+    await Topic.updateMany({ category, module: oldName }, { $set: { module: newName } });
+    await Video.updateMany({ category, module: oldName }, { $set: { module: newName } });
+    await ModulePricing.updateOne({ category, moduleName: oldName }, { $set: { moduleName: newName } });
+    return res.json({ message: 'Module renamed' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to rename module' });
   }
 });
 
