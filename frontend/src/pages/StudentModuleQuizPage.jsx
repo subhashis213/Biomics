@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { requestJson } from '../api';
+import { fetchModuleTopics, requestJson } from '../api';
 
 function normalizeText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -31,6 +31,8 @@ export default function StudentModuleQuizPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [allModuleQuizzes, setAllModuleQuizzes] = useState([]);
+  const [catalogTopics, setCatalogTopics] = useState([]);
+  const [topicsLoadedFromCatalog, setTopicsLoadedFromCatalog] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -58,13 +60,39 @@ export default function StudentModuleQuizPage() {
     };
   }, [decodedModuleName]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogTopics([]);
+    setTopicsLoadedFromCatalog(false);
+
+    fetchModuleTopics(decodedCourseName, decodedModuleName)
+      .then((data) => {
+        if (cancelled) return;
+        const topics = Array.isArray(data?.topics)
+          ? data.topics.map((entry) => normalizeText(entry?.name || '')).filter(Boolean)
+          : [];
+        setCatalogTopics(topics);
+        setTopicsLoadedFromCatalog(true);
+      })
+      .catch(() => {
+        if (!cancelled) setTopicsLoadedFromCatalog(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [decodedCourseName, decodedModuleName]);
+
   const topicFolders = useMemo(() => {
+    if (topicsLoadedFromCatalog) {
+      return Array.from(new Set(catalogTopics)).sort((a, b) => a.localeCompare(b));
+    }
     return Array.from(new Set(
       allModuleQuizzes
         .map((quiz) => normalizeText(quiz?.topic || 'General'))
         .filter(Boolean)
     )).sort((a, b) => a.localeCompare(b));
-  }, [allModuleQuizzes]);
+  }, [allModuleQuizzes, catalogTopics, topicsLoadedFromCatalog]);
 
   const hasTopicFolders = topicFolders.some((topic) => topic.toLowerCase() !== 'general');
 
@@ -84,16 +112,20 @@ export default function StudentModuleQuizPage() {
 
   const filteredQuizzes = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
+    const allowedTopicSet = topicsLoadedFromCatalog
+      ? new Set(topicFolders.map((topic) => topic.toLowerCase()))
+      : null;
     return allModuleQuizzes.filter((quiz) => {
+      const quizTopic = normalizeText(quiz?.topic || 'General');
+      if (allowedTopicSet && !allowedTopicSet.has(quizTopic.toLowerCase())) return false;
       if (hasTopicFolders && selectedTopic) {
-        const quizTopic = normalizeText(quiz?.topic || 'General');
         if (quizTopic !== selectedTopic) return false;
       }
       if (!query) return true;
       const haystack = `${quiz?.title || ''} ${quiz?.difficulty || ''}`.toLowerCase();
       return haystack.includes(query);
     });
-  }, [allModuleQuizzes, hasTopicFolders, selectedTopic, searchQuery]);
+  }, [allModuleQuizzes, hasTopicFolders, selectedTopic, searchQuery, topicsLoadedFromCatalog, topicFolders]);
 
   function handleBack() {
     if (selectedTopic) {

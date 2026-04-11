@@ -1047,15 +1047,6 @@ export default function StudentDashboard() {
     return acc;
   }, {});
 
-  quizAttempts.forEach((attempt) => {
-    const category = normalizeCourseName(attempt.category || course || 'General');
-    const displayModule = String(attempt.module || 'General').trim() || 'General';
-    const moduleKey = resolveModuleKey(category, displayModule);
-    if (!moduleMetaByKey[moduleKey]) {
-      moduleMetaByKey[moduleKey] = { module: displayModule, category };
-    }
-  });
-
   // Include the admin-created module catalog so modules show even before content upload.
   (Array.isArray(moduleCatalog) ? moduleCatalog : []).forEach((entry) => {
     const category = normalizeCourseName(entry?.category || '');
@@ -1096,7 +1087,6 @@ export default function StudentDashboard() {
   [
     ...videos.map((video) => normalizeCourseName(video.category || '')).filter(Boolean),
     ...quizzes.map((quiz) => normalizeCourseName(quiz.category || '')).filter(Boolean),
-    ...quizAttempts.map((attempt) => normalizeCourseName(attempt.category || '')).filter(Boolean),
     ...Object.values(moduleMetaByKey).map((meta) => normalizeCourseName(meta?.category || '')).filter(Boolean),
     normalizeCourseName(course || '')
   ].forEach((courseName) => {
@@ -1174,6 +1164,7 @@ export default function StudentDashboard() {
     const topics = new Set();
     const moduleTopicsByKey = {};
     const moduleTopicsByName = {};
+    const activeModuleKeySet = new Set(visibleModules);
 
     function addTopic(categoryName, moduleName, topicName) {
       const normalizedCategory = normalizeCourseName(categoryName || course || 'General');
@@ -1184,6 +1175,7 @@ export default function StudentDashboard() {
       if (!normalizedModule || !normalizedTopic) return;
 
       const moduleKey = resolveModuleKey(normalizedCategory, normalizedModule);
+      if (activeModuleKeySet.size > 0 && !activeModuleKeySet.has(moduleKey)) return;
       if (!moduleTopicsByKey[moduleKey]) moduleTopicsByKey[moduleKey] = new Set();
       moduleTopicsByKey[moduleKey].add(normalizedTopic);
 
@@ -1198,13 +1190,9 @@ export default function StudentDashboard() {
       addTopic(quiz?.category, quiz?.module, quiz?.topic);
     });
 
-    quizAttempts.forEach((attempt) => {
-      addTopic(attempt?.category, attempt?.module, attempt?.topic);
-    });
-
     const options = Array.from(topics).sort((a, b) => a.localeCompare(b));
     return { options, moduleTopicsByKey, moduleTopicsByName };
-  }, [quizzes, quizAttempts, activeCourseFilter, course]);
+  }, [quizzes, visibleModules, activeCourseFilter, course]);
 
   const quizTopicOptions = quizTopicMetadata.options;
 

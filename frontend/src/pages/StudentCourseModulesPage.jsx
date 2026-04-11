@@ -42,6 +42,7 @@ export default function StudentCourseModulesPage() {
   // Build module metadata for this specific course
   const moduleMetaByKey = useMemo(() => {
     const map = {};
+    const catalogModuleKeySet = new Set();
 
     function resolveKey(cat, mod) {
       return `${normalizeText(cat)}::${normalizeText(mod)}`;
@@ -69,6 +70,7 @@ export default function StudentCourseModulesPage() {
       const mod = normalizeText(entry?.name || '');
       if (!mod) return;
       const key = resolveKey(cat, mod);
+      catalogModuleKeySet.add(key);
       if (!map[key]) map[key] = { module: mod, category: cat };
     });
 
@@ -77,6 +79,9 @@ export default function StudentCourseModulesPage() {
       const modNorm = normalizeText(modName);
       if (!modNorm || modNorm === 'ALL_MODULES') return;
       const key = resolveKey(decodedCourse, modNorm);
+      const hasContentSignals = Boolean(map[key]);
+      const existsInCatalog = catalogModuleKeySet.has(key);
+      if (!hasContentSignals && !existsInCatalog) return;
       if (!map[key]) map[key] = { module: modNorm, category: decodedCourse };
     });
 

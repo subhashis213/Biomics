@@ -49,6 +49,7 @@ export default function StudentLecturePage() {
   const [isFloatingBackVisible, setIsFloatingBackVisible] = useState(true);
   const [selectedTopicFolder, setSelectedTopicFolder] = useState('');
   const [allTopics, setAllTopics] = useState([]);
+  const [topicsLoadedFromCatalog, setTopicsLoadedFromCatalog] = useState(false);
 
   const moduleAccess = access?.moduleAccess?.[decodedModuleName] || null;
   const moduleLocked = Boolean(moduleAccess?.purchaseRequired && !moduleAccess?.unlocked);
@@ -79,13 +80,12 @@ export default function StudentLecturePage() {
   // Merge backend topics with any video-derived topics (fallback),
   // excluding 'general' placeholder entries.
   const topicFolders = useMemo(() => {
-    const backendNames = allTopics.map((t) => normalizeText(t.name));
-    const merged = Array.from(new Set([
-      ...backendNames,
-      ...videoTopics
-    ])).filter((name) => name.toLowerCase() !== 'general');
-    return merged.sort((a, b) => a.localeCompare(b));
-  }, [allTopics, videoTopics]);
+    const backendNames = allTopics.map((t) => normalizeText(t.name)).filter(Boolean);
+    const source = topicsLoadedFromCatalog ? backendNames : videoTopics;
+    return Array.from(new Set(source))
+      .filter((name) => name.toLowerCase() !== 'general')
+      .sort((a, b) => a.localeCompare(b));
+  }, [allTopics, videoTopics, topicsLoadedFromCatalog]);
 
   const hasTopicFolders = topicFolders.length > 0;
 
@@ -100,12 +100,16 @@ export default function StudentLecturePage() {
   useEffect(() => {
     let cancelled = false;
     setAllTopics([]);
+    setTopicsLoadedFromCatalog(false);
     fetchModuleTopics(decodedCourseName, decodedModuleName)
       .then((data) => {
-        if (!cancelled) setAllTopics(Array.isArray(data?.topics) ? data.topics : []);
+        if (cancelled) return;
+        setAllTopics(Array.isArray(data?.topics) ? data.topics : []);
+        setTopicsLoadedFromCatalog(true);
       })
       .catch(() => {
         // silently fall back to video-derived topics
+        if (!cancelled) setTopicsLoadedFromCatalog(false);
       });
     return () => { cancelled = true; };
   }, [decodedCourseName, decodedModuleName]);
