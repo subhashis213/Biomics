@@ -329,7 +329,12 @@ export default function StudentLecturePage() {
         disabled={isExiting}
         aria-label="Go to previous page"
       >
-        {selectedTopicFolder ? '← Back to Chapter Folders' : '← Back to Module Sections'}
+        <span className="lecture-floating-back-text lecture-floating-back-text--full">
+          {selectedTopicFolder ? '← Back to Chapter Folders' : '← Back to Module Sections'}
+        </span>
+        <span className="lecture-floating-back-text lecture-floating-back-text--short" aria-hidden="true">
+          ← Back
+        </span>
       </button>
     </main>
   );

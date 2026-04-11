@@ -102,8 +102,10 @@ export default function FinalWorkingVideoCard({
   const [currentQuality, setCurrentQuality] = useState('default');
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
+  const [activeMenu, setActiveMenu] = useState(null); // 'quality' | 'speed' | null
   const [hoverTime, setHoverTime] = useState(null);
+  const [isVideoEnded, setIsVideoEnded] = useState(false);
 
   const playerRef = useRef(null);
   const playerContainerRef = useRef(null);
@@ -112,15 +114,25 @@ export default function FinalWorkingVideoCard({
   const pendingSeekRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const progressRef = useRef(null);
-  const settingsPanelRef = useRef(null);
-  const settingsShellRef = useRef(null);
+  const qualityMenuRef = useRef(null);
+  const speedMenuRef = useRef(null);
+  const qualityPopupRef = useRef(null);
+  const volPopupRef = useRef(null);
+  const volHideTimeoutRef = useRef(null);
 
   const videoId = useMemo(() => resolveYouTubeVideoId(video?.url), [video?.url]);
   const canPlayInline = !adminMode && Boolean(videoId);
   const storageKey = useMemo(() => `biomics:video-progress:${String(video?._id || '')}`, [video?._id]);
   const qualityOptions = useMemo(() => {
     const normalized = Array.from(new Set((availableQualities || []).filter(Boolean)));
-    return ['default', ...normalized.filter((quality) => quality !== 'default')];
+    // Sort highest quality first, keep 'default' (Auto) at end
+    return [
+      ...normalized.filter((q) => q !== 'default').sort((a, b) => {
+        const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny'];
+        return QUALITY_ORDER.indexOf(a) - QUALITY_ORDER.indexOf(b);
+      }),
+      'default'
+    ];
   }, [availableQualities]);
 
   function clearSaveInterval() {
@@ -204,9 +216,11 @@ export default function FinalWorkingVideoCard({
             enablejsapi: 1,
             iv_load_policy: 3,
             showinfo: 0,
-            fs: 1,
-            cc_load_policy: 1,
-            mute: 0
+            fs: 0,
+            cc_load_policy: 0,
+            mute: 0,
+            playsinline: 1,
+            origin: typeof window !== 'undefined' ? window.location.origin : ''
           },
           events: {
             onReady: (event) => {
@@ -215,12 +229,27 @@ export default function FinalWorkingVideoCard({
               setIsPlayerLoading(false);
               setIsPlayerReady(true);
               setDuration(event.target.getDuration());
+              let detectedQualities = [];
               try {
                 const qualities = event.target.getAvailableQualityLevels?.();
-                if (Array.isArray(qualities) && qualities.length) setAvailableQualities(qualities);
+                if (Array.isArray(qualities) && qualities.length) {
+                  setAvailableQualities(qualities);
+                  detectedQualities = qualities;
+                }
               } catch { /* ignore */ }
               try {
-                setCurrentQuality(event.target.getPlaybackQuality?.() || 'default');
+                // Auto-set highest available quality
+                const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny'];
+                const best = QUALITY_ORDER.find((q) => detectedQualities.includes(q));
+                if (best) {
+                  event.target.setPlaybackQuality(best);
+                  if (typeof event.target.setPlaybackQualityRange === 'function') {
+                    event.target.setPlaybackQualityRange(best, best);
+                  }
+                  setCurrentQuality(best);
+                } else {
+                  setCurrentQuality(event.target.getPlaybackQuality?.() || 'default');
+                }
               } catch { /* ignore */ }
               try {
                 setPlaybackSpeed(event.target.getPlaybackRate?.() || 1);
@@ -249,9 +278,24 @@ export default function FinalWorkingVideoCard({
 
               if (state === YTState.PLAYING) {
                 setIsPlaying(true);
+                setIsVideoEnded(false);
                 clearSaveInterval();
                 saveIntervalRef.current = setInterval(persistCurrentPlayback, 1000);
                 hideControlsDelayed();
+                // Re-enforce highest quality each time playback starts (YT may reset it)
+                try {
+                  const qualities = playerRef.current?.getAvailableQualityLevels?.() || [];
+                  const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny'];
+                  const best = QUALITY_ORDER.find((q) => qualities.includes(q));
+                  if (best) {
+                    playerRef.current?.setPlaybackQuality(best);
+                    if (typeof playerRef.current?.setPlaybackQualityRange === 'function') {
+                      playerRef.current.setPlaybackQualityRange(best, best);
+                    }
+                    setAvailableQualities(qualities);
+                    setCurrentQuality(best);
+                  }
+                } catch { /* ignore */ }
               }
 
               if (state === YTState.PAUSED || state === YTState.BUFFERING) {
@@ -262,6 +306,7 @@ export default function FinalWorkingVideoCard({
 
               if (state === YTState.ENDED) {
                 setIsPlaying(false);
+                setIsVideoEnded(true);
                 clearSaveInterval();
                 idbDel(storageKey).catch(() => {});
                 setSavedProgressSec(0);
@@ -305,7 +350,7 @@ export default function FinalWorkingVideoCard({
       } catch { /* ignore */ }
       setIsPlayerReady(false);
       setIsPlayerLoading(false);
-      setShowSettings(false);
+      setActiveMenu(null);
     };
   }, [canPlayInline, videoId, isPlayerOpen, playerInstanceKey]);
 
@@ -376,9 +421,7 @@ export default function FinalWorkingVideoCard({
           { const fsEl = document.fullscreenElement || document.webkitFullscreenElement; if (!fsEl) { const tgt = playerContainerRef.current || playerFrameWrapRef.current?.querySelector('iframe') || document.documentElement; if (tgt.requestFullscreen) tgt.requestFullscreen().catch(() => {}); else if (tgt.webkitRequestFullscreen) tgt.webkitRequestFullscreen(); } else { if (document.exitFullscreen) document.exitFullscreen().catch(() => {}); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } }
           break;
         case 'Escape':
-          if (showSettings) {
-            setShowSettings(false);
-          }
+          if (activeMenu) setActiveMenu(null);
           break;
         default:
           break;
@@ -386,22 +429,29 @@ export default function FinalWorkingVideoCard({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [isPlayerOpen, isPlayerReady, isPlaying, volume, isMuted, showSettings]);
+  }, [isPlayerOpen, isPlayerReady, isPlaying, volume, isMuted, activeMenu]);
 
-  // Close settings panel on outside click
+  // Close quality/speed popup on outside click
   useEffect(() => {
-    if (!showSettings) return undefined;
-    const handleClickOutside = (e) => {
-      if (settingsPanelRef.current?.contains(e.target) || e.target.closest('.cpv-settings-trigger')) {
-        return;
-      }
-      if (settingsShellRef.current && !settingsShellRef.current.contains(e.target)) {
-        setShowSettings(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showSettings]);
+    if (!activeMenu) return undefined;
+    function handleOutside(e) {
+      const ref = activeMenu === 'quality' ? qualityMenuRef : speedMenuRef;
+      if (ref.current && !ref.current.contains(e.target)) setActiveMenu(null);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [activeMenu]);
+
+  // Scroll active quality item into view when quality popup opens
+  useEffect(() => {
+    if (activeMenu !== 'quality' || !qualityPopupRef.current) return;
+    const activeItem = qualityPopupRef.current.querySelector('.vp-popup-item--on');
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: 'nearest' });
+    } else {
+      qualityPopupRef.current.scrollTop = 0;
+    }
+  }, [activeMenu]);
 
   function getStateName(state) {
     const YTState = window.YT?.PlayerState || {};
@@ -439,6 +489,7 @@ export default function FinalWorkingVideoCard({
     setSavedProgressSec(0);
     setCurrentTime(0);
     setPlayerError('');
+    setIsVideoEnded(false);
     setIsPlayerOpen(true);
     playFrom(0);
   }
@@ -460,7 +511,7 @@ export default function FinalWorkingVideoCard({
     setIsPlayerOpen(false);
     setIsPlaying(false);
     setShowControls(true);
-    setShowSettings(false);
+    setActiveMenu(null);
   }
 
   function handlePlayPause() {
@@ -485,6 +536,39 @@ export default function FinalWorkingVideoCard({
     }
     try { playerRef.current.unMute(); } catch { /* ignore */ }
     setIsMuted(false);
+  }
+
+  function updateVolFromPointer(e) {
+    if (!isPlayerReady || !playerRef.current) return;
+    const el = volPopupRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const usableTop = rect.top + 10;
+    const usableHeight = rect.height - 20;
+    const pct = Math.max(0, Math.min(100, Math.round((1 - (e.clientY - usableTop) / usableHeight) * 100)));
+    setVolume(pct);
+    try { playerRef.current.setVolume(pct); } catch { /* ignore */ }
+    if (pct <= 0) { try { playerRef.current.mute(); } catch {} setIsMuted(true); }
+    else { try { playerRef.current.unMute(); } catch {} setIsMuted(false); }
+  }
+
+  function handleVolPointerDown(e) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    updateVolFromPointer(e);
+  }
+
+  function handleVolPointerMove(e) {
+    if (!e.buttons) return;
+    updateVolFromPointer(e);
+  }
+
+  function showVol() {
+    clearTimeout(volHideTimeoutRef.current);
+    setShowVolume(true);
+  }
+
+  function hideVol() {
+    volHideTimeoutRef.current = setTimeout(() => setShowVolume(false), 180);
   }
 
   function handleSeek(e) {
@@ -535,6 +619,7 @@ export default function FinalWorkingVideoCard({
     }
   }
 
+  const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny','default'];
   const QUALITY_LABELS = { highres: '4K', hd2160: '4K', hd1440: '1440p', hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p', tiny: '144p', default: 'Auto' };
 
   function handleSkip(secs) {
@@ -549,7 +634,7 @@ export default function FinalWorkingVideoCard({
     if (!isPlayerReady || !playerRef.current) return;
     try { playerRef.current.setPlaybackRate(speed); } catch { /* ignore */ }
     setPlaybackSpeed(speed);
-    setShowSettings(false);
+    setActiveMenu(null);
   }
 
   function handleQualityChange(quality) {
@@ -631,6 +716,31 @@ export default function FinalWorkingVideoCard({
             className="compact-premium-player-frame"
           />
 
+          {/* End-screen overlay — hides YT suggestions, provides replay */}
+          {isVideoEnded && (
+            <div className="vp-endscreen">
+              <div className="vp-endscreen-inner">
+                <div className="vp-endscreen-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13v4.5l3.5 2-.75 1.32L10 13V7h1z"/>
+                  </svg>
+                </div>
+                <p className="vp-endscreen-title">Video Ended</p>
+                <button
+                  type="button"
+                  className="vp-endscreen-replay"
+                  onClick={handleStartOver}
+                  aria-label="Replay video"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                  </svg>
+                  Watch Again
+                </button>
+              </div>
+            </div>
+          )}
+
           {playerError ? (
             <div className="compact-premium-player-error">
               <span>{playerError}</span>
@@ -640,114 +750,43 @@ export default function FinalWorkingVideoCard({
             </div>
           ) : null}
           
-          {/* Custom controls overlay */}
+          {/* ── Custom video player controls ─────────────────── */}
           {isPlayerReady && (
-            <div className={`compact-premium-controls-overlay ${showControls ? '' : 'hide-controls'}`}>
-
-              <div className="cpv-control-status-row">
-                <div className="cpv-control-badges">
-                  <span className="cpv-status-badge">Quality {QUALITY_LABELS[currentQuality] || currentQuality}</span>
-                  <span className="cpv-status-badge">Speed {playbackSpeed === 1 ? 'Normal' : `${playbackSpeed}x`}</span>
-                </div>
-                <span className="cpv-control-shortcuts">K play, Left/Right seek, M mute, F fullscreen</span>
-              </div>
-
-              {/* Settings panel — speed & quality — expands overlay upward */}
-              {showSettings && (
-                <div className="cpv-settings-panel" ref={settingsPanelRef}>
-                  <div className="cpv-settings-group">
-                    <span className="cpv-settings-label">Playback Speed</span>
-                    <label className="cpv-settings-field">
-                      <span className="cpv-settings-field-label">Speed</span>
-                      <select
-                        className="cpv-settings-select"
-                        value={String(playbackSpeed)}
-                        onChange={(event) => handleSpeedChange(Number(event.target.value))}
-                      >
-                        {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((speed) => (
-                          <option key={speed} value={speed}>{speed === 1 ? 'Normal (1x)' : `${speed}x`}</option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  {qualityOptions.length > 0 && (
-                    <div className="cpv-settings-group">
-                      <span className="cpv-settings-label">Quality</span>
-                      <label className="cpv-settings-field">
-                        <span className="cpv-settings-field-label">Resolution</span>
-                        <select
-                          className="cpv-settings-select"
-                          value={currentQuality}
-                          onChange={(event) => handleQualityChange(event.target.value)}
-                        >
-                          {qualityOptions.map((quality) => (
-                            <option key={quality} value={quality}>{QUALITY_LABELS[quality] || quality}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  )}
-                  <p className="cpv-settings-hint">Space/K play · Left/Right seek · Up/Down volume · M mute · F fullscreen</p>
-                </div>
-              )}
-
-              {/* Progress bar with hover tooltip */}
-              <div className="cpv-progress-wrap">
+            <div
+              className={`vp-overlay${showControls ? '' : ' vp-overlay--out'}`}
+              onTouchStart={() => { setShowControls(true); hideControlsDelayed(); }}
+            >
+              {/* Seekbar row */}
+              <div className="vp-seekrow">
                 {hoverTime !== null && (
                   <span
-                    className="cpv-time-tooltip"
-                    style={{ left: `clamp(24px, ${hoverTime.percent}%, calc(100% - 24px))` }}
+                    className="vp-seek-tip"
+                    style={{ left: `clamp(18px, ${hoverTime.percent}%, calc(100% - 18px))` }}
                   >
                     {hoverTime.time}
                   </span>
                 )}
                 <div
-                  className="compact-premium-progress-bar"
+                  className="vp-seekbar"
+                  ref={progressRef}
                   onClick={handleProgressClick}
                   onMouseMove={handleProgressHover}
                   onMouseLeave={() => setHoverTime(null)}
-                  ref={progressRef}
                 >
-                  <div
-                    className="compact-premium-progress-fill"
-                    style={{ width: `${progressPercent}%` }}
-                  >
-                    <div className="compact-premium-progress-handle" />
+                  <div className="vp-seekbar-fill" style={{ width: `${progressPercent}%` }}>
+                    <div className="vp-seekbar-dot" />
                   </div>
-                  <div
-                    className="compact-premium-progress-buffered"
-                    style={{ width: `${(savedProgressSec / duration) * 100 || 0}%` }}
-                  />
                 </div>
               </div>
 
-              <div className="compact-premium-controls-main">
-                {/* Left: play, skip, time */}
-                <div className="compact-premium-controls-left">
-                  {/* Play / Pause */}
-                  <button
-                    type="button"
-                    className="compact-premium-control-btn compact-premium-play-btn"
-                    onClick={handlePlayPause}
-                    title={isPlaying ? 'Pause (Space / K)' : 'Play (Space / K)'}
-                    aria-label={isPlaying ? 'Pause' : 'Play'}
-                  >
-                    {isPlaying ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <rect x="6" y="4" width="4" height="16" />
-                        <rect x="14" y="4" width="4" height="16" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    )}
-                  </button>
+              {/* Controls row */}
+              <div className="vp-row">
 
-                  {/* Rewind 10s */}
+                {/* ── Left: skip-back, play, skip-forward, volume, time ── */}
+                <div className="vp-group">
                   <button
                     type="button"
-                    className="compact-premium-control-btn cpv-skip-btn"
+                    className="vp-btn vp-skip-btn"
                     onClick={() => handleSkip(-10)}
                     title="Rewind 10s (←)"
                     aria-label="Rewind 10 seconds"
@@ -755,13 +794,31 @@ export default function FinalWorkingVideoCard({
                     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
                     </svg>
-                    <span className="cpv-skip-label">10</span>
+                    <span className="vp-skip-n">10</span>
                   </button>
 
-                  {/* Forward 10s */}
                   <button
                     type="button"
-                    className="compact-premium-control-btn cpv-skip-btn cpv-skip-fwd"
+                    className="vp-btn vp-play-btn"
+                    onClick={handlePlayPause}
+                    title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                  >
+                    {isPlaying ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <rect x="6" y="4" width="4" height="16"/>
+                        <rect x="14" y="4" width="4" height="16"/>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="vp-btn vp-skip-btn vp-skip-fwd"
                     onClick={() => handleSkip(10)}
                     title="Forward 10s (→)"
                     aria-label="Forward 10 seconds"
@@ -769,79 +826,161 @@ export default function FinalWorkingVideoCard({
                     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8h-2z"/>
                     </svg>
-                    <span className="cpv-skip-label">10</span>
+                    <span className="vp-skip-n">10</span>
                   </button>
 
-                  {/* Time */}
-                  <div className="compact-premium-time-display">
-                    {formatDuration(currentTime)} / {formatDuration(duration)}
+                  {/* Volume — vertical popup on hover */}
+                  <div className="vp-vol-wrap" onMouseEnter={showVol} onMouseLeave={hideVol}>
+                    <button
+                      type="button"
+                      className={`vp-btn${isMuted || volume === 0 ? ' vp-muted' : ''}`}
+                      onClick={toggleMute}
+                      title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
+                      aria-label={isMuted ? 'Unmute' : 'Mute'}
+                    >
+                      {isMuted || volume === 0 ? (
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/>
+                        </svg>
+                      ) : volume < 50 ? (
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                        </svg>
+                      )}
+                    </button>
+                    {/* Vertical volume slider — shown via React state with delayed hide */}
+                    {showVolume && (
+                      <div
+                        ref={volPopupRef}
+                        className="vp-vol-popup"
+                        role="slider"
+                        aria-label="Volume"
+                        aria-valuenow={isMuted ? 0 : volume}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        onMouseEnter={showVol}
+                        onMouseLeave={hideVol}
+                        onPointerDown={handleVolPointerDown}
+                        onPointerMove={handleVolPointerMove}
+                      >
+                        <div className="vp-vol-track" aria-hidden="true">
+                          <div
+                            className="vp-vol-fill"
+                            style={{ height: `${isMuted ? 0 : volume}%` }}
+                          />
+                          <div
+                            className="vp-vol-thumb"
+                            style={{ bottom: `${isMuted ? 0 : volume}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Speed badge (shown only when not 1×) */}
-                  {playbackSpeed !== 1 && (
-                    <span className="cpv-speed-badge">{playbackSpeed}×</span>
-                  )}
+                  {/* Time */}
+                  <span className="vp-time">
+                    {formatDuration(currentTime)}
+                    <span className="vp-dur"> / {formatDuration(duration)}</span>
+                  </span>
                 </div>
 
-                {/* Right: mute, volume, settings, fullscreen */}
-                <div className="compact-premium-controls-right" ref={settingsShellRef}>
-                  {/* Mute toggle */}
-                  <button
-                    type="button"
-                    className={`compact-premium-control-btn${isMuted || volume === 0 ? ' cpv-muted' : ''}`}
-                    onClick={toggleMute}
-                    title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
-                    aria-label={isMuted ? 'Unmute' : 'Mute'}
-                  >
-                    {isMuted || volume === 0 ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/>
+                {/* ── Right: quality, speed, fullscreen ── */}
+                <div className="vp-group vp-group-r">
+
+                  {/* Quality popup — always shown once player ready */}
+                  {qualityOptions.length > 0 && (
+                    <div className="vp-popup-wrap" ref={qualityMenuRef}>
+                      <button
+                        type="button"
+                        className={`vp-pill${activeMenu === 'quality' ? ' vp-pill--on' : ''}`}
+                        onClick={() => setActiveMenu((p) => (p === 'quality' ? null : 'quality'))}
+                        aria-label="Video quality"
+                        aria-expanded={activeMenu === 'quality'}
+                        title="Video quality"
+                      >
+                        <span>{QUALITY_LABELS[currentQuality] || currentQuality}</span>
+                        <svg viewBox="0 0 10 6" fill="currentColor" className="vp-caret" aria-hidden="true">
+                          <path d="M0 0l5 6 5-6z"/>
+                        </svg>
+                      </button>
+                      {activeMenu === 'quality' && (
+                        <div className="vp-popup" role="menu" aria-label="Select quality" ref={qualityPopupRef}>
+                          <div className="vp-popup-head">Quality</div>
+                          {qualityOptions.map((q, i) => (
+                            <button
+                              key={q}
+                              type="button"
+                              role="menuitem"
+                              className={`vp-popup-item${q === currentQuality ? ' vp-popup-item--on' : ''}`}
+                              onClick={() => { handleQualityChange(q); setActiveMenu(null); }}
+                            >
+                              <span className="vp-popup-item-label">
+                                {QUALITY_LABELS[q] || q}
+                                {i === 0 && q !== 'default' && (
+                                  <span className="vp-quality-best">Best</span>
+                                )}
+                              </span>
+                              {q === currentQuality && (
+                                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Speed popup */}
+                  <div className="vp-popup-wrap" ref={speedMenuRef}>
+                    <button
+                      type="button"
+                      className={`vp-pill${activeMenu === 'speed' ? ' vp-pill--on' : ''}`}
+                      onClick={() => setActiveMenu((p) => (p === 'speed' ? null : 'speed'))}
+                      aria-label="Playback speed"
+                      aria-expanded={activeMenu === 'speed'}
+                      title="Playback speed"
+                    >
+                      <span>{playbackSpeed === 1 ? '1×' : `${playbackSpeed}×`}</span>
+                      <svg viewBox="0 0 10 6" fill="currentColor" className="vp-caret" aria-hidden="true">
+                        <path d="M0 0l5 6 5-6z"/>
                       </svg>
-                    ) : volume < 50 ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                      </svg>
+                    </button>
+                    {activeMenu === 'speed' && (
+                      <div className="vp-popup" role="menu" aria-label="Select speed">
+                        <div className="vp-popup-head">Speed</div>
+                        {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            role="menuitem"
+                            className={`vp-popup-item${s === playbackSpeed ? ' vp-popup-item--on' : ''}`}
+                            onClick={() => { handleSpeedChange(s); setActiveMenu(null); }}
+                          >
+                            {s === 1 ? 'Normal (1×)' : `${s}×`}
+                            {s === playbackSpeed && (
+                              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                              </svg>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     )}
-                  </button>
-
-                  {/* Volume slider */}
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={isMuted ? 0 : volume}
-                    onChange={handleVolumeChange}
-                    className="compact-premium-volume-slider"
-                    title={`Volume ${isMuted ? '(muted)' : `${volume}%`} · ↑↓ keys`}
-                    aria-label="Volume"
-                  />
-
-                  {/* Settings: speed + quality */}
-                  <button
-                    type="button"
-                    className={`compact-premium-control-btn cpv-labeled-btn cpv-settings-trigger${showSettings ? ' cpv-settings-active' : ''}`}
-                    onClick={() => setShowSettings((p) => !p)}
-                    title="Settings — speed & quality"
-                    aria-label="Settings"
-                    aria-expanded={showSettings}
-                  >
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-                    </svg>
-                    <span className="cpv-control-label">Settings</span>
-                  </button>
+                  </div>
 
                   {/* Fullscreen */}
                   <button
                     type="button"
-                    className="compact-premium-control-btn cpv-labeled-btn"
+                    className="vp-btn vp-fs-btn"
                     onClick={toggleFullscreen}
                     title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
-                    aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                    aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
                   >
                     {isFullscreen ? (
                       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -852,7 +991,6 @@ export default function FinalWorkingVideoCard({
                         <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
                       </svg>
                     )}
-                    <span className="cpv-control-label">{isFullscreen ? 'Exit Full' : 'Fullscreen'}</span>
                   </button>
                 </div>
               </div>
