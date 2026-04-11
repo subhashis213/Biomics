@@ -27,12 +27,5 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/auth': 'http://localhost:5002',
-      '/videos': 'http://localhost:5002',
-      '/uploads': 'http://localhost:5002',
-      '/quizzes': 'http://localhost:5002',
-      '/feedback': 'http://localhost:5002'
-    }
   }
 });

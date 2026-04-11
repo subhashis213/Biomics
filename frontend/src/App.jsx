@@ -18,6 +18,7 @@ import AdminTopicTestBuilderPage from './pages/AdminTopicTestBuilderPage';
 import AdminFullMockTestBuilderPage from './pages/AdminFullMockTestBuilderPage';
 import AuthPage from './pages/AuthPage';
 
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const CommunityChatPage = lazy(() => import('./pages/CommunityChatPage'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const StudentLecturePage = lazy(() => import('./pages/StudentLecturePage'));
@@ -47,7 +48,8 @@ export default function App() {
     <ErrorBoundary>
     <ScrollToTop />
     <Routes>
-      <Route path="/" element={<AuthPage />} />
+      <Route path="/" element={<Suspense fallback={null}><LandingPage /></Suspense>} />
+      <Route path="/auth" element={<AuthPage />} />
       <Route
         path="/admin"
         element={(
@@ -271,6 +273,7 @@ export default function App() {
         )}
       />
       <Route path="*" element={<Navigate to="/" replace />} />
+    
     </Routes>
     </ErrorBoundary>
   );
