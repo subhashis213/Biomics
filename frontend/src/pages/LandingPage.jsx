@@ -1,7 +1,31 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { getSession } from '../session';
 import logoImg from '../assets/biomics-logo.jpeg';
+import posterTestSeries from '../assets/poster-test-series.jpeg';
+import posterLifeScience from '../assets/poster-life-science.jpeg';
+import posterBatch from '../assets/poster-batch.jpeg';
+
+const POSTERS = [
+  {
+    src: posterTestSeries,
+    alt: 'CSIR NET 2026 Test Series – Topic Wise, Full Length, PYQ Included',
+    label: 'Test Series',
+    tag: 'CSIR NET 2026',
+  },
+  {
+    src: posterLifeScience,
+    alt: 'CSIR NET Life Science – Recorded Classes, Complete Syllabus, PYQ Session',
+    label: 'Life Science Course',
+    tag: 'Recorded + Live',
+  },
+  {
+    src: posterBatch,
+    alt: 'Batch 1.0 for CSIR NET DEC 2026 – Live & Recorded, PDF Notes, Test Series',
+    label: 'Batch 1.0',
+    tag: 'DEC 2026',
+  },
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -12,6 +36,33 @@ export default function LandingPage() {
     return <Navigate to={session.role === 'admin' ? '/admin' : '/student'} replace />;
   }
   const pageRef = useRef(null);
+
+  /* ── Slideshow state ─────────────────────── */
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isPaused, setIsPaused]       = useState(false);
+  const autoRef = useRef(null);
+  const SLIDE_INTERVAL = 6500;
+
+  const goTo = useCallback((idx) => {
+    setActiveSlide(((idx % POSTERS.length) + POSTERS.length) % POSTERS.length);
+  }, []);
+
+  const prev = useCallback(() => {
+    setActiveSlide((s) => ((s - 1) + POSTERS.length) % POSTERS.length);
+  }, []);
+
+  const next = useCallback(() => {
+    setActiveSlide((s) => (s + 1) % POSTERS.length);
+  }, []);
+
+  // Auto-advance; pauses on hover
+  useEffect(() => {
+    if (isPaused) return;
+    autoRef.current = setInterval(() => {
+      setActiveSlide((s) => (s + 1) % POSTERS.length);
+    }, SLIDE_INTERVAL);
+    return () => clearInterval(autoRef.current);
+  }, [isPaused]);
 
   // Scroll reveal — IntersectionObserver fires just before element enters viewport
   useEffect(() => {
@@ -69,6 +120,7 @@ export default function LandingPage() {
             <span className="lp-nav-name">Biomics Hub</span>
           </div>
           <div className="lp-nav-links">
+            <a href="#courses" className="lp-nav-link">Courses</a>
             <a href="#features" className="lp-nav-link">Features</a>
             <a href="#how-it-works" className="lp-nav-link">How it Works</a>
             <a href="#community" className="lp-nav-link">Community</a>
@@ -124,6 +176,110 @@ export default function LandingPage() {
               <span className="lp-stat-label">{s.label}</span>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── COURSE SLIDESHOW ────────────────────── */}
+      <section id="courses" className="lp-section lp-section-alt lp-slideshow-section">
+        <div className="lp-section-inner">
+          <div className="lp-section-header lp-reveal">
+            <p className="lp-eyebrow">Our Courses</p>
+            <h2 className="lp-section-title">What we offer</h2>
+            <p className="lp-section-sub">Comprehensive biology programmes for every stage of your preparation.</p>
+          </div>
+
+          <div
+            className="lp-slideshow lp-reveal"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            {/* ── Slide track — pure CSS translateX, zero JS timing ── */}
+            <div
+              className="lp-slide-track"
+              style={{ transform: `translateX(-${activeSlide * (100 / POSTERS.length)}%)` }}
+              aria-live="polite"
+              aria-label="Course slideshow"
+            >
+              {POSTERS.map((poster, i) => (
+                <div
+                  key={poster.label}
+                  className={`lp-slide${i === activeSlide ? ' lp-slide-active' : ''}`}
+                  aria-hidden={i !== activeSlide}
+                >
+                  <div className="lp-slide-inner">
+                    <img
+                      src={poster.src}
+                      alt={poster.alt}
+                      className="lp-slide-img"
+                      draggable="false"
+                      loading="eager"
+                    />
+                    <div className="lp-slide-badge">
+                      <span className="lp-slide-tag">{poster.tag}</span>
+                      <span className="lp-slide-label">{poster.label}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Prev / Next arrows */}
+            <button
+              type="button"
+              className="lp-slide-arrow lp-slide-arrow-prev"
+              onClick={prev}
+              aria-label="Previous course"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="lp-slide-arrow lp-slide-arrow-next"
+              onClick={next}
+              aria-label="Next course"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+
+            {/* Dot indicators */}
+            <div className="lp-slide-dots" role="tablist" aria-label="Slide selector">
+              {POSTERS.map((poster, i) => (
+                <button
+                  key={poster.label}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === activeSlide}
+                  aria-label={`Go to slide ${i + 1}: ${poster.label}`}
+                  className={`lp-slide-dot${i === activeSlide ? ' lp-slide-dot-active' : ''}`}
+                  onClick={() => goTo(i)}
+                />
+              ))}
+            </div>
+
+            {/* Auto-advance progress bar — key forces remount on slide change */}
+            <div className="lp-slide-progress" aria-hidden="true">
+              <div
+                key={`${activeSlide}-${isPaused}`}
+                className="lp-slide-progress-bar"
+                style={{
+                  animationDuration: `${SLIDE_INTERVAL}ms`,
+                  animationPlayState: isPaused ? 'paused' : 'running',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* CTA below slideshow */}
+          <div className="lp-slideshow-cta lp-reveal">
+            <button type="button" className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/auth')}>
+              Enrol Now
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" /></svg>
+            </button>
+          </div>
         </div>
       </section>
 
