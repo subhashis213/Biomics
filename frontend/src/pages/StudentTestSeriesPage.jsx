@@ -257,6 +257,7 @@ export default function StudentTestSeriesPage() {
     try {
       localStorage.setItem('ts_cart', JSON.stringify(cartItems));
     } catch { /* storage full or unavailable */ }
+    window.dispatchEvent(new Event('ts-cart-updated'));
   }, [cartItems]);
 
   const timerRef = useRef(null);
@@ -1037,6 +1038,16 @@ export default function StudentTestSeriesPage() {
   const topicIsFree   = !(pricing.topicTestPriceInPaise > 0);
   const mockIsFree    = !(pricing.fullMockPriceInPaise > 0);
 
+  useEffect(() => {
+    if (hasTopicTest && !hasFullMock && activeTab !== 'topic') {
+      setActiveTab('topic');
+      return;
+    }
+    if (!hasTopicTest && hasFullMock && activeTab !== 'mock') {
+      setActiveTab('mock');
+    }
+  }, [hasTopicTest, hasFullMock, activeTab]);
+
   return (
     <AppShell
       title="Test Series"
@@ -1085,16 +1096,17 @@ export default function StudentTestSeriesPage() {
           </div>
         ) : (
           <>
-            {/* ─── LOCKED: Two plan banners ─── */}
-            {!hasAnyAccess && (
+            {/* ─── PURCHASE OPTIONS: show only plans not yet purchased ─── */}
+            {(!hasTopicTest || !hasFullMock) && (
               <section className="ts-paywall-section">
                 <div className="ts-paywall-intro">
                   <span className="ts-lock-icon">🔒</span>
                   <div>
                     <h2 className="ts-paywall-title">Unlock Test Series for {course || 'your course'}</h2>
                     <p className="ts-paywall-desc">
-                      Test Series is a premium add-on, separate from your course plan.
-                      Pick the option that matches your preparation level.
+                      {hasAnyAccess
+                        ? 'Upgrade your access with the remaining test series plan.'
+                        : 'Test Series is a premium add-on, separate from your course plan. Pick the option that matches your preparation level.'}
                     </p>
                   </div>
                 </div>
@@ -1102,6 +1114,7 @@ export default function StudentTestSeriesPage() {
                 <div className="ts-plan-banners">
 
                   {/* ── Banner 1: Topic Test Series (Recommended) ── */}
+                  {!hasTopicTest && (
                   <article className="ts-plan-banner ts-plan-topic">
                     <div className="ts-plan-banner-badge">⭐ RECOMMENDED</div>
                     <div className="ts-plan-banner-inner">
@@ -1214,12 +1227,16 @@ export default function StudentTestSeriesPage() {
                       </div>
                     </div>
                   </article>
+                  )}
 
-                  <div className="ts-plan-banners-or">
-                    <span className="ts-or-text">OR, if you only need mock tests</span>
-                  </div>
+                  {!hasTopicTest && !hasFullMock && (
+                    <div className="ts-plan-banners-or">
+                      <span className="ts-or-text">OR, if you only need mock tests</span>
+                    </div>
+                  )}
 
                   {/* ── Banner 2: Full Mock Series ── */}
+                  {!hasFullMock && (
                   <article className="ts-plan-banner ts-plan-mock">
                     <div className="ts-plan-banner-badge ts-mock-badge">MOCK ONLY</div>
                     <div className="ts-plan-banner-inner">
@@ -1334,6 +1351,7 @@ export default function StudentTestSeriesPage() {
                       </div>
                     </div>
                   </article>
+                  )}
 
                 </div>{/* /ts-plan-banners */}
               </section>
