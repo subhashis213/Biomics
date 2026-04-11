@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { fetchModuleTopics } from '../api';
 import { useCourseData } from '../hooks/useCourseData';
 
 function normalizeText(value) {
@@ -41,6 +42,9 @@ export default function StudentModuleDetailsPage() {
     loadError
   } = useCourseData();
 
+  const [catalogTopics, setCatalogTopics] = useState([]);
+  const [topicsLoadedFromCatalog, setTopicsLoadedFromCatalog] = useState(false);
+
   const moduleAccessMap = access?.moduleAccess || {};
 
   const moduleAccess = useMemo(() => {
@@ -54,31 +58,57 @@ export default function StudentModuleDetailsPage() {
 
   const moduleLocked = Boolean(moduleAccess?.purchaseRequired && !moduleAccess?.unlocked);
 
+  const courseKey = decodedCourseName.toLowerCase();
+  const moduleKey = decodedModuleName.toLowerCase();
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogTopics([]);
+    setTopicsLoadedFromCatalog(false);
+
+    fetchModuleTopics(decodedCourseName, decodedModuleName)
+      .then((data) => {
+        if (cancelled) return;
+        const topics = Array.isArray(data?.topics)
+          ? data.topics.map((entry) => normalizeText(entry?.name || '')).filter(Boolean)
+          : [];
+        setCatalogTopics(topics);
+        setTopicsLoadedFromCatalog(true);
+      })
+      .catch(() => {
+        if (!cancelled) setTopicsLoadedFromCatalog(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [decodedCourseName, decodedModuleName]);
+
   const moduleVideos = useMemo(() => {
     return videos.filter((video) => {
-      const sameCourse = normalizeText(video?.category || '') === decodedCourseName;
-      const sameModule = normalizeText(video?.module || 'General') === decodedModuleName;
+      const sameCourse = normalizeText(video?.category || '').toLowerCase() === courseKey;
+      const sameModule = normalizeText(video?.module || 'General').toLowerCase() === moduleKey;
       return sameCourse && sameModule;
     });
-  }, [videos, decodedCourseName, decodedModuleName]);
+  }, [videos, courseKey, moduleKey]);
 
   const moduleQuizzes = useMemo(() => {
     return quizzes.filter((quiz) => {
-      const sameCourse = normalizeText(quiz?.category || decodedCourseName) === decodedCourseName;
-      const sameModule = normalizeText(quiz?.module || 'General') === decodedModuleName;
+      const sameCourse = normalizeText(quiz?.category || decodedCourseName).toLowerCase() === courseKey;
+      const sameModule = normalizeText(quiz?.module || 'General').toLowerCase() === moduleKey;
       return sameCourse && sameModule;
     });
-  }, [quizzes, decodedCourseName, decodedModuleName]);
+  }, [quizzes, decodedCourseName, courseKey, moduleKey]);
 
   const moduleAttempts = useMemo(() => {
     return quizAttempts
       .filter((attempt) => {
-        const sameCourse = normalizeText(attempt?.category || decodedCourseName) === decodedCourseName;
-        const sameModule = normalizeText(attempt?.module || 'General') === decodedModuleName;
+        const sameCourse = normalizeText(attempt?.category || decodedCourseName).toLowerCase() === courseKey;
+        const sameModule = normalizeText(attempt?.module || 'General').toLowerCase() === moduleKey;
         return sameCourse && sameModule;
       })
       .sort((a, b) => new Date(b?.submittedAt || 0).getTime() - new Date(a?.submittedAt || 0).getTime());
-  }, [quizAttempts, decodedCourseName, decodedModuleName]);
+  }, [quizAttempts, decodedCourseName, courseKey, moduleKey]);
 
   const completedCount = moduleVideos.filter((video) => completedIds.has(String(video?._id || ''))).length;
   const savedCount = moduleVideos.filter((video) => favoriteIds.has(String(video?._id || ''))).length;
@@ -89,10 +119,16 @@ export default function StudentModuleDetailsPage() {
   const latestAttempt = moduleAttempts[0] || null;
 
   const topicCount = useMemo(() => {
+    if (topicsLoadedFromCatalog) {
+      return Array.from(new Set(catalogTopics.map((topic) => normalizeText(topic)).filter(Boolean))).length;
+    }
     return new Set(
-      moduleVideos.map((video) => normalizeText(video?.topic || 'General')).filter(Boolean)
+      [
+        ...moduleVideos.map((video) => normalizeText(video?.topic || 'General')),
+        ...moduleQuizzes.map((quiz) => normalizeText(quiz?.topic || 'General'))
+      ].filter(Boolean)
     ).size;
-  }, [moduleVideos]);
+  }, [moduleVideos, moduleQuizzes, catalogTopics, topicsLoadedFromCatalog]);
 
   function handleBack() {
     navigate(`/student/course/${encodeURIComponent(decodedCourseName)}/modules`);
