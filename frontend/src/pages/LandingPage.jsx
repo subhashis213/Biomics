@@ -41,7 +41,7 @@ export default function LandingPage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isPaused, setIsPaused]       = useState(false);
   const autoRef = useRef(null);
-  const SLIDE_INTERVAL = 6500;
+  const SLIDE_INTERVAL = 3200;
 
   const goTo = useCallback((idx) => {
     setActiveSlide(((idx % POSTERS.length) + POSTERS.length) % POSTERS.length);
