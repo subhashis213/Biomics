@@ -214,6 +214,7 @@ async function sendOtpSms(phone, otp) {
 const registerSchema = z.object({
   phone: z.string().min(1).max(20),
   username: z.string().min(1).max(50),
+  email: z.string().email('Invalid email address').max(254).optional().or(z.literal('')),
   class: z.string().min(1).max(50),
   city: z.string().min(1).max(50),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Birth date is required'),
@@ -269,11 +270,12 @@ router.post('/check-username', async (req, res) => {
 
 // User Registration
 router.post('/register', validate(registerSchema), async (req, res) => {
-  const { phone, username, class: userClass, city, birthDate, password } = req.body;
+  const { phone, username, email, class: userClass, city, birthDate, password } = req.body;
   if (!phone || !username || !userClass || !city || !birthDate || !password) return res.status(400).json({ error: 'All fields required' });
   try {
     const normalizedPhone = String(phone).trim();
     const normalizedUsername = String(username).trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     const normalizedClass = String(userClass).trim();
     const normalizedCity = String(city).trim();
     const normalizedBirthDate = normalizeBirthDate(birthDate);
@@ -293,6 +295,7 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     const user = new User({
       phone: normalizedPhone,
       username: normalizedUsername,
+      email: normalizedEmail,
       class: normalizedClass,
       city: normalizedCity,
       security: {
@@ -307,6 +310,7 @@ router.post('/register', validate(registerSchema), async (req, res) => {
       user: {
         username: user.username,
         phone: user.phone,
+        email: user.email,
         class: user.class,
         city: user.city
       }
@@ -362,12 +366,13 @@ router.get('/users', authenticateToken('admin'), async (req, res) => {
     const filter = search
       ? { $or: [
           { username: new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
-          { city: new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+          { city: new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+          { email: new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
         ] }
       : {};
 
     const [users, total] = await Promise.all([
-      User.find(filter, { username: 1, class: 1, phone: 1, city: 1, createdAt: 1, _id: 0 })
+      User.find(filter, { username: 1, class: 1, phone: 1, city: 1, email: 1, createdAt: 1, _id: 0 })
         .sort({ username: 1 })
         .skip(skip)
         .limit(limit)

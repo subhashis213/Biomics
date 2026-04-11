@@ -5683,6 +5683,12 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   color: var(--muted, #6b7280);
 }
 
+.student-card-email {
+  font-size: 0.7rem;
+  color: var(--text-soft, #9aa5c2);
+  word-break: break-all;
+}
+
 .student-remove-btn {
   flex-shrink: 0;
   width: 28px;

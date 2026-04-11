@@ -112,11 +112,17 @@ export default function AuthPage() {
     ? /^\d{10}$/.test(otpForm.phone.trim()) && /^\d{6}$/.test(otpForm.otp.trim())
     : loginForm.username.trim().length >= 3 && loginForm.password.length >= 6;
   const canSendOtp = /^\d{10}$/.test(otpForm.phone.trim()) && otpCooldown === 0;
+  const regEmailHint =
+    registerForm.email.length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(registerForm.email.trim())
+      ? 'Enter a valid email address.'
+      : null;
+
   const canRegister =
     /^\d{10}$/.test(registerForm.phone.trim()) &&
     registerForm.username.trim().length >= 3 &&
     registerForm.class.trim() &&
     registerForm.city.trim().length >= 2 &&
+    (registerForm.email.trim() === '' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(registerForm.email.trim())) &&
     registerForm.password.length >= 8 &&
     /[A-Za-z]/.test(registerForm.password) &&
     /\d/.test(registerForm.password) &&
@@ -256,6 +262,7 @@ export default function AuthPage() {
         body: JSON.stringify({
           phone: registerForm.phone.trim(),
           username: registerForm.username.trim(),
+          email: registerForm.email.trim(),
           class: registerForm.class,
           city: registerForm.city.trim(),
           birthDate: registerForm.birthDate,
@@ -593,6 +600,18 @@ export default function AuthPage() {
                   placeholder="Choose username"
                 />
                 {regUsernameHint ? <small className="field-hint">⚠ {regUsernameHint}</small> : null}
+              </label>
+
+              <label style={{ gridColumn: '1 / -1' }}>
+                Email Address
+                <input
+                  type="email"
+                  value={registerForm.email}
+                  onChange={(e) => setRegisterForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="e.g. yourname@gmail.com"
+                  autoComplete="email"
+                />
+                {regEmailHint ? <small className="field-hint">⚠ {regEmailHint}</small> : null}
               </label>
 
               <label>

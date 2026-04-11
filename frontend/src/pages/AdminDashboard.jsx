@@ -2643,6 +2643,7 @@ export default function AdminDashboard() {
                           {student.city ? <span className="student-city">📍 {student.city}</span> : null}
                         </div>
                         {student.phone ? <span className="student-card-phone">📞 {student.phone}</span> : null}
+                        {student.email ? <span className="student-card-email">✉️ {student.email}</span> : null}
                       </div>
                       {undoItem ? (
                         <div className="student-card-undo">
