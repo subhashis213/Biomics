@@ -250,16 +250,38 @@ function buildMailTransporter() {
   const user = process.env.GMAIL_USER || process.env.SMTP_USER || '';
   const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
   if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: true,
-    auth: { user, pass },
+
+  const timeoutConfig = {
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
     dnsTimeout: 10000
-  });
+  };
+
+  // Some hosts (including certain Render network paths) can intermittently fail on
+  // one SMTP mode. Keep multiple safe transport profiles and fall back in order.
+  return [
+    nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass },
+      ...timeoutConfig
+    }),
+    nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT || 465),
+      secure: true,
+      auth: { user, pass },
+      ...timeoutConfig
+    }),
+    nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: { user, pass },
+      ...timeoutConfig
+    })
+  ];
 }
 
 function withTimeout(promise, timeoutMs) {
@@ -283,44 +305,52 @@ function withTimeout(promise, timeoutMs) {
 }
 
 async function sendOtpEmail(email, otp) {
-  const transporter = buildMailTransporter();
-  if (!transporter) {
+  const transporters = buildMailTransporter();
+  if (!transporters) {
     // GMAIL_USER / GMAIL_APP_PASSWORD not set in environment
     console.error('[EMAIL OTP] Cannot send email — GMAIL_USER or GMAIL_APP_PASSWORD env vars are missing. Set them in Render Dashboard → Environment.');
     throw new Error('Email service is not configured. Please contact support.');
   }
   const from = process.env.GMAIL_USER || process.env.SMTP_FROM || process.env.SMTP_USER;
-  try {
-    await withTimeout(
-      transporter.sendMail({
-        from: `"Biomics Hub" <${from}>`,
-        to: email,
-        subject: 'Your Biomics Hub Login OTP',
-        html: `
-          <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0b0e14;color:#e4e9f8;border-radius:16px;">
-            <h2 style="margin:0 0 8px;color:#6ee7b7;font-size:1.4rem;">Biomics Hub</h2>
-            <p style="margin:0 0 24px;color:#9aa5c2;font-size:0.9rem;">Your one-time login code</p>
-            <div style="background:#1d2335;border:1px solid rgba(110,231,183,0.25);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
-              <span style="font-size:2.4rem;font-weight:800;letter-spacing:0.18em;color:#6ee7b7;">${otp}</span>
-            </div>
-            <p style="margin:0;font-size:0.82rem;color:#5f6b85;">This OTP expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone.</p>
-          </div>
-        `
-      }),
-      20000
-    );
-  } catch (error) {
-    const code = String(error?.code || 'UNKNOWN');
-    console.error(`[EMAIL OTP] sendMail failed (${code}):`, error?.message || error);
+  let lastError = null;
 
-    if (code === 'EAUTH') {
-      throw new Error('Email service authentication failed. Please contact support.');
+  for (let index = 0; index < transporters.length; index += 1) {
+    const transporter = transporters[index];
+    try {
+      await withTimeout(
+        transporter.sendMail({
+          from: `"Biomics Hub" <${from}>`,
+          to: email,
+          subject: 'Your Biomics Hub Login OTP',
+          html: `
+            <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0b0e14;color:#e4e9f8;border-radius:16px;">
+              <h2 style="margin:0 0 8px;color:#6ee7b7;font-size:1.4rem;">Biomics Hub</h2>
+              <p style="margin:0 0 24px;color:#9aa5c2;font-size:0.9rem;">Your one-time login code</p>
+              <div style="background:#1d2335;border:1px solid rgba(110,231,183,0.25);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+                <span style="font-size:2.4rem;font-weight:800;letter-spacing:0.18em;color:#6ee7b7;">${otp}</span>
+              </div>
+              <p style="margin:0;font-size:0.82rem;color:#5f6b85;">This OTP expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone.</p>
+            </div>
+          `
+        }),
+        20000
+      );
+      return;
+    } catch (error) {
+      lastError = error;
+      const code = String(error?.code || 'UNKNOWN');
+      console.error(`[EMAIL OTP] sendMail attempt ${index + 1} failed (${code}):`, error?.message || error);
+      if (code === 'EAUTH') {
+        throw new Error('Email service authentication failed. Please contact support.');
+      }
     }
-    if (code === 'ETIMEDOUT' || code === 'ESOCKET' || code === 'ECONNECTION' || code === 'ENOTFOUND') {
-      throw new Error('Email service is temporarily unavailable. Please try again in 1 minute.');
-    }
-    throw new Error('Failed to send OTP email. Please try again.');
   }
+
+  const finalCode = String(lastError?.code || 'UNKNOWN');
+  if (finalCode === 'ETIMEDOUT' || finalCode === 'ESOCKET' || finalCode === 'ECONNECTION' || finalCode === 'ENOTFOUND') {
+    throw new Error('Email service is temporarily unavailable. Please try again in 1 minute.');
+  }
+  throw new Error('Failed to send OTP email. Please try again.');
 }
 
 const forgotPasswordSchema = z.object({
