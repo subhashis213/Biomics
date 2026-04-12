@@ -114,12 +114,14 @@ app.use(helmet({
     }
   }
 }));
+
+// Handle CORS preflight (OPTIONS) for ALL routes BEFORE any other middleware.
+// Without this, browsers block every cross-origin POST/PATCH/PUT because the
+// preflight never gets a valid 204 response.
+app.options('*', cors({ origin: corsOrigin }));
+
 app.use(cors({ origin: corsOrigin }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  next();
-});
 app.use(express.json());
 app.use('/videos', videoRoutes);
 app.use('/auth', authLimiter, authRoutes);
