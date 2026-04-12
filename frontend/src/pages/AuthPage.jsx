@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { requestJson } from '../api';
+import { getApiBase, requestJson } from '../api';
 import { emptyRegisterForm } from '../constants';
 import { getSession } from '../session';
 import { useSessionStore } from '../stores/sessionStore';
@@ -40,6 +40,9 @@ export default function AuthPage() {
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [toast, setToast] = useState(null);
   const [introVisible, setIntroVisible] = useState(true);
+  // serverReady: false while health ping is in-flight (Render cold start)
+  const isLocalhost = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const [serverReady, setServerReady] = useState(isLocalhost);
   const registerFlipTimerRef = useRef(null);
   const forgotSuccessTimerRef = useRef(null);
 
@@ -47,6 +50,20 @@ export default function AuthPage() {
     if (!existingSession) return;
     navigate(existingSession.role === 'admin' ? '/admin' : '/student', { replace: true });
   }, [existingSession, navigate]);
+
+  // Ping /health on mount so we know the server is warm before the user clicks Send OTP.
+  // Only needed in production (Render free tier sleeps after inactivity).
+  useEffect(() => {
+    if (isLocalhost) return;
+    let cancelled = false;
+    const deadline = setTimeout(() => { if (!cancelled) setServerReady(true); }, 90000);
+    fetch(`${getApiBase()}/health`, { method: 'GET', cache: 'no-store' })
+      .then(() => { if (!cancelled) setServerReady(true); })
+      .catch(() => { if (!cancelled) setServerReady(true); })
+      .finally(() => clearTimeout(deadline));
+    return () => { cancelled = true; clearTimeout(deadline); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -478,13 +495,16 @@ export default function AuthPage() {
                         type="button"
                         className={`otp-send-btn ${otpSent ? 'otp-sent' : ''}`}
                         onClick={handleSendOtp}
-                        disabled={!canSendOtp || isSendingOtp}
+                        disabled={!canSendOtp || isSendingOtp || !serverReady}
+                        title={!serverReady ? 'Server is warming up, please wait…' : undefined}
                       >
-                        {isSendingOtp
-                          ? <><span className="otp-spinner" />Sending…</>
-                          : otpCooldown > 0
-                            ? `Resend in ${otpCooldown}s`
-                            : otpSent ? '✓ Resend OTP' : 'Send OTP'}
+                        {!serverReady
+                          ? <><span className="otp-spinner" />Warming up…</>
+                          : isSendingOtp
+                            ? <><span className="otp-spinner" />Sending…</>
+                            : otpCooldown > 0
+                              ? `Resend in ${otpCooldown}s`
+                              : otpSent ? '✓ Resend OTP' : 'Send OTP'}
                       </button>
                     </div>
                     {otpEmailHint ? <small className="field-hint">⚠ {otpEmailHint}</small> : null}
