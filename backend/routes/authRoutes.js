@@ -304,6 +304,47 @@ function withTimeout(promise, timeoutMs) {
   });
 }
 
+async function sendOtpEmailViaResend(email, otp) {
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
+  if (!apiKey) return false;
+
+  const fromEmail = String(process.env.RESEND_FROM_EMAIL || '').trim() || String(process.env.GMAIL_USER || '').trim();
+  if (!fromEmail) {
+    throw new Error('Email provider is not configured. Missing RESEND_FROM_EMAIL.');
+  }
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: `Biomics Hub <${fromEmail}>`,
+      to: [email],
+      subject: 'Your Biomics Hub Login OTP',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0b0e14;color:#e4e9f8;border-radius:16px;">
+          <h2 style="margin:0 0 8px;color:#6ee7b7;font-size:1.4rem;">Biomics Hub</h2>
+          <p style="margin:0 0 24px;color:#9aa5c2;font-size:0.9rem;">Your one-time login code</p>
+          <div style="background:#1d2335;border:1px solid rgba(110,231,183,0.25);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+            <span style="font-size:2.4rem;font-weight:800;letter-spacing:0.18em;color:#6ee7b7;">${otp}</span>
+          </div>
+          <p style="margin:0;font-size:0.82rem;color:#5f6b85;">This OTP expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone.</p>
+        </div>
+      `
+    })
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    console.error(`[EMAIL OTP] Resend API failed (${response.status}):`, text || 'no-body');
+    throw new Error('Email service fallback failed. Please contact support.');
+  }
+
+  return true;
+}
+
 async function sendOtpEmail(email, otp) {
   const transporters = buildMailTransporter();
   if (!transporters) {
@@ -348,8 +389,14 @@ async function sendOtpEmail(email, otp) {
 
   const finalCode = String(lastError?.code || 'UNKNOWN');
   if (finalCode === 'ETIMEDOUT' || finalCode === 'ESOCKET' || finalCode === 'ECONNECTION' || finalCode === 'ENOTFOUND') {
+    const resendSent = await sendOtpEmailViaResend(email, otp);
+    if (resendSent) return;
     throw new Error('Email service is temporarily unavailable. Please try again in 1 minute.');
   }
+
+  const resendSent = await sendOtpEmailViaResend(email, otp);
+  if (resendSent) return;
+
   throw new Error('Failed to send OTP email. Please try again.');
 }
 
