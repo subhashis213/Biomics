@@ -259,8 +259,9 @@ function buildMailTransporter() {
 async function sendOtpEmail(email, otp) {
   const transporter = buildMailTransporter();
   if (!transporter) {
-    console.log(`[DEV] Email OTP for ${email}: ${otp}`);
-    return;
+    // GMAIL_USER / GMAIL_APP_PASSWORD not set in environment
+    console.error('[EMAIL OTP] Cannot send email — GMAIL_USER or GMAIL_APP_PASSWORD env vars are missing. Set them in Render Dashboard → Environment.');
+    throw new Error('Email service is not configured. Please contact support.');
   }
   const from = process.env.GMAIL_USER || process.env.SMTP_FROM || process.env.SMTP_USER;
   await transporter.sendMail({
