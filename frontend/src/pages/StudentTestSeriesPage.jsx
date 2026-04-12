@@ -576,6 +576,24 @@ export default function StudentTestSeriesPage() {
     });
   }
 
+  const hasTopicTest  = Boolean(accessData?.access?.hasTopicTest);
+  const hasFullMock   = Boolean(accessData?.access?.hasFullMock);
+  const pricing       = accessData?.pricing || {};
+  const course        = accessData?.course || '';
+  const hasAnyAccess  = hasTopicTest || hasFullMock;
+  const topicIsFree   = !(pricing.topicTestPriceInPaise > 0);
+  const mockIsFree    = !(pricing.fullMockPriceInPaise > 0);
+
+  useEffect(() => {
+    if (hasTopicTest && !hasFullMock && activeTab !== 'topic') {
+      setActiveTab('topic');
+      return;
+    }
+    if (!hasTopicTest && hasFullMock && activeTab !== 'mock') {
+      setActiveTab('mock');
+    }
+  }, [hasTopicTest, hasFullMock, activeTab]);
+
   // ══════════════════════════════════════════════════════════
   // RENDER: Result
   // ══════════════════════════════════════════════════════════
@@ -1030,24 +1048,6 @@ export default function StudentTestSeriesPage() {
   // ══════════════════════════════════════════════════════════
   // RENDER: Hub / Paywall / Test list
   // ══════════════════════════════════════════════════════════
-  const hasTopicTest  = Boolean(accessData?.access?.hasTopicTest);
-  const hasFullMock   = Boolean(accessData?.access?.hasFullMock);
-  const pricing       = accessData?.pricing || {};
-  const course        = accessData?.course || '';
-  const hasAnyAccess  = hasTopicTest || hasFullMock;
-  const topicIsFree   = !(pricing.topicTestPriceInPaise > 0);
-  const mockIsFree    = !(pricing.fullMockPriceInPaise > 0);
-
-  useEffect(() => {
-    if (hasTopicTest && !hasFullMock && activeTab !== 'topic') {
-      setActiveTab('topic');
-      return;
-    }
-    if (!hasTopicTest && hasFullMock && activeTab !== 'mock') {
-      setActiveTab('mock');
-    }
-  }, [hasTopicTest, hasFullMock, activeTab]);
-
   return (
     <AppShell
       title="Test Series"
