@@ -4,7 +4,6 @@ const crypto = require('crypto');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const nodemailer = require('nodemailer');
 const path = require('path');
 const { v2: cloudinary } = require('cloudinary');
 const { z } = require('zod');
@@ -245,70 +244,13 @@ const verifyEmailOtpSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits')
 });
 
-function buildMailTransporter() {
-  // Prefer explicit Gmail App Password config; fall back to generic SMTP env vars.
-  const user = process.env.GMAIL_USER || process.env.SMTP_USER || '';
-  const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
-  if (!user || !pass) return null;
-
-  const timeoutConfig = {
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-    dnsTimeout: 10000
-  };
-
-  // Some hosts (including certain Render network paths) can intermittently fail on
-  // one SMTP mode. Keep multiple safe transport profiles and fall back in order.
-  return [
-    nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass },
-      ...timeoutConfig
-    }),
-    nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT || 465),
-      secure: true,
-      auth: { user, pass },
-      ...timeoutConfig
-    }),
-    nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      requireTLS: true,
-      auth: { user, pass },
-      ...timeoutConfig
-    })
-  ];
-}
-
-function withTimeout(promise, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      const timeoutError = new Error('SMTP_TIMEOUT');
-      timeoutError.code = 'ETIMEDOUT';
-      reject(timeoutError);
-    }, timeoutMs);
-
-    promise
-      .then((value) => {
-        clearTimeout(timeoutId);
-        resolve(value);
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      });
-  });
-}
-
 async function sendOtpEmailViaResend(email, otp) {
   const apiKey = String(process.env.RESEND_API_KEY || '').trim();
-  if (!apiKey) return false;
+  if (!apiKey) {
+    throw new Error('Email service is not configured. Missing RESEND_API_KEY.');
+  }
 
-  const fromEmail = String(process.env.RESEND_FROM_EMAIL || '').trim() || String(process.env.GMAIL_USER || '').trim();
+  const fromEmail = String(process.env.RESEND_FROM_EMAIL || '').trim();
   if (!fromEmail) {
     throw new Error('Email provider is not configured. Missing RESEND_FROM_EMAIL.');
   }
@@ -339,65 +281,12 @@ async function sendOtpEmailViaResend(email, otp) {
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     console.error(`[EMAIL OTP] Resend API failed (${response.status}):`, text || 'no-body');
-    throw new Error('Email service fallback failed. Please contact support.');
+    throw new Error('Email service is temporarily unavailable. Please try again in 1 minute.');
   }
-
-  return true;
 }
 
 async function sendOtpEmail(email, otp) {
-  const transporters = buildMailTransporter();
-  if (!transporters) {
-    // GMAIL_USER / GMAIL_APP_PASSWORD not set in environment
-    console.error('[EMAIL OTP] Cannot send email — GMAIL_USER or GMAIL_APP_PASSWORD env vars are missing. Set them in Render Dashboard → Environment.');
-    throw new Error('Email service is not configured. Please contact support.');
-  }
-  const from = process.env.GMAIL_USER || process.env.SMTP_FROM || process.env.SMTP_USER;
-  let lastError = null;
-
-  for (let index = 0; index < transporters.length; index += 1) {
-    const transporter = transporters[index];
-    try {
-      await withTimeout(
-        transporter.sendMail({
-          from: `"Biomics Hub" <${from}>`,
-          to: email,
-          subject: 'Your Biomics Hub Login OTP',
-          html: `
-            <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0b0e14;color:#e4e9f8;border-radius:16px;">
-              <h2 style="margin:0 0 8px;color:#6ee7b7;font-size:1.4rem;">Biomics Hub</h2>
-              <p style="margin:0 0 24px;color:#9aa5c2;font-size:0.9rem;">Your one-time login code</p>
-              <div style="background:#1d2335;border:1px solid rgba(110,231,183,0.25);border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
-                <span style="font-size:2.4rem;font-weight:800;letter-spacing:0.18em;color:#6ee7b7;">${otp}</span>
-              </div>
-              <p style="margin:0;font-size:0.82rem;color:#5f6b85;">This OTP expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone.</p>
-            </div>
-          `
-        }),
-        20000
-      );
-      return;
-    } catch (error) {
-      lastError = error;
-      const code = String(error?.code || 'UNKNOWN');
-      console.error(`[EMAIL OTP] sendMail attempt ${index + 1} failed (${code}):`, error?.message || error);
-      if (code === 'EAUTH') {
-        throw new Error('Email service authentication failed. Please contact support.');
-      }
-    }
-  }
-
-  const finalCode = String(lastError?.code || 'UNKNOWN');
-  if (finalCode === 'ETIMEDOUT' || finalCode === 'ESOCKET' || finalCode === 'ECONNECTION' || finalCode === 'ENOTFOUND') {
-    const resendSent = await sendOtpEmailViaResend(email, otp);
-    if (resendSent) return;
-    throw new Error('Email service is temporarily unavailable. Please try again in 1 minute.');
-  }
-
-  const resendSent = await sendOtpEmailViaResend(email, otp);
-  if (resendSent) return;
-
-  throw new Error('Failed to send OTP email. Please try again.');
+  await sendOtpEmailViaResend(email, otp);
 }
 
 const forgotPasswordSchema = z.object({
