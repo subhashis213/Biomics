@@ -231,7 +231,7 @@ export default function AuthPage() {
   async function handleSendOtp() {
     if (!canSendOtp) return;
     setIsSendingOtp(true);
-    setLoginMessage(null);
+    setLoginMessage({ type: 'info', text: '⏳ Connecting to server… this may take up to 60s on first use.' });
     try {
       const response = await requestJson('/auth/send-email-otp', {
         method: 'POST',

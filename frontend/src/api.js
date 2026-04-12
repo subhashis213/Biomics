@@ -41,15 +41,15 @@ function buildApiBaseCandidates() {
 
 const API_BASES = buildApiBaseCandidates();
 const API_BASE = API_BASES[0] || '';
-const REQUEST_TIMEOUT_MS = isLocalhostClient ? 15000 : 65000;
+const REQUEST_TIMEOUT_MS = isLocalhostClient ? 15000 : 90000; // 90s covers worst-case Render cold start
 
-// Keep Render backend warm — ping /health every 14 min so it doesn't cold-start on first user action.
-// Only runs in the browser (not SSR) and only in production.
+// Keep Render backend warm — ping /health every 10 min (Render sleeps after 15 min of inactivity).
+// Fires immediately on page load so cold start happens before user clicks anything.
 if (typeof window !== 'undefined' && !isLocalhostClient) {
   const pingUrl = `${DEFAULT_REMOTE_API}/health`;
   const ping = () => fetch(pingUrl, { method: 'GET', cache: 'no-store' }).catch(() => {});
-  ping(); // immediate ping on page load
-  setInterval(ping, 14 * 60 * 1000); // then every 14 minutes
+  ping(); // wake up Render immediately on page load
+  setInterval(ping, 10 * 60 * 1000); // re-ping every 10 minutes
 }
 
 export function getApiBase() {
@@ -87,17 +87,7 @@ async function parseJsonResponse(response) {
   return data;
 }
 
-export async function requestJson(path, options = {}) {
-  const headers = { ...(options.headers || {}) };
-  const isJsonBody = options.body && !(options.body instanceof FormData);
-  if (isJsonBody && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
-  }
-  const token = getToken();
-  if (token && !headers['Authorization']) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
+async function attemptRequest(path, options, headers) {
   const basesToTry = API_BASES.length ? API_BASES : [API_BASE];
   let lastNetworkError = null;
   let lastNetworkUrl = buildUrl(path);
@@ -118,8 +108,7 @@ export async function requestJson(path, options = {}) {
       globalThis.clearTimeout(timeoutId);
 
       // API responded with HTTP error -> do not try alternate bases.
-      // Exception: 405 (Method Not Allowed) means this host has no API endpoint
-      // (e.g. Vercel SPA rewrite), so fall through and try the next base.
+      // Exception: 405 means wrong host (Vercel SPA), fall through to next base.
       if (error instanceof Error && !/abort/i.test(error.name || '')) {
         const isMethodNotAllowed = /\(405\)/.test(error.message || '');
         const likelyHttpError = !isMethodNotAllowed &&
@@ -132,13 +121,44 @@ export async function requestJson(path, options = {}) {
     }
   }
 
-  const timeoutHint = lastNetworkError?.name === 'AbortError'
-    ? 'Server is waking up (Render cold start). Please wait ~30s and try again.'
-    : 'Network/CORS handshake failed.';
+  // Attach metadata so the caller knows this was a timeout
+  const err = new Error(lastNetworkError?.name === 'AbortError' ? 'COLD_START_TIMEOUT' : 'NETWORK_ERROR');
+  err.isTimeout = lastNetworkError?.name === 'AbortError';
+  err.lastUrl = lastNetworkUrl;
+  throw err;
+}
 
-  throw new Error(
-    `Cannot reach API server at ${lastNetworkUrl}. ${timeoutHint} Please retry in a moment.`
-  );
+export async function requestJson(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  const isJsonBody = options.body && !(options.body instanceof FormData);
+  if (isJsonBody && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const token = getToken();
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    return await attemptRequest(path, options, headers);
+  } catch (firstError) {
+    // If it was a cold-start timeout, wait 4s then retry once automatically.
+    // Render typically responds on the second attempt after the wake-up completes.
+    if (firstError.isTimeout) {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 4000));
+      try {
+        return await attemptRequest(path, options, headers);
+      } catch (retryError) {
+        if (retryError.isTimeout) {
+          throw new Error(
+            'Server is starting up. Please wait a moment and try again — this usually takes under 60 seconds on first use.'
+          );
+        }
+        throw retryError;
+      }
+    }
+    throw firstError;
+  }
 }
 
 export function uploadMaterial(videoId, file, onProgress) {
