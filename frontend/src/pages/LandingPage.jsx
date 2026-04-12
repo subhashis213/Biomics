@@ -6,6 +6,13 @@ import posterTestSeries from '../assets/poster-test-series.jpeg';
 import posterLifeScience from '../assets/poster-life-science.jpeg';
 import posterBatch from '../assets/poster-batch.jpeg';
 
+const LANDING_STATS = [
+  { target: 500, label: 'Video Lectures', suffix: '+' },
+  { target: 200, label: 'Practice Quizzes', suffix: '+' },
+  { target: 50, label: 'Mock Tests', suffix: '+' },
+  { target: 1000, label: 'Students Learning', suffix: '+' },
+];
+
 const POSTERS = [
   {
     src: posterTestSeries,
@@ -27,6 +34,32 @@ const POSTERS = [
   },
 ];
 
+function SocialIcon({ kind }) {
+  if (kind === 'instagram') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+        <line x1="17.5" y1="6.5" x2="17.5" y2="6.5" />
+      </svg>
+    );
+  }
+  if (kind === 'telegram') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M22 2L11 13" />
+        <path d="M22 2L15 22l-4-9-9-4z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="23 7 16 12 23 17 23 7" />
+      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+    </svg>
+  );
+}
+
 export default function LandingPage() {
   const navigate = useNavigate();
 
@@ -36,10 +69,16 @@ export default function LandingPage() {
     return <Navigate to={session.role === 'admin' ? '/admin' : '/student'} replace />;
   }
   const pageRef = useRef(null);
+  const statsRef = useRef(null);
+  const countStartedRef = useRef(false);
 
   /* ── Slideshow state ─────────────────────── */
   const [activeSlide, setActiveSlide] = useState(0);
   const [isPaused, setIsPaused]       = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [statNumbers, setStatNumbers] = useState(
+    () => LANDING_STATS.map((item) => Math.max(0, item.target - 100))
+  );
   const autoRef = useRef(null);
   const SLIDE_INTERVAL = 3200;
 
@@ -63,6 +102,80 @@ export default function LandingPage() {
     }, SLIDE_INTERVAL);
     return () => clearInterval(autoRef.current);
   }, [isPaused]);
+
+  useEffect(() => {
+    const minY = 120;
+    let lastY = window.scrollY;
+
+    const onScroll = () => {
+      const y = window.scrollY;
+
+      if (y <= minY) {
+        lastY = y;
+        setShowScrollTop(false);
+        return;
+      }
+
+      const delta = y - lastY;
+      lastY = y;
+
+      // Show immediately when user scrolls up; hide when scrolling down.
+      if (delta < 0) {
+        setShowScrollTop(true);
+      } else if (delta > 0) {
+        setShowScrollTop(false);
+      }
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const node = statsRef.current;
+    if (!node) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animateCounts = () => {
+      if (countStartedRef.current) return;
+      countStartedRef.current = true;
+
+      if (prefersReducedMotion) {
+        setStatNumbers(LANDING_STATS.map((item) => item.target));
+        return;
+      }
+
+      const starts = LANDING_STATS.map((item) => Math.max(0, item.target - 100));
+      const durationMs = 1400;
+      const t0 = performance.now();
+
+      const tick = (ts) => {
+        const progress = Math.min(1, (ts - t0) / durationMs);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setStatNumbers(
+          LANDING_STATS.map((item, i) => Math.round(starts[i] + (item.target - starts[i]) * eased))
+        );
+        if (progress < 1) window.requestAnimationFrame(tick);
+      };
+
+      window.requestAnimationFrame(tick);
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            animateCounts();
+            observer.disconnect();
+          }
+        });
+      },
+      { threshold: 0.25 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   // Scroll reveal — IntersectionObserver fires just before element enters viewport
   useEffect(() => {
@@ -153,26 +266,15 @@ export default function LandingPage() {
             </button>
             <a href="#features" className="lp-btn-ghost lp-btn-lg">See What's Inside</a>
           </div>
-          <div className="lp-hero-badges">
-            <span className="lp-badge">📹 Video Lectures</span>
-            <span className="lp-badge">📝 Quizzes</span>
-            <span className="lp-badge">🎯 Mock Tests</span>
-            <span className="lp-badge">🔴 Live Classes</span>
-          </div>
         </div>
       </section>
 
       {/* ── STATS ──────────────────────────────── */}
-      <section className="lp-stats lp-reveal">
+      <section className="lp-stats lp-reveal" ref={statsRef}>
         <div className="lp-stats-inner">
-          {[
-            { value: '500+', label: 'Video Lectures' },
-            { value: '200+', label: 'Practice Quizzes' },
-            { value: '50+', label: 'Mock Tests' },
-            { value: '1000+', label: 'Students Learning' },
-          ].map((s) => (
+          {LANDING_STATS.map((s, i) => (
             <div key={s.label} className="lp-stat-item">
-              <span className="lp-stat-value">{s.value}</span>
+              <span className="lp-stat-value">{statNumbers[i]}{s.suffix}</span>
               <span className="lp-stat-label">{s.label}</span>
             </div>
           ))}
@@ -418,9 +520,9 @@ export default function LandingPage() {
 
           <div className="lp-social-row">
             {[
-              { label: 'Instagram', handle: '@biomics_hub', href: 'https://www.instagram.com/biomics_hub', icon: '📸', color: '#e1306c' },
-              { label: 'Telegram', handle: 'Join Channel', href: 'https://t.me/+WVyK_obKmJ8BbxG6', icon: '✈️', color: '#2aabee' },
-              { label: 'YouTube', handle: '@biomicshub5733', href: 'https://www.youtube.com/@biomicshub5733', icon: '▶️', color: '#ff0000' },
+              { label: 'Instagram', handle: '@biomics_hub', href: 'https://www.instagram.com/biomics_hub', icon: 'instagram', color: '#e1306c' },
+              { label: 'Telegram', handle: 'Join Channel', href: 'https://t.me/+WVyK_obKmJ8BbxG6', icon: 'telegram', color: '#2aabee' },
+              { label: 'YouTube', handle: '@biomicshub5733', href: 'https://www.youtube.com/@biomicshub5733', icon: 'youtube', color: '#ff0000' },
             ].map((s) => (
               <a
                 key={s.label}
@@ -430,7 +532,7 @@ export default function LandingPage() {
                 className="lp-social-card lp-reveal"
                 style={{ '--lp-social-color': s.color }}
               >
-                <span className="lp-social-icon">{s.icon}</span>
+                <span className="lp-social-icon"><SocialIcon kind={s.icon} /></span>
                 <span className="lp-social-label">{s.label}</span>
                 <span className="lp-social-handle">{s.handle}</span>
                 <span className="lp-social-arrow">↗</span>
@@ -472,6 +574,18 @@ export default function LandingPage() {
           <p className="lp-footer-copy">© {new Date().getFullYear()} Biomics Hub. All rights reserved.</p>
         </div>
       </footer>
+
+      <button
+        type="button"
+        className={`lp-scroll-top${showScrollTop ? ' is-visible' : ''}`}
+        onClick={() => {
+          setShowScrollTop(false);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        aria-label="Scroll to top"
+      >
+        ↑
+      </button>
 
     </div>
   );

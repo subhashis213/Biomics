@@ -7,7 +7,7 @@ function normalizeTheme(v) {
 }
 
 const initialTheme = normalizeTheme(
-  typeof localStorage !== 'undefined' ? localStorage.getItem(THEME_KEY) : 'dark'
+  typeof localStorage !== 'undefined' ? (localStorage.getItem(THEME_KEY) || 'light') : 'light'
 );
 
 // Apply immediately on module load so there's no flash.
