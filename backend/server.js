@@ -21,6 +21,25 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const testSeriesRoutes = require('./routes/testSeriesRoutes');
 
 const app = express();
+
+// ABSOLUTE FIRST MIDDLEWARE: answer every OPTIONS preflight immediately before
+// Helmet, rate-limiters, or any route handler can run. This guarantees browsers
+// always get a valid 204 for cross-origin POST/PUT/PATCH preflights.
+const SERVER_VERSION = '2.1.0';
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    const requestedHeaders = req.headers['access-control-request-headers'];
+    res.setHeader('Access-Control-Allow-Headers', requestedHeaders || 'Content-Type,Authorization');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
+  }
+  next();
+});
+
 const rawCorsOrigin = String(process.env.CORS_ORIGIN || '').trim();
 
 function buildCorsOriginResolver(rawValue) {
@@ -136,7 +155,7 @@ app.use('/payments', paymentRoutes);
 app.use('/test-series', testSeriesRoutes);
 
 // Health check — used by keep-alive ping and uptime monitors
-app.get('/health', (req, res) => res.json({ status: 'ok', ts: Date.now() }));
+app.get('/health', (req, res) => res.json({ status: 'ok', version: SERVER_VERSION, ts: Date.now() }));
 
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
