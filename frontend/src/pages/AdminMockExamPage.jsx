@@ -8,6 +8,7 @@ import {
   toggleMockExamNoticeAdmin
 } from '../api';
 import AppShell from '../components/AppShell';
+import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
 import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
@@ -267,6 +268,50 @@ export default function AdminMockExamPage() {
     }
   }
 
+  async function saveMockFromExtractedQuestions(extractedQuestions) {
+    if (!mockExamCategory || !mockExamTitle.trim() || !mockExamDate) {
+      throw new Error('Please set course, exam title and date before saving extracted questions.');
+    }
+
+    const normalizedQuestions = (Array.isArray(extractedQuestions) ? extractedQuestions : [])
+      .map((item) => ({
+        question: String(item?.question || '').trim(),
+        options: Array.isArray(item?.options)
+          ? item.options.map((opt) => String(opt || '').trim()).slice(0, 4)
+          : ['', '', '', ''],
+        correctIndex: Number(item?.correctIndex),
+        explanation: String(item?.explanation || '').trim()
+      }))
+      .filter((item) => item.question && item.options.length === 4);
+
+    if (!normalizedQuestions.length) {
+      throw new Error('No valid extracted questions to save.');
+    }
+
+    const invalid = normalizedQuestions.some((item) => (
+      item.options.some((opt) => !opt) || item.correctIndex < 0 || item.correctIndex > 3
+    ));
+    if (invalid) {
+      throw new Error('Some extracted questions still need review before save.');
+    }
+
+    await saveMockExamAdmin({
+      examId: editingMockExamId || undefined,
+      category: mockExamCategory,
+      title: mockExamTitle.trim(),
+      description: mockExamDescription.trim(),
+      examDate: new Date(mockExamDate).toISOString(),
+      examWindowEndAt: mockExamWindowEndAt ? new Date(mockExamWindowEndAt).toISOString() : null,
+      durationMinutes: Number(mockExamDurationMinutes || 60),
+      noticeEnabled: mockExamNoticeEnabled,
+      questions: normalizedQuestions
+    });
+
+    setMockExamQuestions(normalizedQuestions);
+    setMockExamMessage({ type: 'success', text: editingMockExamId ? 'Mock exam updated.' : 'Mock exam created.' });
+    await loadMockExamList(mockExamCategory);
+  }
+
   return (
     <>
     <AppShell
@@ -292,6 +337,15 @@ export default function AdminMockExamPage() {
             <StatCard label="Performance Rows" value={mockExamPerformance.length} />
           </div>
         </section>
+
+        <PdfMcqExtractor
+          sectionName="Monthly Mock Test"
+          onApplyQuestions={(extracted) => {
+            setMockExamQuestions(extracted);
+            setMockExamMessage({ type: 'success', text: `Loaded ${extracted.length} extracted question${extracted.length !== 1 ? 's' : ''} into the form.` });
+          }}
+          onSaveQuestions={saveMockFromExtractedQuestions}
+        />
 
         <section className="card quiz-builder-panel workspace-panel">
           <form className="quiz-builder-form" onSubmit={handleSaveMockExam}>

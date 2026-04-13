@@ -1,4 +1,6 @@
 const express = require('express');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
 const User = require('../models/User');
@@ -7,6 +9,269 @@ const { hasCourseAccess, hasModuleAccess } = require('../utils/courseAccess');
 const { logAdminAction } = require('../utils/auditLog');
 
 const router = express.Router();
+const PDF_MAX_SIZE_BYTES = 25 * 1024 * 1024;
+const PDF_TEXT_MAX_CHARS = 240000;
+const GEMINI_API_VERSION = String(process.env.GEMINI_API_VERSION || 'v1beta').trim();
+const GEMINI_API_BASE = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}`;
+const GEMINI_MODEL_CANDIDATES = [
+  String(process.env.GEMINI_MODEL || '').trim(),
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-pro'
+].filter(Boolean);
+const GEMINI_SYSTEM_PROMPT = "You are an expert MCQ extractor. Extract ALL multiple choice questions from the given text. Return ONLY a valid JSON array with no markdown, no explanation. Each object must have: question (string), options (array of exactly 4 strings), correct (0-based index number of correct answer, use 0 if unknown). Extract every single question you find.";
+const geminiModelCache = {
+  model: null,
+  fetchedAt: 0
+};
+
+function supportsGenerateContent(model = {}) {
+  const methods = Array.isArray(model?.supportedGenerationMethods)
+    ? model.supportedGenerationMethods
+    : [];
+  return methods.includes('generateContent');
+}
+
+async function listSupportedGeminiModels(apiKey) {
+  const response = await fetch(
+    `${GEMINI_API_BASE}/models?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    }
+  );
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = body?.error?.message || 'Failed to list Gemini models.';
+    throw new Error(message);
+  }
+
+  const models = Array.isArray(body?.models) ? body.models : [];
+  return models
+    .filter(supportsGenerateContent)
+    .map((model) => String(model?.name || '').replace(/^models\//, '').trim())
+    .filter(Boolean);
+}
+
+function pickPreferredModel(availableModels = []) {
+  for (const candidate of GEMINI_MODEL_CANDIDATES) {
+    if (availableModels.includes(candidate)) return candidate;
+  }
+
+  const flash = availableModels.find((name) => /flash/i.test(name));
+  return flash || availableModels[0] || null;
+}
+
+function buildModelPriorityList(availableModels = []) {
+  const prioritized = [];
+
+  for (const candidate of GEMINI_MODEL_CANDIDATES) {
+    if (availableModels.includes(candidate) && !prioritized.includes(candidate)) {
+      prioritized.push(candidate);
+    }
+  }
+
+  for (const model of availableModels) {
+    if (!prioritized.includes(model)) prioritized.push(model);
+  }
+
+  return prioritized;
+}
+
+async function resolveGeminiModel(apiKey, { forceRefresh = false } = {}) {
+  const cacheAgeMs = Date.now() - geminiModelCache.fetchedAt;
+  const canUseCache = !forceRefresh && geminiModelCache.model && cacheAgeMs < 10 * 60 * 1000;
+  if (canUseCache) return geminiModelCache.model;
+
+  const availableModels = await listSupportedGeminiModels(apiKey);
+  const selected = pickPreferredModel(availableModels);
+  if (!selected) {
+    throw new Error('No Gemini model with generateContent support is available for this API key.');
+  }
+
+  geminiModelCache.model = selected;
+  geminiModelCache.fetchedAt = Date.now();
+  return selected;
+}
+
+function isModelAvailabilityError(message = '') {
+  const text = String(message || '').toLowerCase();
+  return text.includes('not found for api version') || text.includes('not supported for generatecontent');
+}
+
+function isRetriableGeminiError(message = '') {
+  const text = String(message || '').toLowerCase();
+  return text.includes('high demand')
+    || text.includes('overloaded')
+    || text.includes('unavailable')
+    || text.includes('rate limit')
+    || text.includes('resource exhausted')
+    || text.includes('try again later');
+}
+
+const pdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: PDF_MAX_SIZE_BYTES },
+  fileFilter: (req, file, cb) => {
+    const mimetype = String(file?.mimetype || '').toLowerCase();
+    const originalName = String(file?.originalname || '').toLowerCase();
+    const isPdf = mimetype === 'application/pdf' || originalName.endsWith('.pdf');
+    if (!isPdf) {
+      cb(new Error('Only PDF files are allowed.'));
+      return;
+    }
+    cb(null, true);
+  }
+});
+
+function cleanGeminiJson(text = '') {
+  const raw = String(text || '').trim();
+  if (!raw) return '[]';
+  if (raw.startsWith('```')) {
+    return raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+  }
+  return raw;
+}
+
+function parseGeminiQuestions(rawText = '') {
+  const cleaned = cleanGeminiJson(rawText);
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.questions)) return parsed.questions;
+  } catch (_) {
+    // Fallback below for malformed wrappers.
+  }
+
+  const firstArray = cleaned.match(/\[[\s\S]*\]/);
+  if (firstArray?.[0]) {
+    try {
+      const parsedArray = JSON.parse(firstArray[0]);
+      if (Array.isArray(parsedArray)) return parsedArray;
+    } catch (_) {
+      // Continue to final error.
+    }
+  }
+
+  throw new Error('Gemini returned invalid JSON format for questions.');
+}
+
+function normalizeExtractedQuestions(payload) {
+  if (!Array.isArray(payload)) return [];
+
+  return payload
+    .map((item) => {
+      const question = String(item?.question || '').trim();
+      const options = Array.isArray(item?.options)
+        ? item.options.map((opt) => String(opt || '').trim()).slice(0, 4)
+        : [];
+
+      if (options.length < 4) {
+        while (options.length < 4) {
+          options.push('');
+        }
+      }
+
+      const correctRaw = Number(item?.correct);
+      const correct = Number.isInteger(correctRaw) && correctRaw >= 0 && correctRaw <= 3 ? correctRaw : 0;
+
+      if (!question) return null;
+
+      return {
+        question,
+        options,
+        correctIndex: correct
+      };
+    })
+    .filter(Boolean);
+}
+
+async function extractQuestionsWithGemini(extractedText) {
+  const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is missing on the server.');
+  }
+
+  const callGemini = async (modelName) => {
+    const response = await fetch(
+      `${GEMINI_API_BASE}/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: GEMINI_SYSTEM_PROMPT }]
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: extractedText
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json'
+          }
+        })
+      }
+    );
+
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = body?.error?.message || 'Gemini API request failed.';
+      throw new Error(message);
+    }
+
+    const parts = body?.candidates?.[0]?.content?.parts;
+    const rawText = Array.isArray(parts)
+      ? parts.map((part) => String(part?.text || '')).join('\n').trim()
+      : '';
+
+    if (!rawText) {
+      throw new Error('Gemini returned an empty response.');
+    }
+
+    const parsed = parseGeminiQuestions(rawText);
+    return normalizeExtractedQuestions(parsed);
+  };
+
+  const availableModels = await listSupportedGeminiModels(apiKey);
+  const prioritizedModels = buildModelPriorityList(availableModels);
+
+  if (!prioritizedModels.length) {
+    throw new Error('No Gemini model with generateContent support is available for this API key.');
+  }
+
+  let lastError = null;
+
+  for (const modelName of prioritizedModels) {
+    try {
+      geminiModelCache.model = modelName;
+      geminiModelCache.fetchedAt = Date.now();
+      return await callGemini(modelName);
+    } catch (error) {
+      lastError = error;
+      const message = String(error?.message || '');
+      const canTryAnotherModel = isModelAvailabilityError(message) || isRetriableGeminiError(message);
+      if (!canTryAnotherModel) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error('Gemini extraction failed after trying all available models.');
+}
 
 function resolveCorrectIndex(question = {}) {
   const normalizedOptions = Array.isArray(question.options) ? question.options : [];
@@ -77,6 +342,49 @@ function validateQuizPayload(payload) {
 
   return null;
 }
+
+// Admin: extract MCQ questions from PDF using Gemini
+router.post('/extract-pdf-mcq', authenticateToken('admin'), (req, res) => {
+  pdfUpload.single('pdf')(req, res, async (uploadError) => {
+    if (uploadError) {
+      if (uploadError instanceof multer.MulterError && uploadError.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'PDF file size must be 25MB or less.' });
+      }
+      return res.status(400).json({ error: uploadError.message || 'Invalid PDF upload.' });
+    }
+
+    if (!req.file?.buffer) {
+      return res.status(400).json({ error: 'PDF file is required.' });
+    }
+
+    try {
+      const parsedPdf = await pdfParse(req.file.buffer);
+      const extractedText = String(parsedPdf?.text || '').trim();
+
+      if (!extractedText) {
+        return res.status(400).json({ error: 'Could not extract readable text from this PDF.' });
+      }
+
+      const boundedText = extractedText.length > PDF_TEXT_MAX_CHARS
+        ? extractedText.slice(0, PDF_TEXT_MAX_CHARS)
+        : extractedText;
+
+      const questions = await extractQuestionsWithGemini(boundedText);
+      return res.json({ questions });
+    } catch (error) {
+      const message = String(error?.message || 'Failed to extract questions from PDF.');
+      const lower = message.toLowerCase();
+      const status = lower.includes('quota') || lower.includes('rate limit')
+        ? 429
+        : lower.includes('api key') || lower.includes('permission')
+          ? 401
+          : 500;
+
+      console.error('[extract-pdf-mcq] Failed:', message);
+      return res.status(status).json({ error: message });
+    }
+  });
+});
 
 // Admin: create or update a module quiz
 router.post('/', authenticateToken('admin'), async (req, res) => {

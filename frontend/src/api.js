@@ -1,7 +1,28 @@
 import { getToken } from './session';
 
+function isPrivateIpv4(hostname = '') {
+  const value = String(hostname || '').trim();
+  if (!value) return false;
+  if (/^10\./.test(value)) return true;
+  if (/^192\.168\./.test(value)) return true;
+  const match = value.match(/^172\.(\d{1,3})\./);
+  if (!match) return false;
+  const secondOctet = Number(match[1]);
+  return Number.isInteger(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+}
+
+function isLocalDevHost(hostname = '') {
+  const value = String(hostname || '').trim().toLowerCase();
+  if (!value) return false;
+  return value === 'localhost'
+    || value === '127.0.0.1'
+    || value === '0.0.0.0'
+    || value === '::1'
+    || isPrivateIpv4(value);
+}
+
 const isLocalhostClient = typeof window !== 'undefined'
-  && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  && isLocalDevHost(window.location.hostname);
 
 const DEFAULT_REMOTE_API = 'https://biomicshub-backend.onrender.com';
 
@@ -41,7 +62,8 @@ function buildApiBaseCandidates() {
 
 const API_BASES = buildApiBaseCandidates();
 const API_BASE = API_BASES[0] || '';
-const REQUEST_TIMEOUT_MS = isLocalhostClient ? 15000 : 90000; // 90s covers worst-case Render cold start
+const REQUEST_TIMEOUT_MS = isLocalhostClient ? 45000 : 90000;
+const EXTRACTION_TIMEOUT_MS = isLocalhostClient ? 180000 : 240000;
 
 // Keep Render backend warm — ping /health every 10 min (Render sleeps after 15 min of inactivity).
 // Fires immediately on page load so cold start happens before user clicks anything.
@@ -91,10 +113,11 @@ async function attemptRequest(path, options, headers) {
   const basesToTry = API_BASES.length ? API_BASES : [API_BASE];
   let lastNetworkError = null;
   let lastNetworkUrl = buildUrl(path);
+  const timeoutMs = path.includes('/extract-pdf-mcq') ? EXTRACTION_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
 
   for (const base of basesToTry) {
     const controller = new AbortController();
-    const timeoutId = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const response = await fetch(buildUrl(path, base), {
@@ -150,8 +173,17 @@ export async function requestJson(path, options = {}) {
         return await attemptRequest(path, options, headers);
       } catch (retryError) {
         if (retryError.isTimeout) {
+          const isExtraction = path.includes('/extract-pdf-mcq');
+          if (isExtraction) {
+            throw new Error(
+              'PDF extraction is taking longer than expected. Please wait and try again, or use a smaller PDF.'
+            );
+          }
+
           throw new Error(
-            'Server is starting up. Please wait a moment and try again — this usually takes under 60 seconds on first use.'
+            isLocalhostClient
+              ? 'Request timed out while waiting for the local server. Please retry.'
+              : 'Server is starting up. Please wait a moment and try again — this usually takes under 60 seconds on first use.'
           );
         }
         throw retryError;
@@ -281,6 +313,16 @@ export function saveModuleQuiz(payload) {
   return requestJson('/quizzes', {
     method: 'POST',
     body: JSON.stringify(payload)
+  });
+}
+
+export function extractMcqFromPdf(file) {
+  const formData = new FormData();
+  formData.append('pdf', file);
+
+  return requestJson('/quizzes/extract-pdf-mcq', {
+    method: 'POST',
+    body: formData
   });
 }
 

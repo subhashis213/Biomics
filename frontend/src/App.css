@@ -5420,6 +5420,113 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   will-change: transform, opacity;
 }
 
+.pdf-mcq-extractor {
+  border: 1px solid var(--line-strong);
+  background:
+    radial-gradient(1200px 300px at -20% -60%, rgba(16, 185, 129, 0.12), transparent 60%),
+    radial-gradient(1000px 300px at 120% -70%, rgba(59, 130, 246, 0.1), transparent 60%),
+    linear-gradient(165deg, rgba(15, 23, 42, 0.16), rgba(15, 118, 110, 0.08));
+}
+
+.pdf-mcq-dropzone {
+  position: relative;
+  border: 1px dashed var(--line-strong);
+  border-radius: 16px;
+  padding: 22px;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.12);
+  transition: border-color var(--theme-transition), transform var(--theme-transition), background var(--theme-transition);
+}
+
+.pdf-mcq-dropzone.is-drag {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  transform: translateY(-1px);
+}
+
+.pdf-mcq-dropzone input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pdf-mcq-dropzone-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.pdf-mcq-dropzone-subtitle {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+}
+
+.pdf-mcq-file-pill {
+  margin: 14px auto 0;
+  width: fit-content;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.42);
+  font-size: 0.9rem;
+}
+
+.pdf-mcq-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.pdf-mcq-progress-text {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.pdf-mcq-stats-bar {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.pdf-mcq-stats-bar span {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(15, 23, 42, 0.14);
+}
+
+.pdf-mcq-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pdf-mcq-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.pdf-mcq-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pdf-mcq-bottom-actions {
+  margin-top: 12px;
+}
+
+.pdf-mcq-toast {
+  margin-top: 12px;
+}
+
 .profile-modal.closing {
   animation: profile-modal-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
 }
