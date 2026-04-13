@@ -513,7 +513,7 @@ export default function StudentTestSeriesPage() {
         markedForReview: new Array(qCount).fill(false),
         timeLeft:        (res.durationMinutes || 30) * 60,
         submitted: false, result: null,
-        currentQ: 0, showQuitConfirm: false
+        currentQ: 0, showQuitConfirm: false, showSubmitConfirm: false, isSubmitting: false
       });
     } catch (e) {
       setBanner({ type: 'error', text: e.message || 'Failed to load test.' });
@@ -537,6 +537,7 @@ export default function StudentTestSeriesPage() {
   async function handleSubmitTest(snap = testSession) {
     if (!snap || snap.submitted) return;
     window.clearInterval(timerRef.current);
+    setTestSession((prev) => (prev ? { ...prev, isSubmitting: true } : prev));
     try {
       const endpoint = snap.type === 'topic'
         ? '/test-series/topic-tests/student/' + snap.test._id + '/submit'
@@ -546,10 +547,32 @@ export default function StudentTestSeriesPage() {
         body: JSON.stringify({ answers: snap.answers })
       });
       setShowReview(false);
-      setTestSession((prev) => prev ? { ...prev, submitted: true, result, showQuitConfirm: false } : prev);
+      setTestSession((prev) => prev ? {
+        ...prev,
+        submitted: true,
+        result,
+        showQuitConfirm: false,
+        showSubmitConfirm: false,
+        isSubmitting: false
+      } : prev);
     } catch (e) {
+      setTestSession((prev) => prev ? { ...prev, isSubmitting: false } : prev);
       setBanner({ type: 'error', text: e.message || 'Failed to submit test.' });
     }
+  }
+
+  function openSubmitConfirm() {
+    setTestSession((prev) => {
+      if (!prev || prev.submitted || prev.isSubmitting) return prev;
+      return { ...prev, showSubmitConfirm: true };
+    });
+  }
+
+  function closeSubmitConfirm() {
+    setTestSession((prev) => {
+      if (!prev || prev.isSubmitting) return prev;
+      return { ...prev, showSubmitConfirm: false };
+    });
   }
 
   function quitTest() {
@@ -562,7 +585,7 @@ export default function StudentTestSeriesPage() {
     setTestSession((prev) => {
       if (!prev) return prev;
       const answers = [...prev.answers];
-      answers[qi] = oi;
+      answers[qi] = answers[qi] === oi ? -1 : oi;
       return { ...prev, answers };
     });
   }
@@ -686,7 +709,7 @@ export default function StudentTestSeriesPage() {
   // RENDER: Active test
   // ══════════════════════════════════════════════════════════
   if (testSession && !testSession.submitted) {
-    const { test, questions, answers, markedForReview, timeLeft, currentQ, showQuitConfirm } = testSession;
+    const { test, questions, answers, markedForReview, timeLeft, currentQ, showQuitConfirm, showSubmitConfirm, isSubmitting } = testSession;
     const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
     const secs = String(timeLeft % 60).padStart(2, '0');
     const isUrgent        = timeLeft < 120;
@@ -695,6 +718,7 @@ export default function StudentTestSeriesPage() {
     const unansweredCount = answers.length - answeredCount;
     const q               = questions[currentQ];
     const isCurrentMarked = markedForReview[currentQ];
+    const isCurrentAnswered = answers[currentQ] >= 0;
 
     return (
       <AppShell
@@ -733,6 +757,9 @@ export default function StudentTestSeriesPage() {
                   <span className="ts-q-counter">
                     Q <strong>{currentQ + 1}</strong>
                     <span className="ts-q-total"> / {questions.length}</span>
+                  </span>
+                  <span className={'ts-question-state-pill' + (isCurrentAnswered ? ' answered' : ' blank')}>
+                    {isCurrentAnswered ? 'Answered' : 'Not Answered'}
                   </span>
                   {isCurrentMarked && <span className="ts-marked-pill">🟣 Marked for Review</span>}
                 </div>
@@ -773,8 +800,9 @@ export default function StudentTestSeriesPage() {
                     </button>
                   ) : (
                     <button type="button" className="primary-btn ts-nav-btn"
-                      onClick={() => handleSubmitTest()}>
-                      Submit Test
+                      onClick={openSubmitConfirm}
+                      disabled={isSubmitting}>
+                      {isSubmitting ? 'Submitting...' : 'Submit Test'}
                     </button>
                   )}
                 </div>
@@ -788,7 +816,15 @@ export default function StudentTestSeriesPage() {
             <div className="card ts-nav-panel">
               <p className="ts-nav-panel-title">Question Navigator</p>
 
+              <div className="ts-nav-chip-row">
+                <span className="ts-nav-chip ts-nav-chip-current">Current: Q{currentQ + 1}</span>
+                <span className="ts-nav-chip ts-nav-chip-answered">{answeredCount} Answered</span>
+                <span className="ts-nav-chip ts-nav-chip-blank">{unansweredCount} Left</span>
+                {markedCount > 0 ? <span className="ts-nav-chip ts-nav-chip-marked">{markedCount} Review</span> : null}
+              </div>
+
               <div className="ts-nav-legend">
+                <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-current" /><span>Current</span></div>
                 <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-answered" /><span>Answered</span></div>
                 <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-marked"  /><span>Review</span></div>
                 <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-blank"   /><span>Not Done</span></div>
@@ -799,13 +835,25 @@ export default function StudentTestSeriesPage() {
                   const isAnswered = answers[qi] >= 0;
                   const isMarked   = markedForReview[qi];
                   const isCurrent  = qi === currentQ;
+                  const stateLabel = isMarked && isAnswered
+                    ? 'Done • Review'
+                    : isMarked
+                      ? 'Review'
+                      : isAnswered
+                        ? 'Answered'
+                        : 'Pending';
                   return (
                     <button key={qi} type="button"
-                      className={['ts-nav-dot', isMarked ? 'marked' : isAnswered ? 'answered' : '', isCurrent ? 'current' : ''].filter(Boolean).join(' ')}
+                      className={[
+                        'ts-nav-dot',
+                        isMarked && isAnswered ? 'answered-marked' : isMarked ? 'marked' : isAnswered ? 'answered' : 'blank',
+                        isCurrent ? 'current' : ''
+                      ].filter(Boolean).join(' ')}
                       onClick={() => setTestSession((p) => ({ ...p, currentQ: qi }))}
                       title={'Q' + (qi + 1) + (isAnswered ? ' \u2713' : '') + (isMarked ? ' \uD83D\uDFE3' : '')}
                     >
-                      {qi + 1}
+                      <span className="ts-nav-dot-index">{qi + 1}</span>
+                      <span className="ts-nav-dot-state">{stateLabel}</span>
                     </button>
                   );
                 })}
@@ -817,8 +865,8 @@ export default function StudentTestSeriesPage() {
                 <span className="ts-nav-sum-item ts-sum-blank">{unansweredCount} Left</span>
               </div>
 
-              <button type="button" className="primary-btn ts-nav-submit-btn" onClick={() => handleSubmitTest()}>
-                Submit Test ({answeredCount}/{questions.length})
+              <button type="button" className="primary-btn ts-nav-submit-btn" onClick={openSubmitConfirm} disabled={isSubmitting}>
+                {isSubmitting ? 'Submitting...' : `Submit Test (${answeredCount}/${questions.length})`}
               </button>
               <button type="button" className="danger-outline-btn ts-nav-quit-btn"
                 onClick={() => setTestSession((p) => ({ ...p, showQuitConfirm: true }))}>
@@ -828,6 +876,42 @@ export default function StudentTestSeriesPage() {
           </aside>
 
         </main>
+
+        <div className="ts-mobile-dock" role="toolbar" aria-label="Mobile exam controls">
+          <button
+            type="button"
+            className="secondary-btn ts-mobile-dock-btn"
+            disabled={currentQ === 0}
+            onClick={() => setTestSession((p) => ({ ...p, currentQ: p.currentQ - 1 }))}
+          >
+            Prev
+          </button>
+          <button
+            type="button"
+            className={'ts-mobile-mark-btn' + (isCurrentMarked ? ' active' : '')}
+            onClick={() => toggleMarkForReview(currentQ)}
+          >
+            {isCurrentMarked ? 'Unmark' : 'Mark'}
+          </button>
+          {currentQ < questions.length - 1 ? (
+            <button
+              type="button"
+              className="primary-btn ts-mobile-dock-btn"
+              onClick={() => setTestSession((p) => ({ ...p, currentQ: p.currentQ + 1 }))}
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="primary-btn ts-mobile-dock-btn"
+              onClick={openSubmitConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </button>
+          )}
+        </div>
 
         {/* Quit confirmation modal */}
         {showQuitConfirm && createPortal(
@@ -860,6 +944,60 @@ export default function StudentTestSeriesPage() {
                   Continue Test
                 </button>
                 <button type="button" className="danger-btn" onClick={quitTest}>Yes, Quit Test</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {showSubmitConfirm && createPortal(
+          <div
+            className="ts-quit-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Submit test confirmation"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) closeSubmitConfirm();
+            }}
+          >
+            <div className="ts-quit-modal ts-submit-modal">
+              <div className="ts-quit-icon-wrap"><span className="ts-quit-icon">📝</span></div>
+              <h3 className="ts-quit-title">Ready to submit?</h3>
+              <p className="ts-quit-body">
+                You have answered <strong>{answeredCount}</strong> out of <strong>{questions.length}</strong> questions.
+                {unansweredCount > 0 ? ` ${unansweredCount} question${unansweredCount === 1 ? ' is' : 's are'} still unanswered.` : ' All questions are answered.'}
+              </p>
+              <div className="ts-quit-stats ts-submit-stats">
+                <div className="ts-quit-stat">
+                  <span className="ts-qs-val ts-qs-answered">{answeredCount}</span>
+                  <span className="ts-qs-key">Answered</span>
+                </div>
+                <div className="ts-quit-stat">
+                  <span className="ts-qs-val ts-qs-blank">{unansweredCount}</span>
+                  <span className="ts-qs-key">Unanswered</span>
+                </div>
+                {markedCount > 0 && (
+                  <div className="ts-quit-stat">
+                    <span className="ts-qs-val ts-qs-marked">{markedCount}</span>
+                    <span className="ts-qs-key">Marked</span>
+                  </div>
+                )}
+              </div>
+              <div className="ts-submit-note">
+                <span className="ts-submit-note-accent">Final check:</span> once submitted, this attempt is locked and scored immediately.
+              </div>
+              <div className="ts-quit-actions ts-submit-actions">
+                <button type="button" className="secondary-btn" onClick={closeSubmitConfirm} disabled={isSubmitting}>
+                  Review Again
+                </button>
+                <button
+                  type="button"
+                  className="primary-btn ts-submit-confirm-btn"
+                  onClick={() => handleSubmitTest()}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Yes, Submit Test'}
+                </button>
               </div>
             </div>
           </div>,
