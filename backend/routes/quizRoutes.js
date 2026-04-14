@@ -11,6 +11,7 @@ const { logAdminAction } = require('../utils/auditLog');
 const router = express.Router();
 const PDF_MAX_SIZE_BYTES = 25 * 1024 * 1024;
 const PDF_TEXT_MAX_CHARS = 240000;
+const PDF_OCR_FALLBACK_TEXT_THRESHOLD = 160;
 const GEMINI_API_VERSION = String(process.env.GEMINI_API_VERSION || 'v1beta').trim();
 const GEMINI_API_BASE = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}`;
 const GEMINI_MODEL_CANDIDATES = [
@@ -193,84 +194,137 @@ function normalizeExtractedQuestions(payload) {
     .filter(Boolean);
 }
 
-async function extractQuestionsWithGemini(extractedText) {
+async function extractQuestionsWithGemini({ extractedText = '', pdfBuffer = null, pdfMimeType = 'application/pdf' } = {}) {
   const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is missing on the server.');
   }
 
-  const callGemini = async (modelName) => {
-    const response = await fetch(
-      `${GEMINI_API_BASE}/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: GEMINI_SYSTEM_PROMPT }]
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: extractedText
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json'
+  const normalizedText = String(extractedText || '').trim();
+  const hasPdfBuffer = Boolean(pdfBuffer?.length);
+
+  const runGeminiExtraction = async ({ includePdfInline = false } = {}) => {
+    const callGemini = async (modelName) => {
+      const parts = [];
+
+      if (includePdfInline && hasPdfBuffer) {
+        parts.push({
+          text: normalizedText
+            ? 'The attached PDF may be scanned or image-based. Use both the PDF pages and the extracted text to find every MCQ.'
+            : 'The attached PDF may be scanned or image-based. Read the PDF directly and extract every MCQ you can find.'
+        });
+
+        if (normalizedText) {
+          parts.push({ text: `Supplemental extracted text from the PDF:\n${normalizedText}` });
+        }
+
+        parts.push({
+          inlineData: {
+            mimeType: pdfMimeType || 'application/pdf',
+            data: Buffer.from(pdfBuffer).toString('base64')
           }
-        })
+        });
+      } else {
+        parts.push({ text: normalizedText });
       }
-    );
 
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = body?.error?.message || 'Gemini API request failed.';
-      throw new Error(message);
+      const response = await fetch(
+        `${GEMINI_API_BASE}/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: GEMINI_SYSTEM_PROMPT }]
+            },
+            contents: [
+              {
+                role: 'user',
+                parts
+              }
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json'
+            }
+          })
+        }
+      );
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = body?.error?.message || 'Gemini API request failed.';
+        throw new Error(message);
+      }
+
+      const responseParts = body?.candidates?.[0]?.content?.parts;
+      const rawText = Array.isArray(responseParts)
+        ? responseParts.map((part) => String(part?.text || '')).join('\n').trim()
+        : '';
+
+      if (!rawText) {
+        throw new Error('Gemini returned an empty response.');
+      }
+
+      const parsed = parseGeminiQuestions(rawText);
+      const questions = normalizeExtractedQuestions(parsed);
+
+      if (!questions.length) {
+        throw new Error('No multiple choice questions could be detected in this PDF.');
+      }
+
+      return questions;
+    };
+
+    const availableModels = await listSupportedGeminiModels(apiKey);
+    const prioritizedModels = buildModelPriorityList(availableModels);
+
+    if (!prioritizedModels.length) {
+      throw new Error('No Gemini model with generateContent support is available for this API key.');
     }
 
-    const parts = body?.candidates?.[0]?.content?.parts;
-    const rawText = Array.isArray(parts)
-      ? parts.map((part) => String(part?.text || '')).join('\n').trim()
-      : '';
+    let lastError = null;
 
-    if (!rawText) {
-      throw new Error('Gemini returned an empty response.');
+    for (const modelName of prioritizedModels) {
+      try {
+        geminiModelCache.model = modelName;
+        geminiModelCache.fetchedAt = Date.now();
+        return await callGemini(modelName);
+      } catch (error) {
+        lastError = error;
+        const message = String(error?.message || '');
+        const canTryAnotherModel = isModelAvailabilityError(message) || isRetriableGeminiError(message);
+        if (!canTryAnotherModel) {
+          throw error;
+        }
+      }
     }
 
-    const parsed = parseGeminiQuestions(rawText);
-    return normalizeExtractedQuestions(parsed);
+    throw lastError || new Error('Gemini extraction failed after trying all available models.');
   };
 
-  const availableModels = await listSupportedGeminiModels(apiKey);
-  const prioritizedModels = buildModelPriorityList(availableModels);
-
-  if (!prioritizedModels.length) {
-    throw new Error('No Gemini model with generateContent support is available for this API key.');
-  }
-
-  let lastError = null;
-
-  for (const modelName of prioritizedModels) {
+  if (normalizedText) {
     try {
-      geminiModelCache.model = modelName;
-      geminiModelCache.fetchedAt = Date.now();
-      return await callGemini(modelName);
+      return await runGeminiExtraction({ includePdfInline: false });
     } catch (error) {
-      lastError = error;
-      const message = String(error?.message || '');
-      const canTryAnotherModel = isModelAvailabilityError(message) || isRetriableGeminiError(message);
-      if (!canTryAnotherModel) {
-        throw error;
-      }
+      const fallbackAllowed = hasPdfBuffer && normalizedText.length < PDF_OCR_FALLBACK_TEXT_THRESHOLD;
+      if (!fallbackAllowed) throw error;
     }
   }
 
-  throw lastError || new Error('Gemini extraction failed after trying all available models.');
+  if (hasPdfBuffer) {
+    try {
+      return await runGeminiExtraction({ includePdfInline: true });
+    } catch (error) {
+      const message = String(error?.message || 'Failed to extract questions from PDF.');
+      if (/payload|too large|request size|inline data/i.test(message)) {
+        throw new Error('This scanned PDF is too large for AI OCR. Please upload a smaller chapter PDF or compress the file.');
+      }
+      throw error;
+    }
+  }
+
+  throw new Error('Could not extract readable content from this PDF.');
 }
 
 function resolveCorrectIndex(question = {}) {
@@ -358,18 +412,18 @@ router.post('/extract-pdf-mcq', authenticateToken('admin'), (req, res) => {
     }
 
     try {
-      const parsedPdf = await pdfParse(req.file.buffer);
+      const parsedPdf = await pdfParse(req.file.buffer).catch(() => ({ text: '' }));
       const extractedText = String(parsedPdf?.text || '').trim();
-
-      if (!extractedText) {
-        return res.status(400).json({ error: 'Could not extract readable text from this PDF.' });
-      }
-
       const boundedText = extractedText.length > PDF_TEXT_MAX_CHARS
         ? extractedText.slice(0, PDF_TEXT_MAX_CHARS)
         : extractedText;
 
-      const questions = await extractQuestionsWithGemini(boundedText);
+      const questions = await extractQuestionsWithGemini({
+        extractedText: boundedText,
+        pdfBuffer: req.file.buffer,
+        pdfMimeType: req.file.mimetype || 'application/pdf'
+      });
+
       return res.json({ questions });
     } catch (error) {
       const message = String(error?.message || 'Failed to extract questions from PDF.');
