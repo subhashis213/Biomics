@@ -310,6 +310,7 @@ export default function StudentTestSeriesPage() {
   }, [cartItems]);
 
   const timerRef = useRef(null);
+  const autoSubmittedRef = useRef(false);
 
   useEffect(() => {
     if (hasHydratedTestSessionRef.current) return;
