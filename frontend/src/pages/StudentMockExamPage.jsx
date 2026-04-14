@@ -27,6 +27,8 @@ export default function StudentMockExamPage() {
   const [reviewMarks, setReviewMarks] = useState({});
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [pendingUnansweredCount, setPendingUnansweredCount] = useState(0);
+  const [hasStartedExam, setHasStartedExam] = useState(false);
+  const [hasAcceptedRules, setHasAcceptedRules] = useState(false);
 
   const autoSubmittedRef = useRef(false);
 
@@ -51,7 +53,9 @@ export default function StudentMockExamPage() {
         setReviewMarks({});
         setActiveIndex(0);
         setSecondsLeft((nextExam.durationMinutes || 60) * 60);
-        setStartedAt(Date.now());
+        setStartedAt(null);
+        setHasStartedExam(false);
+        setHasAcceptedRules(false);
         autoSubmittedRef.current = false;
 
         if (nextExam.attempted) {
@@ -78,14 +82,14 @@ export default function StudentMockExamPage() {
   }, [examId]);
 
   useEffect(() => {
-    if (!exam || result || exam.attempted || secondsLeft <= 0) return undefined;
+    if (!exam || result || exam.attempted || !hasStartedExam || secondsLeft <= 0) return undefined;
     const timer = window.setInterval(() => {
       setSecondsLeft((current) => Math.max(0, current - 1));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [exam, result, secondsLeft]);
+  }, [exam, result, secondsLeft, hasStartedExam]);
 
-  async function handleSubmitExam(forceSubmit = false) {
+  async function handleSubmitExam(forceSubmit = false, submitReason = '') {
     if (!exam || exam.attempted || result || isSubmitting) return;
     if (!forceSubmit) {
       const unansweredCount = answers.reduce((count, value) => count + (value >= 0 ? 0 : 1), 0);
@@ -100,8 +104,9 @@ export default function StudentMockExamPage() {
     try {
       const durationSeconds = startedAt ? Math.max(0, Math.round((Date.now() - startedAt) / 1000)) : undefined;
       const data = await submitMockExam(exam._id, answers, durationSeconds);
-      setSubmitMessage(data?.message || 'Exam submitted successfully.');
+      setSubmitMessage(submitReason || data?.message || 'Exam submitted successfully.');
       setExam((current) => (current ? { ...current, attempted: true } : current));
+      setHasStartedExam(false);
       if (data?.result?.released) {
         const resultData = await fetchMockExamResult(exam._id);
         setResult(resultData?.result || null);
@@ -117,8 +122,46 @@ export default function StudentMockExamPage() {
     if (!exam || result || exam.attempted || isSubmitting || secondsLeft !== 0) return;
     if (autoSubmittedRef.current) return;
     autoSubmittedRef.current = true;
-    handleSubmitExam(true);
+    handleSubmitExam(true, 'Time is over. Your exam has been submitted automatically.');
   }, [exam, result, isSubmitting, secondsLeft]);
+
+  useEffect(() => {
+    if (!exam || result || exam.attempted || isSubmitting || !hasStartedExam) return undefined;
+
+    const triggerSecuritySubmit = () => {
+      if (autoSubmittedRef.current) return;
+      autoSubmittedRef.current = true;
+      setPendingUnansweredCount(0);
+      setExitConfirmOpen(false);
+      handleSubmitExam(true, 'Tab switching or window change was detected. Your exam has been submitted automatically.');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) triggerSecuritySubmit();
+    };
+
+    const handleWindowBlur = () => {
+      if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+        triggerSecuritySubmit();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [exam, result, isSubmitting, hasStartedExam, answers, startedAt]);
+
+  function handleStartExam() {
+    if (!exam || !hasAcceptedRules || result || exam.attempted) return;
+    setStartedAt(Date.now());
+    setHasStartedExam(true);
+    setSubmitMessage('');
+    autoSubmittedRef.current = false;
+  }
 
   const totalQuestions = Array.isArray(exam?.questions) ? exam.questions.length : 0;
   const safeActiveIndex = totalQuestions ? Math.max(0, Math.min(activeIndex, totalQuestions - 1)) : 0;
@@ -189,7 +232,63 @@ export default function StudentMockExamPage() {
       {!isLoading && loadError ? <p className="inline-message error">{loadError}</p> : null}
       {submitMessage ? <p className="inline-message success">{submitMessage}</p> : null}
 
-      {!isLoading && !loadError && exam && !exam.attempted && !result ? (
+      {!isLoading && !loadError && exam && !exam.attempted && !result && !hasStartedExam ? (
+        <section className="quiz-instruction-panel">
+          <div className="quiz-instruction-hero">
+            <p className="eyebrow">Exam Instructions</p>
+            <h3>Read these guidelines before you start</h3>
+            <p>
+              This mock test contains <strong>{totalQuestions}</strong> questions and the total duration is{' '}
+              <strong>{exam.durationMinutes || 60} minutes</strong>.
+            </p>
+          </div>
+
+          <div className="quiz-instruction-grid">
+            <article className="quiz-instruction-stat">
+              <span>Total Questions</span>
+              <strong>{totalQuestions}</strong>
+            </article>
+            <article className="quiz-instruction-stat">
+              <span>Total Time</span>
+              <strong>{exam.durationMinutes || 60} min</strong>
+            </article>
+            <article className="quiz-instruction-stat">
+              <span>Attempts</span>
+              <strong>One Only</strong>
+            </article>
+          </div>
+
+          <ul className="quiz-rules-list">
+            <li className="quiz-rule-item">Read every question carefully before selecting an answer.</li>
+            <li className="quiz-rule-item">You can move between questions using the navigator and mark items for review.</li>
+            <li className="quiz-rule-item">Clicking the same option again will unselect that answer.</li>
+            <li className="quiz-rule-item">If you switch tabs, minimize the window, or move away from the exam screen, the test will be submitted automatically.</li>
+            <li className="quiz-rule-item">Once submitted, the attempt is final and cannot be changed.</li>
+          </ul>
+
+          <label className="quiz-instruction-ack">
+            <input
+              type="checkbox"
+              checked={hasAcceptedRules}
+              onChange={(event) => setHasAcceptedRules(event.target.checked)}
+            />
+            <span>
+              I have read the instructions and understand that switching tabs or leaving the exam window will auto-submit my mock test.
+            </span>
+          </label>
+
+          <div className="quiz-instruction-cta">
+            <button type="button" className="secondary-btn" onClick={() => navigate('/student')}>
+              Back
+            </button>
+            <button type="button" className="primary-btn" disabled={!hasAcceptedRules} onClick={handleStartExam}>
+              Start Mock Test
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {!isLoading && !loadError && exam && !exam.attempted && !result && hasStartedExam ? (
         <form className="quiz-workspace" onSubmit={(event) => { event.preventDefault(); handleSubmitExam(false); }}>
           <div className="quiz-workspace-body">
             <section className="quiz-workspace-main">

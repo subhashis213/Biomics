@@ -63,6 +63,8 @@ function restoreActiveTestSession(raw, username) {
     submitted: false,
     result: null,
     currentQ,
+    hasStarted: raw.hasStarted !== false,
+    acceptedGuidelines: Boolean(raw.acceptedGuidelines),
     showQuitConfirm: false,
     showSubmitConfirm: false,
     isSubmitting: false
@@ -343,6 +345,8 @@ export default function StudentTestSeriesPage() {
       markedForReview: testSession.markedForReview,
       timeLeft: testSession.timeLeft,
       currentQ: testSession.currentQ,
+      hasStarted: Boolean(testSession.hasStarted),
+      acceptedGuidelines: Boolean(testSession.acceptedGuidelines),
       savedAt: Date.now()
     };
 
@@ -614,7 +618,12 @@ export default function StudentTestSeriesPage() {
         markedForReview: new Array(qCount).fill(false),
         timeLeft:        (res.durationMinutes || 30) * 60,
         submitted: false, result: null,
-        currentQ: 0, showQuitConfirm: false, showSubmitConfirm: false, isSubmitting: false
+        currentQ: 0,
+        hasStarted: false,
+        acceptedGuidelines: false,
+        showQuitConfirm: false,
+        showSubmitConfirm: false,
+        isSubmitting: false
       });
     } catch (e) {
       setBanner({ type: 'error', text: e.message || 'Failed to load test.' });
@@ -623,17 +632,17 @@ export default function StudentTestSeriesPage() {
 
   // Timer
   useEffect(() => {
-    if (!testSession || testSession.submitted) return undefined;
+    if (!testSession || testSession.submitted || !testSession.hasStarted) return undefined;
     timerRef.current = window.setInterval(() => {
       setTestSession((prev) => {
-        if (!prev || prev.submitted) return prev;
+        if (!prev || prev.submitted || !prev.hasStarted) return prev;
         const next = prev.timeLeft - 1;
         if (next <= 0) { handleSubmitTest(prev); return { ...prev, timeLeft: 0 }; }
         return { ...prev, timeLeft: next };
       });
     }, 1000);
     return () => window.clearInterval(timerRef.current);
-  }, [testSession?.test?._id, testSession?.submitted]);
+  }, [testSession?.test?._id, testSession?.submitted, testSession?.hasStarted]);
 
   async function handleSubmitTest(snap = testSession) {
     if (!snap || snap.submitted) return;
@@ -660,6 +669,48 @@ export default function StudentTestSeriesPage() {
       setTestSession((prev) => prev ? { ...prev, isSubmitting: false } : prev);
       setBanner({ type: 'error', text: e.message || 'Failed to submit test.' });
     }
+  }
+
+  useEffect(() => {
+    if (!testSession || testSession.submitted || testSession.isSubmitting || !testSession.hasStarted) return undefined;
+
+    const triggerSecuritySubmit = () => {
+      if (autoSubmittedRef.current) return;
+      autoSubmittedRef.current = true;
+      setBanner({ type: 'warn', text: 'Tab switching or window change was detected. Your test has been submitted automatically.' });
+      handleSubmitTest({ ...testSession, showQuitConfirm: false, showSubmitConfirm: false });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) triggerSecuritySubmit();
+    };
+
+    const handleWindowBlur = () => {
+      if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+        triggerSecuritySubmit();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [testSession]);
+
+  function startTestFromInstructions() {
+    setTestSession((prev) => {
+      if (!prev || prev.submitted || prev.isSubmitting || !prev.acceptedGuidelines) return prev;
+      autoSubmittedRef.current = false;
+      return {
+        ...prev,
+        hasStarted: true,
+        showQuitConfirm: false,
+        showSubmitConfirm: false
+      };
+    });
   }
 
   function openSubmitConfirm() {
@@ -718,6 +769,79 @@ export default function StudentTestSeriesPage() {
     }
   }, [hasTopicTest, hasFullMock, activeTab]);
 
+  if (testSession && !testSession.submitted && !testSession.hasStarted) {
+    const { test, questions, acceptedGuidelines } = testSession;
+    const examLabel = testSession.type === 'mock' ? 'Mock Test' : 'Topic Test';
+
+    return (
+      <AppShell
+        title={test.title}
+        subtitle={test.category + (test.module ? ' · ' + test.module : '')}
+        roleLabel="Student"
+        showThemeSwitch
+      >
+        <main className="admin-workspace-page">
+          {banner ? <div className={'ts-top-banner ts-top-banner-' + banner.type}>{banner.text}</div> : null}
+          <section className="quiz-instruction-panel">
+            <div className="quiz-instruction-hero">
+              <p className="eyebrow">Exam Instructions</p>
+              <h3>Read carefully before starting</h3>
+              <p>
+                This {examLabel.toLowerCase()} contains <strong>{questions.length}</strong> questions and the total time is{' '}
+                <strong>{test.durationMinutes || 30} minutes</strong>.
+              </p>
+            </div>
+
+            <div className="quiz-instruction-grid">
+              <article className="quiz-instruction-stat">
+                <span>Total Questions</span>
+                <strong>{questions.length}</strong>
+              </article>
+              <article className="quiz-instruction-stat">
+                <span>Total Time</span>
+                <strong>{test.durationMinutes || 30} min</strong>
+              </article>
+              <article className="quiz-instruction-stat">
+                <span>Mode</span>
+                <strong>{examLabel}</strong>
+              </article>
+            </div>
+
+            <ul className="quiz-rules-list">
+              <li className="quiz-rule-item">Read each question carefully and use the navigator to move between questions.</li>
+              <li className="quiz-rule-item">You can mark questions for review and return to them before final submission.</li>
+              <li className="quiz-rule-item">If you switch tabs, minimize the browser, or move away from the exam window, the test will be submitted automatically.</li>
+              <li className="quiz-rule-item">Once submitted, the attempt is locked and scored immediately.</li>
+            </ul>
+
+            <label className="quiz-instruction-ack">
+              <input
+                type="checkbox"
+                checked={acceptedGuidelines}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setTestSession((prev) => (prev ? { ...prev, acceptedGuidelines: checked } : prev));
+                }}
+              />
+              <span>
+                I have read the instructions and understand that switching tabs or doing other activity outside the exam will auto-submit my attempt.
+              </span>
+            </label>
+
+            <div className="quiz-instruction-cta">
+              <button type="button" className="secondary-btn" onClick={quitTest}>
+                Back to Tests
+              </button>
+              <button type="button" className="primary-btn" disabled={!acceptedGuidelines} onClick={startTestFromInstructions}>
+                Start {examLabel}
+              </button>
+            </div>
+          </section>
+        </main>
+      </AppShell>
+    );
+  }
+
   // ══════════════════════════════════════════════════════════
   // RENDER: Result
   // ══════════════════════════════════════════════════════════
@@ -735,6 +859,7 @@ export default function StudentTestSeriesPage() {
         actions={<button type="button" className="secondary-btn" onClick={quitTest}>← Back to Tests</button>}
       >
         <main className="admin-workspace-page">
+          {banner ? <div className={'ts-top-banner ts-top-banner-' + banner.type}>{banner.text}</div> : null}
 
           <section className="card ts-result-score-card">
             <div className="ts-result-score-left">
