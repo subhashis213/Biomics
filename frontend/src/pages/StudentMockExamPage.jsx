@@ -9,6 +9,24 @@ function formatTimer(totalSeconds) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+function normalizeQuestion(question = {}) {
+  const legacyOptions = [question.optionA, question.optionB, question.optionC, question.optionD]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+
+  const options = Array.isArray(question.options)
+    ? question.options.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 4)
+    : legacyOptions.slice(0, 4);
+
+  while (options.length < 4) options.push('');
+
+  return {
+    ...question,
+    question: String(question.question || '').trim(),
+    options
+  };
+}
+
 export default function StudentMockExamPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
@@ -48,8 +66,12 @@ export default function StudentMockExamPage() {
         if (cancelled) return;
         const nextExam = data?.exam || null;
         if (!nextExam) throw new Error('Mock exam is unavailable.');
-        setExam(nextExam);
-        setAnswers(Array((nextExam.questions || []).length).fill(-1));
+        const normalizedQuestions = Array.isArray(nextExam.questions)
+          ? nextExam.questions.map((item) => normalizeQuestion(item))
+          : [];
+        const normalizedExam = { ...nextExam, questions: normalizedQuestions };
+        setExam(normalizedExam);
+        setAnswers(Array(normalizedQuestions.length).fill(-1));
         setReviewMarks({});
         setActiveIndex(0);
         setSecondsLeft((nextExam.durationMinutes || 60) * 60);
@@ -166,6 +188,7 @@ export default function StudentMockExamPage() {
   const totalQuestions = Array.isArray(exam?.questions) ? exam.questions.length : 0;
   const safeActiveIndex = totalQuestions ? Math.max(0, Math.min(activeIndex, totalQuestions - 1)) : 0;
   const activeQuestion = totalQuestions ? exam.questions[safeActiveIndex] : null;
+  const activeOptions = Array.isArray(activeQuestion?.options) ? activeQuestion.options : [];
 
   const attemptedCount = useMemo(() => answers.filter((value) => value >= 0).length, [answers]);
   const markedCount = useMemo(
@@ -306,11 +329,11 @@ export default function StudentMockExamPage() {
                   </div>
                   <p className="quiz-question-text"><strong>Q{safeActiveIndex + 1}.</strong> {activeQuestion.question}</p>
                   <div className="quiz-options-grid">
-                    {activeQuestion.options.map((option, optionIndex) => {
+                    {activeOptions.map((option, optionIndex) => {
                       const isSelected = answers[safeActiveIndex] === optionIndex;
                       return (
                         <button
-                          key={`${option}-${optionIndex}`}
+                          key={`${String(option)}-${optionIndex}`}
                           type="button"
                           className={`quiz-option quiz-option-button${isSelected ? ' is-selected' : ''}`}
                           onClick={() => handleSelectOption(optionIndex)}
@@ -399,14 +422,18 @@ export default function StudentMockExamPage() {
               </div>
               {showReview ? (
                 <div className="quiz-review-list">
-                  {(result.review || []).map((item, idx) => (
-                    <article key={`mock-review-${idx}`} className={`quiz-review-item ${item.isCorrect ? 'correct' : 'incorrect'}`}>
-                      <p><strong>Q{idx + 1}.</strong> {item.question}</p>
-                      <p><span className="quiz-review-label">Your answer:</span> {item.selectedIndex >= 0 ? item.options[item.selectedIndex] : 'Not answered'}</p>
-                      <p><span className="quiz-review-label">Correct answer:</span> {item.correctAnswer || 'N/A'}</p>
-                      {item.explanation ? <p><span className="quiz-review-label">Explanation:</span> {item.explanation}</p> : null}
-                    </article>
-                  ))}
+                  {(result.review || []).map((item, idx) => {
+                    const reviewOptions = Array.isArray(item?.options) ? item.options : [];
+                    const selectedAnswer = item.selectedIndex >= 0 ? reviewOptions[item.selectedIndex] : 'Not answered';
+                    return (
+                      <article key={`mock-review-${idx}`} className={`quiz-review-item ${item.isCorrect ? 'correct' : 'incorrect'}`}>
+                        <p><strong>Q{idx + 1}.</strong> {item.question}</p>
+                        <p><span className="quiz-review-label">Your answer:</span> {selectedAnswer || 'Not answered'}</p>
+                        <p><span className="quiz-review-label">Correct answer:</span> {item.correctAnswer || 'N/A'}</p>
+                        {item.explanation ? <p><span className="quiz-review-label">Explanation:</span> {item.explanation}</p> : null}
+                      </article>
+                    );
+                  })}
                 </div>
               ) : null}
             </>
