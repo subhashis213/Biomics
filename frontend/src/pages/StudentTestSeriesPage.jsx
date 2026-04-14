@@ -22,6 +22,52 @@ function rupees(paise) {
 }
 
 const DIFFICULTY_COLOR = { easy: '#16a34a', hard: '#dc2626', medium: '#d97706' };
+const ACTIVE_TEST_SESSION_STORAGE_KEY = 'ts_active_exam_session_v1';
+
+function restoreActiveTestSession(raw, username) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const storedUsername = String(raw.username || '').trim();
+  const currentUsername = String(username || '').trim();
+  if (storedUsername && currentUsername && storedUsername !== currentUsername) return null;
+
+  const questions = Array.isArray(raw.questions) ? raw.questions : [];
+  const total = questions.length;
+  if (!total) return null;
+
+  const answersRaw = Array.isArray(raw.answers) ? raw.answers : [];
+  const markedRaw = Array.isArray(raw.markedForReview) ? raw.markedForReview : [];
+  const answers = Array.from({ length: total }, (_, i) => {
+    const value = Number(answersRaw[i]);
+    return Number.isInteger(value) && value >= -1 && value <= 3 ? value : -1;
+  });
+  const markedForReview = Array.from({ length: total }, (_, i) => Boolean(markedRaw[i]));
+
+  const savedAt = Number(raw.savedAt || Date.now());
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - savedAt) / 1000));
+  const baseTimeLeft = Number(raw.timeLeft || 0);
+  const adjustedTimeLeft = Math.max(0, Math.floor(baseTimeLeft) - elapsedSeconds);
+
+  const currentQRaw = Number(raw.currentQ || 0);
+  const currentQ = Number.isInteger(currentQRaw)
+    ? Math.min(Math.max(0, currentQRaw), Math.max(0, total - 1))
+    : 0;
+
+  return {
+    type: raw.type === 'mock' ? 'mock' : 'topic',
+    test: raw.test,
+    questions,
+    answers,
+    markedForReview,
+    timeLeft: adjustedTimeLeft,
+    submitted: false,
+    result: null,
+    currentQ,
+    showQuitConfirm: false,
+    showSubmitConfirm: false,
+    isSubmitting: false
+  };
+}
 
 // ── Inline cart button + drawer for Test Series page ─────────────────────────
 function TsCartButton({ session }) {
@@ -220,6 +266,7 @@ function TsCartButton({ session }) {
 export default function StudentTestSeriesPage() {
   const navigate = useNavigate();
   const { session } = useSessionStore();
+  const hasHydratedTestSessionRef = useRef(false);
 
   const [accessData, setAccessData]         = useState(null);
   const [loadingAccess, setLoadingAccess]   = useState(true);
@@ -261,6 +308,60 @@ export default function StudentTestSeriesPage() {
   }, [cartItems]);
 
   const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (hasHydratedTestSessionRef.current) return;
+    hasHydratedTestSessionRef.current = true;
+    try {
+      const raw = localStorage.getItem(ACTIVE_TEST_SESSION_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const restored = restoreActiveTestSession(parsed, session?.username);
+      if (!restored) {
+        localStorage.removeItem(ACTIVE_TEST_SESSION_STORAGE_KEY);
+        return;
+      }
+      setTestSession(restored);
+      setShowReview(false);
+    } catch {
+      localStorage.removeItem(ACTIVE_TEST_SESSION_STORAGE_KEY);
+    }
+  }, [session?.username]);
+
+  useEffect(() => {
+    if (!testSession || testSession.submitted) {
+      localStorage.removeItem(ACTIVE_TEST_SESSION_STORAGE_KEY);
+      return;
+    }
+
+    const payload = {
+      username: session?.username || '',
+      type: testSession.type,
+      test: testSession.test,
+      questions: testSession.questions,
+      answers: testSession.answers,
+      markedForReview: testSession.markedForReview,
+      timeLeft: testSession.timeLeft,
+      currentQ: testSession.currentQ,
+      savedAt: Date.now()
+    };
+
+    try {
+      localStorage.setItem(ACTIVE_TEST_SESSION_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage quota failures to keep exam flow uninterrupted.
+    }
+  }, [
+    session?.username,
+    testSession?.type,
+    testSession?.test,
+    testSession?.questions,
+    testSession?.answers,
+    testSession?.markedForReview,
+    testSession?.timeLeft,
+    testSession?.currentQ,
+    testSession?.submitted
+  ]);
 
   // ── Access & test loading ─────────────────────────────────────────────────
 
@@ -718,7 +819,6 @@ export default function StudentTestSeriesPage() {
     const unansweredCount = answers.length - answeredCount;
     const q               = questions[currentQ];
     const isCurrentMarked = markedForReview[currentQ];
-    const isCurrentAnswered = answers[currentQ] >= 0;
 
     return (
       <AppShell
@@ -757,9 +857,6 @@ export default function StudentTestSeriesPage() {
                   <span className="ts-q-counter">
                     Q <strong>{currentQ + 1}</strong>
                     <span className="ts-q-total"> / {questions.length}</span>
-                  </span>
-                  <span className={'ts-question-state-pill' + (isCurrentAnswered ? ' answered' : ' blank')}>
-                    {isCurrentAnswered ? 'Answered' : 'Not Answered'}
                   </span>
                   {isCurrentMarked && <span className="ts-marked-pill">🟣 Marked for Review</span>}
                 </div>
@@ -816,15 +913,7 @@ export default function StudentTestSeriesPage() {
             <div className="card ts-nav-panel">
               <p className="ts-nav-panel-title">Question Navigator</p>
 
-              <div className="ts-nav-chip-row">
-                <span className="ts-nav-chip ts-nav-chip-current">Current: Q{currentQ + 1}</span>
-                <span className="ts-nav-chip ts-nav-chip-answered">{answeredCount} Answered</span>
-                <span className="ts-nav-chip ts-nav-chip-blank">{unansweredCount} Left</span>
-                {markedCount > 0 ? <span className="ts-nav-chip ts-nav-chip-marked">{markedCount} Review</span> : null}
-              </div>
-
               <div className="ts-nav-legend">
-                <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-current" /><span>Current</span></div>
                 <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-answered" /><span>Answered</span></div>
                 <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-marked"  /><span>Review</span></div>
                 <div className="ts-legend-item"><span className="ts-legend-dot ts-ld-blank"   /><span>Not Done</span></div>
@@ -835,25 +924,13 @@ export default function StudentTestSeriesPage() {
                   const isAnswered = answers[qi] >= 0;
                   const isMarked   = markedForReview[qi];
                   const isCurrent  = qi === currentQ;
-                  const stateLabel = isMarked && isAnswered
-                    ? 'Done • Review'
-                    : isMarked
-                      ? 'Review'
-                      : isAnswered
-                        ? 'Answered'
-                        : 'Pending';
                   return (
                     <button key={qi} type="button"
-                      className={[
-                        'ts-nav-dot',
-                        isMarked && isAnswered ? 'answered-marked' : isMarked ? 'marked' : isAnswered ? 'answered' : 'blank',
-                        isCurrent ? 'current' : ''
-                      ].filter(Boolean).join(' ')}
+                      className={['ts-nav-dot', isMarked ? 'marked' : isAnswered ? 'answered' : '', isCurrent ? 'current' : ''].filter(Boolean).join(' ')}
                       onClick={() => setTestSession((p) => ({ ...p, currentQ: qi }))}
                       title={'Q' + (qi + 1) + (isAnswered ? ' \u2713' : '') + (isMarked ? ' \uD83D\uDFE3' : '')}
                     >
-                      <span className="ts-nav-dot-index">{qi + 1}</span>
-                      <span className="ts-nav-dot-state">{stateLabel}</span>
+                      {qi + 1}
                     </button>
                   );
                 })}
@@ -876,42 +953,6 @@ export default function StudentTestSeriesPage() {
           </aside>
 
         </main>
-
-        <div className="ts-mobile-dock" role="toolbar" aria-label="Mobile exam controls">
-          <button
-            type="button"
-            className="secondary-btn ts-mobile-dock-btn"
-            disabled={currentQ === 0}
-            onClick={() => setTestSession((p) => ({ ...p, currentQ: p.currentQ - 1 }))}
-          >
-            Prev
-          </button>
-          <button
-            type="button"
-            className={'ts-mobile-mark-btn' + (isCurrentMarked ? ' active' : '')}
-            onClick={() => toggleMarkForReview(currentQ)}
-          >
-            {isCurrentMarked ? 'Unmark' : 'Mark'}
-          </button>
-          {currentQ < questions.length - 1 ? (
-            <button
-              type="button"
-              className="primary-btn ts-mobile-dock-btn"
-              onClick={() => setTestSession((p) => ({ ...p, currentQ: p.currentQ + 1 }))}
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="primary-btn ts-mobile-dock-btn"
-              onClick={openSubmitConfirm}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </button>
-          )}
-        </div>
 
         {/* Quit confirmation modal */}
         {showQuitConfirm && createPortal(
