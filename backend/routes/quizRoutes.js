@@ -12,7 +12,7 @@ const router = express.Router();
 const PDF_MAX_SIZE_BYTES = 25 * 1024 * 1024;
 const PDF_TEXT_MAX_CHARS = 240000;
 const PDF_OCR_FALLBACK_TEXT_THRESHOLD = 160;
-const GEMINI_API_VERSION = String(process.env.GEMINI_API_VERSION || 'v1').trim();
+const GEMINI_API_VERSION = String(process.env.GEMINI_API_VERSION || 'v1beta').trim();
 const GEMINI_API_BASE = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}`;
 const GEMINI_MODEL_CANDIDATES = [
   String(process.env.GEMINI_MODEL || '').trim(),
