@@ -81,6 +81,14 @@ function buildCorsOriginResolver(rawValue) {
       return;
     }
 
+    // Always allow Capacitor native mobile app origins (Android/iOS).
+    // androidScheme: 'https' causes the app to send https://localhost as origin.
+    const capacitorOrigins = ['https://localhost', 'http://localhost', 'capacitor://localhost', 'ionic://localhost'];
+    if (capacitorOrigins.includes(requestOrigin)) {
+      callback(null, true);
+      return;
+    }
+
     if (allowedOrigins.includes(requestOrigin)) {
       callback(null, true);
       return;

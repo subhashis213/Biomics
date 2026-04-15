@@ -21,7 +21,14 @@ function isLocalDevHost(hostname = '') {
     || isPrivateIpv4(value);
 }
 
-const isLocalhostClient = typeof window !== 'undefined'
+// Capacitor native apps run on capacitor://localhost — treat as production, not local dev.
+const isCapacitorNative = typeof window !== 'undefined'
+  && (window.location.protocol === 'capacitor:'
+    || window.location.protocol === 'ionic:'
+    || window.Capacitor?.isNativePlatform?.());
+
+const isLocalhostClient = !isCapacitorNative
+  && typeof window !== 'undefined'
   && isLocalDevHost(window.location.hostname);
 
 const DEFAULT_REMOTE_API = 'https://biomicshub-backend.onrender.com';
