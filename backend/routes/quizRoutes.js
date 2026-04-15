@@ -16,8 +16,8 @@ const GEMINI_API_VERSION = String(process.env.GEMINI_API_VERSION || 'v1beta').tr
 const GEMINI_API_BASE = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}`;
 const GEMINI_MODEL_CANDIDATES = [
   String(process.env.GEMINI_MODEL || '').trim(),
-  'gemini-2.5-flash',
   'gemini-2.0-flash',
+  'gemini-2.5-flash',
   'gemini-1.5-flash',
   'gemini-1.5-pro',
   'gemini-pro'
