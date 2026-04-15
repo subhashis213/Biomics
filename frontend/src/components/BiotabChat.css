@@ -1,4 +1,20 @@
-/* ─── BioTutor AI Chat (biotab) ─────────────────────────────── */
+/* ─── BioTutor AI Chat (biotab) — Premium Blue & White ──────── */
+
+/* ── Design tokens ─────────────────────────────────────────────
+   Primary blue family
+   --bio-blue-1  : #0a1628   deepest navy
+   --bio-blue-2  : #0f2044   dark navy panel bg
+   --bio-blue-3  : #1a3360   card surface
+   --bio-blue-4  : #1e4db7   mid-royal
+   --bio-blue-5  : #2563eb   action blue
+   --bio-blue-6  : #3b82f6   interactive hover
+   --bio-blue-7  : #60a5fa   soft accent
+   --bio-blue-8  : #bfdbfe   pale blue tint
+   --bio-blue-9  : #eff6ff   near-white blue
+   White / neutral
+   --bio-white   : #ffffff
+   --bio-off     : #f0f6ff
+──────────────────────────────────────────────────────────────── */
 
 .biotab-backdrop {
   position: fixed;
@@ -6,34 +22,40 @@
   z-index: 998;
   border: 0;
   background:
-    radial-gradient(circle at 85% 95%, rgba(13, 148, 136, 0.2), transparent 35%),
-    rgba(4, 8, 20, 0.48);
+    radial-gradient(circle at 80% 90%, rgba(37, 99, 235, 0.18), transparent 38%),
+    rgba(4, 10, 28, 0.52);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
 }
 
-/* FAB */
+/* ── FAB ───────────────────────────────────────────────────────── */
 .biotab-fab {
   position: fixed;
   bottom: 24px;
   right: 24px;
   z-index: 1001;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  background: linear-gradient(140deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.45);
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition: transform 220ms ease, box-shadow 220ms ease;
 }
 .biotab-fab:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 24px rgba(13, 148, 136, 0.6);
+  box-shadow:
+    0 8px 28px rgba(37, 99, 235, 0.65),
+    0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .biotab-whatsapp-fab {
@@ -55,7 +77,6 @@
   transition: transform 220ms ease, box-shadow 220ms ease, filter 180ms ease;
   text-decoration: none;
 }
-
 .biotab-whatsapp-fab:hover {
   transform: scale(1.08);
   filter: saturate(1.08);
@@ -81,6 +102,16 @@
   transition: transform 220ms ease, box-shadow 220ms ease, filter 180ms ease;
 }
 
+.biotab-fab-ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid rgba(96, 165, 250, 0.5);
+  animation: bioPulse 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Announcement pieces — unchanged amber palette ─────────────── */
 .biotab-announcement-inline-wrap {
   position: relative;
   display: inline-flex;
@@ -105,7 +136,7 @@
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--line-strong, rgba(245, 158, 11, 0.35)) 72%, transparent);
+  border: 1px solid color-mix(in srgb, rgba(245, 158, 11, 0.35) 72%, transparent);
   background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
   color: #ffffff;
   display: inline-flex;
@@ -115,33 +146,27 @@
   box-shadow: 0 8px 18px rgba(217, 119, 6, 0.38);
   transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
-
 .biotab-announcement-header-btn:hover {
   transform: translateY(-1px);
   filter: saturate(1.05);
   box-shadow: 0 12px 22px rgba(234, 88, 12, 0.38);
 }
-
 .biotab-announcement-header-btn:focus-visible {
   outline: 2px solid rgba(245, 158, 11, 0.45);
   outline-offset: 2px;
 }
-
 .biotab-announcement-fab:hover {
   transform: scale(1.08);
   filter: saturate(1.08);
   box-shadow: 0 10px 24px rgba(217, 119, 6, 0.62);
 }
-
 .biotab-announcement-fab-ringing {
   animation: biotabBellGlow 1.8s ease-in-out infinite;
 }
-
 .biotab-announcement-fab-ringing svg {
   transform-origin: 50% 0%;
   animation: biotabBellRing 1.2s ease-in-out infinite;
 }
-
 .biotab-announcement-count {
   position: absolute;
   top: -5px;
@@ -170,7 +195,7 @@
   background:
     radial-gradient(circle at 100% 0%, rgba(251, 191, 36, 0.16), transparent 42%),
     linear-gradient(165deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-    var(--card-bg, #1a1f2e);
+    #0f2044;
   border: 1px solid color-mix(in srgb, #f59e0b 28%, rgba(255, 255, 255, 0.14));
   border-radius: 16px;
   box-shadow: 0 18px 42px rgba(2, 6, 23, 0.55);
@@ -180,7 +205,6 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
-
 .biotab-announcement-panel-inline {
   position: fixed;
   top: max(calc(var(--app-shell-topbar-clearance, 96px) + 8px), calc(env(safe-area-inset-top) + 4px));
@@ -197,7 +221,6 @@
   transform-origin: top right;
   animation: biotabAnnouncementInlineIn 180ms cubic-bezier(0.22, 0.9, 0.2, 1) both;
 }
-
 .biotab-announcement-panel-inline .biotab-announcement-list {
   flex: none;
   display: flex;
@@ -207,11 +230,9 @@
   width: 100%;
   overflow-y: auto;
 }
-
 .biotab-announcement-panel-inline .biotab-announcement-item {
   flex: 0 0 auto;
 }
-
 .biotab-announcement-head {
   display: flex;
   align-items: center;
@@ -220,14 +241,12 @@
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.24), rgba(217, 119, 6, 0.3));
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
-
 .biotab-announcement-head strong {
   font-size: 0.82rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #fff7ed;
 }
-
 .biotab-announcement-close {
   width: 24px;
   height: 24px;
@@ -241,13 +260,11 @@
   justify-content: center;
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
 }
-
 .biotab-announcement-close:hover {
   transform: translateY(-1px);
   background: rgba(255, 255, 255, 0.28);
   border-color: rgba(255, 255, 255, 0.38);
 }
-
 .biotab-announcement-list {
   overflow: auto;
   padding: 9px;
@@ -261,16 +278,11 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(245, 158, 11, 0.35) rgba(148, 163, 184, 0.14);
 }
-
-.biotab-announcement-list::-webkit-scrollbar {
-  width: 7px;
-}
-
+.biotab-announcement-list::-webkit-scrollbar { width: 7px; }
 .biotab-announcement-list::-webkit-scrollbar-thumb {
   background: rgba(245, 158, 11, 0.42);
   border-radius: 999px;
 }
-
 .biotab-announcement-item {
   border: 1px solid color-mix(in srgb, #f59e0b 20%, rgba(255, 255, 255, 0.16));
   border-radius: 12px;
@@ -284,28 +296,13 @@
   gap: 7px;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
-
 .biotab-announcement-item:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, #f59e0b 36%, rgba(255, 255, 255, 0.22));
   box-shadow: 0 8px 16px rgba(2, 6, 23, 0.28);
 }
-
-.biotab-announcement-item h4 {
-  margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.3;
-  color: #fff7ed;
-}
-
-.biotab-announcement-item p {
-  margin: 0;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  width: 100%;
-  color: color-mix(in srgb, var(--text-secondary, #cdd6e3) 90%, #fff 10%);
-}
-
+.biotab-announcement-item h4 { margin: 0; font-size: 0.84rem; line-height: 1.3; color: #fff7ed; }
+.biotab-announcement-item p  { margin: 0; font-size: 0.75rem; line-height: 1.5; width: 100%; color: color-mix(in srgb, #cdd6e3 90%, #fff 10%); }
 .biotab-announcement-item span {
   display: inline-flex;
   align-self: flex-start;
@@ -318,14 +315,14 @@
   border-radius: 999px;
   padding: 2px 7px;
 }
-
 .biotab-announcement-empty {
   margin: 0;
   padding: 12px 13px;
   font-size: 0.76rem;
-  color: color-mix(in srgb, var(--text-muted, #8a9bb0) 85%, #fff 15%);
+  color: #8a9bb0;
 }
 
+/* ── Light-mode announcement unchanged ────────────────────────── */
 html[data-theme='light'] .biotab-announcement-panel {
   background:
     radial-gradient(circle at 100% 0%, rgba(251, 191, 36, 0.2), transparent 44%),
@@ -333,7 +330,6 @@ html[data-theme='light'] .biotab-announcement-panel {
   border-color: rgba(217, 119, 6, 0.34);
   box-shadow: 0 16px 36px rgba(148, 163, 184, 0.35);
 }
-
 html[data-theme='light'] .biotab-announcement-panel-inline {
   background: linear-gradient(165deg, #fff9ef, #fffef8);
   border-color: rgba(217, 119, 6, 0.3);
@@ -341,63 +337,43 @@ html[data-theme='light'] .biotab-announcement-panel-inline {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-
-html[data-theme='light'] .biotab-announcement-head strong {
-  color: #7c2d12;
-}
-
-html[data-theme='light'] .biotab-announcement-close {
-  color: #7c2d12;
-  border-color: rgba(124, 45, 18, 0.2);
-  background: rgba(255, 255, 255, 0.7);
-}
-
+html[data-theme='light'] .biotab-announcement-head strong { color: #7c2d12; }
+html[data-theme='light'] .biotab-announcement-close { color: #7c2d12; border-color: rgba(124, 45, 18, 0.2); background: rgba(255, 255, 255, 0.7); }
 html[data-theme='light'] .biotab-announcement-item {
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 251, 235, 0.9));
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 251, 235, 0.9));
   border-color: rgba(217, 119, 6, 0.24);
 }
+html[data-theme='light'] .biotab-announcement-item h4 { color: #7c2d12; }
+html[data-theme='light'] .biotab-announcement-item p  { color: #374151; }
+html[data-theme='light'] .biotab-announcement-item span { color: #92400e; background: rgba(251, 191, 36, 0.2); border-color: rgba(217, 119, 6, 0.24); }
 
-html[data-theme='light'] .biotab-announcement-item h4 {
-  color: #7c2d12;
-}
-
-html[data-theme='light'] .biotab-announcement-item p {
-  color: #374151;
-}
-
-html[data-theme='light'] .biotab-announcement-item span {
-  color: #92400e;
-  background: rgba(251, 191, 36, 0.2);
-  border-color: rgba(217, 119, 6, 0.24);
-}
-.biotab-fab-ring {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid rgba(13, 148, 136, 0.55);
-  animation: bioPulse 2.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-/* Panel */
+/* ══════════════════════════════════════════════════════════════
+   PANEL — premium deep navy + white
+══════════════════════════════════════════════════════════════ */
 .biotab-panel {
   position: fixed;
-  bottom: 80px;
-  right: 16px;
-  width: min(360px, calc(100vw - 24px));
-  height: clamp(420px, 68vh, 620px);
+  bottom: 82px;
+  right: 18px;
+  width: min(380px, calc(100vw - 24px));
+  height: clamp(440px, 70vh, 640px);
   max-height: calc(100vh - var(--app-shell-topbar-clearance, 118px) - 16px);
-  background: var(--card-bg, #1a1f2e);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
+  background:
+    radial-gradient(ellipse at 10% 0%, rgba(37, 99, 235, 0.15) 0%, transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(96, 165, 250, 0.08) 0%, transparent 45%),
+    linear-gradient(175deg, #0d1e3d 0%, #0a1628 100%);
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: 20px;
+  box-shadow:
+    0 24px 64px rgba(4, 10, 28, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 rgba(96, 165, 250, 0.18) inset;
   display: grid;
   grid-template-rows: auto auto auto 1fr auto auto;
   overflow: hidden;
   z-index: 999;
-  animation: biotabPanelIn 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: biotabPanelIn 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
 .biotab-panel.expanded {
   position: fixed;
   top: max(calc(var(--app-shell-topbar-clearance, 118px) + 4px), calc(env(safe-area-inset-top) + 58px));
@@ -406,77 +382,102 @@ html[data-theme='light'] .biotab-announcement-item span {
   left: 12px;
   width: auto;
   height: auto;
-  border-radius: 16px;
+  border-radius: 20px;
 }
 
-/* Header */
+/* ── Header ─────────────────────────────────────────────────── */
 .biotab-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 10px;
-  background: linear-gradient(120deg, #0d9488 0%, #0f766e 45%, #155e75 100%);
+  padding: 13px 15px 11px;
+  background:
+    linear-gradient(115deg, #1d4ed8 0%, #1e40af 40%, #1e3a8a 100%);
+  border-bottom: 1px solid rgba(96, 165, 250, 0.22);
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.biotab-header::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 65%);
+  pointer-events: none;
 }
 .biotab-branding {
   display: flex;
   align-items: center;
   gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 .biotab-avatar {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 .biotab-title-block h3 {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 700;
-  color: #fff;
+  color: #ffffff;
   line-height: 1.2;
+  letter-spacing: 0.01em;
 }
 .biotab-title-block p {
   margin: 0;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.68rem;
+  color: rgba(191, 219, 254, 0.9);
   line-height: 1.2;
 }
 .biotab-actions {
   display: flex;
-  gap: 4px;
+  gap: 5px;
+  position: relative;
+  z-index: 1;
 }
 .biotab-ctrl {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 160ms;
+  transition: background 160ms, border-color 160ms, transform 120ms;
 }
 .biotab-ctrl:hover,
 .biotab-ctrl.active {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
 }
 .biotab-ctrl.danger:hover {
-  background: rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.5);
+  border-color: rgba(239, 68, 68, 0.6);
 }
 
-/* Settings Drawer */
+/* ── Settings drawer ─────────────────────────────────────────── */
 .biotab-settings {
   padding: 12px 14px;
-  background: var(--card-bg, #1a1f2e);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(13, 30, 61, 0.95);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.14);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -489,12 +490,12 @@ html[data-theme='light'] .biotab-announcement-item span {
   flex-wrap: wrap;
 }
 .biotab-setting-label {
-  font-size: 0.72rem;
-  color: var(--text-muted, #8a9bb0);
+  font-size: 0.7rem;
+  color: rgba(148, 179, 235, 0.75);
   font-weight: 600;
   min-width: 46px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 .biotab-lang-toggle {
   display: flex;
@@ -503,18 +504,19 @@ html[data-theme='light'] .biotab-announcement-item span {
 .biotab-lang-btn {
   padding: 4px 12px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   background: transparent;
-  color: var(--text-secondary, #cdd6e3);
+  color: rgba(191, 219, 254, 0.8);
   transition: all 160ms;
 }
 .biotab-lang-btn.active {
-  background: #0d9488;
-  border-color: #0d9488;
-  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-color: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
 }
 .biotab-level-group {
   display: flex;
@@ -524,18 +526,18 @@ html[data-theme='light'] .biotab-announcement-item span {
 .biotab-level-chip {
   padding: 3px 9px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
   cursor: pointer;
-  font-size: 0.73rem;
+  font-size: 0.71rem;
   font-weight: 500;
   background: transparent;
-  color: var(--text-secondary, #cdd6e3);
+  color: rgba(191, 219, 254, 0.8);
   transition: all 160ms;
 }
 .biotab-level-chip.active {
-  background: #0d9488;
-  border-color: #0d9488;
-  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-color: #3b82f6;
+  color: #ffffff;
 }
 .biotab-clear-btn {
   display: inline-flex;
@@ -548,69 +550,74 @@ html[data-theme='light'] .biotab-announcement-item span {
   font-size: 0.72rem;
   font-weight: 500;
   background: transparent;
-  color: #f87171;
+  color: #fb7185;
   transition: all 160ms;
   align-self: flex-start;
 }
 .biotab-clear-btn:hover {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.55);
 }
 
-/* Starter prompts */
+/* ── Starter prompts ─────────────────────────────────────────── */
 .biotab-starters {
   display: flex;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 7px;
+  padding: 9px 12px;
   overflow-x: auto;
   scrollbar-width: none;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+  background: rgba(10, 22, 40, 0.4);
 }
-.biotab-starters::-webkit-scrollbar {
-  display: none;
-}
+.biotab-starters::-webkit-scrollbar { display: none; }
 .biotab-starter {
   flex-shrink: 0;
-  padding: 5px 12px;
+  padding: 5px 13px;
   border-radius: 20px;
-  border: 1px solid rgba(13, 148, 136, 0.4);
+  border: 1px solid rgba(59, 130, 246, 0.35);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.71rem;
   font-weight: 500;
-  background: rgba(13, 148, 136, 0.1);
-  color: #5eead4;
+  background: rgba(37, 99, 235, 0.1);
+  color: #93c5fd;
   white-space: nowrap;
-  transition: all 160ms;
+  transition: all 180ms;
 }
 .biotab-starter:hover:not(:disabled) {
-  background: rgba(13, 148, 136, 0.25);
+  background: rgba(37, 99, 235, 0.22);
+  border-color: rgba(96, 165, 250, 0.6);
+  color: #bfdbfe;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
-.biotab-starter:disabled {
-  opacity: 0.4;
-}
+.biotab-starter:disabled { opacity: 0.4; }
 
-/* Messages */
+/* ── Messages area ──────────────────────────────────────────── */
 .biotab-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 12px 4px;
+  padding: 14px 13px 6px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  scrollbar-color: rgba(59, 130, 246, 0.25) transparent;
+}
+.biotab-messages::-webkit-scrollbar { width: 5px; }
+.biotab-messages::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 999px;
 }
 .biotab-msg {
   display: flex;
   gap: 8px;
   align-items: flex-start;
 }
-.biotab-msg.user {
-  flex-direction: row-reverse;
-}
+.biotab-msg.user { flex-direction: row-reverse; }
 .biotab-msg-av {
-  width: 26px;
-  height: 26px;
+  width: 27px;
+  height: 27px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -618,124 +625,124 @@ html[data-theme='light'] .biotab-announcement-item span {
   flex-shrink: 0;
 }
 .biotab-msg.assistant .biotab-msg-av {
-  background: linear-gradient(135deg, #0d9488, #134e4a);
+  background: linear-gradient(135deg, #2563eb, #1e40af);
   color: #fff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
 }
 .biotab-msg.user .biotab-msg-av {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary, #cdd6e3);
+  color: rgba(191, 219, 254, 0.8);
+  border: 1px solid rgba(59, 130, 246, 0.2);
 }
 .biotab-msg-body {
-  max-width: 78%;
+  max-width: 80%;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-.biotab-msg.user .biotab-msg-body {
-  align-items: flex-end;
-}
+.biotab-msg.user .biotab-msg-body { align-items: flex-end; }
 .biotab-msg-body p {
   margin: 0;
-  padding: 9px 12px;
-  border-radius: 14px;
+  padding: 10px 13px;
+  border-radius: 16px;
   font-size: 0.83rem;
-  line-height: 1.55;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
 }
 .biotab-msg.assistant .biotab-msg-body p {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary, #e2e8f0);
-  border-bottom-left-radius: 4px;
+  background: rgba(255, 255, 255, 0.065);
+  color: #e2eeff;
+  border-bottom-left-radius: 5px;
+  border: 1px solid rgba(59, 130, 246, 0.14);
 }
 .biotab-msg.user .biotab-msg-body p {
-  background: linear-gradient(135deg, #0d9488, #0f766e);
-  color: #fff;
-  border-bottom-right-radius: 4px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border-bottom-right-radius: 5px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
 }
 .biotab-msg-body time {
-  font-size: 0.65rem;
-  color: var(--text-muted, #64748b);
+  font-size: 0.62rem;
+  color: rgba(148, 179, 235, 0.5);
 }
 
-/* Typing indicator */
+/* ── Typing indicator ────────────────────────────────────────── */
 .biotab-dots {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  border-bottom-left-radius: 4px;
+  background: rgba(255, 255, 255, 0.065);
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  border-radius: 16px;
+  border-bottom-left-radius: 5px;
 }
 .biotab-dots span {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #0d9488;
-  animation: biotabTyping 1.2s ease-in-out infinite;
+  background: #60a5fa;
+  animation: biotabTyping 1.4s ease-in-out infinite;
 }
-.biotab-dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.biotab-dots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
+.biotab-dots span:nth-child(2) { animation-delay: 0.22s; }
+.biotab-dots span:nth-child(3) { animation-delay: 0.44s; }
 
-/* Error */
+/* ── Error ───────────────────────────────────────────────────── */
 .biotab-error {
   font-size: 0.76rem;
   color: #fca5a5;
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.25);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 8px 12px;
 }
 
-/* Quick mode chips */
+/* ── Quick mode chips ────────────────────────────────────────── */
 .biotab-modes {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  padding: 6px 10px;
+  gap: 6px;
+  padding: 8px 11px;
   flex-shrink: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+  background: rgba(10, 22, 40, 0.4);
 }
 .biotab-mode-chip {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
   cursor: pointer;
   font-size: 0.72rem;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary, #cdd6e3);
+  background: rgba(37, 99, 235, 0.07);
+  color: rgba(191, 219, 254, 0.85);
   transition: all 160ms;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .biotab-mode-chip:hover:not(:disabled) {
-  background: rgba(13, 148, 136, 0.2);
-  border-color: rgba(13, 148, 136, 0.4);
-  color: #5eead4;
+  background: rgba(37, 99, 235, 0.2);
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #bfdbfe;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22);
 }
-.biotab-mode-chip:disabled {
-  opacity: 0.4;
-}
+.biotab-mode-chip:disabled { opacity: 0.38; }
 
-/* Input */
+/* ── Input area ──────────────────────────────────────────────── */
 .biotab-input-area {
-  padding: 8px 10px 10px;
-  background: var(--card-bg, #1a1f2e);
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 9px 11px 11px;
+  background: rgba(10, 22, 40, 0.8);
+  border-top: 1px solid rgba(59, 130, 246, 0.13);
   flex-shrink: 0;
 }
 .biotab-input-row {
   display: flex;
-  gap: 6px;
+  gap: 7px;
   align-items: flex-end;
 }
 .biotab-input-row textarea {
@@ -743,70 +750,186 @@ html[data-theme='light'] .biotab-announcement-item span {
   resize: none;
   max-height: 100px;
   overflow-y: auto;
-  padding: 9px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary, #e2e8f0);
+  padding: 9px 13px;
+  border-radius: 13px;
+  border: 1.5px solid rgba(59, 130, 246, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2eeff;
   font-size: 0.83rem;
   line-height: 1.45;
   font-family: inherit;
   outline: none;
-  transition: border-color 160ms;
+  transition: border-color 180ms, background 180ms, box-shadow 180ms;
   field-sizing: content;
 }
 .biotab-input-row textarea:focus {
-  border-color: rgba(13, 148, 136, 0.6);
+  border-color: rgba(96, 165, 250, 0.55);
   background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
-.biotab-input-row textarea::placeholder {
-  color: var(--text-muted, #64748b);
-}
+.biotab-input-row textarea::placeholder { color: rgba(148, 179, 235, 0.45); }
 .biotab-send {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 39px;
+  height: 39px;
+  border-radius: 11px;
   border: none;
   cursor: pointer;
-  background: #0d9488;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
   transition: all 160ms;
 }
 .biotab-send:hover:not(:disabled) {
-  background: #0f766e;
-  transform: scale(1.05);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.55);
 }
-.biotab-send:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
+.biotab-send:disabled { opacity: 0.32; cursor: not-allowed; box-shadow: none; }
 .biotab-footer-note {
   display: flex;
   align-items: center;
   gap: 5px;
   margin-top: 5px;
-  font-size: 0.65rem;
-  color: var(--text-muted, #64748b);
+  font-size: 0.63rem;
+  color: rgba(148, 179, 235, 0.45);
 }
 
-/* Animations */
+/* ══════════════════════════════════════════════════════════════
+   LIGHT THEME overrides — clean white card with blue accents
+══════════════════════════════════════════════════════════════ */
+html[data-theme='light'] .biotab-panel {
+  background:
+    radial-gradient(ellipse at 10% 0%, rgba(219, 234, 254, 0.6) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 95%, rgba(191, 219, 254, 0.3) 0%, transparent 45%),
+    #ffffff;
+  border-color: rgba(59, 130, 246, 0.22);
+  box-shadow:
+    0 20px 56px rgba(30, 64, 175, 0.14),
+    0 4px 12px rgba(37, 99, 235, 0.08),
+    0 0 0 1px rgba(37, 99, 235, 0.06) inset;
+}
+
+html[data-theme='light'] .biotab-messages {
+  scrollbar-color: rgba(59, 130, 246, 0.2) transparent;
+}
+html[data-theme='light'] .biotab-msg.assistant .biotab-msg-body p {
+  background: #f0f6ff;
+  color: #1e3a8a;
+  border-color: rgba(59, 130, 246, 0.18);
+}
+html[data-theme='light'] .biotab-msg.user .biotab-msg-body p {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+}
+html[data-theme='light'] .biotab-msg.assistant .biotab-msg-av {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  color: #fff;
+}
+html[data-theme='light'] .biotab-msg.user .biotab-msg-av {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.2);
+}
+html[data-theme='light'] .biotab-msg-body time { color: rgba(30, 64, 175, 0.45); }
+
+html[data-theme='light'] .biotab-settings {
+  background: #f8faff;
+  border-bottom-color: rgba(37, 99, 235, 0.12);
+}
+html[data-theme='light'] .biotab-setting-label { color: #6b82b5; }
+html[data-theme='light'] .biotab-lang-btn {
+  border-color: rgba(37, 99, 235, 0.2);
+  color: #2563eb;
+}
+html[data-theme='light'] .biotab-lang-btn.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+}
+html[data-theme='light'] .biotab-level-chip {
+  border-color: rgba(37, 99, 235, 0.2);
+  color: #2563eb;
+}
+html[data-theme='light'] .biotab-level-chip.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+}
+html[data-theme='light'] .biotab-clear-btn { color: #ef4444; }
+
+html[data-theme='light'] .biotab-starters {
+  background: #f8faff;
+  border-bottom-color: rgba(37, 99, 235, 0.1);
+}
+html[data-theme='light'] .biotab-starter {
+  border-color: rgba(37, 99, 235, 0.3);
+  background: rgba(37, 99, 235, 0.06);
+  color: #1d4ed8;
+}
+html[data-theme='light'] .biotab-starter:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.5);
+  color: #1e3a8a;
+}
+
+html[data-theme='light'] .biotab-modes {
+  background: #f4f8ff;
+  border-top-color: rgba(37, 99, 235, 0.1);
+}
+html[data-theme='light'] .biotab-mode-chip {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(37, 99, 235, 0.05);
+  color: #1d4ed8;
+}
+html[data-theme='light'] .biotab-mode-chip:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.4);
+  color: #1e3a8a;
+}
+
+html[data-theme='light'] .biotab-input-area {
+  background: #f4f8ff;
+  border-top-color: rgba(37, 99, 235, 0.12);
+}
+html[data-theme='light'] .biotab-input-row textarea {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: #ffffff;
+  color: #1e3a8a;
+}
+html[data-theme='light'] .biotab-input-row textarea:focus {
+  border-color: rgba(37, 99, 235, 0.5);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+html[data-theme='light'] .biotab-input-row textarea::placeholder { color: rgba(30, 64, 175, 0.38); }
+html[data-theme='light'] .biotab-footer-note { color: rgba(30, 64, 175, 0.4); }
+
+html[data-theme='light'] .biotab-dots {
+  background: #f0f6ff;
+  border-color: rgba(37, 99, 235, 0.16);
+}
+html[data-theme='light'] .biotab-dots span { background: #2563eb; }
+html[data-theme='light'] .biotab-error {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.07);
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
 @keyframes bioPulse {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50%       { opacity: 0.15; transform: scale(1.25); }
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%       { opacity: 0.12; transform: scale(1.28); }
 }
 @keyframes biotabPanelIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes biotabTyping {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40%           { transform: scale(1); opacity: 1; }
+  0%, 80%, 100% { transform: scale(0.55); opacity: 0.35; }
+  40%           { transform: scale(1.05); opacity: 1; }
 }
-
 @keyframes biotabBellRing {
   0%, 100% { transform: rotate(0deg); }
   10% { transform: rotate(16deg); }
@@ -817,158 +940,73 @@ html[data-theme='light'] .biotab-announcement-item span {
   60% { transform: rotate(-4deg); }
   70% { transform: rotate(2deg); }
 }
-
 @keyframes biotabBellGlow {
-  0%, 100% {
-    box-shadow: 0 8px 20px rgba(217, 119, 6, 0.5);
-    filter: saturate(1);
-  }
-  50% {
-    box-shadow: 0 10px 28px rgba(245, 158, 11, 0.68);
-    filter: saturate(1.08);
-  }
+  0%, 100% { box-shadow: 0 8px 20px rgba(217, 119, 6, 0.5); filter: saturate(1); }
+  50%       { box-shadow: 0 10px 28px rgba(245, 158, 11, 0.68); filter: saturate(1.08); }
 }
-
 @keyframes biotabAnnouncementInlineIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .biotab-announcement-fab-ringing,
-  .biotab-announcement-fab-ringing svg {
-    animation: none;
-  }
+  .biotab-announcement-fab-ringing svg { animation: none; }
 }
 
-/* Mobile */
+/* ── Mobile ──────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .biotab-panel {
     bottom: 68px;
     right: 8px;
     left: 8px;
     width: auto;
-    height: clamp(380px, 70vh, 560px);
+    height: clamp(380px, 70vh, 580px);
     max-height: calc(100vh - var(--app-shell-topbar-clearance, 104px) - 8px);
+    border-radius: 18px;
   }
   .biotab-panel.expanded {
     top: max(calc(var(--app-shell-topbar-clearance, 104px) + 4px), calc(env(safe-area-inset-top) + 52px));
     right: 8px;
     bottom: 8px;
     left: 8px;
+    border-radius: 18px;
   }
-  .biotab-fab {
-    bottom: 16px;
-    right: 16px;
-  }
-
-  .biotab-whatsapp-fab {
-    bottom: 76px;
-    right: 16px;
-    width: 44px;
-    height: 44px;
-  }
-
-  .biotab-announcement-fab {
-    bottom: 128px;
-    right: 16px;
-    width: 42px;
-    height: 42px;
-  }
-
-  .biotab-announcement-panel {
-    right: 12px;
-    bottom: 174px;
-    width: min(320px, calc(100vw - 20px));
-    max-height: min(52vh, 390px);
-  }
-
+  .biotab-fab { bottom: 16px; right: 16px; }
+  .biotab-whatsapp-fab { bottom: 76px; right: 16px; width: 44px; height: 44px; }
+  .biotab-announcement-fab { bottom: 128px; right: 16px; width: 42px; height: 42px; }
+  .biotab-announcement-panel { right: 12px; bottom: 174px; width: min(320px, calc(100vw - 20px)); max-height: min(52vh, 390px); }
   .biotab-announcement-panel-inline {
     top: max(calc(var(--app-shell-topbar-clearance, 96px) + 8px), calc(env(safe-area-inset-top) + 4px));
     right: max(var(--shell-pad, 12px), 12px);
     left: max(var(--shell-pad, 12px), 12px);
-    width: auto;
-    height: auto;
-    max-height: none;
-    min-height: 0;
+    width: auto; height: auto; max-height: none; min-height: 0;
     border-radius: 18px;
     animation-duration: 200ms;
   }
-
-  .biotab-announcement-panel-inline .biotab-announcement-list {
-    max-height: min(52dvh, 340px);
-  }
-
-  .biotab-announcement-inline-wrap {
-    position: static;
-  }
-
-  .biotab-announcement-header-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 11px;
-  }
-
-  .biotab-announcement-count {
-    top: -4px;
-    right: -4px;
-    min-width: 16px;
-    height: 16px;
-    font-size: 0.58rem;
-    padding: 0 3px;
-  }
-
-  .biotab-announcement-inline-backdrop {
-    background: rgba(2, 6, 23, 0.45);
-  }
+  .biotab-announcement-panel-inline .biotab-announcement-list { max-height: min(52dvh, 340px); }
+  .biotab-announcement-inline-wrap { position: static; }
+  .biotab-announcement-header-btn { width: 38px; height: 38px; border-radius: 11px; }
+  .biotab-announcement-count { top: -4px; right: -4px; min-width: 16px; height: 16px; font-size: 0.58rem; padding: 0 3px; }
+  .biotab-announcement-inline-backdrop { background: rgba(2, 6, 23, 0.45); }
 }
 @media (max-width: 480px) {
   .biotab-panel {
     height: clamp(340px, 68vh, 500px);
     max-height: calc(100vh - var(--app-shell-topbar-clearance, 96px) - 6px);
   }
-
   .biotab-announcement-panel-inline {
     top: max(calc(var(--app-shell-topbar-clearance, 88px) + 6px), calc(env(safe-area-inset-top) + 2px));
-    right: 8px;
-    left: 8px;
-    height: auto;
-    max-height: none;
-    min-height: 0;
+    right: 8px; left: 8px;
+    height: auto; max-height: none; min-height: 0;
     border-radius: 14px;
   }
-
-  .biotab-announcement-panel-inline .biotab-announcement-list {
-    max-height: min(50dvh, 300px);
-  }
-
-  .biotab-announcement-header-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-  }
-
-  .biotab-announcement-header-btn svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  .biotab-announcement-head {
-    padding: 10px 11px;
-  }
-
-  .biotab-announcement-item {
-    padding: 10px;
-  }
-
-  .biotab-announcement-item p {
-    font-size: 0.73rem;
-    line-height: 1.45;
-  }
+  .biotab-announcement-panel-inline .biotab-announcement-list { max-height: min(50dvh, 300px); }
+  .biotab-announcement-header-btn { width: 36px; height: 36px; border-radius: 10px; }
+  .biotab-announcement-header-btn svg { width: 15px; height: 15px; }
+  .biotab-announcement-head { padding: 10px 11px; }
+  .biotab-announcement-item { padding: 10px; }
+  .biotab-announcement-item p { font-size: 0.73rem; line-height: 1.45; }
 }
+
+

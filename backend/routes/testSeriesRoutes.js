@@ -6,6 +6,8 @@ const { logAdminAction } = require('../utils/auditLog');
 const TestSeriesPricing = require('../models/TestSeriesPricing');
 const TopicTest = require('../models/TopicTest');
 const FullMockTest = require('../models/FullMockTest');
+const TopicTestAttempt = require('../models/TopicTestAttempt');
+const FullMockAttempt = require('../models/FullMockAttempt');
 const TestSeriesPayment = require('../models/TestSeriesPayment');
 const User = require('../models/User');
 const Voucher = require('../models/Voucher');
@@ -449,6 +451,20 @@ router.post('/topic-tests/student/:testId/submit', authenticateToken('user'), as
       };
     });
 
+    const durationSeconds = Number.isFinite(Number(req.body?.durationSeconds)) ? Math.max(0, Number(req.body.durationSeconds)) : 0;
+
+    await TopicTestAttempt.create({
+      testId: test._id,
+      username: req.user.username,
+      category: test.category,
+      module: test.module,
+      topic: test.topic,
+      title: test.title,
+      score,
+      total: test.questions.length,
+      durationSeconds
+    }).catch(() => { /* non-fatal — don't block result delivery */ });
+
     return res.json({
       score,
       total: test.questions.length,
@@ -545,6 +561,18 @@ router.post('/full-mocks/student/:mockId/submit', authenticateToken('user'), asy
         explanation: q.explanation || ''
       };
     });
+
+    const durationSeconds = Number.isFinite(Number(req.body?.durationSeconds)) ? Math.max(0, Number(req.body.durationSeconds)) : 0;
+
+    await FullMockAttempt.create({
+      mockId: mock._id,
+      username: req.user.username,
+      category: mock.category,
+      title: mock.title,
+      score,
+      total: mock.questions.length,
+      durationSeconds
+    }).catch(() => { /* non-fatal — don't block result delivery */ });
 
     return res.json({
       score,

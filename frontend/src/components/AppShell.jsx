@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import logoImg from '../assets/biomics-logo.jpeg';
 import { useThemeStore } from '../stores/themeStore';
+import StudentChatAgent from './StudentChatAgent';
 
 export default function AppShell({
   title,
@@ -343,6 +344,7 @@ export default function AppShell({
           <main className="app-main-content">{children}</main>
         </div>
       </div>
+      {roleLabel === 'Admin' ? <StudentChatAgent hideAnnouncementFab mode="admin" /> : null}
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { previewTestSeriesVoucher, requestJson } from '../api';
 import AppShell from '../components/AppShell';
 import { useSessionStore } from '../stores/sessionStore';
@@ -23,6 +23,14 @@ function rupees(paise) {
 
 const DIFFICULTY_COLOR = { easy: '#16a34a', hard: '#dc2626', medium: '#d97706' };
 const ACTIVE_TEST_SESSION_STORAGE_KEY = 'ts_active_exam_session_v1';
+
+function matchesRequestedTopic(test, requestedTopic) {
+  const query = String(requestedTopic || '').trim().toLowerCase();
+  if (!query) return true;
+
+  return [test?.title, test?.topic, test?.module, test?.category, test?.description]
+    .some((value) => String(value || '').toLowerCase().includes(query));
+}
 
 function restoreActiveTestSession(raw, username) {
   if (!raw || typeof raw !== 'object') return null;
@@ -267,6 +275,7 @@ function TsCartButton({ session }) {
 
 export default function StudentTestSeriesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session } = useSessionStore();
   const hasHydratedTestSessionRef = useRef(false);
 
@@ -276,6 +285,7 @@ export default function StudentTestSeriesPage() {
   const [fullMocks,  setFullMocks]          = useState([]);
   const [loadingTests, setLoadingTests]     = useState(false);
   const [activeTab, setActiveTab]           = useState('topic');
+  const [requestedTopic, setRequestedTopic] = useState('');
   const [purchasingType, setPurchasingType] = useState('');
   const [banner, setBanner]                 = useState(null);
   const [testSession, setTestSession]       = useState(null);
@@ -759,6 +769,32 @@ export default function StudentTestSeriesPage() {
   const hasAnyAccess  = hasTopicTest || hasFullMock;
   const topicIsFree   = !(pricing.topicTestPriceInPaise > 0);
   const mockIsFree    = !(pricing.fullMockPriceInPaise > 0);
+  const filteredTopicTests = requestedTopic
+    ? topicTests.filter((test) => matchesRequestedTopic(test, requestedTopic))
+    : topicTests;
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestedTab = params.get('tab');
+    const topicFromQuery = String(params.get('topic') || location.state?.focusTopic || '').trim();
+
+    if (requestedTab === 'topic' || requestedTab === 'mock') {
+      setActiveTab(requestedTab);
+    }
+
+    setRequestedTopic(topicFromQuery);
+
+    if (location.state?.fromChatAgent) {
+      setBanner({
+        type: 'success',
+        text: topicFromQuery
+          ? `Opened topic tests for ${topicFromQuery}.`
+          : requestedTab === 'mock'
+            ? 'Opened the full mock test section.'
+            : 'Opened the topic test section.'
+      });
+    }
+  }, [location.search, location.state]);
 
   useEffect(() => {
     if (hasTopicTest && !hasFullMock && activeTab !== 'topic') {
@@ -1687,6 +1723,15 @@ export default function StudentTestSeriesPage() {
                   )}
                 </div>
 
+                {requestedTopic && activeTab === 'topic' ? (
+                  <div className="ts-top-banner ts-top-banner-success">
+                    Showing topic tests matching <strong>{requestedTopic}</strong>.
+                    <button type="button" className="secondary-btn" style={{ marginLeft: '10px' }} onClick={() => setRequestedTopic('')}>
+                      Clear Filter
+                    </button>
+                  </div>
+                ) : null}
+
                 {loadingTests && (
                   <div className="ts-loading-state">
                     <div className="ts-loading-spinner" />
@@ -1696,7 +1741,7 @@ export default function StudentTestSeriesPage() {
 
                 {activeTab === 'topic' && hasTopicTest && !loadingTests && (
                   <div className="ts-test-grid">
-                    {topicTests.length ? topicTests.map((test) => (
+                    {filteredTopicTests.length ? filteredTopicTests.map((test) => (
                       <article key={test._id} className="card ts-test-card">
                         <div className="ts-test-card-top">
                           <span className="ts-module-chip">{test.module}</span>
@@ -1721,7 +1766,11 @@ export default function StudentTestSeriesPage() {
                     )) : (
                       <div className="ts-empty-state">
                         <span className="ts-empty-icon">📖</span>
-                        <p>No topic tests for <strong>{course}</strong> yet.</p>
+                        <p>
+                          {requestedTopic
+                            ? <>No topic tests found for <strong>{requestedTopic}</strong> yet.</>
+                            : <>No topic tests for <strong>{course}</strong> yet.</>}
+                        </p>
                         <p className="subtitle">Check back soon.</p>
                       </div>
                     )}

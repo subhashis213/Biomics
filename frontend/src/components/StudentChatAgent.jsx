@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   BookOpen,
   Bot,
   FlaskConical,
   Leaf,
-  MessageCircle,
   Maximize2,
   Microscope,
   Minimize2,
@@ -21,14 +21,25 @@ import { fetchStudentAnnouncements, requestJson } from '../api';
 import { useSessionStore } from '../stores/sessionStore';
 import './BiotabChat.css';
 
-const STARTER_PROMPTS = [
-  'Create a 7-day study plan for my exam',
-  'How should I prepare for GATE effectively?',
-  'Explain photosynthesis in simple terms',
-  'Give me a strategy to improve revision consistency'
+const STUDENT_STARTER_PROMPTS = [
+  'Is this module available for my course?',
+  'Which topics are created in this module?',
+  'Is there any monthly exam available now?',
+  'Show the quiz sections available for now'
 ];
 
-const QUICK_MODES = [
+const ADMIN_STARTER_PROMPTS = [
+  'Show full profile and scores of student [username]',
+  'How many times did each student attempt the quiz section module wise?',
+  'Show monthly exam scores and attempt count for all students',
+  'Show test series topic test scores module wise for student [username]',
+  'Which students gave full mock test and what are their scores?',
+  'Open the audit logs and recent activity',
+  'How many students are registered and what courses they purchased?',
+  'Show platform wide attempt count for all sections'
+];
+
+const STUDENT_QUICK_MODES = [
   { icon: Leaf, title: 'Concept Help', action: 'Explain this concept in simple, exam-friendly language with examples.' },
   { icon: Microscope, title: 'Study Plan', action: 'Create a practical 10-day plan with daily targets and revision slots.' },
   {
@@ -43,10 +54,19 @@ const QUICK_MODES = [
   },
   {
     icon: Microscope,
-    title: 'CSIR-NET Life Science Practice',
+    title: 'CSIR-NET Practice',
     action: 'Give me CSIR-NET Life Science style questions with detailed answer logic and common traps to avoid.'
   },
   { icon: BookOpen, title: 'MCQ Practice', action: 'Give me 5 quality MCQs with answers and short explanations.' }
+];
+
+const ADMIN_QUICK_MODES = [
+  { icon: User, title: 'Student Details', action: 'Show all registered students with their class, city, phone, email, purchased courses, and total attempt count.' },
+  { icon: BookOpen, title: 'Quiz Scores', action: 'Show quiz section attempt count and module wise average score for all students.' },
+  { icon: FlaskConical, title: 'Exam Results', action: 'Show monthly exam attempt count and best score percentage for all students.' },
+  { icon: Microscope, title: 'Test Series', action: 'Show test series topic test and full mock test attempt count and best scores for all students.' },
+  { icon: Settings, title: 'Recent Logs', action: 'Show recent audit logs and content creation activity.' },
+  { icon: Leaf, title: 'Content Status', action: 'Show how many videos, quizzes, topic tests, and modules are published right now.' }
 ];
 
 const DEFAULT_WHATSAPP_MESSAGE = 'Hi Biomics Hub, I need support.';
@@ -55,7 +75,17 @@ function formatNow() {
   return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-function getWelcomeMsg(lang) {
+function getWelcomeMsg(lang, role = 'user') {
+  if (role === 'admin') {
+    if (lang === 'hi') {
+      return 'मैं आपकी admin assistant हूं। मुझसे students, logs, quizzes, videos और navigation के बारे में पूछ सकते हैं।';
+    }
+    if (lang === 'or') {
+      return 'ମୁଁ ଆପଣଙ୍କ admin assistant। students, logs, quizzes, videos ଏବଂ navigation ବିଷୟରେ ପଚାରନ୍ତୁ।';
+    }
+    return 'I am your admin assistant. Ask me about students, logs, quizzes, videos, and navigation.';
+  }
+
   if (lang === 'hi') {
     return 'मैं Sonupriya Sahu हूं, मुझसे कुछ भी पूछिए। मैं आपकी tutor हूं।';
   }
@@ -71,8 +101,104 @@ function getLanguageLabel(lang) {
   return 'English';
 }
 
-export default function StudentChatAgent({ hideAnnouncementFab = false }) {
-  return <StudentChatAgentPanel hideAnnouncementFab={hideAnnouncementFab} />;
+function extractRequestedTopic(message) {
+  const raw = String(message || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+
+  const patterns = [
+    /\b(?:for|about|on)\s+(?:the\s+)?(?:topic\s+of\s+|topic\s+)?([a-z][a-z0-9&/+\-\s]{2,60})$/i,
+    /\btopic\s*[:\-]?\s*([a-z][a-z0-9&/+\-\s]{2,60})/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    const value = String(match?.[1] || '')
+      .replace(/\b(test\s*series|topic\s*tests?|full\s*mocks?|mock\s*tests?)\b/gi, '')
+      .trim();
+    if (value && !/^(this|that|it)$/i.test(value)) return value;
+  }
+
+  return '';
+}
+
+function getStudentNavigationIntent(message) {
+  const normalized = String(message || '').trim().toLowerCase();
+  if (!normalized) return null;
+
+  const wantsNavigation = /(open|show|go to|take me to|navigate|bring up|start)/i.test(normalized);
+  const mentionsTestSeries = /test\s*series|topic\s*tests?|mock\s*tests?|full\s*mocks?/i.test(normalized);
+
+  if (!wantsNavigation || !mentionsTestSeries) return null;
+
+  const tab = /full\s*mocks?|mock\s*tests?/.test(normalized) && !/topic\s*tests?/.test(normalized)
+    ? 'mock'
+    : 'topic';
+
+  return {
+    destination: 'test-series',
+    tab,
+    topic: tab === 'topic' ? extractRequestedTopic(message) : ''
+  };
+}
+
+function getAdminNavigationIntent(message) {
+  const normalized = String(message || '').trim().toLowerCase();
+  if (!normalized) return null;
+
+  const wantsNavigation = /(open|show|go to|take me to|navigate|bring up|start|view|check|manage)/i.test(normalized);
+  if (!wantsNavigation) return null;
+
+  if (/student|learner|registered user|user details/.test(normalized)) {
+    return { destination: 'admin-section', route: '/admin', sectionId: 'section-registered-users', reply: 'Opening the learner details section now.' };
+  }
+  if (/live class|go live|scheduled class/.test(normalized)) {
+    return { destination: 'admin-section', route: '/admin', sectionId: 'section-live-class', reply: 'Opening the live class section now.' };
+  }
+  if (/content library|video|lecture|materials/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/content-library', reply: 'Opening the content library now.' };
+  }
+  if (/community chat|student chat|chat room/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/community-chat', reply: 'Opening the community chat now.' };
+  }
+  if (/quiz builder|create quiz|quiz workspace/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/quiz-builder', reply: 'Opening the quiz workspace now.' };
+  }
+  if (/monthly exam|mock exam|exam workspace/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/mock-exams', reply: 'Opening the monthly exam workspace now.' };
+  }
+  if (/test series/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/test-series', reply: 'Opening the test series workspace now.' };
+  }
+  if (/announcement/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/announcements-workspace', reply: 'Opening the announcements workspace now.' };
+  }
+  if (/voucher/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/voucher-workspace', reply: 'Opening the voucher workspace now.' };
+  }
+  if (/pricing|price setup|payment settings/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/pricing-workspace', reply: 'Opening the pricing workspace now.' };
+  }
+  if (/revenue|payment history|transactions/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/revenue-tracking', reply: 'Opening the revenue tracking page now.' };
+  }
+  if (/audit|logs|activity/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/audit-log', reply: 'Opening the audit log page now.' };
+  }
+  if (/recovery|rollback|restore/.test(normalized)) {
+    return { destination: 'admin-route', route: '/admin/recovery-center', reply: 'Opening the recovery center now.' };
+  }
+
+  return null;
+}
+
+function getLocalNavigationIntent(message, role = 'user') {
+  return role === 'admin'
+    ? getAdminNavigationIntent(message)
+    : getStudentNavigationIntent(message);
+}
+
+export default function StudentChatAgent({ hideAnnouncementFab = false, mode }) {
+  return <StudentChatAgentPanel hideAnnouncementFab={hideAnnouncementFab} mode={mode} />;
 }
 
 export function StudentAnnouncementBell() {
@@ -203,9 +329,16 @@ export function StudentAnnouncementBell() {
   );
 }
 
-function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
+function StudentChatAgentPanel({ hideAnnouncementFab = false, mode }) {
+  const navigate = useNavigate();
   const { session } = useSessionStore();
   const isLoggedIn = !!session?.token;
+  const userRole = mode || (session?.role === 'admin' ? 'admin' : 'user');
+  const isAdminMode = userRole === 'admin';
+  const starterPrompts = isAdminMode ? ADMIN_STARTER_PROMPTS : STUDENT_STARTER_PROMPTS;
+  const quickModes = isAdminMode ? ADMIN_QUICK_MODES : STUDENT_QUICK_MODES;
+  const assistantTitle = isAdminMode ? 'Biomics Admin Assistant' : 'Biomics Hub Support';
+  const assistantSubtitle = isAdminMode ? 'Live admin AI help' : 'Live AI Help';
 
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -237,7 +370,7 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
   const shouldRingAnnouncement = activeAnnouncementCount > 0 && !announcementsOpen;
 
   const loadAnnouncements = useCallback(async () => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || isAdminMode || hideAnnouncementFab) {
       setAnnouncements([]);
       return;
     }
@@ -252,7 +385,7 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
     } finally {
       setAnnouncementsLoading(false);
     }
-  }, [isLoggedIn]);
+  }, [hideAnnouncementFab, isAdminMode, isLoggedIn]);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
@@ -273,18 +406,18 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
             nextIdRef.current = mapped.length + 1;
             setMessages(mapped);
           } else {
-            setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language), timestamp: formatNow() }]);
+            setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language, userRole), timestamp: formatNow() }]);
             nextIdRef.current = 2;
           }
           if (data.language) setLanguage(data.language);
         })
         .catch(() => {
-          setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language), timestamp: formatNow() }]);
+          setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language, userRole), timestamp: formatNow() }]);
           nextIdRef.current = 2;
         })
         .finally(() => setHistoryLoaded(true));
     } else {
-      setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language), timestamp: formatNow() }]);
+      setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language, userRole), timestamp: formatNow() }]);
       nextIdRef.current = 2;
       setHistoryLoaded(true);
     }
@@ -302,6 +435,18 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
   useEffect(() => {
     loadAnnouncements();
   }, [loadAnnouncements]);
+
+  // Listen for admin "Clear All AI Tutor History" event and wipe local state.
+  useEffect(() => {
+    const handleHistoryCleared = () => {
+      setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language, userRole), timestamp: formatNow() }]);
+      nextIdRef.current = 2;
+      setHistoryLoaded(false);
+      setApiError(null);
+    };
+    window.addEventListener('biomics-chat-history-cleared', handleHistoryCleared);
+    return () => window.removeEventListener('biomics-chat-history-cleared', handleHistoryCleared);
+  }, [language, userRole]);
 
   // Prevent background page scrolling when chat is open.
   useEffect(() => {
@@ -335,15 +480,61 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
   }, [isOpen]);
 
   const sendMessage = useCallback(
-    async (question) => {
+    async (question, { skipNavigation = false } = {}) => {
       const trimmed = question.trim();
       if (!trimmed || isTyping) return;
 
       const userMsg = { id: nextIdRef.current++, type: 'user', content: trimmed, timestamp: formatNow() };
       setMessages((prev) => [...prev, userMsg]);
       setInputMessage('');
-      setIsTyping(true);
       setApiError(null);
+
+      const localIntent = skipNavigation ? null : getLocalNavigationIntent(trimmed, userRole);
+      if (localIntent?.destination === 'test-series') {
+        const params = new URLSearchParams();
+        params.set('tab', localIntent.tab);
+        if (localIntent.topic) params.set('topic', localIntent.topic);
+
+        navigate('/student/test-series?' + params.toString(), {
+          state: {
+            fromChatAgent: true,
+            tab: localIntent.tab,
+            focusTopic: localIntent.topic || ''
+          }
+        });
+
+        const actionReply = localIntent.tab === 'mock'
+          ? 'Opening the Full Mock Test section for you now.'
+          : localIntent.topic
+            ? `Opening the Topic Test section for ${localIntent.topic} now.`
+            : 'Opening the Topic Test section for you now.';
+
+        const botMsg = { id: nextIdRef.current++, type: 'assistant', content: actionReply, timestamp: formatNow() };
+        setMessages((prev) => [...prev, botMsg]);
+        return;
+      }
+
+      if (localIntent?.destination === 'admin-route' || localIntent?.destination === 'admin-section') {
+        navigate(localIntent.route || '/admin');
+        if (localIntent.sectionId) {
+          window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('biomics-admin-chat-navigate', {
+              detail: { targetId: localIntent.sectionId }
+            }));
+          }, 120);
+        }
+
+        const botMsg = {
+          id: nextIdRef.current++,
+          type: 'assistant',
+          content: localIntent.reply || 'Opening that admin area now.',
+          timestamp: formatNow()
+        };
+        setMessages((prev) => [...prev, botMsg]);
+        return;
+      }
+
+      setIsTyping(true);
 
       const historyForApi = messages.slice(-20).map((m) => ({
         role: m.type === 'user' ? 'user' : 'assistant',
@@ -376,7 +567,7 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
         setIsTyping(false);
       }
     },
-    [isTyping, messages, language, isLoggedIn]
+    [isTyping, messages, language, isLoggedIn, navigate, userRole]
   );
 
   const handleKeyDown = (e) => {
@@ -387,7 +578,7 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
   };
 
   const clearChat = () => {
-    setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language), timestamp: formatNow() }]);
+    setMessages([{ id: 1, type: 'assistant', content: getWelcomeMsg(language, userRole), timestamp: formatNow() }]);
     nextIdRef.current = 2;
     setApiError(null);
     if (isLoggedIn) requestJson('/chat/history', { method: 'DELETE' }).catch(() => {});
@@ -398,7 +589,7 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
       {/* ── Floating Action Button — always shows when panel is closed ── */}
       {!isOpen && (
         <>
-        {isLoggedIn && !hideAnnouncementFab ? (
+        {isLoggedIn && !hideAnnouncementFab && !isAdminMode ? (
           <button
             type="button"
             className={`biotab-announcement-fab${shouldRingAnnouncement ? ' biotab-announcement-fab-ringing' : ''}`}
@@ -424,7 +615,9 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
             title="Chat on WhatsApp"
             aria-label="Open WhatsApp chat with Biomics Hub"
           >
-            <MessageCircle size={20} />
+            <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
           </a>
         ) : null}
         <button
@@ -499,8 +692,8 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
                 <Bot size={16} />
               </div>
               <div className="biotab-title-block">
-                <h3>Biomics Hub Support</h3>
-                <p>{getLanguageLabel(language)}&nbsp;·&nbsp;Live AI Help</p>
+                <h3>{assistantTitle}</h3>
+                <p>{getLanguageLabel(language)}&nbsp;·&nbsp;{assistantSubtitle}</p>
               </div>
             </div>
 
@@ -559,12 +752,12 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
           {/* Starter prompts — only before real conversation begins */}
           {!showSettings && messages.length <= 2 && (
             <div className="biotab-starters">
-              {STARTER_PROMPTS.map((p) => (
+              {starterPrompts.map((p) => (
                 <button
                   key={p}
                   type="button"
                   className="biotab-starter"
-                  onClick={() => sendMessage(p)}
+                  onClick={() => sendMessage(p, { skipNavigation: isAdminMode })}
                   disabled={isTyping}
                 >{p}</button>
               ))}
@@ -602,12 +795,12 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
           {/* Quick mode chips */}
           {!showSettings && (
             <div className="biotab-modes">
-              {QUICK_MODES.map(({ icon: Icon, title, action }) => (
+              {quickModes.map(({ icon: Icon, title, action }) => (
                 <button
                   key={title}
                   className="biotab-mode-chip"
                   type="button"
-                  onClick={() => sendMessage(action)}
+                  onClick={() => sendMessage(action, { skipNavigation: true })}
                   disabled={isTyping}
                 >
                   <Icon size={12} /><span>{title}</span>
@@ -625,11 +818,17 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  language === 'hi'
-                    ? 'कुछ भी पूछें: पढ़ाई, GATE, रणनीति…'
-                    : language === 'or'
-                      ? 'କିଛି ପଚାରନ୍ତୁ: ପଢ଼ା, GATE, ପ୍ଲାନିଂ, କନ୍ସେପ୍ଟ…'
-                      : 'Ask anything: studies, GATE, planning, concepts…'
+                  isAdminMode
+                    ? (language === 'hi'
+                        ? 'पूछें: students, logs, quizzes, navigation…'
+                        : language === 'or'
+                          ? 'ପଚାରନ୍ତୁ: students, logs, quizzes, navigation…'
+                          : 'Ask about students, logs, quizzes, navigation…')
+                    : (language === 'hi'
+                        ? 'कुछ भी पूछें: पढ़ाई, GATE, रणनीति…'
+                        : language === 'or'
+                          ? 'କିଛି ପଚାରନ୍ତୁ: ପଢ଼ା, GATE, ପ୍ଲାନିଂ, କନ୍ସେପ୍ଟ…'
+                          : 'Ask anything: studies, GATE, planning, concepts…')
                 }
                 rows={1}
                 disabled={isTyping}
@@ -647,7 +846,7 @@ function StudentChatAgentPanel({ hideAnnouncementFab = false }) {
             </div>
             <div className="biotab-footer-note">
               <Sparkles size={11} aria-hidden="true" />
-              <span>Gemini AI · {isLoggedIn ? 'History saved to your account' : 'Log in to save history'}</span>
+              <span>Gemini AI · {isLoggedIn ? (isAdminMode ? 'Admin history saved' : 'History saved to your account') : 'Log in to save history'}</span>
             </div>
           </div>
           </div>

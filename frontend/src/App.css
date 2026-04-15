@@ -6063,6 +6063,12 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   margin-top: 8px;
 }
 
+@media (max-width: 640px) {
+  .library-course-selector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .library-course-tile {
   min-height: 112px;
 }
@@ -7223,6 +7229,14 @@ th {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  --student-surface: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--student-card-accent, var(--accent)) 6%, var(--surface-start)) 0%,
+    color-mix(in srgb, #09111f 8%, var(--surface-end)) 100%
+  );
+  --student-card-border: color-mix(in srgb, var(--student-card-accent, var(--accent)) 24%, var(--line));
+  --student-card-shadow: 0 16px 34px rgba(9, 16, 30, 0.16);
+  --student-card-hover-shadow: 0 22px 42px rgba(9, 16, 30, 0.22);
 }
 
 .student-dashboard-view .banner {
@@ -7240,24 +7254,130 @@ th {
   will-change: transform, opacity;
 }
 
-.student-dashboard-view > .student-tools-row.card {
+.student-dashboard-view > .card,
+.student-dashboard-view .course-chooser-card,
+.student-dashboard-view .video-card,
+.student-dashboard-view .stat-card {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--student-card-border);
+  background:
+    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--student-card-accent, var(--accent)) 12%, transparent), transparent 46%),
+    var(--student-surface);
+  box-shadow: var(--student-card-shadow);
+}
+
+.student-dashboard-view > .card::after,
+.student-dashboard-view .course-chooser-card::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--student-card-accent, var(--accent)),
+    color-mix(in srgb, var(--student-card-accent, var(--accent)) 42%, white)
+  );
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.student-dashboard-view > .student-tools-row.card,
+.student-dashboard-view .course-chooser-card {
+  --student-card-accent: #3b82f6;
   animation-delay: 18ms;
+}
+
+.student-dashboard-view > .favorites-panel.card {
+  --student-card-accent: #10b981;
+  animation-delay: 30ms;
+}
+
+.student-dashboard-view > .quiz-history-panel.card {
+  --student-card-accent: #2563eb;
+  animation-delay: 30ms;
+}
+
+.student-dashboard-view > .quiz-panel.card {
+  --student-card-accent: #4f46e5;
+  animation-delay: 42ms;
+}
+
+.student-dashboard-view > .feedback-form-card.card {
+  --student-card-accent: #8b5cf6;
+  animation-delay: 42ms;
+}
+
+.student-dashboard-view > .student-community-launch-card.card {
+  --student-card-accent: #0f766e;
+}
+
+.student-dashboard-view > .monthly-exam-panel.card,
+.student-dashboard-view > .live-class-student-banner.card {
+  --student-card-accent: #06b6d4;
+}
+
+.student-dashboard-view > .quiz-leaderboard-panel.card {
+  --student-card-accent: #f59e0b;
+}
+
+.student-dashboard-view > .ts-student-entry-card.card {
+  --student-card-accent: #7c3aed;
+}
+
+.student-dashboard-view > .membership-lock-panel.card,
+.student-dashboard-view > .course-lock-panel.card {
+  --student-card-accent: #6366f1;
+}
+
+.student-dashboard-view .favorite-chip,
+.student-dashboard-view .quiz-history-item,
+.student-dashboard-view .quiz-admin-item,
+.student-dashboard-view .course-chooser-pill,
+.student-dashboard-view .quiz-filter-bar {
+  border-color: color-mix(in srgb, var(--student-card-accent, var(--accent)) 18%, var(--line));
+  background: color-mix(in srgb, var(--student-card-accent, var(--accent)) 8%, var(--bg-card-soft));
+}
+
+.student-dashboard-view .stat-card {
+  min-width: 108px;
+  backdrop-filter: blur(6px);
+}
+
+.student-dashboard-view .quiz-history-panel::before,
+.student-dashboard-view .quiz-leaderboard-panel::before,
+.student-dashboard-view .monthly-exam-panel::before,
+.student-dashboard-view .feedback-form-card::before {
+  opacity: 0.28;
+  filter: none;
+}
+
+.student-dashboard-view .card:hover,
+.student-dashboard-view .video-card:hover,
+.student-dashboard-view .quiz-history-item:hover,
+.student-dashboard-view .feedback-item:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--student-card-hover-shadow);
+}
+
+html[data-theme='light'] .student-dashboard-view {
+  --student-card-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+  --student-card-hover-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme='light'] .student-dashboard-view > .card,
+html[data-theme='light'] .student-dashboard-view .course-chooser-card,
+html[data-theme='light'] .student-dashboard-view .video-card,
+html[data-theme='light'] .student-dashboard-view .stat-card {
+  background:
+    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--student-card-accent, var(--accent)) 10%, transparent), transparent 48%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 249, 255, 0.98) 100%);
 }
 
 @media (max-width: 720px) {
   .student-dashboard-view > .student-tools-row.card {
     margin-top: 10px;
   }
-}
-
-.student-dashboard-view > .favorites-panel.card,
-.student-dashboard-view > .quiz-history-panel.card {
-  animation-delay: 30ms;
-}
-
-.student-dashboard-view > .quiz-panel.card,
-.student-dashboard-view > .feedback-form-card.card {
-  animation-delay: 42ms;
 }
 
 .student-dashboard-view .video-grid .video-card:nth-child(2n),
@@ -7282,12 +7402,6 @@ th {
 .student-dashboard-view .quiz-review-list .quiz-review-item:nth-child(3n),
 .student-dashboard-view .feedback-list .feedback-item:nth-child(3n) {
   animation-delay: 34ms;
-}
-
-.student-dashboard-view .card:hover,
-.student-dashboard-view .quiz-history-item:hover,
-.student-dashboard-view .feedback-item:hover {
-  transform: translateY(-2px);
 }
 
 .student-dashboard-view label {
@@ -11384,7 +11498,7 @@ html[data-theme='light'] .empty-note {
   }
 
   .course-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .quiz-options-list,
@@ -13988,8 +14102,8 @@ html[data-theme='light'] .cpv-thumb-wrap {
   }
 
   .content-library-card .video-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
 
   .connect-section {

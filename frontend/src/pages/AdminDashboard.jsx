@@ -759,6 +759,7 @@ export default function AdminDashboard() {
         try {
           const response = await clearAiTutorHistoryAdmin();
           const deletedCount = Number(response?.deletedCount || 0);
+          window.dispatchEvent(new CustomEvent('biomics-chat-history-cleared'));
           setBanner({ type: 'success', text: `AI tutor history cleared (${deletedCount} records removed).` });
         } finally {
           setIsClearingAiTutorHistory(false);
@@ -2123,6 +2124,18 @@ export default function AdminDashboard() {
   function handleAdminNavItemClick(id) {
     scrollToSection(id);
   }
+
+  useEffect(() => {
+    const handleChatSectionNavigation = (event) => {
+      const targetId = event?.detail?.targetId;
+      if (targetId) {
+        scrollToSection(targetId);
+      }
+    };
+
+    window.addEventListener('biomics-admin-chat-navigate', handleChatSectionNavigation);
+    return () => window.removeEventListener('biomics-admin-chat-navigate', handleChatSectionNavigation);
+  }, []);
 
   const activeUserUndoEntry = Object.entries(undoItems).find(([id]) => id.startsWith('user-'));
 
