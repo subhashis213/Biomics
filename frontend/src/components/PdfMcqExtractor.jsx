@@ -188,7 +188,7 @@ export default function PdfMcqExtractor({
         <div>
           <p className="eyebrow">AI PDF Extractor</p>
           <h3>PDF to MCQ for {sectionName}</h3>
-          <p className="subtitle">Upload one PDF and auto-generate editable MCQs using Gemini 1.5 Flash.</p>
+          <p className="subtitle">Upload one PDF and auto-generate editable MCQs using Gemini AI.</p>
         </div>
       </div>
 

@@ -17,7 +17,6 @@ const GEMINI_API_BASE = `https://generativelanguage.googleapis.com/${GEMINI_API_
 const GEMINI_MODEL_CANDIDATES = [
   String(process.env.GEMINI_MODEL || '').trim(),
   'gemini-2.5-flash',
-  'gemini-2.0-flash-001',
   'gemini-1.5-flash',
   'gemini-1.5-pro',
   'gemini-pro'
@@ -100,7 +99,12 @@ async function resolveGeminiModel(apiKey, { forceRefresh = false } = {}) {
 
 function isModelAvailabilityError(message = '') {
   const text = String(message || '').toLowerCase();
-  return text.includes('not found for api version') || text.includes('not supported for generatecontent');
+  return text.includes('not found for api version')
+    || text.includes('not supported for generatecontent')
+    || text.includes('no longer available to new users')
+    || text.includes('model is no longer available')
+    || text.includes('deprecated')
+    || text.includes('retired');
 }
 
 function isRetriableGeminiError(message = '') {
