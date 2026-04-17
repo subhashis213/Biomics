@@ -28,8 +28,7 @@ function normalizeQuestions(items = []) {
 
 export default function PdfMcqExtractor({
   sectionName = 'Question Builder',
-  onApplyQuestions,
-  onSaveQuestions
+  onApplyQuestions
 }) {
   const [file, setFile] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -37,7 +36,6 @@ export default function PdfMcqExtractor({
   const [extractProgressText, setExtractProgressText] = useState('');
   const [questions, setQuestions] = useState([]);
   const [toast, setToast] = useState(null);
-  const [isSavingAll, setIsSavingAll] = useState(false);
 
   const stats = useMemo(() => {
     const total = questions.length;
@@ -165,23 +163,6 @@ export default function PdfMcqExtractor({
     showToast('success', 'Questions applied to the form.');
   }
 
-  async function handleSaveAll() {
-    if (!onSaveQuestions) {
-      applyToFormOnly();
-      return;
-    }
-
-    setIsSavingAll(true);
-    try {
-      await onSaveQuestions(questions);
-      showToast('success', 'All extracted questions saved.');
-    } catch (error) {
-      showToast('error', error.message || 'Failed to save extracted questions.');
-    } finally {
-      setIsSavingAll(false);
-    }
-  }
-
   return (
     <section className="card workspace-panel pdf-mcq-extractor">
       <div className="section-header compact">
@@ -272,9 +253,6 @@ export default function PdfMcqExtractor({
           <div className="workspace-inline-actions pdf-mcq-bottom-actions">
             <button type="button" className="secondary-btn" onClick={addQuestion}>Add Question</button>
             <button type="button" className="secondary-btn" onClick={applyToFormOnly}>Apply to Form</button>
-            <button type="button" className="primary-btn" disabled={isSavingAll} onClick={handleSaveAll}>
-              {isSavingAll ? 'Saving...' : 'Save All Questions'}
-            </button>
           </div>
         </>
       ) : null}

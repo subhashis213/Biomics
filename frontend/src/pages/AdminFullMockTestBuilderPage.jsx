@@ -227,50 +227,6 @@ export default function AdminFullMockTestBuilderPage() {
     }
   }
 
-  async function saveFullMockFromExtractedQuestions(extractedQuestions) {
-    if (!category || !title.trim()) {
-      throw new Error('Please set course and title before saving extracted questions.');
-    }
-
-    const normalizedQuestions = (Array.isArray(extractedQuestions) ? extractedQuestions : [])
-      .map((item) => ({
-        question: String(item?.question || '').trim(),
-        options: Array.isArray(item?.options)
-          ? item.options.map((opt) => String(opt || '').trim()).slice(0, 4)
-          : ['', '', '', ''],
-        correctIndex: Number(item?.correctIndex),
-        explanation: String(item?.explanation || '').trim()
-      }))
-      .filter((item) => item.question && item.options.length === 4);
-
-    if (!normalizedQuestions.length) {
-      throw new Error('No valid extracted questions to save.');
-    }
-
-    const invalid = normalizedQuestions.some((item) => (
-      item.options.some((opt) => !opt) || item.correctIndex < 0 || item.correctIndex > 3
-    ));
-    if (invalid) {
-      throw new Error('Some extracted questions still need review before save.');
-    }
-
-    await requestJson('/test-series/full-mocks', {
-      method: 'POST',
-      body: JSON.stringify({
-        mockId: editingId || undefined,
-        category,
-        title: title.trim(),
-        description: description.trim(),
-        durationMinutes: Number(durationMinutes),
-        questions: normalizedQuestions
-      })
-    });
-
-    setQuestions(normalizedQuestions);
-    setMessage({ type: 'success', text: editingId ? 'Full mock test updated.' : 'Full mock test created.' });
-    await loadMocks();
-  }
-
   return (
     <>
       <AppShell
@@ -303,7 +259,6 @@ export default function AdminFullMockTestBuilderPage() {
               setQuestions(extracted);
               setMessage({ type: 'success', text: `Loaded ${extracted.length} extracted question${extracted.length !== 1 ? 's' : ''} into the form.` });
             }}
-            onSaveQuestions={saveFullMockFromExtractedQuestions}
           />
 
           <section className="card quiz-builder-panel workspace-panel">
