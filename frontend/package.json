@@ -8,9 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cap:sync": "npm run build && ./node_modules/.bin/cap sync android",
+    "cap:open": "./node_modules/.bin/cap open android",
+    "cap:run": "./node_modules/.bin/cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@tanstack/react-query": "^5.90.21",
     "idb-keyval": "^6.2.2",
     "livekit-client": "^2.18.1",

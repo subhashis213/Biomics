@@ -40,6 +40,18 @@ window.addEventListener('load', () => {
   }
 }, { once: true });
 
+// Add a CSS class to <body> when running as a native Capacitor APK.
+// Use `.native-app` in App.css to style APK differently from the web.
+(function detectNativeApp() {
+  const isNative =
+    window.location.protocol === 'capacitor:' ||
+    window.location.protocol === 'ionic:' ||
+    window.Capacitor?.isNativePlatform?.();
+  if (isNative) {
+    document.body.classList.add('native-app');
+  }
+})();
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { refetchOnWindowFocus: false }

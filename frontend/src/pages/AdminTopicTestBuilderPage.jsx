@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { requestJson } from '../api';
 import AppShell from '../components/AppShell';
 import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
+import TopicTestCatalogBoard from '../components/TopicTestCatalogBoard';
 import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
 
 const COURSE_CATEGORIES = [
@@ -23,6 +24,7 @@ function emptyQuestion() {
 
 export default function AdminTopicTestBuilderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // builder form
   const [category, setCategory] = useState(DEFAULT_COURSE);
@@ -144,6 +146,25 @@ export default function AdminTopicTestBuilderPage() {
   }
 
   useEffect(() => { loadTests(); }, [category]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const categoryFromQuery = params.get('category');
+    if (categoryFromQuery && COURSE_CATEGORIES.includes(categoryFromQuery) && categoryFromQuery !== category) {
+      setCategory(categoryFromQuery);
+    }
+  }, [location.search, category]);
+
+  useEffect(() => {
+    const editId = new URLSearchParams(location.search).get('edit');
+    if (!editId) return;
+    if (editingId === editId) return;
+
+    const matchedTest = allTests.find((test) => test._id === editId);
+    if (matchedTest) {
+      editTest(matchedTest);
+    }
+  }, [location.search, allTests, editingId]);
 
   // ── derived options ──────────────────────────────────────────────────────
 
@@ -362,9 +383,18 @@ export default function AdminTopicTestBuilderPage() {
         roleLabel="Admin"
         showThemeSwitch
         actions={(
-          <button type="button" className="secondary-btn" onClick={() => navigate('/admin/test-series')}>
-            ← Test Series Hub
-          </button>
+          <>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => navigate(`/admin/test-series/topic-tests/catalog?category=${encodeURIComponent(category)}`)}
+            >
+              Organized View
+            </button>
+            <button type="button" className="secondary-btn" onClick={() => navigate('/admin/test-series')}>
+              Back to Test Series Hub
+            </button>
+          </>
         )}
       >
         <main className="admin-workspace-page">
@@ -558,30 +588,27 @@ export default function AdminTopicTestBuilderPage() {
                 <p className="eyebrow">Published Tests</p>
                 <h3>{category} — topic tests</h3>
               </div>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => navigate(`/admin/test-series/topic-tests/catalog?category=${encodeURIComponent(category)}`)}
+              >
+                Open Full Organizer
+              </button>
             </div>
-            {tests.length ? (
-              <div className="quiz-admin-items">
-                {tests.map((test) => (
-                  <article key={test._id} className="quiz-admin-item">
-                    <div className="quiz-admin-item-body">
-                      <strong>{test.title}</strong>
-                      <p>{test.module} → {test.topic} • {test.category}</p>
-                      <div className="quiz-admin-meta">
-                        <span className="quiz-admin-meta-chip">{test.questionCount || test.questions?.length || 0} questions</span>
-                        <span className="quiz-admin-meta-chip">{test.durationMinutes || 30} min</span>
-                        <span className="quiz-admin-meta-chip">{test.difficulty || 'medium'}</span>
-                      </div>
-                    </div>
-                    <div className="quiz-admin-item-actions">
-                      <button type="button" className="secondary-btn" onClick={() => editTest(test)}>Edit</button>
-                      <button type="button" className="danger-btn" onClick={() => handleDeleteClick(test)}>Delete</button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="empty-note">No topic tests created for {category} yet.</p>
-            )}
+            <TopicTestCatalogBoard
+              tests={tests}
+              mode="admin"
+              title={`${category} topic tests`}
+              subtitle="Published tests are grouped into separate module and topic containers for faster scanning."
+              emptyMessage={`No topic tests created for ${category} yet.`}
+              renderCardActions={(test) => (
+                <>
+                  <button type="button" className="secondary-btn" onClick={() => editTest(test)}>Edit</button>
+                  <button type="button" className="danger-btn" onClick={() => handleDeleteClick(test)}>Delete</button>
+                </>
+              )}
+            />
           </section>
         </main>
       </AppShell>

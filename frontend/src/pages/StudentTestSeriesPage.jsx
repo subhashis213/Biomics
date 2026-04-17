@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { previewTestSeriesVoucher, requestJson } from '../api';
 import AppShell from '../components/AppShell';
+import TopicTestCatalogBoard from '../components/TopicTestCatalogBoard';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 import { useSessionStore } from '../stores/sessionStore';
 
 function loadRazorpayCheckoutScript() {
@@ -23,6 +25,15 @@ function rupees(paise) {
 
 const DIFFICULTY_COLOR = { easy: '#16a34a', hard: '#dc2626', medium: '#d97706' };
 const ACTIVE_TEST_SESSION_STORAGE_KEY = 'ts_active_exam_session_v1';
+
+function readTestSeriesCart() {
+  try {
+    const saved = localStorage.getItem('ts_cart');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
 
 function matchesRequestedTopic(test, requestedTopic) {
   const query = String(requestedTopic || '').trim().toLowerCase();
@@ -81,16 +92,14 @@ function restoreActiveTestSession(raw, username) {
 
 // ── Inline cart button + drawer for Test Series page ─────────────────────────
 function TsCartButton({ session }) {
-  const [items, setItems] = useState(() => {
-    try { const s = localStorage.getItem('ts_cart'); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
+  const [items, setItems] = useState(() => readTestSeriesCart());
   const [open, setOpen] = useState(false);
   const [checkoutKey, setCheckoutKey] = useState('');
 
   // Re-read cart when localStorage changes (cross-tab or after add-to-cart)
   useEffect(() => {
     function sync() {
-      try { const s = localStorage.getItem('ts_cart'); setItems(s ? JSON.parse(s) : []); } catch { setItems([]); }
+      setItems(readTestSeriesCart());
     }
     window.addEventListener('storage', sync);
     window.addEventListener('ts-cart-updated', sync);
@@ -278,6 +287,7 @@ export default function StudentTestSeriesPage() {
   const location = useLocation();
   const { session } = useSessionStore();
   const hasHydratedTestSessionRef = useRef(false);
+  const hasAutoStartedFromQueryRef = useRef(false);
 
   const [accessData, setAccessData]         = useState(null);
   const [loadingAccess, setLoadingAccess]   = useState(true);
@@ -301,15 +311,10 @@ export default function StudentTestSeriesPage() {
   const [voucherLoading,  setVoucherLoading]  = useState({ topic_test: false, full_mock: false });
 
   // Cart state — { seriesType, label, originalPaise, finalPaise, voucherCode }
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ts_cart');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cartItems, setCartItems] = useState(() => readTestSeriesCart());
   const [cartCheckoutST, setCartCheckoutST] = useState(''); // which cart item is being checked out
+
+  useAutoDismissMessage(banner, setBanner);
 
   // Persist cart to localStorage whenever it changes
   useEffect(() => {
@@ -318,6 +323,20 @@ export default function StudentTestSeriesPage() {
     } catch { /* storage full or unavailable */ }
     window.dispatchEvent(new Event('ts-cart-updated'));
   }, [cartItems]);
+
+  useEffect(() => {
+    function syncCartItems() {
+      setCartItems(readTestSeriesCart());
+    }
+
+    window.addEventListener('storage', syncCartItems);
+    window.addEventListener('ts-cart-updated', syncCartItems);
+
+    return () => {
+      window.removeEventListener('storage', syncCartItems);
+      window.removeEventListener('ts-cart-updated', syncCartItems);
+    };
+  }, []);
 
   const timerRef = useRef(null);
   const autoSubmittedRef = useRef(false);
@@ -508,8 +527,7 @@ export default function StudentTestSeriesPage() {
     const discountPaise = preview ? preview.discountInPaise : 0;
 
     // Build the new cart value synchronously BEFORE touching React state
-    let current = [];
-    try { current = JSON.parse(localStorage.getItem('ts_cart') || '[]'); } catch {}
+    const current = readTestSeriesCart();
     const next = [
       ...current.filter((item) => item.seriesType !== seriesType),
       { seriesType, label, originalPaise, finalPaise, voucherCode, discountPaise }
@@ -524,8 +542,7 @@ export default function StudentTestSeriesPage() {
   }
 
   function handleRemoveFromCart(seriesType) {
-    let current = [];
-    try { current = JSON.parse(localStorage.getItem('ts_cart') || '[]'); } catch {}
+    const current = readTestSeriesCart();
     const next = current.filter((item) => item.seriesType !== seriesType);
     try { localStorage.setItem('ts_cart', JSON.stringify(next)); } catch {}
     window.dispatchEvent(new Event('ts-cart-updated'));
@@ -777,6 +794,7 @@ export default function StudentTestSeriesPage() {
     const params = new URLSearchParams(location.search);
     const requestedTab = params.get('tab');
     const topicFromQuery = String(params.get('topic') || location.state?.focusTopic || '').trim();
+    hasAutoStartedFromQueryRef.current = false;
 
     if (requestedTab === 'topic' || requestedTab === 'mock') {
       setActiveTab(requestedTab);
@@ -805,6 +823,17 @@ export default function StudentTestSeriesPage() {
       setActiveTab('mock');
     }
   }, [hasTopicTest, hasFullMock, activeTab]);
+
+  useEffect(() => {
+    const testId = new URLSearchParams(location.search).get('testId');
+    if (!testId || !hasTopicTest || loadingTests || testSession || hasAutoStartedFromQueryRef.current) return;
+
+    const matchedTest = topicTests.find((test) => test._id === testId);
+    if (!matchedTest) return;
+
+    hasAutoStartedFromQueryRef.current = true;
+    startTest(testId, 'topic');
+  }, [location.search, hasTopicTest, loadingTests, testSession, topicTests]);
 
   if (testSession && !testSession.submitted && !testSession.hasStarted) {
     const { test, questions, acceptedGuidelines } = testSession;
@@ -1740,41 +1769,29 @@ export default function StudentTestSeriesPage() {
                 )}
 
                 {activeTab === 'topic' && hasTopicTest && !loadingTests && (
-                  <div className="ts-test-grid">
-                    {filteredTopicTests.length ? filteredTopicTests.map((test) => (
-                      <article key={test._id} className="card ts-test-card">
-                        <div className="ts-test-card-top">
-                          <span className="ts-module-chip">{test.module}</span>
-                          <span className="ts-difficulty-chip"
-                            style={{ color: DIFFICULTY_COLOR[test.difficulty] || '#d97706' }}>
-                            {test.difficulty}
-                          </span>
-                        </div>
-                        <h4 className="ts-test-title">{test.title}</h4>
-                        {test.topic && test.topic !== 'General' && (
-                          <p className="ts-test-topic">{test.topic}</p>
-                        )}
-                        <div className="ts-test-meta">
-                          <span className="ts-meta-chip">📝 {test.questionCount} Qs</span>
-                          <span className="ts-meta-chip">⏱ {test.durationMinutes} min</span>
-                        </div>
-                        <button type="button" className="primary-btn ts-start-btn"
-                          onClick={() => startTest(test._id, 'topic')}>
-                          Start Test →
-                        </button>
-                      </article>
-                    )) : (
-                      <div className="ts-empty-state">
-                        <span className="ts-empty-icon">📖</span>
-                        <p>
-                          {requestedTopic
-                            ? <>No topic tests found for <strong>{requestedTopic}</strong> yet.</>
-                            : <>No topic tests for <strong>{course}</strong> yet.</>}
-                        </p>
-                        <p className="subtitle">Check back soon.</p>
-                      </div>
+                  <TopicTestCatalogBoard
+                    tests={filteredTopicTests}
+                    mode="student"
+                    title={course ? `${course} topic tests` : 'Topic tests'}
+                    subtitle="Browse module containers, open the right topic bucket, and start the exact test you need."
+                    emptyMessage={requestedTopic ? `No topic tests found for ${requestedTopic} yet.` : `No topic tests for ${course} yet.`}
+                    searchValue={requestedTopic}
+                    onSearchChange={setRequestedTopic}
+                    toolbar={(
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => navigate(`/student/test-series/topic-tests/catalog${requestedTopic ? `?topic=${encodeURIComponent(requestedTopic)}` : ''}`)}
+                      >
+                        Open Spacious View
+                      </button>
                     )}
-                  </div>
+                    renderCardActions={(test) => (
+                      <button type="button" className="primary-btn ts-start-btn" onClick={() => startTest(test._id, 'topic')}>
+                        Start Test
+                      </button>
+                    )}
+                  />
                 )}
 
                 {activeTab === 'mock' && hasFullMock && !loadingTests && (

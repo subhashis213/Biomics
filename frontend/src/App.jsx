@@ -15,6 +15,7 @@ import AdminRevenueTrackingPage from './pages/AdminRevenueTrackingPage';
 import AdminVoucherWorkspacePage from './pages/AdminVoucherWorkspacePage';
 import AdminTestSeriesHubPage from './pages/AdminTestSeriesHubPage';
 import AdminTopicTestBuilderPage from './pages/AdminTopicTestBuilderPage';
+import AdminTopicTestCatalogPage from './pages/AdminTopicTestCatalogPage';
 import AdminFullMockTestBuilderPage from './pages/AdminFullMockTestBuilderPage';
 import AuthPage from './pages/AuthPage';
 
@@ -27,6 +28,7 @@ const StudentMockExamPage = lazy(() => import('./pages/StudentMockExamPage'));
 const StudentModuleQuizPage = lazy(() => import('./pages/StudentModuleQuizPage'));
 const StudentQuizPage = lazy(() => import('./pages/StudentQuizPage'));
 const StudentTestSeriesPage = lazy(() => import('./pages/StudentTestSeriesPage'));
+const StudentTopicTestCatalogPage = lazy(() => import('./pages/StudentTopicTestCatalogPage'));
 const StudentCourseModulesPage = lazy(() => import('./pages/StudentCourseModulesPage'));
 const StudentInsightsPage = lazy(() => import('./pages/StudentInsightsPage'));
 
@@ -165,6 +167,14 @@ export default function App() {
         )}
       />
       <Route
+        path="/admin/test-series/topic-tests/catalog"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminTopicTestCatalogPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/admin/test-series/full-mocks"
         element={(
           <ProtectedRoute role="admin">
@@ -258,6 +268,16 @@ export default function App() {
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading test series...</div>}>
               <StudentTestSeriesPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/test-series/topic-tests/catalog"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading topic test organizer...</div>}>
+              <StudentTopicTestCatalogPage />
             </Suspense>
           </ProtectedRoute>
         )}
