@@ -4,6 +4,24 @@ import AppShell from '../components/AppShell';
 import { fetchTestSeriesPerformanceStudent } from '../api';
 import { useSessionStore } from '../stores/sessionStore';
 
+function normalizeText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function getPastDate(days) {
+  const dt = new Date();
+  dt.setHours(0, 0, 0, 0);
+  dt.setDate(dt.getDate() - days);
+  return dt;
+}
+
+function getRangeDays(range) {
+  if (range === '7d') return 7;
+  if (range === '30d') return 30;
+  if (range === '90d') return 90;
+  return null;
+}
+
 function formatDateTime(value) {
   if (!value) return 'No attempts yet';
   const date = new Date(value);
@@ -17,6 +35,10 @@ export default function StudentTestSeriesPerformancePage() {
   const [performance, setPerformance] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [rangeFilter, setRangeFilter] = useState('30d');
+  const [moduleFilter, setModuleFilter] = useState('all');
+  const [topicFilter, setTopicFilter] = useState('all');
+  const [fullMockFilter, setFullMockFilter] = useState('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -39,15 +61,154 @@ export default function StudentTestSeriesPerformancePage() {
     };
   }, []);
 
-  const summary = performance?.summary || {
-    topicTests: { attempts: 0, averageScore: 0, bestScore: 0, lastAttemptAt: null, modulesCovered: 0, topicsCovered: 0 },
-    fullMocks: { attempts: 0, averageScore: 0, bestScore: 0, lastAttemptAt: null }
-  };
   const access = performance?.access || { hasTopicTest: false, hasFullMock: false };
-  const modulePerformance = performance?.modulePerformance || [];
-  const fullMockPerformance = performance?.fullMockPerformance || [];
-  const recentTopicAttempts = performance?.recentTopicAttempts || [];
-  const recentFullMockAttempts = performance?.recentFullMockAttempts || [];
+  const topicAttemptSource = performance?.recentTopicAttempts || [];
+  const fullMockAttemptSource = performance?.recentFullMockAttempts || [];
+
+  const moduleOptions = useMemo(() => {
+    const modules = new Set((performance?.modulePerformance || []).map((item) => normalizeText(item?.module || '')).filter(Boolean));
+    topicAttemptSource.forEach((attempt) => {
+      const moduleName = normalizeText(attempt?.module || 'General');
+      if (moduleName) modules.add(moduleName);
+    });
+    return Array.from(modules).sort((a, b) => a.localeCompare(b));
+  }, [performance?.modulePerformance, topicAttemptSource]);
+
+  const topicOptions = useMemo(() => {
+    const topics = new Set();
+    (performance?.modulePerformance || []).forEach((moduleEntry) => {
+      const moduleName = normalizeText(moduleEntry?.module || 'General');
+      if (moduleFilter !== 'all' && moduleName !== moduleFilter) return;
+      (moduleEntry?.topics || []).forEach((topicEntry) => {
+        const topicName = normalizeText(topicEntry?.topic || 'General');
+        if (topicName) topics.add(topicName);
+      });
+    });
+    topicAttemptSource.forEach((attempt) => {
+      const moduleName = normalizeText(attempt?.module || 'General');
+      const topicName = normalizeText(attempt?.topic || 'General');
+      if (moduleFilter !== 'all' && moduleName !== moduleFilter) return;
+      if (topicName) topics.add(topicName);
+    });
+    return Array.from(topics).sort((a, b) => a.localeCompare(b));
+  }, [moduleFilter, performance?.modulePerformance, topicAttemptSource]);
+
+  const fullMockOptions = useMemo(() => {
+    const titles = new Set((performance?.fullMockPerformance || []).map((item) => normalizeText(item?.title || '')).filter(Boolean));
+    fullMockAttemptSource.forEach((attempt) => {
+      const title = normalizeText(attempt?.title || 'Full Mock Test');
+      if (title) titles.add(title);
+    });
+    return Array.from(titles).sort((a, b) => a.localeCompare(b));
+  }, [fullMockAttemptSource, performance?.fullMockPerformance]);
+
+  useEffect(() => {
+    if (moduleFilter !== 'all' && !moduleOptions.includes(moduleFilter)) {
+      setModuleFilter('all');
+    }
+  }, [moduleFilter, moduleOptions]);
+
+  useEffect(() => {
+    if (topicFilter !== 'all' && !topicOptions.includes(topicFilter)) {
+      setTopicFilter('all');
+    }
+  }, [topicFilter, topicOptions]);
+
+  useEffect(() => {
+    if (fullMockFilter !== 'all' && !fullMockOptions.includes(fullMockFilter)) {
+      setFullMockFilter('all');
+    }
+  }, [fullMockFilter, fullMockOptions]);
+
+  const filteredTopicAttempts = useMemo(() => {
+    const now = new Date();
+    const rangeDays = getRangeDays(rangeFilter);
+    const cutoff = rangeDays ? getPastDate(rangeDays) : null;
+
+    return topicAttemptSource.filter((attempt) => {
+      const moduleName = normalizeText(attempt?.module || 'General');
+      const topicName = normalizeText(attempt?.topic || 'General');
+      if (moduleFilter !== 'all' && moduleName !== moduleFilter) return false;
+      if (topicFilter !== 'all' && topicName !== topicFilter) return false;
+      if (!cutoff) return true;
+
+      const submittedAt = new Date(attempt?.submittedAt || 0);
+      if (Number.isNaN(submittedAt.getTime())) return false;
+      return submittedAt >= cutoff && submittedAt <= now;
+    });
+  }, [moduleFilter, rangeFilter, topicAttemptSource, topicFilter]);
+
+  const filteredFullMockAttempts = useMemo(() => {
+    const now = new Date();
+    const rangeDays = getRangeDays(rangeFilter);
+    const cutoff = rangeDays ? getPastDate(rangeDays) : null;
+
+    return fullMockAttemptSource.filter((attempt) => {
+      const title = normalizeText(attempt?.title || 'Full Mock Test');
+      if (fullMockFilter !== 'all' && title !== fullMockFilter) return false;
+      if (!cutoff) return true;
+
+      const submittedAt = new Date(attempt?.submittedAt || 0);
+      if (Number.isNaN(submittedAt.getTime())) return false;
+      return submittedAt >= cutoff && submittedAt <= now;
+    });
+  }, [fullMockAttemptSource, fullMockFilter, rangeFilter]);
+
+  const filteredModulePerformance = useMemo(() => {
+    return (performance?.modulePerformance || [])
+      .filter((moduleEntry) => {
+        const moduleName = normalizeText(moduleEntry?.module || 'General');
+        if (moduleFilter !== 'all' && moduleName !== moduleFilter) return false;
+        return true;
+      })
+      .map((moduleEntry) => ({
+        ...moduleEntry,
+        topics: (moduleEntry?.topics || []).filter((topicEntry) => {
+          const topicName = normalizeText(topicEntry?.topic || 'General');
+          if (topicFilter !== 'all' && topicName !== topicFilter) return false;
+          return true;
+        })
+      }))
+      .filter((moduleEntry) => moduleEntry.topics.length > 0 || topicFilter === 'all');
+  }, [moduleFilter, performance?.modulePerformance, topicFilter]);
+
+  const filteredFullMockPerformance = useMemo(() => {
+    return (performance?.fullMockPerformance || []).filter((item) => {
+      const title = normalizeText(item?.title || 'Full Mock Test');
+      if (fullMockFilter !== 'all' && title !== fullMockFilter) return false;
+      return true;
+    });
+  }, [fullMockFilter, performance?.fullMockPerformance]);
+
+  const summary = useMemo(() => {
+    const topicPercentages = filteredTopicAttempts.map((attempt) => Number(attempt?.percentage || 0)).filter((value) => Number.isFinite(value));
+    const fullMockPercentages = filteredFullMockAttempts.map((attempt) => Number(attempt?.percentage || 0)).filter((value) => Number.isFinite(value));
+    const topicModulesCovered = new Set(filteredTopicAttempts.map((attempt) => normalizeText(attempt?.module || 'General'))).size;
+    const topicTracksCovered = new Set(filteredTopicAttempts.map((attempt) => `${normalizeText(attempt?.module || 'General')}::${normalizeText(attempt?.topic || 'General')}`)).size;
+    const latestTopicAttempt = filteredTopicAttempts
+      .slice()
+      .sort((left, right) => new Date(right?.submittedAt || 0) - new Date(left?.submittedAt || 0))[0]?.submittedAt || null;
+    const latestFullMockAttempt = filteredFullMockAttempts
+      .slice()
+      .sort((left, right) => new Date(right?.submittedAt || 0) - new Date(left?.submittedAt || 0))[0]?.submittedAt || null;
+
+    return {
+      topicTests: {
+        attempts: filteredTopicAttempts.length,
+        averageScore: topicPercentages.length ? Math.round(topicPercentages.reduce((sum, value) => sum + value, 0) / topicPercentages.length) : 0,
+        bestScore: topicPercentages.length ? Math.max(...topicPercentages) : 0,
+        lastAttemptAt: latestTopicAttempt,
+        modulesCovered: topicModulesCovered,
+        topicsCovered: topicTracksCovered
+      },
+      fullMocks: {
+        attempts: filteredFullMockAttempts.length,
+        averageScore: fullMockPercentages.length ? Math.round(fullMockPercentages.reduce((sum, value) => sum + value, 0) / fullMockPercentages.length) : 0,
+        bestScore: fullMockPercentages.length ? Math.max(...fullMockPercentages) : 0,
+        lastAttemptAt: latestFullMockAttempt
+      }
+    };
+  }, [filteredFullMockAttempts, filteredTopicAttempts]);
 
   const totalSeriesAttempts = useMemo(() => (
     Number(summary.topicTests?.attempts || 0) + Number(summary.fullMocks?.attempts || 0)
@@ -112,6 +273,47 @@ export default function StudentTestSeriesPerformancePage() {
             <h2>Hi {session?.username || 'Student'}</h2>
             <p className="subtitle">Track topic tests module by module and separate full mock results in one cleaner, more premium workspace.</p>
           </div>
+          <div className="performance-filter-row" role="group" aria-label="Test series performance filters">
+            <label>
+              Range
+              <select value={rangeFilter} onChange={(event) => setRangeFilter(event.target.value)}>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="all">All time</option>
+              </select>
+            </label>
+            <label>
+              Module
+              <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}>
+                <option value="all">All Modules</option>
+                {moduleOptions.map((moduleName) => (
+                  <option key={moduleName} value={moduleName}>{moduleName}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Topic
+              <select value={topicFilter} onChange={(event) => setTopicFilter(event.target.value)}>
+                <option value="all">All Topics</option>
+                {topicOptions.map((topicName) => (
+                  <option key={topicName} value={topicName}>{topicName}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Full Mock
+              <select value={fullMockFilter} onChange={(event) => setFullMockFilter(event.target.value)}>
+                <option value="all">All Full Mocks</option>
+                {fullMockOptions.map((title) => (
+                  <option key={title} value={title}>{title}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section className="card performance-access-card">
           <div className="performance-access-grid" aria-label="Test series access status">
             <span className={`performance-access-pill${access.hasTopicTest ? ' active' : ''}`}>Topic Tests {access.hasTopicTest ? 'Unlocked' : 'Locked'}</span>
             <span className={`performance-access-pill${access.hasFullMock ? ' active' : ''}`}>Full Mocks {access.hasFullMock ? 'Unlocked' : 'Locked'}</span>
@@ -159,7 +361,7 @@ export default function StudentTestSeriesPerformancePage() {
 
         <section id="series-performance-topic-tests" className="performance-module-grid">
           {access.hasTopicTest ? (
-            modulePerformance.length ? modulePerformance.map((moduleEntry) => (
+            filteredModulePerformance.length ? filteredModulePerformance.map((moduleEntry) => (
               <article key={moduleEntry.module} className="card performance-module-card">
                 <div className="performance-module-head">
                   <div>
@@ -195,8 +397,8 @@ export default function StudentTestSeriesPerformancePage() {
               </article>
             )) : (
               <article className="card performance-empty-card">
-                <h3>No topic test attempts yet</h3>
-                <p className="subtitle">Your module-wise and topic-wise breakdown will appear here after you start attempting topic tests.</p>
+                <h3>No topic test attempts match this filter</h3>
+                <p className="subtitle">Try changing the range, module, or topic filter to reveal more topic test results.</p>
               </article>
             )
           ) : (
@@ -209,7 +411,7 @@ export default function StudentTestSeriesPerformancePage() {
 
         <section id="series-performance-full-mocks" className="performance-module-grid performance-module-grid--compact">
           {access.hasFullMock ? (
-            fullMockPerformance.length ? fullMockPerformance.map((item) => (
+            filteredFullMockPerformance.length ? filteredFullMockPerformance.map((item) => (
               <article key={item.title} className="card performance-module-card performance-module-card--mock">
                 <div className="performance-module-head">
                   <div>
@@ -234,8 +436,8 @@ export default function StudentTestSeriesPerformancePage() {
               </article>
             )) : (
               <article className="card performance-empty-card">
-                <h3>No full mock attempts yet</h3>
-                <p className="subtitle">Once you complete a full mock, this page will show separate result cards here.</p>
+                <h3>No full mock attempts match this filter</h3>
+                <p className="subtitle">Try changing the range or full mock filter to see matching full mock performance.</p>
               </article>
             )
           ) : (
@@ -254,9 +456,9 @@ export default function StudentTestSeriesPerformancePage() {
                 <h3>Latest topic-test attempts</h3>
               </div>
             </div>
-            {recentTopicAttempts.length ? (
+            {filteredTopicAttempts.length ? (
               <div className="performance-timeline-list">
-                {recentTopicAttempts.map((attempt) => (
+                {filteredTopicAttempts.map((attempt) => (
                   <article key={attempt._id} className="performance-timeline-item">
                     <div>
                       <strong>{attempt.module} • {attempt.topic}</strong>
@@ -280,9 +482,9 @@ export default function StudentTestSeriesPerformancePage() {
                 <h3>Latest full mock attempts</h3>
               </div>
             </div>
-            {recentFullMockAttempts.length ? (
+            {filteredFullMockAttempts.length ? (
               <div className="performance-timeline-list">
-                {recentFullMockAttempts.map((attempt) => (
+                {filteredFullMockAttempts.map((attempt) => (
                   <article key={attempt._id} className="performance-timeline-item">
                     <div>
                       <strong>{attempt.title}</strong>
