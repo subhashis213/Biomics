@@ -105,6 +105,25 @@ function sanitizeQuestionsForStudent(questions = []) {
   }));
 }
 
+function buildTopicTestSignature(testLike = {}) {
+  const normalizedQuestions = Array.isArray(testLike.questions)
+    ? testLike.questions.map((item) => ({
+        question: String(item?.question || '').trim(),
+        options: Array.isArray(item?.options) ? item.options.map((opt) => String(opt || '').trim()) : [],
+        correctIndex: Number(item?.correctIndex ?? -1),
+        explanation: String(item?.explanation || '').trim()
+      }))
+    : [];
+
+  return JSON.stringify({
+    category: normalizeCourse(testLike.category),
+    title: String(testLike.title || '').trim(),
+    difficulty: String(testLike.difficulty || 'medium').trim(),
+    durationMinutes: Number(testLike.durationMinutes || 0),
+    questions: normalizedQuestions
+  });
+}
+
 function calculatePercentage(score, total) {
   const safeTotal = Number(total || 0);
   if (safeTotal <= 0) return 0;
@@ -225,13 +244,48 @@ router.post('/topic-tests', authenticateToken('admin'), async (req, res) => {
     const testId = String(req.body?.testId || '').trim();
     let test;
     if (testId) {
-      test = await TopicTest.findByIdAndUpdate(testId, { $set: payload }, { new: true });
-      if (!test) return res.status(404).json({ error: 'Topic test not found.' });
+      const existingTest = await TopicTest.findById(testId);
+      if (!existingTest) return res.status(404).json({ error: 'Topic test not found.' });
+
+      const originalPlacement = {
+        category: normalizeCourse(existingTest.category),
+        module: String(existingTest.module || '').trim(),
+        topic: String(existingTest.topic || 'General').trim() || 'General'
+      };
+
+      existingTest.set(payload);
+      test = await existingTest.save();
+
+      const movedPlacement = originalPlacement.category !== payload.category
+        || originalPlacement.module !== payload.module
+        || originalPlacement.topic !== payload.topic;
+
+      if (movedPlacement) {
+        const categoriesToCheck = Array.from(new Set([
+          normalizeCourse(originalPlacement.category),
+          normalizeCourse(payload.category)
+        ].filter(Boolean)));
+        const savedSignature = buildTopicTestSignature(test);
+
+        const duplicateCandidates = await TopicTest.find({
+          _id: { $ne: test._id },
+          category: { $in: categoriesToCheck },
+          title: payload.title
+        });
+
+        const duplicateIds = duplicateCandidates
+          .filter((candidate) => buildTopicTestSignature(candidate) === savedSignature)
+          .map((candidate) => candidate._id);
+
+        if (duplicateIds.length) {
+          await TopicTest.deleteMany({ _id: { $in: duplicateIds } });
+        }
+      }
     } else {
       test = await TopicTest.create(payload);
     }
     await logAdminAction(req.user.username, testId ? 'UPDATE_TOPIC_TEST' : 'CREATE_TOPIC_TEST', `${category}/${module}/${topic}: ${title}`);
-    return res.status(201).json({ message: 'Topic test saved.', test });
+    return res.status(testId ? 200 : 201).json({ message: 'Topic test saved.', test });
   } catch {
     return res.status(500).json({ error: 'Failed to save topic test.' });
   }
