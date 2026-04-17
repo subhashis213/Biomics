@@ -105,6 +105,32 @@ function sanitizeQuestionsForStudent(questions = []) {
   }));
 }
 
+function calculatePercentage(score, total) {
+  const safeTotal = Number(total || 0);
+  if (safeTotal <= 0) return 0;
+  return Math.round((Number(score || 0) / safeTotal) * 100);
+}
+
+function summarizeAttempts(attempts = []) {
+  if (!attempts.length) {
+    return {
+      attempts: 0,
+      averageScore: 0,
+      bestScore: 0,
+      lastAttemptAt: null
+    };
+  }
+
+  const percentages = attempts.map((attempt) => calculatePercentage(attempt.score, attempt.total));
+  const averageScore = Math.round(percentages.reduce((sum, value) => sum + value, 0) / percentages.length);
+  return {
+    attempts: attempts.length,
+    averageScore,
+    bestScore: Math.max(...percentages),
+    lastAttemptAt: attempts[0]?.submittedAt || null
+  };
+}
+
 // ─── Admin: Pricing ──────────────────────────────────────────────────────────
 
 // GET /test-series/pricing/admin — list all courses with pricing
@@ -582,6 +608,173 @@ router.post('/full-mocks/student/:mockId/submit', authenticateToken('user'), asy
     });
   } catch {
     return res.status(500).json({ error: 'Failed to submit full mock test.' });
+  }
+});
+
+// GET /test-series/performance/student
+router.get('/performance/student', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+
+    const course = normalizeCourse(user.class);
+    const access = await resolveStudentAccess(req.user.username, course);
+
+    const [topicAttempts, fullMockAttempts] = await Promise.all([
+      access.hasTopicTest
+        ? TopicTestAttempt.find({ username: req.user.username, category: course }).sort({ submittedAt: -1 }).lean()
+        : Promise.resolve([]),
+      access.hasFullMock
+        ? FullMockAttempt.find({ username: req.user.username, category: course }).sort({ submittedAt: -1 }).lean()
+        : Promise.resolve([])
+    ]);
+
+    const modulePerformanceMap = new Map();
+    const topicKeys = new Set();
+
+    topicAttempts.forEach((attempt) => {
+      const moduleName = String(attempt.module || 'General').trim() || 'General';
+      const topicName = String(attempt.topic || 'General').trim() || 'General';
+      const percentage = calculatePercentage(attempt.score, attempt.total);
+      const moduleKey = moduleName.toLowerCase();
+      const topicKey = `${moduleKey}::${topicName.toLowerCase()}`;
+      topicKeys.add(topicKey);
+
+      if (!modulePerformanceMap.has(moduleKey)) {
+        modulePerformanceMap.set(moduleKey, {
+          module: moduleName,
+          attempts: 0,
+          totalPct: 0,
+          bestScore: 0,
+          lastAttemptAt: null,
+          topics: new Map()
+        });
+      }
+
+      const moduleEntry = modulePerformanceMap.get(moduleKey);
+      moduleEntry.attempts += 1;
+      moduleEntry.totalPct += percentage;
+      moduleEntry.bestScore = Math.max(moduleEntry.bestScore, percentage);
+      if (!moduleEntry.lastAttemptAt || new Date(attempt.submittedAt) > new Date(moduleEntry.lastAttemptAt)) {
+        moduleEntry.lastAttemptAt = attempt.submittedAt;
+      }
+
+      if (!moduleEntry.topics.has(topicKey)) {
+        moduleEntry.topics.set(topicKey, {
+          topic: topicName,
+          attempts: 0,
+          totalPct: 0,
+          bestScore: 0,
+          lastAttemptAt: null
+        });
+      }
+
+      const topicEntry = moduleEntry.topics.get(topicKey);
+      topicEntry.attempts += 1;
+      topicEntry.totalPct += percentage;
+      topicEntry.bestScore = Math.max(topicEntry.bestScore, percentage);
+      if (!topicEntry.lastAttemptAt || new Date(attempt.submittedAt) > new Date(topicEntry.lastAttemptAt)) {
+        topicEntry.lastAttemptAt = attempt.submittedAt;
+      }
+    });
+
+    const modulePerformance = Array.from(modulePerformanceMap.values())
+      .map((moduleEntry) => ({
+        module: moduleEntry.module,
+        attempts: moduleEntry.attempts,
+        averageScore: moduleEntry.attempts ? Math.round(moduleEntry.totalPct / moduleEntry.attempts) : 0,
+        bestScore: moduleEntry.bestScore,
+        lastAttemptAt: moduleEntry.lastAttemptAt,
+        topics: Array.from(moduleEntry.topics.values())
+          .map((topicEntry) => ({
+            topic: topicEntry.topic,
+            attempts: topicEntry.attempts,
+            averageScore: topicEntry.attempts ? Math.round(topicEntry.totalPct / topicEntry.attempts) : 0,
+            bestScore: topicEntry.bestScore,
+            lastAttemptAt: topicEntry.lastAttemptAt
+          }))
+          .sort((left, right) => {
+            if (right.averageScore !== left.averageScore) return right.averageScore - left.averageScore;
+            return left.topic.localeCompare(right.topic);
+          })
+      }))
+      .sort((left, right) => {
+        if (right.averageScore !== left.averageScore) return right.averageScore - left.averageScore;
+        return left.module.localeCompare(right.module);
+      });
+
+    const fullMockPerformanceMap = new Map();
+    fullMockAttempts.forEach((attempt) => {
+      const mockTitle = String(attempt.title || 'Full Mock Test').trim() || 'Full Mock Test';
+      const mockKey = mockTitle.toLowerCase();
+      const percentage = calculatePercentage(attempt.score, attempt.total);
+
+      if (!fullMockPerformanceMap.has(mockKey)) {
+        fullMockPerformanceMap.set(mockKey, {
+          title: mockTitle,
+          attempts: 0,
+          totalPct: 0,
+          bestScore: 0,
+          lastAttemptAt: null
+        });
+      }
+
+      const mockEntry = fullMockPerformanceMap.get(mockKey);
+      mockEntry.attempts += 1;
+      mockEntry.totalPct += percentage;
+      mockEntry.bestScore = Math.max(mockEntry.bestScore, percentage);
+      if (!mockEntry.lastAttemptAt || new Date(attempt.submittedAt) > new Date(mockEntry.lastAttemptAt)) {
+        mockEntry.lastAttemptAt = attempt.submittedAt;
+      }
+    });
+
+    const fullMockPerformance = Array.from(fullMockPerformanceMap.values())
+      .map((entry) => ({
+        title: entry.title,
+        attempts: entry.attempts,
+        averageScore: entry.attempts ? Math.round(entry.totalPct / entry.attempts) : 0,
+        bestScore: entry.bestScore,
+        lastAttemptAt: entry.lastAttemptAt
+      }))
+      .sort((left, right) => {
+        if (right.bestScore !== left.bestScore) return right.bestScore - left.bestScore;
+        return left.title.localeCompare(right.title);
+      });
+
+    return res.json({
+      course,
+      access,
+      summary: {
+        topicTests: {
+          ...summarizeAttempts(topicAttempts),
+          modulesCovered: modulePerformance.length,
+          topicsCovered: topicKeys.size
+        },
+        fullMocks: summarizeAttempts(fullMockAttempts)
+      },
+      modulePerformance,
+      fullMockPerformance,
+      recentTopicAttempts: topicAttempts.slice(0, 8).map((attempt) => ({
+        _id: attempt._id,
+        title: attempt.title,
+        module: attempt.module,
+        topic: attempt.topic,
+        score: attempt.score,
+        total: attempt.total,
+        percentage: calculatePercentage(attempt.score, attempt.total),
+        submittedAt: attempt.submittedAt
+      })),
+      recentFullMockAttempts: fullMockAttempts.slice(0, 8).map((attempt) => ({
+        _id: attempt._id,
+        title: attempt.title,
+        score: attempt.score,
+        total: attempt.total,
+        percentage: calculatePercentage(attempt.score, attempt.total),
+        submittedAt: attempt.submittedAt
+      }))
+    });
+  } catch {
+    return res.status(500).json({ error: 'Failed to fetch test series performance.' });
   }
 });
 

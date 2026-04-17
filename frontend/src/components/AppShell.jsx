@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import logoImg from '../assets/biomics-logo.jpeg';
-import { useThemeStore } from '../stores/themeStore';
 import StudentChatAgent from './StudentChatAgent';
 
 export default function AppShell({
@@ -12,13 +11,11 @@ export default function AppShell({
   actions,
   navItems = [],
   navTitle = 'Menu',
-  showThemeSwitch = true,
+  showThemeSwitch = false,
   activeNavItemId,
   onNavItemClick,
   refreshOnBrandIconClick = false
 }) {
-  const { theme, toggleTheme } = useThemeStore();
-  const isLightTheme = theme === 'light';
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
@@ -274,21 +271,6 @@ export default function AppShell({
           </div>
           <div className="topbar-actions">
             {actions}
-            {showThemeSwitch ? (
-              <button
-                type="button"
-                className="theme-switch"
-                onClick={toggleTheme}
-                aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
-                aria-pressed={isLightTheme}
-                title={isLightTheme ? 'Light theme active' : 'Dark theme active'}
-              >
-                <span className="theme-switch-track" aria-hidden="true">
-                  <span className="theme-switch-thumb" />
-                </span>
-                <span>{isLightTheme ? 'Light' : 'Dark'}</span>
-              </button>
-            ) : null}
             {typeof onLogout === 'function' ? (
               <button className="topbar-logout-btn" type="button" onClick={onLogout}>
                 <svg className="topbar-logout-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

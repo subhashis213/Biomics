@@ -53,8 +53,6 @@ export default function StudentDashboard() {
   const [leaderboardModules, setLeaderboardModules] = useState([]);
   const [leaderboardModuleFilter, setLeaderboardModuleFilter] = useState('all');
   const [leaderboardTopicFilter, setLeaderboardTopicFilter] = useState('all');
-  const [performanceTopicFilter, setPerformanceTopicFilter] = useState('all');
-  const [performanceModuleFilter, setPerformanceModuleFilter] = useState('all');
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1196,29 +1194,6 @@ export default function StudentDashboard() {
 
   const quizTopicOptions = quizTopicMetadata.options;
 
-  const performanceModuleOptions = Array.from(new Set(
-    visibleModules.map((moduleKey) => moduleMetaByKey[moduleKey]?.module).filter(Boolean)
-  )).sort((a, b) => a.localeCompare(b));
-
-  const filteredQuizPerformanceModules = visibleModules.filter((moduleKey) => {
-    const moduleName = normalizeModuleName(moduleMetaByKey[moduleKey]?.module || 'General');
-    if (performanceModuleFilter !== 'all' && moduleName !== normalizeModuleName(performanceModuleFilter)) {
-      return false;
-    }
-    if (performanceTopicFilter === 'all') return true;
-    const topicSet = quizTopicMetadata.moduleTopicsByKey[moduleKey];
-    return Boolean(topicSet && topicSet.has(performanceTopicFilter));
-  });
-
-  const latestAttemptByModule = quizAttempts.reduce((acc, attempt) => {
-    const moduleKey = resolveModuleKey(attempt.category || course || 'General', attempt.module || 'General');
-    const existing = acc[moduleKey];
-    if (!existing || new Date(attempt.submittedAt) > new Date(existing.submittedAt)) {
-      acc[moduleKey] = attempt;
-    }
-    return acc;
-  }, {});
-
   const quizStreakDays = useMemo(() => {
     const attemptedDayKeys = new Set();
     quizAttempts.forEach((attempt) => {
@@ -1273,6 +1248,8 @@ export default function StudentDashboard() {
       if (cancelled) return;
       import('./StudentCourseModulesPage');
       import('./StudentInsightsPage');
+      import('./StudentQuizPerformancePage');
+      import('./StudentTestSeriesPerformancePage');
     };
 
     let cleanup = () => {};
@@ -1291,19 +1268,10 @@ export default function StudentDashboard() {
   }, []);
 
   useEffect(() => {
-    if (performanceTopicFilter !== 'all' && !quizTopicOptions.includes(performanceTopicFilter)) {
-      setPerformanceTopicFilter('all');
-    }
     if (leaderboardTopicFilter !== 'all' && !quizTopicOptions.includes(leaderboardTopicFilter)) {
       setLeaderboardTopicFilter('all');
     }
-  }, [performanceTopicFilter, leaderboardTopicFilter, quizTopicOptions]);
-
-  useEffect(() => {
-    if (performanceModuleFilter === 'all') return;
-    if (performanceModuleOptions.includes(performanceModuleFilter)) return;
-    setPerformanceModuleFilter('all');
-  }, [performanceModuleFilter, performanceModuleOptions]);
+  }, [leaderboardTopicFilter, quizTopicOptions]);
 
   useEffect(() => {
     if (!loadError) return;
@@ -1752,10 +1720,11 @@ export default function StudentDashboard() {
         ),
         icon: '💬'
       },
-      { id: 'section-quiz-performance', label: 'Quiz Performance', icon: '📊' },
+      { id: 'route-student-quiz-performance', label: 'Quiz Performance', icon: '📊' },
       { id: 'section-leaderboard', label: 'Leaderboard', icon: '🏆' },
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
       { id: 'section-test-series', label: 'Test Series', icon: '📝' },
+      { id: 'route-student-test-series-performance', label: 'Series Performance', icon: '🎯' },
       { id: 'section-exam-leaderboard', label: 'Exam Leaderboard', icon: '🥇' },
       { id: 'section-feedback', label: 'Feedback', icon: '💬' },
       { id: 'section-connect', label: 'Connect', icon: '🔗' }
@@ -1765,6 +1734,16 @@ export default function StudentDashboard() {
   function handleStudentNavClick(id) {
     if (id === 'route-student-insights') {
       navigate('/student/insights');
+      return;
+    }
+
+    if (id === 'route-student-quiz-performance') {
+      navigate('/student/quiz-performance');
+      return;
+    }
+
+    if (id === 'route-student-test-series-performance') {
+      navigate('/student/test-series-performance');
       return;
     }
 
@@ -2457,66 +2436,39 @@ export default function StudentDashboard() {
         </section>
       ) : null}
 
-      {hasAnyUnlockedModule && !selectedModule && visibleModules.length ? (
-        <section id="section-quiz-performance" className="card quiz-history-panel">
+      {hasAnyUnlockedModule && !selectedModule ? (
+        <section
+          id="section-quiz-performance"
+          className="card student-route-entry-card quiz-performance-entry-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/student/quiz-performance')}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              navigate('/student/quiz-performance');
+            }
+          }}
+        >
           <div className="section-header compact">
             <div>
               <p className="eyebrow">Quiz Performance</p>
-              <h2>Last score by module</h2>
+              <h2>Open your organized performance board</h2>
+              <p className="subtitle">Review module-wise and topic-wise quiz progress in a dedicated premium workspace.</p>
             </div>
           </div>
-          <div className="quiz-filter-bar" role="group" aria-label="Quiz performance filters">
-            <span className="quiz-filter-icon" aria-hidden="true">⚙️</span>
-            <label className="quiz-filter-field">
-              Module
-              <select
-                value={performanceModuleFilter}
-                onChange={(event) => setPerformanceModuleFilter(event.target.value)}
-              >
-                <option value="all">All Modules</option>
-                {performanceModuleOptions.map((moduleName) => (
-                  <option key={`perf-module-${moduleName}`} value={moduleName}>{moduleName}</option>
-                ))}
-              </select>
-            </label>
-            <label className="quiz-filter-field">
-              Topic
-              <select
-                value={performanceTopicFilter}
-                onChange={(event) => setPerformanceTopicFilter(event.target.value)}
-              >
-                <option value="all">All Topics</option>
-                {quizTopicOptions.map((topic) => (
-                  <option key={`perf-topic-${topic}`} value={topic}>{topic}</option>
-                ))}
-              </select>
-            </label>
+          <div className="student-route-entry-copy">
+            <div className="student-route-chip-row" aria-hidden="true">
+              <span>Module trends</span>
+              <span>Topic breakdown</span>
+              <span>Recent attempts</span>
+            </div>
+            <div className="workspace-link-actions">
+              <button type="button" className="primary-btn" onClick={() => navigate('/student/quiz-performance')}>
+                Open Quiz Performance →
+              </button>
+            </div>
           </div>
-          <div className="quiz-history-grid">
-            {filteredQuizPerformanceModules.map((moduleKey) => {
-              const moduleMeta = moduleMetaByKey[moduleKey];
-              const module = moduleMeta.module;
-              const moduleCourse = moduleMeta.category;
-              const attempt = latestAttemptByModule[moduleKey];
-              return (
-                <article key={`history-${moduleKey}`} className="quiz-history-item">
-                  <strong>{module}</strong>
-                  {selectedCourseFilter === 'all' ? <small>{moduleCourse}</small> : null}
-                  {attempt ? (
-                    <>
-                      <span>Last: {attempt.score}/{attempt.total} ({Math.round((attempt.score / attempt.total) * 100)}%)</span>
-                      <small>{new Date(attempt.submittedAt).toLocaleString()}</small>
-                    </>
-                  ) : (
-                    <span>No attempts yet</span>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-          {!filteredQuizPerformanceModules.length ? (
-            <p className="empty-note">No modules found for this topic filter.</p>
-          ) : null}
         </section>
       ) : null}
 
@@ -2684,6 +2636,42 @@ export default function StudentDashboard() {
             <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series')}>
               Go to Test Series →
             </button>
+          </div>
+        </section>
+      ) : null}
+
+      {!selectedModule ? (
+        <section
+          id="section-test-series-performance"
+          className="card student-route-entry-card test-series-performance-entry-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/student/test-series-performance')}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              navigate('/student/test-series-performance');
+            }
+          }}
+        >
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Test Series Performance</p>
+              <h2>Track topic tests and full mocks separately</h2>
+              <p className="subtitle">Dive into module-wise topic test results and a dedicated full mock performance board with clearer spacing and cleaner visuals.</p>
+            </div>
+          </div>
+          <div className="student-route-entry-copy">
+            <div className="student-route-chip-row" aria-hidden="true">
+              <span>Topic test modules</span>
+              <span>Full mock scores</span>
+              <span>Premium layout</span>
+            </div>
+            <div className="workspace-link-actions">
+              <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series-performance')}>
+                Open Series Performance →
+              </button>
+            </div>
           </div>
         </section>
       ) : null}

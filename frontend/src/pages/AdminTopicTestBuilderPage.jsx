@@ -26,6 +26,16 @@ export default function AdminTopicTestBuilderPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  function updateBuilderQuery(nextEditId) {
+    const params = new URLSearchParams(location.search);
+    if (category) params.set('category', category);
+    else params.delete('category');
+    if (nextEditId) params.set('edit', nextEditId);
+    else params.delete('edit');
+    const nextSearch = params.toString();
+    navigate(`/admin/test-series/topic-tests${nextSearch ? `?${nextSearch}` : ''}`, { replace: true });
+  }
+
   // builder form
   const [category, setCategory] = useState(DEFAULT_COURSE);
   const [module, setModule] = useState('');
@@ -228,6 +238,7 @@ export default function AdminTopicTestBuilderPage() {
     setDifficulty('medium');
     setDurationMinutes(30);
     setQuestions([emptyQuestion()]);
+    updateBuilderQuery('');
   }
 
   function editTest(test) {
@@ -245,6 +256,12 @@ export default function AdminTopicTestBuilderPage() {
       explanation: q.explanation || ''
     })));
     setMessage(null);
+    if (new URLSearchParams(location.search).get('edit') !== test._id) {
+      const params = new URLSearchParams(location.search);
+      params.set('category', test.category || DEFAULT_COURSE);
+      params.set('edit', test._id);
+      navigate(`/admin/test-series/topic-tests?${params.toString()}`, { replace: true });
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -381,16 +398,8 @@ export default function AdminTopicTestBuilderPage() {
         title="Topic Test Builder"
         subtitle="Create and manage module/topic-wise tests for the Test Series"
         roleLabel="Admin"
-        showThemeSwitch
         actions={(
           <>
-            <button
-              type="button"
-              className="secondary-btn"
-              onClick={() => navigate(`/admin/test-series/topic-tests/catalog?category=${encodeURIComponent(category)}`)}
-            >
-              Organized View
-            </button>
             <button type="button" className="secondary-btn" onClick={() => navigate('/admin/test-series')}>
               Back to Test Series Hub
             </button>

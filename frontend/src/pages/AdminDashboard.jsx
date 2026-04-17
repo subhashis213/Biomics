@@ -181,6 +181,8 @@ export default function AdminDashboard() {
   const [mockExamPerformanceError, setMockExamPerformanceError] = useState('');
   const [editingMockExamId, setEditingMockExamId] = useState('');
   const [mockExamMessage, setMockExamMessage] = useState(null);
+  const [topicTestCount, setTopicTestCount] = useState(0);
+  const [fullMockTestCount, setFullMockTestCount] = useState(0);
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementMessage, setAnnouncementMessage] = useState('');
   const [announcementSaving, setAnnouncementSaving] = useState(false);
@@ -1797,6 +1799,19 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadTestSeriesCounts() {
+    try {
+      const [topicTestsData, fullMocksData] = await Promise.all([
+        requestJson('/test-series/topic-tests/admin'),
+        requestJson('/test-series/full-mocks/admin')
+      ]);
+      setTopicTestCount(Array.isArray(topicTestsData?.tests) ? topicTestsData.tests.length : 0);
+      setFullMockTestCount(Array.isArray(fullMocksData?.mocks) ? fullMocksData.mocks.length : 0);
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load test series counts.' });
+    }
+  }
+
   function formatMonthLabel(monthValue) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(monthValue || ''))) return monthValue || 'Unknown Month';
     const [year, month] = String(monthValue).split('-');
@@ -2095,6 +2110,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadAnnouncements();
+  }, []);
+
+  useEffect(() => {
+    loadTestSeriesCounts();
   }, []);
 
   useEffect(() => {
@@ -2761,7 +2780,6 @@ export default function AdminDashboard() {
             <p className="subtitle">Open the dedicated page to choose class, set quiz details and build question sets in a cleaner UI.</p>
           </div>
           <div className="quiz-count-cards">
-            <StatCard label={`${quizCategory} Quizzes`} value={adminQuizzes.length} />
             <StatCard label="Total Quizzes" value={allQuizzesCount} />
           </div>
         </div>
@@ -2779,10 +2797,6 @@ export default function AdminDashboard() {
             <h2>Monthly exam workspace</h2>
             <p className="subtitle">Open the dedicated page to choose class, set exam details and add questions with a focused layout.</p>
           </div>
-          <div className="quiz-count-cards">
-            <StatCard label={`${mockExamCategory} Exams`} value={mockExamList.length} />
-            <StatCard label="Performance Rows" value={mockExamPerformance.length} />
-          </div>
         </div>
         <div className="workspace-link-actions">
           <button type="button" className="primary-btn" onClick={() => navigate('/admin/mock-exams')}>
@@ -2799,8 +2813,8 @@ export default function AdminDashboard() {
             <p className="subtitle">Create topic-wise tests and full-length mock tests sold as separate add-ons. Manage pricing per course independently of Pro and Elite plans.</p>
           </div>
           <div className="quiz-count-cards">
-            <StatCard label="Topic Tests" value="—" />
-            <StatCard label="Full Mocks" value="—" />
+            <StatCard label="Topic Tests" value={topicTestCount} />
+            <StatCard label="Full Mocks" value={fullMockTestCount} />
           </div>
         </div>
         <div className="workspace-link-actions">

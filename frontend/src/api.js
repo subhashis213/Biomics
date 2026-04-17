@@ -633,6 +633,10 @@ export function fetchTestSeriesStudentAccess() {
   return requestJson('/test-series/pricing/student');
 }
 
+export function fetchTestSeriesPerformanceStudent() {
+  return requestJson('/test-series/performance/student');
+}
+
 export function createTestSeriesOrder(seriesType, voucherCode) {
   return requestJson('/test-series/payment/create-order', {
     method: 'POST',
