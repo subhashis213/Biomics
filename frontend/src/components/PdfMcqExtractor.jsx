@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { extractMcqFromPdf } from '../api';
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
@@ -30,6 +30,7 @@ export default function PdfMcqExtractor({
   sectionName = 'Question Builder',
   onApplyQuestions
 }) {
+  const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -89,6 +90,17 @@ export default function PdfMcqExtractor({
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
     handlePickedFile(selectedFile);
+  }
+
+  function clearExtractor() {
+    setFile(null);
+    setQuestions([]);
+    setExtractProgressText('');
+    setIsDragActive(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    showToast('success', 'Cleared extracted questions from the AI extractor.');
   }
 
   function handleDrop(event) {
@@ -184,7 +196,7 @@ export default function PdfMcqExtractor({
       >
         <p className="pdf-mcq-dropzone-title">Drop PDF here</p>
         <p className="pdf-mcq-dropzone-subtitle">or click to upload (PDF only, max 25MB)</p>
-        <input type="file" accept="application/pdf,.pdf" onChange={handleFileInputChange} />
+        <input ref={fileInputRef} type="file" accept="application/pdf,.pdf" onChange={handleFileInputChange} />
         {file ? <p className="pdf-mcq-file-pill">{file.name}</p> : null}
       </div>
 
@@ -253,6 +265,9 @@ export default function PdfMcqExtractor({
           <div className="workspace-inline-actions pdf-mcq-bottom-actions">
             <button type="button" className="secondary-btn" onClick={addQuestion}>Add Question</button>
             <button type="button" className="secondary-btn" onClick={applyToFormOnly}>Apply to Form</button>
+            <button type="button" className="secondary-btn" onClick={clearExtractor} disabled={isExtracting}>
+              Clear Extractor
+            </button>
           </div>
         </>
       ) : null}
