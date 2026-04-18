@@ -85,6 +85,13 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function formatReadyStateLabel(state) {
+  if (state === 1) return 'connected';
+  if (state === 2) return 'connecting';
+  if (state === 3) return 'disconnecting';
+  return 'disconnected';
+}
+
 function buildAvatarUrl(user) {
   const cloudAvatarUrl = String(user?.avatar?.url || '').trim();
   if (cloudAvatarUrl) return cloudAvatarUrl;
@@ -457,6 +464,93 @@ router.get('/admin/audit-logs', authenticateToken('admin'), async (req, res) => 
     return res.json({ logs, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch audit logs.' });
+  }
+});
+
+router.get('/admin/storage-stats', authenticateToken('admin'), async (req, res) => {
+  try {
+    const db = mongoose.connection?.db;
+    if (!db) {
+      return res.status(503).json({ error: 'MongoDB connection is not available right now.' });
+    }
+
+    const dbStats = await db.stats(1);
+    const collectionsMeta = await db.listCollections({}, { nameOnly: true }).toArray();
+    const collectionNames = collectionsMeta
+      .map((entry) => String(entry?.name || '').trim())
+      .filter((name) => name && !name.startsWith('system.'));
+
+    const collectionStats = await Promise.all(collectionNames.map(async (name) => {
+      try {
+        const stats = await db.command({ collStats: name, scale: 1 });
+        const storageSizeBytes = Number(stats?.storageSize || 0);
+        const dataSizeBytes = Number(stats?.size || 0);
+        const totalIndexSizeBytes = Number(stats?.totalIndexSize || 0);
+        const documentCount = Number(stats?.count || 0);
+        return {
+          name,
+          documentCount,
+          avgDocumentSizeBytes: Number(stats?.avgObjSize || 0),
+          dataSizeBytes,
+          storageSizeBytes,
+          freeStorageSizeBytes: Number(stats?.freeStorageSize || 0),
+          totalIndexSizeBytes,
+          indexCount: Number(stats?.nindexes || 0),
+          usagePercent: storageSizeBytes > 0
+            ? Math.round((dataSizeBytes / storageSizeBytes) * 1000) / 10
+            : 0
+        };
+      } catch {
+        return {
+          name,
+          documentCount: 0,
+          avgDocumentSizeBytes: 0,
+          dataSizeBytes: 0,
+          storageSizeBytes: 0,
+          freeStorageSizeBytes: 0,
+          totalIndexSizeBytes: 0,
+          indexCount: 0,
+          usagePercent: 0
+        };
+      }
+    }));
+
+    const sortedCollections = collectionStats
+      .sort((left, right) => right.storageSizeBytes - left.storageSizeBytes);
+
+    const topCollections = sortedCollections.slice(0, 8);
+    const totalCollectionStorage = sortedCollections.reduce((sum, item) => sum + Number(item.storageSizeBytes || 0), 0);
+    const totalCollectionIndexes = sortedCollections.reduce((sum, item) => sum + Number(item.totalIndexSizeBytes || 0), 0);
+    const totalDocuments = sortedCollections.reduce((sum, item) => sum + Number(item.documentCount || 0), 0);
+
+    return res.json({
+      snapshotAt: new Date().toISOString(),
+      connection: {
+        readyState: mongoose.connection.readyState,
+        status: formatReadyStateLabel(mongoose.connection.readyState),
+        host: mongoose.connection.host || '',
+        port: mongoose.connection.port || '',
+        databaseName: mongoose.connection.name || dbStats?.db || ''
+      },
+      database: {
+        collections: Number(dbStats?.collections || collectionNames.length || 0),
+        views: Number(dbStats?.views || 0),
+        documents: Number(dbStats?.objects || totalDocuments || 0),
+        avgDocumentSizeBytes: Number(dbStats?.avgObjSize || 0),
+        dataSizeBytes: Number(dbStats?.dataSize || 0),
+        storageSizeBytes: Number(dbStats?.storageSize || totalCollectionStorage || 0),
+        totalIndexSizeBytes: Number(dbStats?.indexSize || totalCollectionIndexes || 0),
+        indexCount: Number(dbStats?.indexes || 0),
+        fileSizeBytes: Number(dbStats?.fileSize || 0),
+        fsUsedSizeBytes: Number(dbStats?.fsUsedSize || 0),
+        fsTotalSizeBytes: Number(dbStats?.fsTotalSize || 0),
+        storageEngine: dbStats?.raw ? 'wiredTiger' : 'mongodb'
+      },
+      topCollections,
+      collections: sortedCollections
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load MongoDB storage stats.' });
   }
 });
 

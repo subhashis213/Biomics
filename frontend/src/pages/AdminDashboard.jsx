@@ -2290,6 +2290,7 @@ export default function AdminDashboard() {
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
     { id: 'section-quiz-analytics', label: 'Quiz Analytics', icon: '🏆' },
+    { id: 'section-storage-monitor', label: 'Storage', icon: '💾' },
     { id: 'section-audit-log', label: 'Audit Log', icon: '🛡️' },
     { id: 'section-recovery-center', label: 'Recovery', icon: '♻️' },
     { id: 'section-feedback', label: 'Feedback', icon: '💬' }
@@ -2890,6 +2891,27 @@ export default function AdminDashboard() {
         <div className="workspace-link-actions">
           <button type="button" className="primary-btn" onClick={() => navigate('/admin/revenue-tracking')}>
             Open Revenue Tracking
+          </button>
+        </div>
+      </section>
+
+      <section id="section-storage-monitor" className="card analytics-card workspace-launch-card workspace-launch-storage">
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Infrastructure</p>
+            <h2>Open Storage Monitor</h2>
+            <p className="subtitle">View live MongoDB usage, collection sizes, index footprint and storage pressure in a dedicated admin workspace.</p>
+            <div className="workspace-quick-chips" aria-label="Storage workspace quick insights">
+              <span className="workspace-quick-chip">Live MongoDB stats</span>
+              <span className="workspace-quick-chip">Collection-level usage</span>
+              <span className="workspace-quick-chip">Auto refresh enabled</span>
+            </div>
+          </div>
+          <StatCard label="Scope" value="MongoDB" />
+        </div>
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/storage-monitor')}>
+            Open Storage Monitor
           </button>
         </div>
       </section>

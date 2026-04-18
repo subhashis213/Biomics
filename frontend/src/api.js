@@ -445,6 +445,10 @@ export function fetchRecoveryActionsAdmin(params = {}) {
   return requestJson(`/auth/admin/recovery-actions?${qs.toString()}`);
 }
 
+export function fetchStorageStatsAdmin() {
+  return requestJson('/auth/admin/storage-stats');
+}
+
 export function applyRecoveryActionAdmin(auditLogId) {
   return requestJson(`/auth/admin/recovery-actions/${encodeURIComponent(auditLogId)}/apply`, {
     method: 'POST',

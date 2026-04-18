@@ -12,6 +12,7 @@ import AdminPricingWorkspacePage from './pages/AdminPricingWorkspacePage';
 import AdminQuizBuilderPage from './pages/AdminQuizBuilderPage';
 import AdminRecoveryCenterPage from './pages/AdminRecoveryCenterPage';
 import AdminRevenueTrackingPage from './pages/AdminRevenueTrackingPage';
+import AdminStorageMonitorPage from './pages/AdminStorageMonitorPage';
 import AdminVoucherWorkspacePage from './pages/AdminVoucherWorkspacePage';
 import AdminTestSeriesHubPage from './pages/AdminTestSeriesHubPage';
 import AdminTopicTestBuilderPage from './pages/AdminTopicTestBuilderPage';
@@ -149,6 +150,14 @@ export default function App() {
         element={(
           <ProtectedRoute role="admin">
             <AdminRecoveryCenterPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/storage-monitor"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminStorageMonitorPage />
           </ProtectedRoute>
         )}
       />
