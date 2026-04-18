@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { fetchAdminUserInsights, getApiBase } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
+
+const TRACKED_WINDOW_OPTIONS = [
+  { value: '7', shortLabel: '1 week', headingLabel: '7 days' },
+  { value: '14', shortLabel: '2 weeks', headingLabel: '14 days' },
+  { value: '30', shortLabel: '1 month', headingLabel: '30 days' }
+];
 
 function formatDate(value) {
   if (!value) return 'Not available';
@@ -40,11 +46,17 @@ function formatPercent(value) {
   return `${Math.round(numeric)}%`;
 }
 
-function formatTrackedHours(seconds) {
-  const hours = Number(seconds || 0) / 3600;
-  if (!Number.isFinite(hours) || hours <= 0) return '0h';
-  if (hours >= 10) return `${hours.toFixed(1)}h`;
-  return `${hours.toFixed(2)}h`;
+function formatUsageTime(seconds) {
+  const totalSeconds = Math.max(0, Number(seconds || 0));
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '0m';
+
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (!minutes) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
 }
 
 function formatDurationCompact(seconds) {
@@ -398,6 +410,18 @@ function FrequencyBarChart({ title, eyebrow, items, emptyText, tone, subtitle })
 
 function DailyHoursChart({ items, dayWindow, totalSeconds }) {
   const maxHours = Math.max(...items.map((item) => Number(item.hours || 0)), 0);
+  const safeMaxHours = maxHours > 0 ? Math.ceil(maxHours) : 1;
+  const peakItem = items.reduce((best, item) => {
+    if (!best || Number(item.seconds || 0) > Number(best.seconds || 0)) return item;
+    return best;
+  }, null);
+  const tickSteps = [1, 0.75, 0.5, 0.25, 0].map((ratio) => ({
+    ratio,
+    valueHours: safeMaxHours * ratio,
+    label: formatUsageTime(safeMaxHours * ratio * 3600)
+  }));
+  const selectedWindowLabel = TRACKED_WINDOW_OPTIONS.find((option) => Number(option.value) === Number(dayWindow))?.shortLabel || `${dayWindow} days`;
+
   return (
     <section className="card workspace-panel learner-insights-hours-panel learner-insights-tone-teal">
       <div className="section-header compact learner-insights-section-header">
@@ -406,27 +430,68 @@ function DailyHoursChart({ items, dayWindow, totalSeconds }) {
           <h3>Active webapp hours in the last {dayWindow} days</h3>
           <p className="subtitle">Captured from real session heartbeats across the entire webapp, not only timed assessments.</p>
         </div>
-        <StatCard label="Usage Hours" value={formatTrackedHours(totalSeconds)} />
+        <StatCard label="Usage Time" value={formatUsageTime(totalSeconds)} />
       </div>
 
-      <div className="learner-insights-day-chart">
-        {items.map((item) => {
-          const heightPercent = maxHours > 0 ? (item.hours / maxHours) * 100 : 0;
-          return (
-            <article key={item.key} className="learner-insights-day-column">
-              <span className="learner-insights-day-value">{formatTrackedHours(item.seconds)}</span>
-              <div className="learner-insights-day-bar-track">
-                <div
-                  className="learner-insights-day-bar-fill"
-                  style={{ height: `${Math.max(item.hours > 0 ? 14 : 0, heightPercent)}%` }}
-                />
-              </div>
-              <strong>{item.label}</strong>
-              <span>{item.shortDate}</span>
-              <small>{item.hours > 0 ? 'Active day' : 'No activity'}</small>
-            </article>
-          );
-        })}
+      <div className="learner-insights-usage-mobile-head">
+        <span className="learner-insights-usage-window-pill">{selectedWindowLabel}</span>
+        {peakItem && Number(peakItem.seconds || 0) > 0 ? (
+          <span className="learner-insights-usage-peak-note">
+            Peak {peakItem.label} · {formatUsageTime(peakItem.seconds)}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="learner-insights-usage-chart-shell">
+        <div className="learner-insights-usage-axis" aria-hidden="true">
+          {tickSteps.map((tick) => (
+            <span
+              key={`tick-${tick.ratio}`}
+              className="learner-insights-usage-axis-label"
+              style={{ bottom: `${tick.ratio * 100}%` }}
+            >
+              {tick.label}
+            </span>
+          ))}
+        </div>
+
+        <div className="learner-insights-usage-plot">
+          <div className="learner-insights-usage-grid" aria-hidden="true">
+            {tickSteps.map((tick) => (
+              <span
+                key={`grid-${tick.ratio}`}
+                className="learner-insights-usage-grid-line"
+                style={{ bottom: `${tick.ratio * 100}%` }}
+              />
+            ))}
+          </div>
+
+          <div className="learner-insights-day-chart">
+            {items.map((item) => {
+              const heightPercent = maxHours > 0 ? (item.hours / maxHours) * 100 : 0;
+              const isPeak = peakItem && peakItem.key === item.key && Number(item.seconds || 0) > 0;
+              return (
+                <article key={item.key} className={`learner-insights-day-column${isPeak ? ' is-peak' : ''}`}>
+                  <span className={`learner-insights-day-value${isPeak ? ' is-peak' : ''}`}>{formatUsageTime(item.seconds)}</span>
+                  <div className="learner-insights-day-bar-track">
+                    <div
+                      className="learner-insights-day-bar-fill"
+                      style={{ height: `${Math.max(item.hours > 0 ? 14 : 0, heightPercent)}%` }}
+                    />
+                  </div>
+                  <strong className="learner-insights-day-label">{item.label}</strong>
+                  <span className="learner-insights-day-date">{item.shortDate}</span>
+                  <small className="learner-insights-day-status">{item.hours > 0 ? 'Active day' : 'No activity'}</small>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="learner-insights-usage-footer">
+        <span>X-axis: day in selected window</span>
+        <span>Y-axis: active usage time</span>
       </div>
     </section>
   );
@@ -434,6 +499,7 @@ function DailyHoursChart({ items, dayWindow, totalSeconds }) {
 
 export default function AdminLearnerInsightsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { username = '' } = useParams();
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -582,6 +648,19 @@ export default function AdminLearnerInsightsPage() {
     { key: 'date', label: 'Paid On', render: (item) => formatDate(item.paidAt || item.createdAt) }
   ]), []);
 
+  const backTarget = typeof location.state?.from === 'string' && location.state.from
+    ? location.state.from
+    : '/admin/registered-learners';
+
+  function handleBackNavigation() {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(backTarget, { replace: true });
+  }
+
   return (
     <AppShell
       title="Learner Insights"
@@ -605,7 +684,7 @@ export default function AdminLearnerInsightsPage() {
             <span className="workspace-refresh-btn-icon" aria-hidden="true">↻</span>
             {refreshing ? 'Refreshing...' : 'Refresh'}
           </button>
-          <button type="button" className="secondary-btn" onClick={() => navigate('/admin/registered-learners')}>
+          <button type="button" className="secondary-btn" onClick={handleBackNavigation}>
             ← Back to Learners
           </button>
         </div>
@@ -651,7 +730,7 @@ export default function AdminLearnerInsightsPage() {
             <StatCard label="Course Purchases" value={overview.totalCoursePurchases || 0} />
             <StatCard label="Test Series" value={overview.totalTestSeriesPurchases || 0} />
             <StatCard label="Voucher Uses" value={overview.totalVoucherUses || 0} />
-            <StatCard label="Site Hours" value={formatTrackedHours(overview.totalWebappUsageSeconds || 0)} />
+            <StatCard label="Site Usage" value={formatUsageTime(overview.totalWebappUsageSeconds || 0)} />
             <StatCard label="Video Progress" value={formatPercent(overview.videoCompletionPercent || 0)} />
           </div>
         </section>
@@ -749,15 +828,24 @@ export default function AdminLearnerInsightsPage() {
                   />
                 </label>
                 <label>
-                  <span>Tracked hours window</span>
-                  <select
-                    value={filters.dayWindow}
-                    onChange={(event) => setFilters((current) => ({ ...current, dayWindow: event.target.value }))}
-                  >
-                    <option value="7">Last 7 days</option>
-                    <option value="14">Last 14 days</option>
-                    <option value="30">Last 30 days</option>
-                  </select>
+                  <span>Tracked usage window</span>
+                  <div className="learner-insights-window-switcher" role="tablist" aria-label="Tracked usage window">
+                    {TRACKED_WINDOW_OPTIONS.map((option) => {
+                      const active = filters.dayWindow === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          className={`learner-insights-window-chip${active ? ' is-active' : ''}`}
+                          onClick={() => setFilters((current) => ({ ...current, dayWindow: option.value }))}
+                        >
+                          {option.shortLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </label>
                 <div className="learner-insights-filter-actions">
                   <button
@@ -779,7 +867,7 @@ export default function AdminLearnerInsightsPage() {
               <div className="learner-insights-filter-stats">
                 <StatCard label="Active Range" value={filterSummary} />
                 <StatCard label="Filtered Attempts" value={filteredAssessmentAttempts.length} />
-                <StatCard label="Range Usage" value={formatTrackedHours(selectedRangeTrackedSeconds)} />
+                <StatCard label="Range Usage" value={formatUsageTime(selectedRangeTrackedSeconds)} />
                 <StatCard label="Usage Sessions" value={siteUsage.totalSessions || 0} />
                 <StatCard label="Top Repeat Exam" value={examFrequency[0] ? `${examFrequency[0].attempts}x` : '0x'} />
               </div>
@@ -836,8 +924,8 @@ export default function AdminLearnerInsightsPage() {
                     <strong>{filteredMockExamAttempts.length}</strong>
                   </article>
                   <article className="learner-insights-mini-metric">
-                    <span>Tracked Hours</span>
-                    <strong>{formatTrackedHours(selectedRangeTrackedSeconds)}</strong>
+                    <span>Tracked Time</span>
+                    <strong>{formatUsageTime(selectedRangeTrackedSeconds)}</strong>
                   </article>
                   <article className="learner-insights-mini-metric">
                     <span>Top Quiz Retake</span>

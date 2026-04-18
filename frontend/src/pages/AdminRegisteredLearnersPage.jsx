@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { fetchAdminUsers } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
@@ -18,6 +18,7 @@ function formatJoinedDate(value) {
 
 export default function AdminRegisteredLearnersPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [learners, setLearners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -193,7 +194,9 @@ export default function AdminRegisteredLearnersPage() {
                       <button
                         type="button"
                         className="primary-btn"
-                        onClick={() => navigate(`/admin/registered-learners/${encodeURIComponent(learner.username || '')}`)}
+                        onClick={() => navigate(`/admin/registered-learners/${encodeURIComponent(learner.username || '')}`, {
+                          state: { from: `${location.pathname}${location.search}` }
+                        })}
                       >
                         Open Insights
                       </button>
@@ -228,7 +231,9 @@ export default function AdminRegisteredLearnersPage() {
                           <button
                             type="button"
                             className="secondary-btn registered-learners-open-btn"
-                            onClick={() => navigate(`/admin/registered-learners/${encodeURIComponent(learner.username || '')}`)}
+                            onClick={() => navigate(`/admin/registered-learners/${encodeURIComponent(learner.username || '')}`, {
+                              state: { from: `${location.pathname}${location.search}` }
+                            })}
                           >
                             Open Insights
                           </button>

@@ -6761,6 +6761,10 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   gap: 14px;
 }
 
+.learner-insights-page > * {
+  min-width: 0;
+}
+
 .learner-insights-hero {
   background:
     radial-gradient(480px 240px at 0% 0%, rgba(8, 145, 178, 0.18), transparent 62%),
@@ -6770,6 +6774,11 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 
 .learner-insights-hero-stats {
   width: 100%;
+}
+
+.learner-insights-hero .workspace-hero-stats {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
 }
 
 .learner-insights-hero-main {
@@ -6811,6 +6820,16 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   min-width: 0;
 }
 
+.learner-insights-avatar-meta h2,
+.learner-insights-avatar-meta .subtitle,
+.learner-insights-section-header h3,
+.learner-insights-section-header .subtitle,
+.learner-insights-frequency-head strong,
+.learner-insights-activity-head strong,
+.learner-insights-table-strong strong {
+  overflow-wrap: anywhere;
+}
+
 .learner-insights-meta-row {
   display: flex;
   flex-wrap: wrap;
@@ -6846,6 +6865,23 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 .learner-insights-contact-card strong,
 .learner-insights-mini-metric strong {
   overflow-wrap: anywhere;
+}
+
+.learner-insights-contact-card,
+.learner-insights-mini-metric,
+.learner-insights-frequency-item,
+.learner-insights-access-item,
+.learner-insights-voucher-card,
+.learner-insights-activity-item,
+.learner-insights-progress-card,
+.learner-insights-profile-card,
+.learner-insights-purchase-panel,
+.learner-insights-voucher-panel,
+.learner-insights-activity-panel,
+.learner-insights-filter-panel,
+.learner-insights-frequency-panel,
+.learner-insights-hours-panel {
+  min-width: 0;
 }
 
 .learner-insights-main-grid,
@@ -6921,6 +6957,40 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   background: color-mix(in srgb, #ffffff 3%, var(--bg-card));
   color: var(--text);
   padding: 0 12px;
+}
+
+.learner-insights-window-switcher {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #ffffff 14%, var(--line));
+  background: color-mix(in srgb, #ffffff 5%, var(--bg-card));
+}
+
+.learner-insights-window-chip {
+  border: 0;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.learner-insights-window-chip:hover {
+  color: var(--text);
+}
+
+.learner-insights-window-chip.is-active {
+  background: linear-gradient(135deg, #dcfce7 0%, #86efac 100%);
+  color: #14532d;
+  box-shadow: 0 10px 20px rgba(34, 197, 94, 0.18);
 }
 
 .learner-insights-filter-actions {
@@ -7002,12 +7072,60 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   margin-top: 12px;
 }
 
-.learner-insights-day-chart {
+.learner-insights-usage-chart-shell {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
-  gap: 10px;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+  align-items: stretch;
+}
+
+.learner-insights-usage-axis {
+  position: relative;
+  min-height: 248px;
+}
+
+.learner-insights-usage-axis-label {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.learner-insights-usage-plot {
+  position: relative;
+  min-height: 248px;
+  padding: 10px 0 0;
+  border-left: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  border-bottom: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  border-radius: 0 0 18px 18px;
+}
+
+.learner-insights-usage-grid {
+  position: absolute;
+  inset: 0 0 58px 0;
+  pointer-events: none;
+}
+
+.learner-insights-usage-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed color-mix(in srgb, #ffffff 10%, var(--line));
+}
+
+.learner-insights-day-chart {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 12px;
   align-items: end;
-  margin-top: 12px;
+  min-height: 248px;
+  padding: 0 6px 0 14px;
 }
 
 .learner-insights-day-column {
@@ -7015,33 +7133,100 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   gap: 8px;
   justify-items: center;
   text-align: center;
+  min-width: 0;
+}
+
+.learner-insights-usage-mobile-head {
+  display: none;
+}
+
+.learner-insights-usage-window-pill,
+.learner-insights-usage-peak-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.learner-insights-usage-window-pill {
+  background: color-mix(in srgb, #d9f99d 80%, #ffffff 20%);
+  color: #3f6212;
+}
+
+.learner-insights-usage-peak-note {
+  background: color-mix(in srgb, #ffffff 8%, var(--bg-card));
+  color: var(--text-soft);
+  border: 1px solid color-mix(in srgb, #ffffff 12%, var(--line));
 }
 
 .learner-insights-day-value,
 .learner-insights-day-column span,
 .learner-insights-day-column small {
   color: var(--text-soft);
+  overflow-wrap: anywhere;
 }
 
 .learner-insights-day-column strong {
   font-size: 0.92rem;
 }
 
+.learner-insights-day-label,
+.learner-insights-day-date,
+.learner-insights-day-status {
+  display: block;
+}
+
 .learner-insights-day-bar-track {
   width: 100%;
-  height: 168px;
+  height: 170px;
   display: flex;
   align-items: flex-end;
-  padding: 10px;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, color-mix(in srgb, #ffffff 4%, var(--bg-card)) 0%, var(--bg-card) 100%);
+  padding: 8px;
+  border-radius: 18px 18px 12px 12px;
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #ffffff 5%, var(--bg-card)) 0%, color-mix(in srgb, #0f766e 4%, var(--bg-card)) 100%),
+    radial-gradient(90px 120px at 50% 0%, rgba(45, 212, 191, 0.08), transparent 78%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .learner-insights-day-bar-fill {
   width: 100%;
   border-radius: 14px 14px 10px 10px;
-  background: linear-gradient(180deg, #2dd4bf 0%, #0f766e 100%);
+  background: linear-gradient(180deg, #67e8f9 0%, #2dd4bf 32%, #0f766e 100%);
+  box-shadow: 0 10px 22px rgba(13, 148, 136, 0.28);
+}
+
+.learner-insights-day-column.is-peak .learner-insights-day-bar-track {
+  border-color: rgba(132, 204, 22, 0.28);
+  background:
+    linear-gradient(180deg, rgba(236, 253, 245, 0.98) 0%, rgba(240, 253, 244, 0.92) 100%),
+    radial-gradient(120px 140px at 50% 0%, rgba(163, 230, 53, 0.16), transparent 78%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 14px 24px rgba(132, 204, 22, 0.12);
+}
+
+.learner-insights-day-column.is-peak .learner-insights-day-bar-fill {
+  background: linear-gradient(180deg, #bef264 0%, #84cc16 55%, #65a30d 100%);
+  box-shadow: 0 14px 26px rgba(101, 163, 13, 0.28);
+}
+
+.learner-insights-day-value.is-peak {
+  color: #65a30d;
+  font-weight: 800;
+}
+
+.learner-insights-usage-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  flex-wrap: wrap;
 }
 
 .learner-insights-frequency-list {
@@ -7238,6 +7423,13 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 .learner-insights-history-table th,
 .learner-insights-history-table td {
   white-space: nowrap;
+}
+
+.learner-insights-history-table td strong,
+.learner-insights-history-table td,
+.learner-insights-collapsible-table td,
+.learner-insights-collapsible-table th {
+  overflow-wrap: anywhere;
 }
 
 .learner-insights-table-strong {
@@ -7646,11 +7838,35 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 }
 
 @media (max-width: 720px) {
+  .learner-insights-page {
+    gap: 12px;
+  }
+
+  .learner-insights-hero,
+  .learner-insights-progress-card,
+  .learner-insights-profile-card,
+  .learner-insights-purchase-panel,
+  .learner-insights-voucher-panel,
+  .learner-insights-activity-panel,
+  .learner-insights-filter-panel,
+  .learner-insights-frequency-panel,
+  .learner-insights-hours-panel {
+    padding: 14px;
+  }
+
   .registered-learners-topbar-actions,
   .registered-learners-search-row,
   .registered-learners-pagination {
-    grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .registered-learners-topbar-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .registered-learners-search-row,
+  .registered-learners-pagination {
+    grid-template-columns: 1fr;
   }
 
   .registered-learners-topbar-actions .secondary-btn,
@@ -7684,8 +7900,95 @@ html[data-theme='dark'] .course-manager-card .course-tile {
     grid-template-columns: 1fr;
   }
 
+  .learner-insights-hours-panel .learner-insights-section-header {
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .learner-insights-hours-panel .learner-insights-section-header .stat-card {
+    width: 100%;
+  }
+
   .learner-insights-day-chart {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 4px 0 10px;
+  }
+
+  .learner-insights-usage-chart-shell {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .learner-insights-usage-axis,
+  .learner-insights-usage-plot,
+  .learner-insights-day-chart {
+    min-height: 190px;
+  }
+
+  .learner-insights-day-bar-track {
+    height: 116px;
+    padding: 4px;
+    border-radius: 12px 12px 8px 8px;
+  }
+
+  .learner-insights-day-column {
+    gap: 5px;
+  }
+
+  .learner-insights-day-column strong {
+    font-size: 0.76rem;
+  }
+
+  .learner-insights-day-value {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  .learner-insights-usage-axis-label {
+    font-size: 0.6rem;
+  }
+
+  .learner-insights-usage-footer {
+    font-size: 0.74rem;
+    display: none;
+  }
+
+  .learner-insights-mini-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .learner-insights-hero .workspace-hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .learner-insights-filter-grid input,
+  .learner-insights-filter-grid select,
+  .learner-insights-filter-actions .secondary-btn,
+  .registered-learners-topbar-actions .secondary-btn,
+  .registered-learners-topbar-actions .workspace-refresh-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .learner-insights-frequency-item,
+  .learner-insights-activity-item,
+  .learner-insights-voucher-card,
+  .learner-insights-access-item {
+    padding: 12px;
+  }
+
+  .learner-insights-history-table th,
+  .learner-insights-history-table td {
+    white-space: normal;
+    min-width: 0;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .learner-insights-history-details summary,
+  .learner-insights-collapsible-table summary {
+    line-height: 1.4;
   }
 
   .learner-insights-avatar-image,
@@ -7709,6 +8012,73 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 
   .storage-monitor-page {
     gap: 12px;
+  }
+
+  .learner-insights-window-switcher {
+    gap: 6px;
+    justify-content: space-between;
+    border-radius: 22px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(244, 255, 225, 0.92) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 10px 24px rgba(132, 204, 22, 0.1);
+  }
+
+  .learner-insights-window-chip {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 0.76rem;
+  }
+
+  .learner-insights-hours-panel {
+    background: linear-gradient(135deg, rgba(248, 255, 235, 0.98) 0%, rgba(255, 255, 255, 0.98) 68%, rgba(241, 255, 218, 0.98) 100%);
+    border-color: rgba(163, 230, 53, 0.22);
+    box-shadow: 0 18px 34px rgba(163, 230, 53, 0.09);
+  }
+
+  .learner-insights-hours-panel .eyebrow,
+  .learner-insights-hours-panel h3 {
+    color: #365314;
+  }
+
+  .learner-insights-usage-mobile-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  .learner-insights-usage-chart-shell {
+    margin-top: 12px;
+    padding: 14px 10px 10px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(249, 255, 239, 0.96) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .learner-insights-usage-axis-label {
+    color: #7c8b6b;
+  }
+
+  .learner-insights-usage-plot {
+    border-left-color: rgba(132, 204, 22, 0.22);
+    border-bottom-color: rgba(132, 204, 22, 0.22);
+  }
+
+  .learner-insights-usage-grid-line {
+    border-top-color: rgba(132, 204, 22, 0.14);
+  }
+
+  .learner-insights-day-column strong,
+  .learner-insights-day-column span,
+  .learner-insights-day-column small {
+    color: #5f6f52;
+  }
+
+  .learner-insights-day-date,
+  .learner-insights-day-status {
+    display: none;
   }
 
   .storage-monitor-topbar-actions {
@@ -7811,6 +8181,145 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 }
 
 @media (max-width: 560px) {
+  .learner-insights-hero .workspace-hero-stats,
+  .learner-insights-mini-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-insights-usage-chart-shell {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .learner-insights-window-switcher {
+    padding: 5px;
+  }
+
+  .learner-insights-window-chip {
+    min-height: 34px;
+    font-size: 0.72rem;
+  }
+
+  .learner-insights-usage-axis,
+  .learner-insights-usage-plot,
+  .learner-insights-day-chart {
+    min-height: 172px;
+  }
+
+  .learner-insights-day-chart {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    padding: 0 2px 0 8px;
+  }
+
+  .learner-insights-avatar-block {
+    gap: 10px;
+  }
+
+  .learner-insights-avatar-image,
+  .learner-insights-avatar-fallback {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+  }
+
+  .learner-insights-avatar-fallback {
+    font-size: 1.4rem;
+  }
+
+  .learner-insights-avatar-meta h2 {
+    font-size: clamp(1.22rem, 5.4vw, 1.5rem);
+  }
+
+  .learner-insights-avatar-meta .subtitle,
+  .learner-insights-section-header .subtitle,
+  .learner-insights-frequency-head p,
+  .learner-insights-frequency-meta span,
+  .learner-insights-activity-meta span,
+  .learner-insights-activity-head p,
+  .learner-insights-profile-grid span,
+  .learner-insights-purchase-meta span,
+  .learner-insights-voucher-meta span,
+  .learner-insights-access-item span {
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
+  .learner-insights-hours-panel .subtitle,
+  .learner-insights-usage-peak-note {
+    display: none;
+  }
+
+  .learner-insights-hero,
+  .learner-insights-progress-card,
+  .learner-insights-profile-card,
+  .learner-insights-purchase-panel,
+  .learner-insights-voucher-panel,
+  .learner-insights-activity-panel,
+  .learner-insights-filter-panel,
+  .learner-insights-frequency-panel,
+  .learner-insights-hours-panel {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .learner-insights-day-bar-track {
+    height: 96px;
+    border-radius: 14px;
+  }
+
+  .learner-insights-usage-axis-label {
+    font-size: 0.56rem;
+  }
+
+  .learner-insights-usage-footer {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .learner-insights-usage-mobile-head {
+    align-items: flex-start;
+  }
+
+  .learner-insights-usage-window-pill,
+  .learner-insights-usage-peak-note {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 0.7rem;
+  }
+
+  .learner-insights-day-column {
+    gap: 4px;
+  }
+
+  .learner-insights-day-column strong {
+    font-size: 0.68rem;
+    line-height: 1;
+  }
+
+  .learner-insights-day-value {
+    font-size: 0.66rem;
+  }
+
+  .learner-insights-frequency-track,
+  .learner-insights-bar-track {
+    height: 10px;
+  }
+
+  .learner-insights-filter-stats {
+    margin-top: 12px;
+  }
+
+  .learner-insights-history-table-wrap {
+    padding: 0 8px 8px;
+  }
+
+  .learner-insights-history-table th,
+  .learner-insights-history-table td {
+    font-size: 0.78rem;
+    padding: 8px 6px;
+  }
+
   .registered-learners-mobile-list {
     display: grid;
     gap: 10px;
@@ -7902,6 +8411,66 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 }
 
 @media (max-width: 400px) {
+  .registered-learners-topbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-insights-meta-row {
+    gap: 6px;
+  }
+
+  .learner-insights-day-bar-track {
+    height: 84px;
+  }
+
+  .learner-insights-window-chip {
+    font-size: 0.68rem;
+    padding: 0 8px;
+  }
+
+  .learner-insights-usage-chart-shell {
+    grid-template-columns: 24px minmax(0, 1fr);
+    padding: 12px 8px 8px;
+  }
+
+  .learner-insights-day-chart {
+    gap: 4px;
+    padding-left: 6px;
+  }
+
+  .learner-insights-day-column strong {
+    font-size: 0.62rem;
+  }
+
+  .learner-insights-day-value {
+    font-size: 0.58rem;
+  }
+
+  .learner-insights-usage-axis-label {
+    font-size: 0.5rem;
+  }
+
+  .learner-insights-usage-axis,
+  .learner-insights-usage-plot,
+  .learner-insights-day-chart {
+    min-height: 168px;
+  }
+
+  .learner-insights-frequency-item,
+  .learner-insights-activity-item,
+  .learner-insights-voucher-card,
+  .learner-insights-access-item,
+  .learner-insights-contact-card,
+  .learner-insights-mini-metric {
+    padding: 10px;
+  }
+
+  .learner-insights-score-pill {
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 0.8rem;
+  }
+
   .registered-learners-mobile-grid {
     grid-template-columns: 1fr;
   }
