@@ -437,6 +437,35 @@ export function fetchAuditLogsAdmin(params = {}) {
   return requestJson(`/auth/admin/audit-logs${qs.toString() ? '?' + qs.toString() : ''}`);
 }
 
+export function fetchAdminUsers(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+  if (params.search) qs.set('search', params.search);
+  return requestJson(`/auth/users${qs.toString() ? `?${qs.toString()}` : ''}`);
+}
+
+export function fetchAdminUserInsights(username) {
+  return requestJson(`/auth/users/${encodeURIComponent(username)}/insights`);
+}
+
+export async function postSessionActivity(payload, options = {}) {
+  const token = options.tokenOverride || getToken();
+  if (!token) return null;
+
+  const response = await fetch(buildUrl('/auth/activity/session'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload),
+    keepalive: Boolean(options.keepalive)
+  });
+
+  return parseJsonResponse(response);
+}
+
 export function fetchRecoveryActionsAdmin(params = {}) {
   const qs = new URLSearchParams();
   qs.set('limit', String(params.limit || 30));

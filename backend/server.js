@@ -129,6 +129,13 @@ const authLimiter = rateLimit({
   message: { error: 'Too many auth requests. Try again later.' }
 });
 
+function authLimiterMiddleware(req, res, next) {
+  if (req.path.startsWith('/activity/session')) {
+    return next();
+  }
+  return authLimiter(req, res, next);
+}
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
@@ -151,7 +158,7 @@ app.use(cors({ origin: corsOrigin }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.json());
 app.use('/videos', videoRoutes);
-app.use('/auth', authLimiter, authRoutes);
+app.use('/auth', authLimiterMiddleware, authRoutes);
 app.use('/feedback', feedbackRoutes);
 app.use('/quizzes', quizRoutes);
 app.use('/live', liveClassRoutes);

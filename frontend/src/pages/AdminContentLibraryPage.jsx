@@ -23,6 +23,20 @@ function getInitialCourse(search) {
   return COURSE_CATEGORIES.includes(raw) ? raw : 'All';
 }
 
+function normalizeLibraryLabel(value, fallback) {
+  const text = String(value || '').trim();
+  return text || fallback;
+}
+
+function sortLibraryLabels(a, b) {
+  const first = String(a || '').trim().toLowerCase();
+  const second = String(b || '').trim().toLowerCase();
+  if (first === second) return 0;
+  if (first.includes('general')) return 1;
+  if (second.includes('general')) return -1;
+  return first.localeCompare(second);
+}
+
 export default function AdminContentLibraryPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,6 +50,8 @@ export default function AdminContentLibraryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [moduleInput, setModuleInput] = useState('');
   const [moduleQuery, setModuleQuery] = useState('');
+  const [topicInput, setTopicInput] = useState('');
+  const [topicQuery, setTopicQuery] = useState('');
   const [uploadFiles, setUploadFiles] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
   const [materialMessages, setMaterialMessages] = useState({});
@@ -110,6 +126,7 @@ export default function AdminContentLibraryPage() {
   function applySearch() {
     setSearchQuery(String(searchInput || '').trim().toLowerCase());
     setModuleQuery(String(moduleInput || '').trim().toLowerCase());
+    setTopicQuery(String(topicInput || '').trim().toLowerCase());
   }
 
   function clearSearch() {
@@ -117,6 +134,8 @@ export default function AdminContentLibraryPage() {
     setSearchQuery('');
     setModuleInput('');
     setModuleQuery('');
+    setTopicInput('');
+    setTopicQuery('');
   }
 
   function handleCourseChange(nextCourse) {
@@ -219,11 +238,60 @@ export default function AdminContentLibraryPage() {
 
       const title = String(video.title || '').toLowerCase();
       const moduleName = String(video.module || 'General').toLowerCase();
+      const topicName = String(video.topic || 'General').toLowerCase();
       const matchesTitle = !searchQuery || title.includes(searchQuery);
       const matchesModule = !moduleQuery || moduleName.includes(moduleQuery);
-      return matchesTitle && matchesModule;
+      const matchesTopic = !topicQuery || topicName.includes(topicQuery);
+      return matchesTitle && matchesModule && matchesTopic;
     });
-  }, [videos, activeCourse, searchQuery, moduleQuery]);
+  }, [videos, activeCourse, searchQuery, moduleQuery, topicQuery]);
+
+  const groupedVideos = useMemo(() => {
+    const moduleMap = new Map();
+
+    filteredVideos.forEach((video) => {
+      const moduleName = normalizeLibraryLabel(video.module, 'General Module');
+      const topicName = normalizeLibraryLabel(video.topic, 'General Topic');
+      const existingModule = moduleMap.get(moduleName) || {
+        name: moduleName,
+        videos: [],
+        topicMap: new Map(),
+        materialCount: 0
+      };
+
+      existingModule.videos.push(video);
+      existingModule.materialCount += Array.isArray(video.materials) ? video.materials.length : 0;
+
+      const existingTopic = existingModule.topicMap.get(topicName) || {
+        name: topicName,
+        videos: []
+      };
+
+      existingTopic.videos.push(video);
+      existingModule.topicMap.set(topicName, existingTopic);
+      moduleMap.set(moduleName, existingModule);
+    });
+
+    return Array.from(moduleMap.values())
+      .map((entry) => ({
+        name: entry.name,
+        videos: entry.videos.sort((left, right) => String(left.title || '').localeCompare(String(right.title || ''))),
+        materialCount: entry.materialCount,
+        topics: Array.from(entry.topicMap.values())
+          .map((topicEntry) => ({
+            name: topicEntry.name,
+            videos: topicEntry.videos.sort((left, right) => String(left.title || '').localeCompare(String(right.title || '')))
+          }))
+          .sort((left, right) => sortLibraryLabels(left.name, right.name))
+      }))
+      .sort((left, right) => sortLibraryLabels(left.name, right.name));
+  }, [filteredVideos]);
+
+  const topicCount = useMemo(() => groupedVideos.reduce((sum, moduleEntry) => sum + moduleEntry.topics.length, 0), [groupedVideos]);
+  const materialCount = useMemo(
+    () => filteredVideos.reduce((sum, video) => sum + (Array.isArray(video.materials) ? video.materials.length : 0), 0),
+    [filteredVideos]
+  );
 
   return (
     <AppShell
@@ -246,11 +314,13 @@ export default function AdminContentLibraryPage() {
           <div>
             <p className="eyebrow">Uploaded Video Content</p>
             <h2>{activeCourse === 'All' ? 'All Uploaded Lectures' : `${activeCourse} Uploaded Lectures`}</h2>
-            <p className="subtitle">Clean mobile-friendly page with course filter, search and lecture management.</p>
+            <p className="subtitle">Clean module-wise and topic-wise workspace for reviewing uploaded lectures, PDFs and content structure.</p>
           </div>
           <div className="admin-content-stats">
-            <StatCard label="Total" value={filteredVideos.length} />
-            <StatCard label="Courses" value={COURSE_CATEGORIES.filter((course) => videos.some((v) => (v.category || 'General') === course)).length} />
+            <StatCard label="Lectures" value={filteredVideos.length} />
+            <StatCard label="Modules" value={groupedVideos.length} />
+            <StatCard label="Topics" value={topicCount} />
+            <StatCard label="Materials" value={materialCount} />
           </div>
         </header>
 
@@ -297,23 +367,62 @@ export default function AdminContentLibraryPage() {
                 }
               }}
             />
+            <input
+              type="text"
+              className="library-search-input"
+              placeholder="Filter by topic"
+              value={topicInput}
+              onChange={(event) => setTopicInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  applySearch();
+                }
+              }}
+            />
             <button type="button" className="primary-btn" onClick={applySearch}>Search</button>
             <button
               type="button"
               className="secondary-btn"
               onClick={clearSearch}
-              disabled={!searchInput && !searchQuery && !moduleInput && !moduleQuery}
+              disabled={!searchInput && !searchQuery && !moduleInput && !moduleQuery && !topicInput && !topicQuery}
             >
               Clear
             </button>
           </div>
         </section>
 
+        {!loading && groupedVideos.length ? (
+          <section className="card library-structure-overview">
+            <div className="section-header content-library-focused-head" style={{ marginTop: 0 }}>
+              <div>
+                <p className="eyebrow">Structure Overview</p>
+                <h2>Modules and topics at a glance</h2>
+                <p className="subtitle">Each module block below opens into topic-wise lecture collections with lecture and material counts.</p>
+              </div>
+            </div>
+            <div className="library-structure-grid">
+              {groupedVideos.map((moduleEntry) => (
+                <article key={`summary-${moduleEntry.name}`} className="library-structure-card">
+                  <p className="eyebrow">Module</p>
+                  <h3>{moduleEntry.name}</h3>
+                  <div className="library-structure-stats">
+                    <span>{moduleEntry.videos.length} {moduleEntry.videos.length === 1 ? 'lecture' : 'lectures'}</span>
+                    <span>{moduleEntry.topics.length} {moduleEntry.topics.length === 1 ? 'topic' : 'topics'}</span>
+                    <span>{moduleEntry.materialCount} {moduleEntry.materialCount === 1 ? 'PDF' : 'PDFs'}</span>
+                  </div>
+                  <p className="library-structure-topics">{moduleEntry.topics.map((topicEntry) => topicEntry.name).join(' • ')}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <section className="admin-content-results">
           {loading ? <p className="empty-state">Loading uploaded lectures...</p> : null}
           {!loading && !filteredVideos.length ? (
             <p className="empty-state">
-              {searchQuery || moduleQuery
+              {searchQuery || moduleQuery || topicQuery
                 ? 'No lectures found for the selected filters.'
                 : activeCourse === 'All'
                   ? 'No lectures uploaded yet.'
@@ -321,22 +430,55 @@ export default function AdminContentLibraryPage() {
             </p>
           ) : null}
 
-          <div className="video-grid">
-            {filteredVideos.map((video) => (
-              <VideoCard
-                key={video._id}
-                video={video}
-                adminMode
-                selectedFile={uploadFiles[video._id]}
-                uploadProgress={uploadProgress[video._id]}
-                materialMessage={materialMessages[video._id]}
-                onFileSelect={(videoId, file) => setUploadFiles((current) => ({ ...current, [videoId]: file }))}
-                onUploadMaterial={handleUploadMaterial}
-                onRemoveMaterial={handleRemoveMaterial}
-                onDeleteVideo={handleDeleteVideo}
-                disableDangerActions={false}
-                undoItems={{}}
-              />
+          <div className="library-module-sections">
+            {groupedVideos.map((moduleEntry) => (
+              <article key={`module-${moduleEntry.name}`} className="card library-module-section">
+                <div className="library-module-header">
+                  <div>
+                    <p className="eyebrow">Module</p>
+                    <h3>{moduleEntry.name}</h3>
+                    <p className="subtitle">{moduleEntry.topics.length} {moduleEntry.topics.length === 1 ? 'topic section' : 'topic sections'} inside this module.</p>
+                  </div>
+                  <div className="library-module-meta">
+                    <span className="library-module-pill">{moduleEntry.videos.length} lectures</span>
+                    <span className="library-module-pill">{moduleEntry.materialCount} PDFs</span>
+                  </div>
+                </div>
+
+                <div className="library-topic-grid">
+                  {moduleEntry.topics.map((topicEntry) => (
+                    <section key={`topic-${moduleEntry.name}-${topicEntry.name}`} className="library-topic-card">
+                      <div className="library-topic-header">
+                        <div>
+                          <p className="eyebrow">Topic</p>
+                          <h4>{topicEntry.name}</h4>
+                          <p className="library-topic-description">Lectures grouped under this topic are shown below for quick admin review.</p>
+                        </div>
+                        <span className="library-topic-stat">{topicEntry.videos.length} {topicEntry.videos.length === 1 ? 'lecture' : 'lectures'}</span>
+                      </div>
+
+                      <div className="video-grid library-video-grid">
+                        {topicEntry.videos.map((video) => (
+                          <VideoCard
+                            key={video._id}
+                            video={video}
+                            adminMode
+                            selectedFile={uploadFiles[video._id]}
+                            uploadProgress={uploadProgress[video._id]}
+                            materialMessage={materialMessages[video._id]}
+                            onFileSelect={(videoId, file) => setUploadFiles((current) => ({ ...current, [videoId]: file }))}
+                            onUploadMaterial={handleUploadMaterial}
+                            onRemoveMaterial={handleRemoveMaterial}
+                            onDeleteVideo={handleDeleteVideo}
+                            disableDangerActions={false}
+                            undoItems={{}}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </article>
             ))}
           </div>
         </section>

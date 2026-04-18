@@ -2289,7 +2289,6 @@ export default function AdminDashboard() {
     { id: 'section-announcements', label: 'Announcements', icon: '📢' },
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
-    { id: 'section-quiz-analytics', label: 'Quiz Analytics', icon: '🏆' },
     { id: 'section-storage-monitor', label: 'Storage', icon: '💾' },
     { id: 'section-audit-log', label: 'Audit Log', icon: '🛡️' },
     { id: 'section-recovery-center', label: 'Recovery', icon: '♻️' },
@@ -2614,8 +2613,13 @@ export default function AdminDashboard() {
 
         <div className="admin-after-community-grid">
           <section id="section-course-manager" className="card compose-card course-manager-card">
-            <h2>Course categories</h2>
-            <p className="subtitle">Tap a course to add lectures &amp; notes.</p>
+            <div className="section-header" style={{ marginTop: 0 }}>
+              <div>
+                <h2>Course categories</h2>
+                <p className="subtitle">Tap a course to add lectures &amp; notes.</p>
+              </div>
+              <StatCard label="Total Courses" value={COURSE_CATEGORIES.length} />
+            </div>
             <div className="course-grid">
               {COURSE_CATEGORIES.map((course) => {
                 const meta = COURSE_META[course] || { icon: '\ud83d\udcda', color: '#6b7280' };
@@ -2643,133 +2647,53 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          <section id="section-registered-users" className="card table-card registered-learners-card">
-            <div className="section-header" style={{ marginTop: 0 }}>
-              <div>
-                <p className="eyebrow">Students</p>
-                <h2>Registered learners</h2>
+          <div className="admin-after-community-side-grid">
+            <section id="section-registered-users" className="card analytics-card workspace-launch-card registered-learners-launch-card">
+              <div className="section-header" style={{ marginTop: 0 }}>
+                <div>
+                  <p className="eyebrow">Students</p>
+                  <h2>Open Registered Learners</h2>
+                  <p className="subtitle">Use the dedicated learner page for cleaner formatting, search, pagination and a readable admin table.</p>
+                </div>
+                <StatCard label="Total Students" value={students.length} />
               </div>
-              <StatCard label="Total Students" value={students.length} />
-            </div>
-            {activeUserUndoEntry ? (
-              <div className="section-undo-alert" role="status" aria-live="polite">
-                <span className="undo-message">
-                  {Math.ceil(Math.max(0, activeUserUndoEntry[1].remainingMs || 0) / 1000)}s - {activeUserUndoEntry[1].message}
-                </span>
-                <button type="button" className="secondary-btn undo-btn" onClick={() => handleUndoAction(activeUserUndoEntry[0])}>
-                  Undo
+              <div className="workspace-quick-chips" aria-label="Learner quick insights">
+                <span className="workspace-quick-chip">Dedicated learner directory</span>
+                <span className="workspace-quick-chip">Search and pagination</span>
+                <span className="workspace-quick-chip">Readable admin table</span>
+              </div>
+              <div className="workspace-link-actions">
+                <button type="button" className="primary-btn" onClick={() => navigate('/admin/registered-learners')}>
+                  Open Registered Learners
                 </button>
               </div>
-            ) : null}
-            <div className="student-cards-scroll">
-              <div className="student-cards-grid">
-                {students.length ? students.map((student) => {
-                  const initial = (student.username || '?')[0].toUpperCase();
-                  const undoItem = undoItems[`user-${student.username}`];
-                  return (
-                    <div key={`${student.username}-${student.phone}`} className="student-card">
-                      <div className="student-card-avatar">{initial}</div>
-                      <div className="student-card-info">
-                        <span className="student-card-name">{student.username}</span>
-                        <div className="student-card-meta">
-                          {student.class ? <span className="student-course-badge">{student.class}</span> : null}
-                          {student.city ? <span className="student-city">📍 {student.city}</span> : null}
-                        </div>
-                        {student.phone ? <span className="student-card-phone">📞 {student.phone}</span> : null}
-                        {student.email ? <span className="student-card-email">✉️ {student.email}</span> : null}
-                      </div>
-                      {undoItem ? (
-                        <div className="student-card-undo">
-                          <span className="undo-timer">{undoItem.remainingMs > 0 ? Math.ceil(undoItem.remainingMs / 1000) : '0'}s</span>
-                          <button
-                            type="button"
-                            className="secondary-btn undo-btn"
-                            onClick={() => handleUndoAction(`user-${student.username}`)}
-                            aria-label={`Undo removal of ${student.username}`}
-                            title="Undo removal"
-                          >
-                            Undo
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="student-remove-btn"
-                          onClick={() => handleRemoveUser(student.username)}
-                          disabled={Object.keys(undoItems).length > 0}
-                          aria-label={`Remove ${student.username}`}
-                          title="Remove user"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  );
-                }) : (
-                  <p className="empty-state">No students registered yet.</p>
-                )}
+            </section>
+
+            <section id="section-content-library" className="card analytics-card workspace-launch-card content-library-launch-card">
+              <div className="section-header" style={{ marginTop: 0 }}>
+                <div>
+                  <p className="eyebrow">Content Library</p>
+                  <h2>Open Uploaded Content Library</h2>
+                  <p className="subtitle">Open a focused admin page where uploaded lectures are arranged module-wise and topic-wise with better formatting.</p>
+                </div>
+                <StatCard label="Total Lectures" value={videos.length} />
               </div>
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <section id="section-content-library" className="card content-library-card is-overview">
-        <div className="section-header content-library-header">
-          <div>
-            <p className="eyebrow">Content Library</p>
-            <h2>Uploaded lectures</h2>
-            <p className="subtitle">Choose a course and open uploaded contents in a dedicated page view.</p>
+              <div className="workspace-quick-chips" aria-label="Content library quick insights">
+                <span className="workspace-quick-chip">Module-wise sections</span>
+                <span className="workspace-quick-chip">Topic-wise grouping</span>
+                <span className="workspace-quick-chip">Search and filters</span>
+              </div>
+              <div className="content-library-launch-metrics">
+                <StatCard label="Courses With Content" value={COURSE_CATEGORIES.filter((course) => videos.some((v) => (v.category || 'General') === course)).length} />
+                <StatCard label="Modules" value={Array.from(new Set(videos.map((video) => String(video.module || 'General')))).length} />
+              </div>
+              <div className="workspace-link-actions">
+                <button type="button" className="primary-btn" onClick={() => openLibraryCourseView('All')}>
+                  Open Content Library
+                </button>
+              </div>
+            </section>
           </div>
-          <div className="quiz-count-cards">
-            <StatCard label="Total Lectures" value={videos.length} />
-            <StatCard label="Courses With Content" value={COURSE_CATEGORIES.filter((course) => videos.some((v) => (v.category || 'General') === course)).length} />
-          </div>
-        </div>
-
-        <div className="library-course-selector" role="list" aria-label="Select course to open uploaded contents">
-          {COURSE_CATEGORIES.map((course) => {
-            const meta = COURSE_META[course] || { icon: '📚', color: '#6b7280' };
-            const lectureCount = videos.filter((video) => (video.category || 'General') === course).length;
-            const moduleCount = Array.from(new Set(videos
-              .filter((video) => (video.category || 'General') === course)
-              .map((video) => String(video.module || 'General')))).length;
-
-            return (
-              <button
-                key={`library-${course}`}
-                type="button"
-                className="course-tile library-course-tile"
-                style={{ '--tile-accent': meta.color }}
-                onClick={() => openLibraryCourseView(course)}
-                role="listitem"
-              >
-                <span className="course-tile-icon">{meta.icon}</span>
-                <span className="course-tile-body">
-                  <span className="course-tile-label">{course}</span>
-                  <span className="course-tile-count">
-                    {moduleCount} {moduleCount === 1 ? 'module' : 'modules'} · {lectureCount} {lectureCount === 1 ? 'lecture' : 'lectures'}
-                  </span>
-                </span>
-                <span className="course-tile-plus" aria-hidden="true">→</span>
-              </button>
-            );
-          })}
-
-          <button
-            type="button"
-            className="course-tile library-course-tile library-course-all"
-            style={{ '--tile-accent': '#6366f1' }}
-            onClick={() => openLibraryCourseView('All')}
-            role="listitem"
-          >
-            <span className="course-tile-icon">🎬</span>
-            <span className="course-tile-body">
-              <span className="course-tile-label">All Uploaded Contents</span>
-              <span className="course-tile-count">Browse all courses in one list</span>
-            </span>
-            <span className="course-tile-plus" aria-hidden="true">→</span>
-          </button>
         </div>
       </section>
 
@@ -2913,71 +2837,6 @@ export default function AdminDashboard() {
           <button type="button" className="primary-btn" onClick={() => navigate('/admin/storage-monitor')}>
             Open Storage Monitor
           </button>
-        </div>
-      </section>
-
-      <section id="section-quiz-analytics" className="card analytics-card">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Performance Insights</p>
-            <h2>🏆 Quiz Analytics</h2>
-          </div>
-          <StatCard label="Total Quizzes Tracked" value={quizAnalytics.length} />
-        </div>
-
-        <div className="analytics-filters">
-          <select
-            className="analytics-filter-select"
-            value={quizAnalyticsCategory}
-            onChange={(e) => setQuizAnalyticsCategory(e.target.value)}
-          >
-            <option value="">All Courses</option>
-            {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <button
-            className="primary-btn"
-            type="button"
-            onClick={() => loadQuizAnalytics(quizAnalyticsCategory)}
-            disabled={quizAnalyticsLoading}
-          >
-            {quizAnalyticsLoading ? 'Loading...' : 'Load Analytics'}
-          </button>
-        </div>
-
-        <div className="analytics-section-scroll">
-          {quizAnalytics.length === 0 && !quizAnalyticsLoading ? (
-            <p className="empty-note">Click Load Analytics to view quiz performance data.</p>
-          ) : (
-            <div className="analytics-cards-grid">
-              {quizAnalytics.map((q) => (
-                <div key={String(q.quizId)} className="quiz-stat-card">
-                  <div className="quiz-stat-card-header">
-                    <span className={`difficulty-badge diff-${q.difficulty}`}>{q.difficulty}</span>
-                    <span className="quiz-stat-module">{q.module} · {q.category}</span>
-                  </div>
-                  <h4 className="quiz-stat-title">{q.title}</h4>
-                  <div className="quiz-stat-metrics">
-                    <div className="quiz-stat-metric">
-                      <span className="metric-value">{q.totalAttempts}</span>
-                      <span className="metric-label">Attempts</span>
-                    </div>
-                    <div className="quiz-stat-metric">
-                      <span className="metric-value">{q.avgScore}</span>
-                      <span className="metric-label">Avg Score</span>
-                    </div>
-                    <div className="quiz-stat-metric">
-                      <span className={`metric-value ${Number(q.passRate) >= 60 ? 'metric-pass' : 'metric-fail'}`}>{q.passRate}%</span>
-                      <span className="metric-label">Pass Rate</span>
-                    </div>
-                  </div>
-                  <div className="quiz-stat-bar-wrap">
-                    <div className="quiz-stat-bar" style={{ width: `${Math.min(100, Number(q.avgPct))}%` }} />
-                    <span className="quiz-stat-bar-label">{q.avgPct}% avg</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 

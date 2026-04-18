@@ -10,6 +10,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminMockExamPage from './pages/AdminMockExamPage';
 import AdminPricingWorkspacePage from './pages/AdminPricingWorkspacePage';
 import AdminQuizBuilderPage from './pages/AdminQuizBuilderPage';
+import AdminLearnerInsightsPage from './pages/AdminLearnerInsightsPage';
+import AdminRegisteredLearnersPage from './pages/AdminRegisteredLearnersPage';
 import AdminRecoveryCenterPage from './pages/AdminRecoveryCenterPage';
 import AdminRevenueTrackingPage from './pages/AdminRevenueTrackingPage';
 import AdminStorageMonitorPage from './pages/AdminStorageMonitorPage';
@@ -18,6 +20,7 @@ import AdminTestSeriesHubPage from './pages/AdminTestSeriesHubPage';
 import AdminTopicTestBuilderPage from './pages/AdminTopicTestBuilderPage';
 import AdminTopicTestCatalogPage from './pages/AdminTopicTestCatalogPage';
 import AdminFullMockTestBuilderPage from './pages/AdminFullMockTestBuilderPage';
+import SessionActivityTracker from './components/SessionActivityTracker';
 import AuthPage from './pages/AuthPage';
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -51,6 +54,7 @@ function ScrollToTop() {
 export default function App() {
   return (
     <ErrorBoundary>
+    <SessionActivityTracker />
     <ScrollToTop />
     <Routes>
       <Route path="/" element={<Suspense fallback={null}><LandingPage /></Suspense>} />
@@ -134,6 +138,22 @@ export default function App() {
         element={(
           <ProtectedRoute role="admin">
             <AdminRevenueTrackingPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/registered-learners"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminRegisteredLearnersPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/registered-learners/:username"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminLearnerInsightsPage />
           </ProtectedRoute>
         )}
       />

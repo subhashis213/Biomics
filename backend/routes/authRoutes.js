@@ -15,6 +15,14 @@ const LoginOtp = require('../models/LoginOtp');
 const AuditLog = require('../models/AuditLog');
 const Video = require('../models/Video');
 const Quiz = require('../models/Quiz');
+const Payment = require('../models/Payment');
+const TestSeriesPayment = require('../models/TestSeriesPayment');
+const QuizAttempt = require('../models/QuizAttempt');
+const TopicTestAttempt = require('../models/TopicTestAttempt');
+const FullMockAttempt = require('../models/FullMockAttempt');
+const MockExamAttempt = require('../models/MockExamAttempt');
+const MockExam = require('../models/MockExam');
+const UserActivitySession = require('../models/UserActivitySession');
 const Voucher = require('../models/Voucher');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken, JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
@@ -26,6 +34,7 @@ const OTP_COOLDOWN_SECONDS = Number(process.env.OTP_COOLDOWN_SECONDS || 45);
 const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
 const RECOVERY_RETENTION_DAYS = 15;
 const RECOVERY_RETENTION_MS = RECOVERY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const ACTIVITY_SESSION_MAX_GAP_MS = Math.max(15, Number(process.env.ACTIVITY_SESSION_MAX_GAP_SECONDS || 90)) * 1000;
 const uploadsDir = path.join(__dirname, '../uploads');
 
 const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
@@ -171,6 +180,248 @@ function buildAtlasStorageHealth(usagePercent, remainingBytes) {
     level: 'danger',
     title: 'Upgrade recommended',
     message: 'You are close to your storage limit. If usage keeps growing, you should upgrade your Atlas storage plan.'
+  };
+}
+
+function calculateAveragePercent(items) {
+  const safeItems = Array.isArray(items) ? items : [];
+  if (!safeItems.length) return 0;
+  const totalPercent = safeItems.reduce((sum, item) => {
+    const score = Number(item?.score || 0);
+    const total = Number(item?.total || 0);
+    if (!Number.isFinite(score) || !Number.isFinite(total) || total <= 0) return sum;
+    return sum + ((score / total) * 100);
+  }, 0);
+  return Math.round((totalPercent / safeItems.length) * 10) / 10;
+}
+
+function toDashboardPercent(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(100, Math.max(0, Math.round(numeric * 10) / 10));
+}
+
+function formatAttemptSummary(item, extra = {}) {
+  const score = Number(item?.score || 0);
+  const total = Number(item?.total || 0);
+  return {
+    id: String(item?._id || ''),
+    resourceId: String(
+      extra.resourceId
+      || item?.quizId
+      || item?.testId
+      || item?.mockId
+      || item?.examId
+      || item?._id
+      || ''
+    ),
+    attemptType: String(extra.attemptType || item?.attemptType || 'assessment').trim() || 'assessment',
+    title: String(extra.title || item?.title || 'Untitled').trim() || 'Untitled',
+    category: String(extra.category || item?.category || '').trim(),
+    module: String(extra.module || item?.module || '').trim(),
+    topic: String(extra.topic || item?.topic || '').trim(),
+    score,
+    total,
+    percent: total > 0 ? toDashboardPercent((score / total) * 100) : 0,
+    submittedAt: item?.submittedAt || null,
+    durationSeconds: Number(item?.durationSeconds || 0)
+  };
+}
+
+function formatCurrencyRecord(record, voucherLookup) {
+  const voucherCode = String(record?.voucherCode || '').trim().toUpperCase();
+  const voucherMeta = voucherCode ? voucherLookup.get(voucherCode) : null;
+  return {
+    id: String(record?._id || ''),
+    course: String(record?.course || '').trim(),
+    moduleName: String(record?.moduleName || 'ALL_MODULES').trim() || 'ALL_MODULES',
+    planType: String(record?.planType || '').trim(),
+    status: String(record?.status || '').trim(),
+    amountInPaise: Number(record?.amountInPaise || 0),
+    originalAmountInPaise: Number(record?.originalAmountInPaise || 0),
+    discountInPaise: Number(record?.discountInPaise || 0),
+    voucherCode,
+    voucherDescription: String(voucherMeta?.description || '').trim(),
+    voucherDiscountType: String(record?.voucherSnapshot?.discountType || voucherMeta?.discountType || '').trim(),
+    voucherDiscountValue: Number(record?.voucherSnapshot?.discountValue || voucherMeta?.discountValue || 0),
+    paidAt: record?.paidAt || null,
+    createdAt: record?.createdAt || null,
+    expiresAt: record?.expiresAt || null,
+    currency: String(record?.currency || 'INR').trim()
+  };
+}
+
+function formatTestSeriesRecord(record, voucherLookup) {
+  const voucherCode = String(record?.voucherCode || '').trim().toUpperCase();
+  const voucherMeta = voucherCode ? voucherLookup.get(voucherCode) : null;
+  return {
+    id: String(record?._id || ''),
+    course: String(record?.course || '').trim(),
+    seriesType: String(record?.seriesType || '').trim(),
+    status: String(record?.status || '').trim(),
+    amountInPaise: Number(record?.amountInPaise || 0),
+    originalAmountInPaise: Number(record?.originalAmountInPaise || 0),
+    discountInPaise: Number(record?.discountInPaise || 0),
+    voucherCode,
+    voucherDescription: String(voucherMeta?.description || '').trim(),
+    voucherDiscountType: String(voucherMeta?.discountType || '').trim(),
+    voucherDiscountValue: Number(voucherMeta?.discountValue || 0),
+    paidAt: record?.paidAt || null,
+    createdAt: record?.createdAt || null,
+    currency: String(record?.currency || 'INR').trim()
+  };
+}
+
+function normalizeTrackedPath(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '/';
+
+  try {
+    const parsed = raw.startsWith('http://') || raw.startsWith('https://')
+      ? new URL(raw)
+      : new URL(raw, 'http://localhost');
+    const normalized = `${parsed.pathname || '/'}${parsed.search || ''}`;
+    return normalized.slice(0, 512) || '/';
+  } catch (_) {
+    const fallback = raw.startsWith('/') ? raw : `/${raw}`;
+    return fallback.slice(0, 512) || '/';
+  }
+}
+
+function dayKeyFromDate(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildDayBucketEntries(startAt, endAt) {
+  const start = startAt instanceof Date ? startAt : new Date(startAt);
+  const end = endAt instanceof Date ? endAt : new Date(endAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return [];
+
+  const entries = [];
+  let cursor = new Date(start);
+
+  while (cursor < end) {
+    const nextBoundary = new Date(cursor);
+    nextBoundary.setHours(24, 0, 0, 0);
+    const segmentEnd = nextBoundary < end ? nextBoundary : end;
+    const seconds = (segmentEnd.getTime() - cursor.getTime()) / 1000;
+    if (seconds > 0) {
+      entries.push({ dayKey: dayKeyFromDate(cursor), seconds });
+    }
+    cursor = segmentEnd;
+  }
+
+  return entries;
+}
+
+function normalizeDayBucketMap(value) {
+  if (value instanceof Map) return new Map(value);
+  return new Map(Object.entries(value || {}));
+}
+
+function mergeDayBucketEntries(dayBuckets, entries) {
+  const bucketMap = normalizeDayBucketMap(dayBuckets);
+  entries.forEach((entry) => {
+    if (!entry?.dayKey) return;
+    const current = Number(bucketMap.get(entry.dayKey) || 0);
+    const next = current + Number(entry.seconds || 0);
+    bucketMap.set(entry.dayKey, Math.round(next * 1000) / 1000);
+  });
+  return bucketMap;
+}
+
+function applySessionDelta(sessionDoc, now) {
+  const lastSeen = sessionDoc?.lastSeenAt ? new Date(sessionDoc.lastSeenAt) : null;
+  if (!sessionDoc?.isActive || !lastSeen || Number.isNaN(lastSeen.getTime())) {
+    return 0;
+  }
+
+  const nowDate = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(nowDate.getTime()) || nowDate <= lastSeen) {
+    return 0;
+  }
+
+  const cappedEnd = new Date(Math.min(nowDate.getTime(), lastSeen.getTime() + ACTIVITY_SESSION_MAX_GAP_MS));
+  const deltaSeconds = (cappedEnd.getTime() - lastSeen.getTime()) / 1000;
+  if (deltaSeconds <= 0) {
+    return 0;
+  }
+
+  sessionDoc.totalActiveSeconds = Number(sessionDoc.totalActiveSeconds || 0) + deltaSeconds;
+  sessionDoc.dayBuckets = mergeDayBucketEntries(sessionDoc.dayBuckets, buildDayBucketEntries(lastSeen, cappedEnd));
+  return deltaSeconds;
+}
+
+function trackSessionPath(sessionDoc, pathValue, titleValue) {
+  const nextPath = normalizeTrackedPath(pathValue);
+  const nextTitle = String(titleValue || '').trim().slice(0, 160);
+  const lastPath = String(sessionDoc?.lastPath || '').trim();
+
+  if (!sessionDoc.firstPath) {
+    sessionDoc.firstPath = nextPath;
+  }
+  if (!lastPath || lastPath !== nextPath || !Number(sessionDoc.pageViews || 0)) {
+    sessionDoc.pageViews = Number(sessionDoc.pageViews || 0) + 1;
+  }
+
+  sessionDoc.lastPath = nextPath;
+  sessionDoc.lastTitle = nextTitle;
+}
+
+function summarizeSiteUsage(sessionDocs = []) {
+  const aggregated = new Map();
+  let totalActiveSeconds = 0;
+  let totalPageViews = 0;
+  let totalSessions = 0;
+  const now = new Date();
+
+  sessionDocs.forEach((sessionDoc) => {
+    totalSessions += 1;
+    totalPageViews += Number(sessionDoc?.pageViews || 0);
+
+    const bucketMap = normalizeDayBucketMap(sessionDoc?.dayBuckets);
+    bucketMap.forEach((value, dayKey) => {
+      const current = Number(aggregated.get(dayKey) || 0);
+      aggregated.set(dayKey, current + Number(value || 0));
+    });
+
+    totalActiveSeconds += Number(sessionDoc?.totalActiveSeconds || 0);
+
+    if (sessionDoc?.isActive && sessionDoc?.lastSeenAt) {
+      const lastSeen = new Date(sessionDoc.lastSeenAt);
+      if (!Number.isNaN(lastSeen.getTime()) && now > lastSeen) {
+        const cappedEnd = new Date(Math.min(now.getTime(), lastSeen.getTime() + ACTIVITY_SESSION_MAX_GAP_MS));
+        const pendingSeconds = (cappedEnd.getTime() - lastSeen.getTime()) / 1000;
+        if (pendingSeconds > 0) {
+          totalActiveSeconds += pendingSeconds;
+          buildDayBucketEntries(lastSeen, cappedEnd).forEach((entry) => {
+            const current = Number(aggregated.get(entry.dayKey) || 0);
+            aggregated.set(entry.dayKey, current + Number(entry.seconds || 0));
+          });
+        }
+      }
+    }
+  });
+
+  const dailyUsage = [...aggregated.entries()]
+    .map(([date, seconds]) => ({
+      date,
+      seconds: Math.round(Number(seconds || 0) * 1000) / 1000,
+      hours: Number(seconds || 0) / 3600
+    }))
+    .sort((left, right) => left.date.localeCompare(right.date));
+
+  return {
+    totalActiveSeconds: Math.round(totalActiveSeconds * 1000) / 1000,
+    totalPageViews,
+    totalSessions,
+    activeDays: dailyUsage.filter((item) => Number(item.seconds || 0) > 0).length,
+    dailyUsage
   };
 }
 
@@ -455,6 +706,13 @@ const adminUpdateProfileSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters').optional()
 });
 
+const sessionActivitySchema = z.object({
+  sessionId: z.string().min(8, 'Session ID is required').max(128),
+  event: z.enum(['start', 'heartbeat', 'pause', 'end']),
+  path: z.string().min(1).max(512).optional().default('/'),
+  title: z.string().max(160).optional().default('')
+});
+
 // Check if username exists
 router.post('/check-username', async (req, res) => {
   const { username } = req.body;
@@ -523,6 +781,59 @@ router.post('/register', validate(registerSchema), async (req, res) => {
   }
 });
 
+router.post('/activity/session', authenticateToken(), validate(sessionActivitySchema), async (req, res) => {
+  try {
+    const { sessionId, event, path: rawPath, title } = req.body;
+    const username = String(req.user?.username || '').trim();
+    const role = String(req.user?.role || '').trim();
+    const now = new Date();
+
+    if (!username || !role) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    let sessionDoc = await UserActivitySession.findOne({ sessionId, username, role });
+    if (!sessionDoc) {
+      sessionDoc = new UserActivitySession({
+        sessionId,
+        username,
+        role,
+        startedAt: now,
+        lastSeenAt: now,
+        endedAt: event === 'end' ? now : null,
+        isActive: event === 'start' || event === 'heartbeat',
+        totalActiveSeconds: 0,
+        pageViews: 0,
+        firstPath: normalizeTrackedPath(rawPath),
+        lastPath: normalizeTrackedPath(rawPath),
+        lastTitle: String(title || '').trim().slice(0, 160)
+      });
+      trackSessionPath(sessionDoc, rawPath, title);
+      await sessionDoc.save();
+      return res.json({ ok: true, active: sessionDoc.isActive });
+    }
+
+    applySessionDelta(sessionDoc, now);
+    trackSessionPath(sessionDoc, rawPath, title);
+    sessionDoc.lastSeenAt = now;
+
+    if (event === 'start' || event === 'heartbeat') {
+      sessionDoc.isActive = true;
+      sessionDoc.endedAt = null;
+    } else if (event === 'pause') {
+      sessionDoc.isActive = false;
+    } else if (event === 'end') {
+      sessionDoc.isActive = false;
+      sessionDoc.endedAt = now;
+    }
+
+    await sessionDoc.save();
+    return res.json({ ok: true, active: sessionDoc.isActive });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to record session activity.' });
+  }
+});
+
 router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res) => {
   const { username, birthDate, password } = req.body;
   try {
@@ -584,6 +895,187 @@ router.get('/users', authenticateToken('admin'), async (req, res) => {
     res.json({ total, users, pagination: { page, limit, totalPages: Math.ceil(total / limit) } });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+router.get('/users/:username/insights', authenticateToken('admin'), async (req, res) => {
+  try {
+    const username = String(req.params.username || '').trim();
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required.' });
+    }
+
+    const user = await User.findOne(
+      { username },
+      {
+        username: 1,
+        class: 1,
+        phone: 1,
+        city: 1,
+        email: 1,
+        avatar: 1,
+        createdAt: 1,
+        completedVideos: 1,
+        purchasedCourses: 1,
+        _id: 0
+      }
+    ).lean();
+
+    if (!user) {
+      return res.status(404).json({ error: 'Learner not found.' });
+    }
+
+    const completedVideoIds = Array.isArray(user.completedVideos) ? user.completedVideos : [];
+    const userCourse = String(user.class || '').trim();
+
+    const [
+      coursePayments,
+      testSeriesPayments,
+      quizAttempts,
+      topicTestAttempts,
+      fullMockAttempts,
+      mockExamAttempts,
+      siteSessions,
+      totalCourseVideos,
+      completedVideos,
+      recentCompletedVideos
+    ] = await Promise.all([
+      Payment.find({ username }).sort({ createdAt: -1 }).lean(),
+      TestSeriesPayment.find({ username }).sort({ createdAt: -1 }).lean(),
+      QuizAttempt.find({ username }).sort({ submittedAt: -1 }).lean(),
+      TopicTestAttempt.find({ username }).sort({ submittedAt: -1 }).lean(),
+      FullMockAttempt.find({ username }).sort({ submittedAt: -1 }).lean(),
+      MockExamAttempt.find({ username }).sort({ submittedAt: -1 }).lean(),
+      UserActivitySession.find({ username, role: 'user' }, {
+        totalActiveSeconds: 1,
+        pageViews: 1,
+        dayBuckets: 1,
+        lastSeenAt: 1,
+        isActive: 1,
+        _id: 0
+      }).lean(),
+      userCourse ? Video.countDocuments({ category: userCourse }) : 0,
+      completedVideoIds.length
+        ? Video.find({ _id: { $in: completedVideoIds }, ...(userCourse ? { category: userCourse } : {}) }, { title: 1, category: 1, module: 1, topic: 1, uploadedAt: 1 }).lean()
+        : [],
+      completedVideoIds.length
+        ? Video.find({ _id: { $in: completedVideoIds } }, { title: 1, category: 1, module: 1, topic: 1, uploadedAt: 1 }).sort({ uploadedAt: -1 }).limit(8).lean()
+        : []
+    ]);
+
+    const quizIds = [...new Set(quizAttempts.map((item) => String(item.quizId || '')).filter(Boolean))];
+    const mockExamIds = [...new Set(mockExamAttempts.map((item) => String(item.examId || '')).filter(Boolean))];
+
+    const [quizDocs, mockExamDocs] = await Promise.all([
+      quizIds.length ? Quiz.find({ _id: { $in: quizIds } }, { title: 1, topic: 1, module: 1, category: 1 }).lean() : [],
+      mockExamIds.length ? MockExam.find({ _id: { $in: mockExamIds } }, { title: 1, category: 1, examDate: 1 }).lean() : []
+    ]);
+
+    const quizLookup = new Map(quizDocs.map((item) => [String(item._id), item]));
+    const mockExamLookup = new Map(mockExamDocs.map((item) => [String(item._id), item]));
+
+    const voucherCodes = [...new Set([
+      ...coursePayments.map((item) => String(item?.voucherCode || '').trim().toUpperCase()),
+      ...testSeriesPayments.map((item) => String(item?.voucherCode || '').trim().toUpperCase())
+    ].filter(Boolean))];
+
+    const vouchers = voucherCodes.length
+      ? await Voucher.find({ code: { $in: voucherCodes } }, { code: 1, description: 1, discountType: 1, discountValue: 1 }).lean()
+      : [];
+    const voucherLookup = new Map(vouchers.map((item) => [String(item.code || '').trim().toUpperCase(), item]));
+
+    const paidCoursePayments = coursePayments.filter((item) => String(item.status || '') === 'paid');
+    const paidTestSeriesPayments = testSeriesPayments.filter((item) => String(item.status || '') === 'paid');
+    const completedCourseVideos = completedVideos.length;
+    const avatarState = resolveAvatarState(user);
+    const siteUsage = summarizeSiteUsage(siteSessions);
+    const videoCompletionPercent = totalCourseVideos > 0
+      ? toDashboardPercent((completedCourseVideos / totalCourseVideos) * 100)
+      : 0;
+    const quizAveragePercent = calculateAveragePercent(quizAttempts);
+    const topicTestAveragePercent = calculateAveragePercent(topicTestAttempts);
+    const fullMockAveragePercent = calculateAveragePercent(fullMockAttempts);
+    const mockExamAveragePercent = calculateAveragePercent(mockExamAttempts);
+
+    return res.json({
+      learner: {
+        username: user.username,
+        class: user.class,
+        phone: user.phone,
+        city: user.city,
+        email: user.email,
+        avatarUrl: avatarState.avatarUrl,
+        createdAt: user.createdAt,
+        purchasedCourses: Array.isArray(user.purchasedCourses) ? user.purchasedCourses : []
+      },
+      overview: {
+        totalCoursePurchases: paidCoursePayments.length,
+        totalTestSeriesPurchases: paidTestSeriesPayments.length,
+        totalVoucherUses: [...paidCoursePayments, ...paidTestSeriesPayments].filter((item) => String(item?.voucherCode || '').trim()).length,
+        completedCourseVideos,
+        totalCourseVideos,
+        videoCompletionPercent,
+        totalWebappUsageSeconds: siteUsage.totalActiveSeconds,
+        totalQuizAttempts: quizAttempts.length,
+        totalTopicTestAttempts: topicTestAttempts.length,
+        totalFullMockAttempts: fullMockAttempts.length,
+        totalMockExamAttempts: mockExamAttempts.length
+      },
+      progress: {
+        bars: [
+          { key: 'videos', label: 'Video completion', value: videoCompletionPercent, tone: 'teal' },
+          { key: 'quiz', label: 'Quiz accuracy', value: quizAveragePercent, tone: 'blue' },
+          { key: 'topic', label: 'Topic test accuracy', value: topicTestAveragePercent, tone: 'amber' },
+          { key: 'fullMock', label: 'Full mock accuracy', value: fullMockAveragePercent, tone: 'violet' },
+          { key: 'mockExam', label: 'Monthly mock accuracy', value: mockExamAveragePercent, tone: 'rose' }
+        ]
+      },
+      purchases: {
+        coursePayments: coursePayments.map((item) => formatCurrencyRecord(item, voucherLookup)),
+        testSeriesPayments: testSeriesPayments.map((item) => formatTestSeriesRecord(item, voucherLookup))
+      },
+      activity: {
+        siteUsage,
+        recentCompletedVideos: recentCompletedVideos.map((video) => ({
+          id: String(video?._id || ''),
+          title: String(video?.title || 'Untitled').trim() || 'Untitled',
+          category: String(video?.category || '').trim(),
+          module: String(video?.module || '').trim(),
+          topic: String(video?.topic || '').trim(),
+          uploadedAt: video?.uploadedAt || null
+        })),
+        quizAttempts: quizAttempts.map((item) => {
+          const quizMeta = quizLookup.get(String(item.quizId || '')) || {};
+          return formatAttemptSummary(item, {
+            title: quizMeta.title,
+            category: quizMeta.category,
+            module: quizMeta.module,
+            topic: quizMeta.topic,
+            resourceId: item?.quizId,
+            attemptType: 'quiz'
+          });
+        }),
+        topicTestAttempts: topicTestAttempts.map((item) => formatAttemptSummary(item, {
+          resourceId: item?.testId,
+          attemptType: 'topic-test'
+        })),
+        fullMockAttempts: fullMockAttempts.map((item) => formatAttemptSummary(item, {
+          resourceId: item?.mockId,
+          attemptType: 'full-mock'
+        })),
+        mockExamAttempts: mockExamAttempts.map((item) => {
+          const examMeta = mockExamLookup.get(String(item.examId || '')) || {};
+          return formatAttemptSummary(item, {
+            title: examMeta.title,
+            category: examMeta.category,
+            resourceId: item?.examId,
+            attemptType: 'mock-exam'
+          });
+        })
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch learner insights.' });
   }
 });
 

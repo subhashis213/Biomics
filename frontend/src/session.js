@@ -1,4 +1,6 @@
 const SESSION_KEY = 'biomics_session';
+const ACTIVITY_SESSION_ID_KEY = 'biomics_activity_session_id';
+const ACTIVITY_SESSION_OWNER_KEY = 'biomics_activity_session_owner';
 
 // On native Capacitor (Android/iOS), use localStorage so the session persists
 // when the app is killed or cleared from recents. On web, use sessionStorage
@@ -71,5 +73,7 @@ export function clearSession() {
   storage.removeItem('sessionRole');
   storage.removeItem('adminSession');
   storage.removeItem('userSession');
+  storage.removeItem(ACTIVITY_SESSION_ID_KEY);
+  storage.removeItem(ACTIVITY_SESSION_OWNER_KEY);
   clearLegacySessionKeys();
 }
