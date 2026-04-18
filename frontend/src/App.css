@@ -6417,6 +6417,20 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   gap: 12px;
 }
 
+.storage-monitor-page .stat-card {
+  min-width: 0;
+}
+
+.storage-monitor-page .stat-card span {
+  font-size: 0.78rem;
+}
+
+.storage-monitor-page .stat-card strong {
+  font-size: 1.28rem;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
 .storage-monitor-meta-row {
   display: flex;
   flex-wrap: wrap;
@@ -6698,6 +6712,16 @@ html[data-theme='dark'] .course-manager-card .course-tile {
     gap: 12px;
   }
 
+  .workspace-hero-storage h2 {
+    font-size: clamp(1.55rem, 5.8vw, 2rem);
+    line-height: 1.15;
+  }
+
+  .workspace-hero-storage .subtitle {
+    font-size: 0.94rem;
+    line-height: 1.45;
+  }
+
   .storage-monitor-guidance-card,
   .storage-monitor-health-card,
   .storage-monitor-disk-card,
@@ -6756,11 +6780,45 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   .storage-collection-size {
     font-size: 0.98rem;
   }
+
+  .storage-monitor-page .stat-card {
+    padding: 12px;
+  }
+
+  .storage-monitor-page .stat-card strong {
+    font-size: 1.14rem;
+  }
 }
 
 @media (max-width: 560px) {
+  .workspace-hero-storage {
+    gap: 10px;
+  }
+
+  .workspace-hero-storage h2 {
+    font-size: clamp(1.3rem, 6vw, 1.65rem);
+  }
+
+  .workspace-hero-storage .subtitle {
+    font-size: 0.88rem;
+  }
+
   .storage-monitor-hero-stats {
     gap: 10px;
+  }
+
+  .storage-monitor-page .stat-card {
+    padding: 10px 11px;
+    border-radius: 14px;
+    gap: 3px;
+  }
+
+  .storage-monitor-page .stat-card span {
+    font-size: 0.73rem;
+  }
+
+  .storage-monitor-page .stat-card strong {
+    font-size: 1.02rem;
   }
 
   .storage-monitor-meta-row,
@@ -6806,6 +6864,14 @@ html[data-theme='dark'] .course-manager-card .course-tile {
     gap: 10px;
   }
 
+  .workspace-hero-storage h2 {
+    font-size: 1.16rem;
+  }
+
+  .workspace-hero-storage .subtitle {
+    font-size: 0.82rem;
+  }
+
   .storage-monitor-guidance-card,
   .storage-monitor-health-card,
   .storage-monitor-disk-card,
@@ -6835,6 +6901,19 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 
   .storage-monitor-spotlight-copy h3 {
     font-size: 1.2rem;
+  }
+
+  .storage-monitor-page .stat-card {
+    padding: 9px 10px;
+    border-radius: 12px;
+  }
+
+  .storage-monitor-page .stat-card span {
+    font-size: 0.7rem;
+  }
+
+  .storage-monitor-page .stat-card strong {
+    font-size: 0.94rem;
   }
 }
 
