@@ -142,7 +142,7 @@ export default function AdminStorageMonitorPage() {
       roleLabel="Admin"
       showThemeSwitch
       actions={(
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="storage-monitor-topbar-actions">
           <button
             type="button"
             className={`secondary-btn workspace-refresh-btn${refreshing ? ' is-loading' : ''}${refreshPulse ? ' is-done' : ''}`}
@@ -265,7 +265,7 @@ export default function AdminStorageMonitorPage() {
 
         {atlas.configured ? (
           <section className="card storage-monitor-panel workspace-panel">
-            <div className="section-header compact">
+            <div className="section-header compact storage-monitor-section-header">
               <div>
                 <p className="eyebrow">Atlas Capacity</p>
                 <h3>{atlasMetricsAvailable ? 'Plan quota versus current database footprint' : 'Atlas plan data is configured'}</h3>
@@ -287,7 +287,7 @@ export default function AdminStorageMonitorPage() {
         ) : null}
 
         <section className="card storage-monitor-panel workspace-panel">
-          <div className="section-header compact">
+          <div className="section-header compact storage-monitor-section-header">
             <div>
               <p className="eyebrow">Top Collections</p>
               <h3>Largest collections by allocated storage</h3>
@@ -328,7 +328,7 @@ export default function AdminStorageMonitorPage() {
         </section>
 
         <section className="card storage-monitor-panel workspace-panel">
-          <div className="section-header compact">
+          <div className="section-header compact storage-monitor-section-header">
             <div>
               <p className="eyebrow">Collection Table</p>
               <h3>Detailed MongoDB collection usage</h3>
@@ -340,7 +340,37 @@ export default function AdminStorageMonitorPage() {
             {!allCollections.length && !loading ? (
               <p className="empty-note">No detailed collection stats available.</p>
             ) : (
-              <div className="analytics-table-wrap storage-monitor-table-wrap">
+              <>
+                <div className="storage-monitor-mobile-list" aria-label="Detailed collection usage cards">
+                  {allCollections.map((collection) => (
+                    <article key={`${collection.name}-mobile`} className="storage-monitor-mobile-item">
+                      <div className="storage-monitor-mobile-item-head">
+                        <strong>{collection.name}</strong>
+                        <span className="storage-table-usage-pill">{formatPercent(collection.usagePercent)}</span>
+                      </div>
+                      <div className="storage-monitor-mobile-item-grid">
+                        <div>
+                          <span>Documents</span>
+                          <strong>{collection.documentCount}</strong>
+                        </div>
+                        <div>
+                          <span>Data Size</span>
+                          <strong>{formatBytes(collection.dataSizeBytes)}</strong>
+                        </div>
+                        <div>
+                          <span>Storage Size</span>
+                          <strong>{formatBytes(collection.storageSizeBytes)}</strong>
+                        </div>
+                        <div>
+                          <span>Index Size</span>
+                          <strong>{formatBytes(collection.totalIndexSizeBytes)}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="analytics-table-wrap storage-monitor-table-wrap">
                 <table className="analytics-table storage-monitor-table">
                   <thead>
                     <tr>
@@ -369,7 +399,8 @@ export default function AdminStorageMonitorPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </>
             )}
           </div>
         </section>
