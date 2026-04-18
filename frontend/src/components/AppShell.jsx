@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import logoImg from '../assets/biomics-logo.jpeg';
-import StudentChatAgent from './StudentChatAgent';
+
+const AdminChatAgent = lazy(() => import('./StudentChatAgent'));
 
 export default function AppShell({
   title,
@@ -326,7 +327,11 @@ export default function AppShell({
           <main className="app-main-content">{children}</main>
         </div>
       </div>
-      {roleLabel === 'Admin' ? <StudentChatAgent hideAnnouncementFab mode="admin" /> : null}
+      {roleLabel === 'Admin' ? (
+        <Suspense fallback={null}>
+          <AdminChatAgent hideAnnouncementFab mode="admin" />
+        </Suspense>
+      ) : null}
     </>
   );
 }

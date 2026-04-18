@@ -9,7 +9,47 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('stream-chat') || id.includes('stream-chat-react')) return 'vendor-stream-chat';
+
+          if (
+            id.includes('node_modules/react-player/')
+            || id.includes('node_modules/react-image-gallery/')
+          ) {
+            return 'vendor-chat-media';
+          }
+
+          if (
+            id.includes('node_modules/react-markdown/')
+            || id.includes('node_modules/remark-gfm/')
+            || id.includes('node_modules/hast-util-find-and-replace/')
+            || id.includes('node_modules/unist-builder/')
+            || id.includes('node_modules/unist-util-visit/')
+            || id.includes('node_modules/linkifyjs/')
+          ) {
+            return 'vendor-chat-markdown';
+          }
+
+          if (id.includes('node_modules/stream-chat/')) {
+            return 'vendor-stream-chat-core';
+          }
+
+          if (id.includes('node_modules/livekit-client/')) {
+            return 'vendor-livekit';
+          }
+
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'vendor-icons';
+          }
+
+          if (
+            id.includes('node_modules/react/')
+            || id.includes('node_modules/react-dom/')
+            || id.includes('node_modules/react-router-dom/')
+            || id.includes('node_modules/zustand/')
+            || id.includes('node_modules/@tanstack/')
+          ) {
+            return 'vendor-react';
+          }
+
           return;
         }
       }

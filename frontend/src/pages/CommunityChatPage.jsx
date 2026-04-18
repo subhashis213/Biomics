@@ -1,18 +1,18 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StreamChat } from 'stream-chat';
 import {
   Channel,
   ChannelHeader,
   Chat,
-  MessageInput,
-  MessageList,
-  Thread,
   Window
 } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
 import { fetchCommunityChatToken } from '../api';
 import AppShell from '../components/AppShell';
+
+const CommunityChatMessagePane = lazy(() => import('../components/CommunityChatMessagePane'));
+const CommunityChatThreadPane = lazy(() => import('../components/CommunityChatThreadPane'));
 
 export default function CommunityChatPage() {
   const navigate = useNavigate();
@@ -99,10 +99,13 @@ export default function CommunityChatPage() {
                 <Channel channel={channel}>
                   <Window>
                     <ChannelHeader />
-                    <MessageList />
-                    <MessageInput focus />
+                    <Suspense fallback={<div className="empty-note">Loading chat messages...</div>}>
+                      <CommunityChatMessagePane />
+                    </Suspense>
                   </Window>
-                  <Thread />
+                  <Suspense fallback={null}>
+                    <CommunityChatThreadPane />
+                  </Suspense>
                 </Channel>
               </Chat>
             </div>
