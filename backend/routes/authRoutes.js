@@ -5,6 +5,7 @@ const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
+const DigestFetch = require('digest-fetch');
 const { v2: cloudinary } = require('cloudinary');
 const { z } = require('zod');
 const mongoose = require('mongoose');
@@ -31,6 +32,14 @@ const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim
 const cloudinaryApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
 const cloudinaryApiSecret = String(process.env.CLOUDINARY_API_SECRET || '').trim();
 const hasCloudinaryConfig = !!(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret);
+const atlasPublicKey = String(process.env.ATLAS_PUBLIC_KEY || '').trim();
+const atlasPrivateKey = String(process.env.ATLAS_PRIVATE_KEY || '').trim();
+const atlasProjectId = String(process.env.ATLAS_PROJECT_ID || '').trim();
+const atlasClusterName = String(process.env.ATLAS_CLUSTER_NAME || '').trim();
+const hasAtlasConfig = !!(atlasPublicKey && atlasPrivateKey && atlasProjectId && atlasClusterName);
+const ATLAS_API_ACCEPT = 'application/vnd.atlas.2024-08-05+json';
+const ATLAS_CACHE_TTL_MS = 60 * 1000;
+let atlasClusterCache = { expiresAt: 0, data: null };
 
 if (hasCloudinaryConfig) {
   cloudinary.config({
@@ -90,6 +99,103 @@ function formatReadyStateLabel(state) {
   if (state === 2) return 'connecting';
   if (state === 3) return 'disconnecting';
   return 'disconnected';
+}
+
+function gbToBytes(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return Math.round(numeric * 1024 * 1024 * 1024);
+}
+
+function readAtlasPlanCapacityGb(cluster = {}) {
+  const specs = Array.isArray(cluster.effectiveReplicationSpecs) && cluster.effectiveReplicationSpecs.length
+    ? cluster.effectiveReplicationSpecs
+    : Array.isArray(cluster.replicationSpecs)
+      ? cluster.replicationSpecs
+      : [];
+
+  let largestDiskSizeGb = 0;
+  for (const spec of specs) {
+    const regionConfigs = Array.isArray(spec?.regionConfigs) ? spec.regionConfigs : [];
+    for (const region of regionConfigs) {
+      const diskCandidates = [
+        region?.electableSpecs?.diskSizeGB,
+        region?.effectiveElectableSpecs?.diskSizeGB,
+        region?.analyticsSpecs?.diskSizeGB,
+        region?.effectiveAnalyticsSpecs?.diskSizeGB,
+        region?.readOnlySpecs?.diskSizeGB,
+        region?.effectiveReadOnlySpecs?.diskSizeGB
+      ];
+
+      for (const candidate of diskCandidates) {
+        const diskSizeGb = Number(candidate || 0);
+        if (Number.isFinite(diskSizeGb) && diskSizeGb > largestDiskSizeGb) {
+          largestDiskSizeGb = diskSizeGb;
+        }
+      }
+    }
+  }
+
+  return largestDiskSizeGb;
+}
+
+async function fetchAtlasClusterSummary() {
+  if (!hasAtlasConfig) {
+    return {
+      configured: false,
+      available: false,
+      clusterName: atlasClusterName,
+      error: 'Atlas API credentials are not configured.'
+    };
+  }
+
+  if (atlasClusterCache.expiresAt > Date.now() && atlasClusterCache.data) {
+    return atlasClusterCache.data;
+  }
+
+  try {
+    const client = new DigestFetch(atlasPublicKey, atlasPrivateKey);
+    const response = await client.fetch(
+      `https://cloud.mongodb.com/api/atlas/v2/groups/${atlasProjectId}/clusters/${atlasClusterName}`,
+      {
+        headers: { Accept: ATLAS_API_ACCEPT }
+      }
+    );
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = String(payload?.detail || payload?.reason || 'Atlas cluster lookup failed.');
+      throw new Error(detail);
+    }
+
+    const planCapacityGb = readAtlasPlanCapacityGb(payload);
+    const summary = {
+      configured: true,
+      available: planCapacityGb > 0,
+      clusterName: String(payload?.name || atlasClusterName || '').trim(),
+      clusterType: String(payload?.clusterType || '').trim(),
+      providerName: String(payload?.replicationSpecs?.[0]?.regionConfigs?.[0]?.providerName || '').trim(),
+      stateName: String(payload?.stateName || '').trim(),
+      planCapacityGb,
+      planCapacityBytes: gbToBytes(planCapacityGb),
+      source: 'atlas-admin-api',
+      error: ''
+    };
+
+    atlasClusterCache = {
+      expiresAt: Date.now() + ATLAS_CACHE_TTL_MS,
+      data: summary
+    };
+
+    return summary;
+  } catch (error) {
+    return {
+      configured: true,
+      available: false,
+      clusterName: atlasClusterName,
+      error: error.message || 'Atlas cluster lookup failed.'
+    };
+  }
 }
 
 function buildAvatarUrl(user) {
@@ -522,6 +628,21 @@ router.get('/admin/storage-stats', authenticateToken('admin'), async (req, res) 
     const totalCollectionStorage = sortedCollections.reduce((sum, item) => sum + Number(item.storageSizeBytes || 0), 0);
     const totalCollectionIndexes = sortedCollections.reduce((sum, item) => sum + Number(item.totalIndexSizeBytes || 0), 0);
     const totalDocuments = sortedCollections.reduce((sum, item) => sum + Number(item.documentCount || 0), 0);
+    const totalSizeBytes = Number(dbStats?.totalSize || (Number(dbStats?.storageSize || totalCollectionStorage || 0) + Number(dbStats?.indexSize || totalCollectionIndexes || 0)));
+    const fsUsedSizeBytes = Number(dbStats?.fsUsedSize || 0);
+    const fsTotalSizeBytes = Number(dbStats?.fsTotalSize || 0);
+    const diskMetricsAvailable = fsTotalSizeBytes > 0 && fsUsedSizeBytes >= 0;
+    const atlasSummary = await fetchAtlasClusterSummary();
+    const atlasPlanCapacityBytes = Number(atlasSummary?.planCapacityBytes || 0);
+    const atlasUsedEstimateBytes = atlasPlanCapacityBytes > 0
+      ? Math.max(totalSizeBytes, Number(dbStats?.dataSize || 0), Number(dbStats?.storageSize || 0), Number(dbStats?.indexSize || 0))
+      : 0;
+    const atlasRemainingEstimateBytes = atlasPlanCapacityBytes > 0
+      ? Math.max(atlasPlanCapacityBytes - atlasUsedEstimateBytes, 0)
+      : 0;
+    const atlasUsagePercent = atlasPlanCapacityBytes > 0
+      ? Math.round((atlasUsedEstimateBytes / atlasPlanCapacityBytes) * 1000) / 10
+      : 0;
 
     return res.json({
       snapshotAt: new Date().toISOString(),
@@ -542,9 +663,29 @@ router.get('/admin/storage-stats', authenticateToken('admin'), async (req, res) 
         totalIndexSizeBytes: Number(dbStats?.indexSize || totalCollectionIndexes || 0),
         indexCount: Number(dbStats?.indexes || 0),
         fileSizeBytes: Number(dbStats?.fileSize || 0),
-        fsUsedSizeBytes: Number(dbStats?.fsUsedSize || 0),
-        fsTotalSizeBytes: Number(dbStats?.fsTotalSize || 0),
+        fsUsedSizeBytes,
+        fsTotalSizeBytes,
+        diskMetricsAvailable,
+        totalSizeBytes,
         storageEngine: dbStats?.raw ? 'wiredTiger' : 'mongodb'
+      },
+      atlas: {
+        configured: Boolean(atlasSummary?.configured),
+        available: Boolean(atlasSummary?.available) && atlasPlanCapacityBytes > 0,
+        clusterName: String(atlasSummary?.clusterName || atlasClusterName || '').trim(),
+        clusterType: String(atlasSummary?.clusterType || '').trim(),
+        providerName: String(atlasSummary?.providerName || '').trim(),
+        stateName: String(atlasSummary?.stateName || '').trim(),
+        planCapacityGb: Number(atlasSummary?.planCapacityGb || 0),
+        planCapacityBytes: atlasPlanCapacityBytes,
+        usedEstimateBytes: atlasUsedEstimateBytes,
+        remainingEstimateBytes: atlasRemainingEstimateBytes,
+        usagePercent: atlasUsagePercent,
+        source: String(atlasSummary?.source || ''),
+        note: atlasPlanCapacityBytes > 0
+          ? 'Atlas plan capacity from Atlas Admin API. Used estimate is based on MongoDB-reported total database footprint.'
+          : '',
+        error: String(atlasSummary?.error || '').trim()
       },
       topCollections,
       collections: sortedCollections

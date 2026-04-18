@@ -86,9 +86,12 @@ export default function AdminStorageMonitorPage() {
   }
 
   const database = storageStats?.database || {};
+  const atlas = storageStats?.atlas || {};
   const connection = storageStats?.connection || {};
   const topCollections = Array.isArray(storageStats?.topCollections) ? storageStats.topCollections : [];
   const allCollections = Array.isArray(storageStats?.collections) ? storageStats.collections : [];
+  const atlasMetricsAvailable = Boolean(atlas.available) && Number(atlas.planCapacityBytes || 0) > 0;
+  const diskMetricsAvailable = database.diskMetricsAvailable !== false && Number(database.fsTotalSizeBytes || 0) > 0;
 
   const storageFootprint = useMemo(() => {
     const storageSize = Number(database.storageSizeBytes || 0);
@@ -130,18 +133,20 @@ export default function AdminStorageMonitorPage() {
         <section className="workspace-hero workspace-hero-storage">
           <div>
             <p className="eyebrow">MongoDB Monitor</p>
-            <h2>Track live database growth, collection size and index load</h2>
-            <p className="subtitle">This workspace refreshes automatically every 15 seconds so you can watch storage pressure and collection hotspots in real time.</p>
+            <h2>Track live database growth, Atlas quota and collection size</h2>
+            <p className="subtitle">This workspace refreshes automatically every 15 seconds so you can watch storage pressure, Atlas plan usage and collection hotspots in real time.</p>
             <div className="storage-monitor-meta-row">
               <span className="storage-monitor-meta-pill">Status: {connection.status || 'unknown'}</span>
               <span className="storage-monitor-meta-pill">DB: {connection.databaseName || 'mongodb'}</span>
+              {atlasMetricsAvailable ? <span className="storage-monitor-meta-pill">Plan: {formatBytes(atlas.planCapacityBytes)}</span> : null}
               <span className="storage-monitor-meta-pill">Updated: {formatSnapshot(storageStats?.snapshotAt)}</span>
             </div>
           </div>
           <div className="workspace-hero-stats">
             <StatCard label="Collections" value={database.collections || 0} />
             <StatCard label="Documents" value={database.documents || 0} />
-            <StatCard label="Storage" value={formatBytes(database.storageSizeBytes)} />
+            <StatCard label={atlasMetricsAvailable ? 'Atlas Used' : 'Storage'} value={formatBytes(atlasMetricsAvailable ? atlas.usedEstimateBytes : database.storageSizeBytes)} />
+            <StatCard label={atlasMetricsAvailable ? 'Atlas Limit' : 'Indexes'} value={formatBytes(atlasMetricsAvailable ? atlas.planCapacityBytes : database.totalIndexSizeBytes)} />
           </div>
         </section>
 
@@ -177,26 +182,63 @@ export default function AdminStorageMonitorPage() {
           </article>
 
           <article className="card storage-monitor-disk-card">
-            <p className="eyebrow">Disk Consumption</p>
-            <div className="storage-monitor-progress-block">
-              <div className="storage-monitor-progress-head">
-                <strong>{formatBytes(database.fsUsedSizeBytes)}</strong>
-                <span>of {formatBytes(database.fsTotalSizeBytes)} used</span>
+            <p className="eyebrow">{atlasMetricsAvailable ? 'Atlas Plan Usage' : 'Disk Consumption'}</p>
+            {atlasMetricsAvailable ? (
+              <div className="storage-monitor-progress-block">
+                <div className="storage-monitor-progress-head">
+                  <strong>{formatBytes(atlas.usedEstimateBytes)}</strong>
+                  <span>of {formatBytes(atlas.planCapacityBytes)} used</span>
+                </div>
+                <div className="storage-monitor-progress-track">
+                  <div className="storage-monitor-progress-fill" style={{ width: `${Math.min(100, Number(atlas.usagePercent || 0))}%` }} />
+                </div>
+                <p className="subtitle">Remaining {formatBytes(atlas.remainingEstimateBytes)}. {atlas.note || 'Atlas quota pulled from Atlas Admin API.'}</p>
               </div>
-              <div className="storage-monitor-progress-track">
-                <div className="storage-monitor-progress-fill" style={{ width: `${Math.min(100, storageFootprint.diskUsagePercent)}%` }} />
+            ) : diskMetricsAvailable ? (
+              <div className="storage-monitor-progress-block">
+                <div className="storage-monitor-progress-head">
+                  <strong>{formatBytes(database.fsUsedSizeBytes)}</strong>
+                  <span>of {formatBytes(database.fsTotalSizeBytes)} used</span>
+                </div>
+                <div className="storage-monitor-progress-track">
+                  <div className="storage-monitor-progress-fill" style={{ width: `${Math.min(100, storageFootprint.diskUsagePercent)}%` }} />
+                </div>
+                <p className="subtitle">Filesystem usage reported by MongoDB.</p>
               </div>
-              <p className="subtitle">Filesystem usage reported by MongoDB.</p>
-            </div>
+            ) : (
+              <div className="storage-monitor-unavailable-block">
+                <strong>Disk metrics unavailable</strong>
+                <p className="subtitle">{atlas.configured && atlas.error ? atlas.error : 'Your MongoDB host is not returning filesystem totals for this connection, so this panel cannot calculate disk consumption reliably.'}</p>
+              </div>
+            )}
           </article>
         </section>
 
         <section className="storage-monitor-stats-grid">
-          <StatCard label="Data Size" value={formatBytes(database.dataSizeBytes)} />
-          <StatCard label="Index Size" value={formatBytes(database.totalIndexSizeBytes)} />
-          <StatCard label="File Size" value={formatBytes(database.fileSizeBytes)} />
-          <StatCard label="Views" value={database.views || 0} />
+          <StatCard label={atlasMetricsAvailable ? 'Atlas Remaining' : 'Data Size'} value={formatBytes(atlasMetricsAvailable ? atlas.remainingEstimateBytes : database.dataSizeBytes)} />
+          <StatCard label={atlasMetricsAvailable ? 'Data Size' : 'Index Size'} value={formatBytes(atlasMetricsAvailable ? database.dataSizeBytes : database.totalIndexSizeBytes)} />
+          <StatCard label={atlasMetricsAvailable ? 'Index Size' : 'File Size'} value={formatBytes(atlasMetricsAvailable ? database.totalIndexSizeBytes : database.fileSizeBytes)} />
+          <StatCard label={atlasMetricsAvailable ? 'Usage' : 'Views'} value={atlasMetricsAvailable ? formatPercent(atlas.usagePercent) : database.views || 0} />
         </section>
+
+        {atlasMetricsAvailable ? (
+          <section className="card storage-monitor-panel workspace-panel">
+            <div className="section-header compact">
+              <div>
+                <p className="eyebrow">Atlas Capacity</p>
+                <h3>Plan quota versus current database footprint</h3>
+                <p className="subtitle">Cluster {atlas.clusterName || 'Atlas'} {atlas.clusterType ? `• ${atlas.clusterType}` : ''} {atlas.providerName ? `• ${atlas.providerName}` : ''}</p>
+              </div>
+              <StatCard label="Atlas State" value={atlas.stateName || 'unknown'} />
+            </div>
+            <div className="storage-monitor-meta-row">
+              <span className="storage-monitor-meta-pill">Total: {formatBytes(atlas.planCapacityBytes)}</span>
+              <span className="storage-monitor-meta-pill">Used: {formatBytes(atlas.usedEstimateBytes)}</span>
+              <span className="storage-monitor-meta-pill">Remaining: {formatBytes(atlas.remainingEstimateBytes)}</span>
+              <span className="storage-monitor-meta-pill">Usage: {formatPercent(atlas.usagePercent)}</span>
+            </div>
+          </section>
+        ) : null}
 
         <section className="card storage-monitor-panel workspace-panel">
           <div className="section-header compact">
