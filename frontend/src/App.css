@@ -6409,11 +6409,63 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   gap: 14px;
 }
 
+.storage-monitor-hero-stats {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .storage-monitor-meta-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+}
+
+.storage-monitor-guidance-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+}
+
+.storage-monitor-guidance-safe {
+  background: linear-gradient(150deg, color-mix(in srgb, #10b981 15%, var(--bg-card)) 0%, var(--bg-card) 100%);
+}
+
+.storage-monitor-guidance-watch {
+  background: linear-gradient(150deg, color-mix(in srgb, #f59e0b 16%, var(--bg-card)) 0%, var(--bg-card) 100%);
+}
+
+.storage-monitor-guidance-danger {
+  background: linear-gradient(150deg, color-mix(in srgb, #ef4444 15%, var(--bg-card)) 0%, var(--bg-card) 100%);
+}
+
+.storage-monitor-guidance-card h3 {
+  margin: 4px 0 6px;
+}
+
+.storage-monitor-guidance-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.storage-monitor-guidance-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  border: 1px solid color-mix(in srgb, #ffffff 12%, var(--line));
+  background: color-mix(in srgb, #ffffff 6%, var(--bg-card));
 }
 
 .storage-monitor-meta-pill,
@@ -6541,6 +6593,7 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .storage-monitor-progress-track,
@@ -6615,10 +6668,12 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 }
 
 @media (max-width: 1080px) {
+  .storage-monitor-guidance-card,
   .storage-monitor-grid {
     grid-template-columns: 1fr;
   }
 
+  .storage-monitor-hero-stats,
   .storage-monitor-stats-grid,
   .storage-collection-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6630,13 +6685,32 @@ html[data-theme='dark'] .course-manager-card .course-tile {
     grid-template-columns: 1fr;
   }
 
+  .storage-monitor-guidance-pills {
+    justify-content: flex-start;
+  }
+
+  .storage-monitor-health-list div,
+  .storage-monitor-progress-head,
+  .storage-collection-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .storage-monitor-rings {
     justify-content: flex-start;
   }
 
+  .storage-monitor-hero-stats,
   .storage-monitor-stats-grid,
   .storage-collection-grid {
     grid-template-columns: 1fr;
+  }
+
+  .storage-monitor-meta-pill,
+  .storage-monitor-guidance-pill,
+  .storage-table-usage-pill {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 

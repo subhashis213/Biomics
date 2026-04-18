@@ -139,6 +139,41 @@ function readAtlasPlanCapacityGb(cluster = {}) {
   return largestDiskSizeGb;
 }
 
+function buildAtlasStorageHealth(usagePercent, remainingBytes) {
+  const percent = Number(usagePercent || 0);
+  const remaining = Number(remainingBytes || 0);
+
+  if (!Number.isFinite(percent) || percent <= 0) {
+    return {
+      level: 'safe',
+      title: 'Safe zone',
+      message: 'Storage usage is very low right now. You are in the safe zone.'
+    };
+  }
+
+  if (percent < 60) {
+    return {
+      level: 'safe',
+      title: 'Safe zone',
+      message: 'You are in the safe zone. Current storage usage is comfortably below your Atlas plan limit.'
+    };
+  }
+
+  if (percent < 85) {
+    return {
+      level: 'watch',
+      title: 'Watch zone',
+      message: `Storage usage is increasing. Keep an eye on growth and remaining space (${Math.max(remaining, 0)} bytes left).`
+    };
+  }
+
+  return {
+    level: 'danger',
+    title: 'Upgrade recommended',
+    message: 'You are close to your storage limit. If usage keeps growing, you should upgrade your Atlas storage plan.'
+  };
+}
+
 async function fetchAtlasClusterSummary() {
   if (!hasAtlasConfig) {
     return {
@@ -643,6 +678,7 @@ router.get('/admin/storage-stats', authenticateToken('admin'), async (req, res) 
     const atlasUsagePercent = atlasPlanCapacityBytes > 0
       ? Math.round((atlasUsedEstimateBytes / atlasPlanCapacityBytes) * 1000) / 10
       : 0;
+    const atlasHealth = buildAtlasStorageHealth(atlasUsagePercent, atlasRemainingEstimateBytes);
 
     return res.json({
       snapshotAt: new Date().toISOString(),
@@ -678,9 +714,13 @@ router.get('/admin/storage-stats', authenticateToken('admin'), async (req, res) 
         stateName: String(atlasSummary?.stateName || '').trim(),
         planCapacityGb: Number(atlasSummary?.planCapacityGb || 0),
         planCapacityBytes: atlasPlanCapacityBytes,
+        consumedBytes: atlasUsedEstimateBytes,
         usedEstimateBytes: atlasUsedEstimateBytes,
         remainingEstimateBytes: atlasRemainingEstimateBytes,
         usagePercent: atlasUsagePercent,
+        healthLevel: atlasHealth.level,
+        healthTitle: atlasHealth.title,
+        healthMessage: atlasHealth.message,
         source: String(atlasSummary?.source || ''),
         note: atlasPlanCapacityBytes > 0
           ? 'Atlas plan capacity from Atlas Admin API. Used estimate is based on MongoDB-reported total database footprint.'

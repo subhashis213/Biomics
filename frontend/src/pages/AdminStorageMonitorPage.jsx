@@ -33,6 +33,30 @@ function formatSnapshot(value) {
   });
 }
 
+function getStorageGuidance(atlas, atlasMetricsAvailable) {
+  if (!atlasMetricsAvailable) {
+    if (atlas?.configured && atlas?.error) {
+      return {
+        level: 'watch',
+        title: 'Atlas plan data unavailable',
+        message: atlas.error
+      };
+    }
+
+    return {
+      level: 'watch',
+      title: 'Plan data pending',
+      message: 'Atlas plan capacity is not available yet. MongoDB footprint is still being tracked below.'
+    };
+  }
+
+  return {
+    level: atlas.healthLevel || 'safe',
+    title: atlas.healthTitle || 'Storage health',
+    message: atlas.healthMessage || 'Atlas storage health is available.'
+  };
+}
+
 export default function AdminStorageMonitorPage() {
   const navigate = useNavigate();
   const [storageStats, setStorageStats] = useState(null);
@@ -92,6 +116,7 @@ export default function AdminStorageMonitorPage() {
   const allCollections = Array.isArray(storageStats?.collections) ? storageStats.collections : [];
   const atlasMetricsAvailable = Boolean(atlas.available) && Number(atlas.planCapacityBytes || 0) > 0;
   const diskMetricsAvailable = database.diskMetricsAvailable !== false && Number(database.fsTotalSizeBytes || 0) > 0;
+  const storageGuidance = getStorageGuidance(atlas, atlasMetricsAvailable);
 
   const storageFootprint = useMemo(() => {
     const storageSize = Number(database.storageSizeBytes || 0);
@@ -105,6 +130,10 @@ export default function AdminStorageMonitorPage() {
       diskUsagePercent: fsTotal > 0 ? (fsUsed / fsTotal) * 100 : 0
     };
   }, [database.dataSizeBytes, database.fsTotalSizeBytes, database.fsUsedSizeBytes, database.storageSizeBytes, database.totalIndexSizeBytes]);
+
+  const heroConsumedValue = atlasMetricsAvailable ? atlas.consumedBytes : database.totalSizeBytes || database.storageSizeBytes;
+  const heroLimitValue = atlasMetricsAvailable ? atlas.planCapacityBytes : database.storageSizeBytes;
+  const heroRemainingValue = atlasMetricsAvailable ? atlas.remainingEstimateBytes : 0;
 
   return (
     <AppShell
@@ -133,40 +162,53 @@ export default function AdminStorageMonitorPage() {
         <section className="workspace-hero workspace-hero-storage">
           <div>
             <p className="eyebrow">MongoDB Monitor</p>
-            <h2>Track live database growth, Atlas quota and collection size</h2>
-            <p className="subtitle">This workspace refreshes automatically every 15 seconds so you can watch storage pressure, Atlas plan usage and collection hotspots in real time.</p>
+            <h2>Track total storage, consumed storage and collection growth</h2>
+            <p className="subtitle">This workspace refreshes automatically every 15 seconds so admins can see total plan capacity, consumed storage, remaining space and collection hotspots on both web and Android layouts.</p>
             <div className="storage-monitor-meta-row">
               <span className="storage-monitor-meta-pill">Status: {connection.status || 'unknown'}</span>
               <span className="storage-monitor-meta-pill">DB: {connection.databaseName || 'mongodb'}</span>
-              {atlasMetricsAvailable ? <span className="storage-monitor-meta-pill">Plan: {formatBytes(atlas.planCapacityBytes)}</span> : null}
+              {atlasMetricsAvailable ? <span className="storage-monitor-meta-pill">Total Plan: {formatBytes(atlas.planCapacityBytes)}</span> : null}
               <span className="storage-monitor-meta-pill">Updated: {formatSnapshot(storageStats?.snapshotAt)}</span>
             </div>
           </div>
-          <div className="workspace-hero-stats">
+          <div className="workspace-hero-stats storage-monitor-hero-stats">
             <StatCard label="Collections" value={database.collections || 0} />
-            <StatCard label="Documents" value={database.documents || 0} />
-            <StatCard label={atlasMetricsAvailable ? 'Atlas Used' : 'Storage'} value={formatBytes(atlasMetricsAvailable ? atlas.usedEstimateBytes : database.storageSizeBytes)} />
-            <StatCard label={atlasMetricsAvailable ? 'Atlas Limit' : 'Indexes'} value={formatBytes(atlasMetricsAvailable ? atlas.planCapacityBytes : database.totalIndexSizeBytes)} />
+            <StatCard label={atlasMetricsAvailable ? 'Consumed' : 'Documents'} value={atlasMetricsAvailable ? formatBytes(heroConsumedValue) : database.documents || 0} />
+            <StatCard label={atlasMetricsAvailable ? 'Total Storage' : 'Storage'} value={formatBytes(heroLimitValue)} />
+            <StatCard label={atlasMetricsAvailable ? 'Remaining' : 'Indexes'} value={atlasMetricsAvailable ? formatBytes(heroRemainingValue) : formatBytes(database.totalIndexSizeBytes)} />
           </div>
         </section>
 
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
+        <section className={`card storage-monitor-guidance-card storage-monitor-guidance-${storageGuidance.level}`}>
+          <div>
+            <p className="eyebrow">Storage Guidance</p>
+            <h3>{storageGuidance.title}</h3>
+            <p className="subtitle">{storageGuidance.message}</p>
+          </div>
+          <div className="storage-monitor-guidance-pills">
+            <span className="storage-monitor-guidance-pill">Consumed: {formatBytes(heroConsumedValue)}</span>
+            <span className="storage-monitor-guidance-pill">Total: {formatBytes(heroLimitValue)}</span>
+            {atlasMetricsAvailable ? <span className="storage-monitor-guidance-pill">Usage: {formatPercent(atlas.usagePercent)}</span> : null}
+          </div>
+        </section>
+
         <section className="storage-monitor-grid">
           <article className="card storage-monitor-spotlight">
             <div className="storage-monitor-spotlight-copy">
-              <p className="eyebrow">Storage Footprint</p>
-              <h3>{formatBytes(database.storageSizeBytes)}</h3>
-              <p className="subtitle">Allocated storage across MongoDB collections.</p>
+              <p className="eyebrow">Storage Overview</p>
+              <h3>{formatBytes(heroLimitValue)}</h3>
+              <p className="subtitle">{atlasMetricsAvailable ? 'Total Atlas storage offered for this cluster.' : 'Allocated MongoDB storage across collections.'}</p>
             </div>
             <div className="storage-monitor-rings" aria-hidden="true">
               <div className="storage-monitor-ring storage-monitor-ring-data">
-                <span>{formatPercent(storageFootprint.dataVsStoragePercent)}</span>
-                <small>Data</small>
+                <span>{atlasMetricsAvailable ? formatPercent(atlas.usagePercent) : formatPercent(storageFootprint.dataVsStoragePercent)}</span>
+                <small>{atlasMetricsAvailable ? 'Used' : 'Data'}</small>
               </div>
               <div className="storage-monitor-ring storage-monitor-ring-index">
-                <span>{formatPercent(storageFootprint.indexVsStoragePercent)}</span>
-                <small>Indexes</small>
+                <span>{atlasMetricsAvailable ? formatBytes(atlas.remainingEstimateBytes) : formatPercent(storageFootprint.indexVsStoragePercent)}</span>
+                <small>{atlasMetricsAvailable ? 'Left' : 'Indexes'}</small>
               </div>
             </div>
           </article>
@@ -186,7 +228,7 @@ export default function AdminStorageMonitorPage() {
             {atlasMetricsAvailable ? (
               <div className="storage-monitor-progress-block">
                 <div className="storage-monitor-progress-head">
-                  <strong>{formatBytes(atlas.usedEstimateBytes)}</strong>
+                  <strong>{formatBytes(atlas.consumedBytes || atlas.usedEstimateBytes)}</strong>
                   <span>of {formatBytes(atlas.planCapacityBytes)} used</span>
                 </div>
                 <div className="storage-monitor-progress-track">
@@ -221,22 +263,26 @@ export default function AdminStorageMonitorPage() {
           <StatCard label={atlasMetricsAvailable ? 'Usage' : 'Views'} value={atlasMetricsAvailable ? formatPercent(atlas.usagePercent) : database.views || 0} />
         </section>
 
-        {atlasMetricsAvailable ? (
+        {atlas.configured ? (
           <section className="card storage-monitor-panel workspace-panel">
             <div className="section-header compact">
               <div>
                 <p className="eyebrow">Atlas Capacity</p>
-                <h3>Plan quota versus current database footprint</h3>
+                <h3>{atlasMetricsAvailable ? 'Plan quota versus current database footprint' : 'Atlas plan data is configured'}</h3>
                 <p className="subtitle">Cluster {atlas.clusterName || 'Atlas'} {atlas.clusterType ? `• ${atlas.clusterType}` : ''} {atlas.providerName ? `• ${atlas.providerName}` : ''}</p>
               </div>
               <StatCard label="Atlas State" value={atlas.stateName || 'unknown'} />
             </div>
-            <div className="storage-monitor-meta-row">
-              <span className="storage-monitor-meta-pill">Total: {formatBytes(atlas.planCapacityBytes)}</span>
-              <span className="storage-monitor-meta-pill">Used: {formatBytes(atlas.usedEstimateBytes)}</span>
-              <span className="storage-monitor-meta-pill">Remaining: {formatBytes(atlas.remainingEstimateBytes)}</span>
-              <span className="storage-monitor-meta-pill">Usage: {formatPercent(atlas.usagePercent)}</span>
-            </div>
+            {atlasMetricsAvailable ? (
+              <div className="storage-monitor-meta-row">
+                <span className="storage-monitor-meta-pill">Total: {formatBytes(atlas.planCapacityBytes)}</span>
+                <span className="storage-monitor-meta-pill">Consumed: {formatBytes(atlas.consumedBytes || atlas.usedEstimateBytes)}</span>
+                <span className="storage-monitor-meta-pill">Remaining: {formatBytes(atlas.remainingEstimateBytes)}</span>
+                <span className="storage-monitor-meta-pill">Usage: {formatPercent(atlas.usagePercent)}</span>
+              </div>
+            ) : (
+              <p className="subtitle">{atlas.error || 'Atlas is configured, but the plan capacity is not available yet. Refresh after deployment completes.'}</p>
+            )}
           </section>
         ) : null}
 
