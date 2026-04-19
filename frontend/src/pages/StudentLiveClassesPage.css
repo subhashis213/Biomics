@@ -101,6 +101,7 @@
 
 .livekit-student-page .student-room-shell .student-video-conference-primary,
 .livekit-student-page .student-room-shell .student-video-conference-grid-wrapper {
+  position: relative;
   min-width: 0;
   min-height: clamp(300px, 62vh, 720px);
   height: 100%;
@@ -114,6 +115,109 @@
   height: 100%;
 }
 
+.livekit-student-page .student-room-shell .student-video-conference-primary.is-screen-share {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--student-stage-controls-border);
+  background: color-mix(in srgb, var(--student-stage-controls-bg) 88%, transparent);
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-copy strong {
+  color: var(--student-room-title);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--student-stage-badge-border);
+  background: var(--student-stage-badge-bg);
+  color: var(--student-stage-badge-text);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-zoom-btn {
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--student-stage-group-border);
+  background: var(--student-stage-group-bg);
+  color: var(--student-stage-controls-text);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-zoom-btn:disabled {
+  opacity: 0.48;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-zoom-btn--reset {
+  min-width: 74px;
+  font-size: 0.84rem;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-viewport {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y pinch-zoom;
+  border-radius: 22px;
+  background: rgba(2, 6, 23, 0.48);
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-canvas {
+  width: calc(100% * var(--student-screen-share-scale, 1));
+  height: calc(100% * var(--student-screen-share-scale, 1));
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-tile {
+  min-height: 100%;
+  border-radius: 22px;
+}
+
+.livekit-student-page .student-room-shell .student-screen-share-footnote {
+  margin: 0;
+  color: var(--student-room-copy);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .livekit-student-page .student-room-shell .student-video-conference-support-rail {
   min-width: 0;
   display: grid;
@@ -121,8 +225,21 @@
   gap: 10px;
 }
 
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share {
+  align-self: start;
+}
+
 .livekit-student-page .student-room-shell .student-video-conference-support-rail .lk-participant-tile {
   min-height: 152px;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share .lk-participant-tile {
+  min-height: 132px;
+  aspect-ratio: 16 / 10;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share .lk-participant-placeholder {
+  display: none !important;
 }
 
 .livekit-student-page .student-room-shell .student-room-controls {
@@ -1286,6 +1403,30 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
     min-height: clamp(240px, 48vh, 420px);
   }
 
+  .livekit-student-page .student-room-shell .student-video-conference-primary.is-screen-share {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .livekit-student-page .student-room-shell .student-screen-share-toolbar {
+    padding: 10px;
+  }
+
+  .livekit-student-page .student-room-shell .student-screen-share-copy strong {
+    font-size: 0.82rem;
+  }
+
+  .livekit-student-page .student-room-shell .student-screen-share-zoom-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .livekit-student-page .student-room-shell .student-screen-share-zoom-btn {
+    flex: 0 0 auto;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
   .livekit-student-page .student-room-shell .student-video-conference-support-rail {
     display: flex;
     gap: 10px;
@@ -1699,11 +1840,139 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   min-height: calc(100vh - 24px);
 }
 
+.livekit-student-page .student-room-shell:fullscreen .student-video-conference-stage,
+.livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-stage {
+  min-height: 0;
+  height: 100%;
+}
+
 .livekit-student-page .student-room-shell:fullscreen .student-video-conference-primary,
 .livekit-student-page .student-room-shell:fullscreen .student-video-conference-grid-wrapper,
 .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-primary,
 .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-grid-wrapper {
   min-height: calc(100vh - 180px);
+}
+
+.livekit-student-page .student-room-shell:fullscreen .student-video-conference-stage.has-screen-share,
+.livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-stage.has-screen-share {
+  grid-template-columns: minmax(0, 1fr);
+  position: relative;
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .livekit-student-page .student-room-shell:fullscreen,
+  .livekit-student-page .student-room-shell:-webkit-full-screen {
+    padding: 8px;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference {
+    gap: 8px;
+    min-height: calc(100vh - 16px);
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-status strong,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-status strong {
+    font-size: 0.82rem;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-stage,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-stage {
+    gap: 8px;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-primary,
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-grid-wrapper,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-primary,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-grid-wrapper {
+    min-height: calc(100vh - 138px);
+    border-radius: 22px;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-primary.is-screen-share,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-primary.is-screen-share {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-screen-share-toolbar,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-screen-share-toolbar {
+    padding: 8px 10px;
+    border-radius: 16px;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-screen-share-copy strong,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-screen-share-copy strong {
+    font-size: 0.76rem;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-screen-share-footnote,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-screen-share-footnote {
+    display: none;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-stage.has-screen-share,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-stage.has-screen-share {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-support-rail,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-support-rail {
+    gap: 8px;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-support-rail.has-screen-share,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-support-rail.has-screen-share {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 4;
+    width: min(22vw, 180px);
+    min-width: 112px;
+    max-width: 180px;
+    padding: 6px;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(2, 6, 23, 0.62);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 14px 28px rgba(2, 6, 23, 0.28);
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-support-rail .lk-participant-tile,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-support-rail .lk-participant-tile {
+    min-height: 92px;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-support-rail.has-screen-share .lk-participant-tile,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-support-rail.has-screen-share .lk-participant-tile {
+    min-height: auto;
+    height: auto;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.22);
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-support-rail.has-screen-share .lk-participant-metadata,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-support-rail.has-screen-share .lk-participant-metadata {
+    left: 8px;
+    bottom: 8px;
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 0.72rem;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-support-rail.has-screen-share .lk-participant-name,
+  .livekit-student-page .student-room-shell:fullscreen .student-video-conference-support-rail.has-screen-share .lk-participant-identity,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-support-rail.has-screen-share .lk-participant-name,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-support-rail.has-screen-share .lk-participant-identity {
+    font-size: 0.72rem;
+  }
+
+  .livekit-student-page .student-room-shell:fullscreen .student-room-controls,
+  .livekit-student-page .student-room-shell:-webkit-full-screen .student-room-controls {
+    margin: 0;
+    padding: 10px 12px;
+    gap: 8px;
+  }
 }
 
 html[data-theme='light'] .livekit-student-page .student-room-shell,

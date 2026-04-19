@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Chat,
-  FocusLayout,
   GridLayout,
   LiveKitRoom,
   ParticipantTile,
@@ -49,6 +48,13 @@ function getTrackIdentity(trackReference) {
   return `${String(trackReference?.participant?.identity || '').trim()}::${String(trackReference?.source || '').trim()}`;
 }
 
+function trackHasVisibleVideo(trackReference) {
+  if (!isTrackReference(trackReference)) return false;
+  if (trackReference.publication?.source !== Track.Source.Camera) return false;
+  if (!trackReference.publication?.isSubscribed || trackReference.publication?.isMuted) return false;
+  return participantHasVisibleVideo(trackReference.participant);
+}
+
 function createDefaultRoomPolicy() {
   return {
     studentsMuted: false,
@@ -62,6 +68,7 @@ function isLocalMicEnabled(room) {
 }
 
 function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
+  const [screenShareZoom, setScreenShareZoom] = useState(1);
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -84,6 +91,11 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
     [tracks]
   );
 
+  const teacherPreviewTrack = useMemo(
+    () => (trackHasVisibleVideo(remoteCameraTrack) ? remoteCameraTrack : null),
+    [remoteCameraTrack]
+  );
+
   const primaryTrack = useMemo(() => {
     if (screenShareTrack) return screenShareTrack;
     if (remoteCameraTrack) return remoteCameraTrack;
@@ -91,10 +103,36 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
   }, [remoteCameraTrack, screenShareTrack, tracks]);
 
   const supportingTracks = useMemo(() => {
+    if (screenShareTrack) {
+      return teacherPreviewTrack ? [teacherPreviewTrack] : [];
+    }
+
     if (!primaryTrack) return tracks;
     const primaryIdentity = getTrackIdentity(primaryTrack);
     return tracks.filter((trackReference) => getTrackIdentity(trackReference) !== primaryIdentity);
-  }, [primaryTrack, tracks]);
+  }, [primaryTrack, screenShareTrack, teacherPreviewTrack, tracks]);
+
+  useEffect(() => {
+    if (!screenShareTrack) {
+      setScreenShareZoom(1);
+    }
+  }, [screenShareTrack]);
+
+  const hasScreenShare = Boolean(screenShareTrack);
+  const canZoomOut = screenShareZoom > 1;
+  const canZoomIn = screenShareZoom < 2.5;
+
+  function handleZoomIn() {
+    setScreenShareZoom((current) => Math.min(2.5, Number((current + 0.25).toFixed(2))));
+  }
+
+  function handleZoomOut() {
+    setScreenShareZoom((current) => Math.max(1, Number((current - 0.25).toFixed(2))));
+  }
+
+  function handleZoomReset() {
+    setScreenShareZoom(1);
+  }
 
   return (
     <div className="student-video-conference student-video-conference--custom">
@@ -108,10 +146,51 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
         </button>
       </div>
 
-      <div className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}`}>
+      <div className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}`}>
         {primaryTrack ? (
-          <div className="student-video-conference-primary">
-            <FocusLayout trackRef={primaryTrack} className="student-video-conference-focus-tile" />
+          <div className={`student-video-conference-primary${hasScreenShare ? ' is-screen-share' : ''}`}>
+            {hasScreenShare ? (
+              <>
+                <div className="student-screen-share-toolbar">
+                  <div className="student-screen-share-copy">
+                    <span className="student-screen-share-badge">Shared screen mode</span>
+                    <strong>
+                      {isFullscreen
+                        ? 'Rotate or zoom if the shared slide looks cropped.'
+                        : 'Use zoom controls when the shared question needs a closer look.'}
+                    </strong>
+                  </div>
+                  <div className="student-screen-share-zoom-controls" role="group" aria-label="Screen share zoom controls">
+                    <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomOut} disabled={!canZoomOut}>
+                      -
+                    </button>
+                    <button type="button" className="student-screen-share-zoom-btn student-screen-share-zoom-btn--reset" onClick={handleZoomReset} disabled={screenShareZoom === 1}>
+                      {Math.round(screenShareZoom * 100)}%
+                    </button>
+                    <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomIn} disabled={!canZoomIn}>
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="student-screen-share-viewport">
+                  <div
+                    className="student-screen-share-canvas"
+                    style={{ '--student-screen-share-scale': screenShareZoom }}
+                  >
+                    <ParticipantTile trackRef={primaryTrack} className="student-video-conference-focus-tile student-screen-share-tile" />
+                  </div>
+                </div>
+
+                <p className="student-screen-share-footnote">
+                  {screenShareZoom > 1
+                    ? 'Drag the shared screen to inspect hidden corners and detailed text.'
+                    : 'If rotation makes the teacher slide look small, zoom in here without affecting the rest of the room.'}
+                </p>
+              </>
+            ) : (
+              <ParticipantTile trackRef={primaryTrack} className="student-video-conference-focus-tile" />
+            )}
           </div>
         ) : (
           <div className="student-video-conference-grid-wrapper">
@@ -122,7 +201,7 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
         )}
 
         {primaryTrack && supportingTracks.length ? (
-          <div className="student-video-conference-support-rail">
+          <div className={`student-video-conference-support-rail${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}`}>
             <TrackLoop tracks={supportingTracks}>
               <ParticipantTile />
             </TrackLoop>
