@@ -397,7 +397,8 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
       <div
         ref={stageRef}
         className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-immersive-stage' : ''}`}
-        onPointerDownCapture={showImmersiveStage ? onStageInteract : undefined}
+        onPointerDownCapture={isFullscreen ? onStageInteract : undefined}
+        onTouchStartCapture={isFullscreen ? onStageInteract : undefined}
       >
         {primaryTrack ? (
           <div className={`student-video-conference-primary${hasScreenShare ? ' is-screen-share' : ''}`}>
