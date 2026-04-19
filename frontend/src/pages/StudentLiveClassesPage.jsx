@@ -491,6 +491,10 @@ export default function StudentLiveClassesPage() {
                   navigate('/student/live-classes', { replace: true });
                   loadWorkspace();
                 }}
+                onLeave={() => {
+                  navigate('/student/live-classes', { replace: true });
+                  loadWorkspace({ showLoading: false });
+                }}
               />
           ) : !workspace.activeClass ? (
             <section className="card livekit-empty-room-card">

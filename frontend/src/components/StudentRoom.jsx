@@ -1,5 +1,16 @@
-import { useEffect, useState } from 'react';
-import { LiveKitRoom, RoomAudioRenderer, VideoConference, useRoomContext } from '@livekit/components-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Chat,
+  FocusLayout,
+  GridLayout,
+  LiveKitRoom,
+  ParticipantTile,
+  RoomAudioRenderer,
+  TrackLoop,
+  useRoomContext,
+  useTracks
+} from '@livekit/components-react';
+import { isTrackReference } from '@livekit/components-core';
 import { RoomEvent, Track } from 'livekit-client';
 import '@livekit/components-styles';
 import { fetchStudentLivekitToken } from '../api';
@@ -7,6 +18,17 @@ import { getSession } from '../session';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+function getDocumentTheme() {
+  if (typeof document === 'undefined') return 'dark';
+  return document.documentElement.getAttribute('data-theme')
+    || document.body?.getAttribute('data-theme')
+    || 'dark';
+}
+
+function getLiveKitTheme(theme) {
+  return theme === 'light' ? 'default' : 'black';
+}
 
 function isRemovedFromSessionMessage(value) {
   return /removed from the current live session|participant removed|removed by the admin|removed/i.test(String(value || ''));
@@ -18,6 +40,231 @@ function participantHasVisibleVideo(participant) {
     const source = publication?.source;
     return !publication?.isMuted && (source === Track.Source.Camera || source === Track.Source.ScreenShare);
   });
+}
+
+function getTrackIdentity(trackReference) {
+  if (!trackReference) return '';
+  const trackSid = String(trackReference?.publication?.trackSid || '').trim();
+  if (trackSid) return trackSid;
+  return `${String(trackReference?.participant?.identity || '').trim()}::${String(trackReference?.source || '').trim()}`;
+}
+
+function createDefaultRoomPolicy() {
+  return {
+    studentsMuted: false,
+    chatDisabled: false
+  };
+}
+
+function isLocalMicEnabled(room) {
+  const publications = Array.from(room?.localParticipant?.trackPublications?.values?.() || []);
+  return publications.some((publication) => publication?.source === Track.Source.Microphone && !publication?.isMuted);
+}
+
+function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false }
+    ],
+    { updateOnlyOn: [RoomEvent.ActiveSpeakersChanged], onlySubscribed: false }
+  );
+
+  const screenShareTrack = useMemo(
+    () => tracks.find((trackReference) => isTrackReference(trackReference)
+      && trackReference.publication.source === Track.Source.ScreenShare
+      && trackReference.publication.isSubscribed) || null,
+    [tracks]
+  );
+
+  const remoteCameraTrack = useMemo(
+    () => tracks.find((trackReference) => isTrackReference(trackReference)
+      && trackReference.publication.source === Track.Source.Camera
+      && !trackReference.participant?.isLocal) || null,
+    [tracks]
+  );
+
+  const primaryTrack = useMemo(() => {
+    if (screenShareTrack) return screenShareTrack;
+    if (remoteCameraTrack) return remoteCameraTrack;
+    return tracks.find((trackReference) => isTrackReference(trackReference)) || tracks[0] || null;
+  }, [remoteCameraTrack, screenShareTrack, tracks]);
+
+  const supportingTracks = useMemo(() => {
+    if (!primaryTrack) return tracks;
+    const primaryIdentity = getTrackIdentity(primaryTrack);
+    return tracks.filter((trackReference) => getTrackIdentity(trackReference) !== primaryIdentity);
+  }, [primaryTrack, tracks]);
+
+  return (
+    <div className="student-video-conference student-video-conference--custom">
+      <div className="student-video-conference-toolbar">
+        <div className="student-video-conference-status">
+          <span className="student-video-conference-status-pill">Classroom Focus</span>
+          <strong>{screenShareTrack ? 'Teacher screen is being shared' : 'Teacher stage is pinned for mobile view'}</strong>
+        </div>
+        <button type="button" className="student-room-fullscreen-btn" onClick={onToggleFullscreen}>
+          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+        </button>
+      </div>
+
+      <div className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}`}>
+        {primaryTrack ? (
+          <div className="student-video-conference-primary">
+            <FocusLayout trackRef={primaryTrack} className="student-video-conference-focus-tile" />
+          </div>
+        ) : (
+          <div className="student-video-conference-grid-wrapper">
+            <GridLayout tracks={tracks}>
+              <ParticipantTile />
+            </GridLayout>
+          </div>
+        )}
+
+        {primaryTrack && supportingTracks.length ? (
+          <div className="student-video-conference-support-rail">
+            <TrackLoop tracks={supportingTracks}>
+              <ParticipantTile />
+            </TrackLoop>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function StudentRoomControls({ policy, onError, onLeave, isChatOpen, onToggleChat }) {
+  const room = useRoomContext();
+  const [isMicEnabled, setIsMicEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!room) return undefined;
+
+    function syncMicState() {
+      setIsMicEnabled(isLocalMicEnabled(room));
+    }
+
+    syncMicState();
+    room.on(RoomEvent.LocalTrackPublished, syncMicState);
+    room.on(RoomEvent.LocalTrackUnpublished, syncMicState);
+    room.on(RoomEvent.TrackMuted, syncMicState);
+    room.on(RoomEvent.TrackUnmuted, syncMicState);
+
+    return () => {
+      room.off(RoomEvent.LocalTrackPublished, syncMicState);
+      room.off(RoomEvent.LocalTrackUnpublished, syncMicState);
+      room.off(RoomEvent.TrackMuted, syncMicState);
+      room.off(RoomEvent.TrackUnmuted, syncMicState);
+    };
+  }, [room]);
+
+  useEffect(() => {
+    if (!room || !policy.studentsMuted) return;
+
+    room.localParticipant.setMicrophoneEnabled(false)
+      .then(() => setIsMicEnabled(false))
+      .catch((error) => onError?.(error.message || 'Failed to mute microphone.'));
+  }, [onError, policy.studentsMuted, room]);
+
+  async function handleToggleMic() {
+    if (!room || policy.studentsMuted) return;
+
+    try {
+      const nextEnabled = !isMicEnabled;
+      await room.localParticipant.setMicrophoneEnabled(nextEnabled);
+      setIsMicEnabled(nextEnabled);
+    } catch (error) {
+      onError?.(error.message || 'Failed to update microphone state.');
+    }
+  }
+
+  function handleLeaveRoom() {
+    room?.disconnect();
+    onLeave?.();
+  }
+
+  return (
+    <div className="student-room-controls" aria-label="Student room controls">
+      <div className="student-room-controls-status">
+        {policy.studentsMuted ? <span className="student-room-control-pill is-alert">Mic locked by teacher</span> : null}
+        {policy.chatDisabled ? <span className="student-room-control-pill">Chat off for all</span> : null}
+      </div>
+      <div className="student-room-controls-actions">
+        <button type="button" className={`student-room-control-btn${isMicEnabled ? ' is-live' : ''}`} onClick={handleToggleMic} disabled={policy.studentsMuted}>
+          {policy.studentsMuted ? 'Muted by teacher' : isMicEnabled ? 'Mute mic' : 'Unmute mic'}
+        </button>
+        <button
+          type="button"
+          className={`student-room-control-btn${isChatOpen ? ' is-live' : ''}`}
+          onClick={onToggleChat}
+          disabled={policy.chatDisabled}
+        >
+          {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
+        </button>
+        <button type="button" className="student-room-control-btn student-room-control-btn--ghost" onClick={handleLeaveRoom}>
+          Leave class
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StudentRoomChatPanel({ policy, isOpen, onClose }) {
+  if (policy.chatDisabled) {
+    return (
+      <section className="student-room-chat-panel is-disabled" aria-live="polite">
+        <div className="student-room-chat-panel-head">
+          <div>
+            <p className="eyebrow">Class Chat</p>
+            <strong>Chat is turned off</strong>
+          </div>
+        </div>
+        <p className="student-room-chat-disabled-copy">The teacher has locked chat for this live class. You can use it again when they reopen it.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}`} aria-live="polite">
+      <div className="student-room-chat-panel-head">
+        <div>
+          <p className="eyebrow">Class Chat</p>
+          <strong>Messages</strong>
+        </div>
+        <button type="button" className="student-room-chat-close-btn" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <Chat />
+    </section>
+  );
+}
+
+function StudentRoomPolicySync({ onPolicyChange }) {
+  const room = useRoomContext();
+
+  useEffect(() => {
+    if (!room) return undefined;
+
+    function handleData(payload) {
+      try {
+        const message = JSON.parse(decoder.decode(payload));
+        if (message?.type !== 'room-policy' || !message?.policy) return;
+
+        onPolicyChange({
+          studentsMuted: Boolean(message.policy.studentsMuted),
+          chatDisabled: Boolean(message.policy.chatDisabled)
+        });
+      } catch (_) {
+        // Ignore malformed payloads.
+      }
+    }
+
+    room.on(RoomEvent.DataReceived, handleData);
+    return () => room.off(RoomEvent.DataReceived, handleData);
+  }, [onPolicyChange, room]);
+
+  return null;
 }
 
 function StudentRoomStatusOverlay() {
@@ -137,34 +384,30 @@ function StudentPollOverlay({ participantIdentity, onError }) {
         <div className="livekit-student-poll-head">
           <div>
             <p className="eyebrow">Live Poll</p>
-            <strong>Classroom question</strong>
+            <strong>Choose the matching option</strong>
           </div>
           <div className="livekit-student-poll-head-meta">
             <span className="livekit-student-poll-badge">Answer once</span>
             <span className="livekit-student-poll-meta-pill">{optionEntries.length} options</span>
+            <span className="livekit-student-poll-meta-pill">Question on teacher screen</span>
           </div>
         </div>
-        <div className="livekit-student-poll-question-card">
-          <span className="livekit-student-poll-question-label">Question</span>
-          <h3>{activePoll.question}</h3>
-        </div>
         <div className="livekit-student-poll-options">
-          {optionEntries.map(([key, label]) => {
+          {optionEntries.map(([key]) => {
             const isSelected = selectedAnswer === key;
             const isCorrect = activePoll.revealed && activePoll.correctOption === key;
+            const isIncorrect = activePoll.revealed && isSelected && !isCorrect;
             return (
               <button
                 key={key}
                 type="button"
-                className={`livekit-student-poll-option${isSelected ? ' is-selected' : ''}${isCorrect ? ' is-correct' : ''}`}
+                className={`livekit-student-poll-option${isSelected ? ' is-selected' : ''}${isCorrect ? ' is-correct' : ''}${isIncorrect ? ' is-incorrect' : ''}`}
                 onClick={() => handleVote(key)}
                 disabled={Boolean(selectedAnswer)}
+                aria-label={`Option ${key}`}
               >
                 <span className="livekit-student-poll-option-key">{key}</span>
-                <span className="livekit-student-poll-option-copy">
-                  <strong>Option {key}</strong>
-                  <span>{label}</span>
-                </span>
+                <strong className="livekit-student-poll-option-label">Option {key}</strong>
               </button>
             );
           })}
@@ -175,14 +418,14 @@ function StudentPollOverlay({ participantIdentity, onError }) {
               ? `Results are in. You selected option ${selectedAnswer || 'not answered'}.`
               : selectedAnswer
                 ? `You selected option ${selectedAnswer}.`
-                : 'Choose one option to submit instantly.'}
+                : 'Tap one option to submit instantly.'}
           </strong>
           <p className="subtitle">
             {activePoll.revealed
               ? 'The teacher has revealed the correct answer for everyone in the room.'
               : selectedAnswer
                 ? 'Waiting for teacher to reveal answer.'
-                : 'Tap the answer card that best matches the question.'}
+                : 'Read the question from the shared PPT or teacher screen, then choose A, B, C, or D.'}
           </p>
         </div>
         {selectedAnswer && !activePoll.revealed ? (
@@ -203,11 +446,93 @@ function StudentPollOverlay({ participantIdentity, onError }) {
   );
 }
 
-export default function StudentRoom({ classSession, onSessionRemoved }) {
+export default function StudentRoom({ classSession, onSessionRemoved, onLeave }) {
   const session = getSession();
   const [connectionInfo, setConnectionInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [roomPolicy, setRoomPolicy] = useState(createDefaultRoomPolicy);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
+  const roomShellRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return undefined;
+
+    const syncTheme = () => setLiveKitTheme(getLiveKitTheme(getDocumentTheme()));
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    if (document.body) {
+      observer.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const syncChatState = (event) => {
+      setIsChatOpen(!event.matches);
+    };
+
+    syncChatState(mediaQuery);
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncChatState);
+      return () => mediaQuery.removeEventListener('change', syncChatState);
+    }
+
+    mediaQuery.addListener(syncChatState);
+    return () => mediaQuery.removeListener(syncChatState);
+  }, []);
+
+  useEffect(() => {
+    if (!roomPolicy.chatDisabled) return;
+    setIsChatOpen(false);
+  }, [roomPolicy.chatDisabled]);
+
+  useEffect(() => {
+    function syncFullscreenState() {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
+      setIsFullscreen(Boolean(fullscreenElement && roomShellRef.current && fullscreenElement === roomShellRef.current));
+    }
+
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreenState);
+      document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
+    };
+  }, []);
+
+  async function handleToggleFullscreen() {
+    const target = roomShellRef.current;
+    if (!target) return;
+
+    try {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
+      if (fullscreenElement === target) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+        return;
+      }
+
+      if (target.requestFullscreen) {
+        await target.requestFullscreen();
+      } else if (target.webkitRequestFullscreen) {
+        target.webkitRequestFullscreen();
+      }
+    } catch (error) {
+      setErrorMessage(error?.message || 'Fullscreen mode is not available on this device.');
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -262,14 +587,14 @@ export default function StudentRoom({ classSession, onSessionRemoved }) {
   }
 
   return (
-    <section className="card livekit-conference-card student-room-shell">
+    <section ref={roomShellRef} className="card livekit-conference-card student-room-shell">
       <LiveKitRoom
         token={connectionInfo.token}
         serverUrl={connectionInfo.livekitUrl}
         connect
         audio
         video={false}
-        data-lk-theme="default"
+        data-lk-theme={liveKitTheme}
         onDisconnected={(reason) => {
           const rawReason = String(reason || '').trim();
           if (isRemovedFromSessionMessage(rawReason)) {
@@ -279,9 +604,28 @@ export default function StudentRoom({ classSession, onSessionRemoved }) {
           }
         }}
       >
+        <StudentRoomPolicySync onPolicyChange={setRoomPolicy} />
+        <StudentStageConference isFullscreen={isFullscreen} onToggleFullscreen={handleToggleFullscreen} />
         <StudentRoomStatusOverlay />
-        <VideoConference />
         <RoomAudioRenderer />
+        <StudentRoomControls
+          policy={roomPolicy}
+          onError={setErrorMessage}
+          isChatOpen={isChatOpen}
+          onToggleChat={() => setIsChatOpen((current) => !current)}
+          onLeave={() => {
+            setConnectionInfo(null);
+            setRoomPolicy(createDefaultRoomPolicy());
+            setIsChatOpen(false);
+            setErrorMessage('');
+            onLeave?.();
+          }}
+        />
+        <StudentRoomChatPanel
+          policy={roomPolicy}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+        />
         <StudentPollOverlay participantIdentity={`student-${session?.username || 'viewer'}-${classSession?._id || 'room'}`} onError={setErrorMessage} />
       </LiveKitRoom>
     </section>

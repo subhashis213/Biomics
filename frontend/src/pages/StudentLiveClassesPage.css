@@ -11,6 +11,7 @@
 .livekit-student-page .student-room-shell {
   position: relative;
   overflow: hidden;
+  padding: 12px;
   border-radius: 30px;
   border: 1px solid rgba(191, 219, 254, 0.34);
   background:
@@ -28,6 +29,293 @@
 .livekit-student-page .student-room-shell .lk-focus-layout-wrapper {
   min-height: inherit;
   background: transparent;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  min-height: min(78vh, 880px);
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-status {
+  display: grid;
+  gap: 4px;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-status strong {
+  color: #f8fafc;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-status-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  background: rgba(14, 165, 233, 0.14);
+  color: #bae6fd;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.livekit-student-page .student-room-shell .student-room-fullscreen-btn {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.82);
+  color: #f8fafc;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.24);
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 12px;
+  align-items: stretch;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-stage.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-primary,
+.livekit-student-page .student-room-shell .student-video-conference-grid-wrapper {
+  min-width: 0;
+  min-height: clamp(300px, 62vh, 720px);
+  height: 100%;
+  border-radius: 26px;
+  overflow: hidden;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-focus-tile,
+.livekit-student-page .student-room-shell .student-video-conference-grid-wrapper .lk-grid-layout {
+  width: 100%;
+  height: 100%;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-support-rail {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-support-rail .lk-participant-tile {
+  min-height: 152px;
+}
+
+.livekit-student-page .student-room-shell .student-room-controls {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 10px;
+  margin: 0 4px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(10, 15, 27, 0.88);
+  box-shadow: 0 18px 32px rgba(2, 6, 23, 0.2);
+}
+
+.livekit-student-page .student-room-shell .student-room-controls-status,
+.livekit-student-page .student-room-shell .student-room-controls-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.livekit-student-page .student-room-shell .student-room-control-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.livekit-student-page .student-room-shell .student-room-control-pill.is-alert {
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(127, 29, 29, 0.46);
+  color: #fecaca;
+}
+
+.livekit-student-page .student-room-shell .student-room-control-btn {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.livekit-student-page .student-room-shell .student-room-control-btn.is-live {
+  border-color: rgba(56, 189, 248, 0.28);
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.livekit-student-page .student-room-shell .student-room-control-btn--ghost {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.livekit-student-page .student-room-shell .student-room-control-btn:disabled {
+  opacity: 0.68;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel {
+  position: relative;
+  z-index: 2;
+  display: none;
+  gap: 14px;
+  margin: 0 4px;
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(10, 15, 27, 0.92);
+  box-shadow: 0 18px 32px rgba(2, 6, 23, 0.22);
+  overflow: hidden;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel.is-open,
+.livekit-student-page .student-room-shell .student-room-chat-panel.is-disabled {
+  display: grid;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel-head .eyebrow {
+  margin: 0 0 4px;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel-head strong {
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-close-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-disabled-copy {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.82);
+  line-height: 1.6;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat {
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1fr) auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  height: min(360px, 42vh);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 250, 255, 0.98) 100%);
+  overflow: hidden;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(214, 223, 238, 0.84);
+  color: #10233a;
+  font-weight: 800;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-close-button {
+  display: none;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-messages {
+  padding: 12px;
+  gap: 10px;
+  overflow: auto;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry * {
+  color: #10233a;
+  overflow-wrap: anywhere;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(214, 223, 238, 0.82);
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid rgba(214, 223, 238, 0.84);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input {
+  min-width: 0;
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(177, 190, 217, 0.56);
+  background: rgba(255, 255, 255, 0.98);
+  color: #10233a;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+  border-color: rgba(37, 99, 235, 0.84);
+  color: #fff;
+  font-weight: 700;
 }
 
 .livekit-student-page .student-room-shell .lk-participant-tile {
@@ -198,47 +486,24 @@
   color: #0f766e;
 }
 
-.livekit-student-page .student-room-shell .livekit-student-poll-question-card {
-  display: grid;
-  gap: 8px;
-  padding: 18px 20px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #0f3b57 0%, #135f8a 54%, #0f766e 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.livekit-student-page .student-room-shell .livekit-student-poll-question-label {
-  color: rgba(191, 219, 254, 0.88);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.livekit-student-page .student-room-shell .livekit-student-poll-question-card h3 {
-  margin: 0;
-  color: #f8fafc;
-  font-size: clamp(1.08rem, 1.7vw, 1.26rem);
-  line-height: 1.35;
-}
-
 .livekit-student-page .student-room-shell .livekit-student-poll-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
   align-content: start;
 }
 
 .livekit-student-page .student-room-shell .livekit-student-poll-option {
   width: 100%;
   min-width: 0;
-  min-height: 96px;
-  padding: 16px;
-  display: flex !important;
-  align-items: flex-start;
-  gap: 12px;
-  text-align: left;
-  border-radius: 22px;
+  min-height: 84px;
+  padding: 14px;
+  display: grid !important;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  text-align: center;
+  border-radius: 20px;
   border: 1px solid rgba(147, 197, 253, 0.42);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(239, 246, 255, 0.96) 100%);
   color: #10233a;
@@ -256,9 +521,8 @@
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 14px;
   background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
   color: #f8fafc;
@@ -267,23 +531,11 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
-.livekit-student-page .student-room-shell .livekit-student-poll-option-copy {
-  display: grid !important;
-  gap: 6px;
-  min-width: 0;
-}
-
-.livekit-student-page .student-room-shell .livekit-student-poll-option-copy strong {
+.livekit-student-page .student-room-shell .livekit-student-poll-option-label {
   color: #10233a;
-  font-size: 0.98rem;
-  line-height: 1.24;
-}
-
-.livekit-student-page .student-room-shell .livekit-student-poll-option-copy span {
-  color: #51657f;
-  font-size: 0.88rem;
-  line-height: 1.42;
-  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  line-height: 1.1;
+  font-weight: 800;
 }
 
 .livekit-student-page .student-room-shell .livekit-student-poll-option.is-selected {
@@ -294,6 +546,11 @@
 .livekit-student-page .student-room-shell .livekit-student-poll-option.is-correct {
   border-color: rgba(13, 148, 136, 0.52);
   background: linear-gradient(180deg, rgba(204, 251, 241, 0.99) 0%, rgba(153, 246, 228, 0.94) 100%);
+}
+
+.livekit-student-page .student-room-shell .livekit-student-poll-option.is-incorrect {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.99) 0%, rgba(254, 226, 226, 0.96) 100%);
 }
 
 .livekit-student-page .student-room-shell .livekit-student-poll-footer,
@@ -398,6 +655,22 @@
 
 .livekit-student-page .livekit-hero-stats .stat-card span,
 .livekit-student-page .livekit-hero-stats .stat-card strong {
+  overflow-wrap: anywhere;
+}
+
+.livekit-student-page .livekit-live-banner-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-student-page .livekit-live-banner-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.livekit-student-page .livekit-live-banner-copy strong,
+.livekit-student-page .livekit-live-banner-copy p,
+.livekit-student-page .livekit-live-banner-copy span {
   overflow-wrap: anywhere;
 }
 
@@ -977,6 +1250,95 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
     min-height: 0;
   }
 
+  .livekit-student-page .livekit-live-banner-panel {
+    padding: 14px;
+  }
+
+  .livekit-student-page .livekit-live-banner-panel .primary-btn,
+  .livekit-student-page .livekit-live-banner-panel .secondary-btn {
+    width: 100%;
+  }
+
+  .livekit-student-page .student-room-shell {
+    padding: 10px;
+    border-radius: 24px;
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference {
+    min-height: min(82vh, 760px);
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-toolbar {
+    align-items: stretch;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-fullscreen-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-primary,
+  .livekit-student-page .student-room-shell .student-video-conference-grid-wrapper {
+    min-height: clamp(240px, 48vh, 420px);
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-support-rail {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-support-rail .lk-participant-tile {
+    flex: 0 0 min(44vw, 170px);
+    min-height: 112px;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-controls-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .livekit-student-page .student-room-shell .student-room-control-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0 10px;
+    font-size: 0.84rem;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-chat-panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-height: min(68vh, 520px);
+    border-radius: 24px;
+    backdrop-filter: blur(16px);
+  }
+
+  .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat {
+    height: min(46vh, 360px);
+  }
+
+  .livekit-student-page .student-room-shell .student-room-controls {
+    margin: 0;
+    padding: 10px 12px;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-controls-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .livekit-student-page .student-room-shell .student-room-control-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .livekit-student-topbar-actions {
     max-width: min(46vw, 188px);
   }
@@ -1001,18 +1363,18 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   }
 
   .livekit-student-page .student-room-shell .livekit-student-poll-layer {
-    align-items: stretch;
-    padding: 10px;
+    place-items: end center;
+    padding: 12px;
   }
 
   .livekit-student-page .student-room-shell .livekit-student-poll-popup {
-    width: 100%;
-    height: 100%;
-    max-height: none;
+    width: min(420px, 100%);
+    height: auto;
+    max-height: min(62vh, 520px);
     padding: 14px;
-    gap: 12px;
-    border-radius: 22px;
-    overflow: hidden;
+    gap: 10px;
+    border-radius: 24px;
+    overflow: auto;
   }
 
   .livekit-student-page .student-room-shell .livekit-student-poll-head {
@@ -1033,15 +1395,6 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
     font-size: 0.7rem;
   }
 
-  .livekit-student-page .student-room-shell .livekit-student-poll-question-card {
-    padding: 14px 16px;
-    border-radius: 20px;
-  }
-
-  .livekit-student-page .student-room-shell .livekit-student-poll-question-card h3 {
-    font-size: 1rem;
-  }
-
   .livekit-student-page .student-room-shell .livekit-student-poll-options {
     gap: 10px;
     overflow: auto;
@@ -1049,22 +1402,20 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   }
 
   .livekit-student-page .student-room-shell .livekit-student-poll-option {
-    min-height: 84px;
-    padding: 14px;
+    min-height: 68px;
+    padding: 10px 12px;
     border-radius: 18px;
+    gap: 8px;
   }
 
   .livekit-student-page .student-room-shell .livekit-student-poll-option-key {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 12px;
+    font-size: 0.88rem;
   }
 
-  .livekit-student-page .student-room-shell .livekit-student-poll-option-copy strong {
-    font-size: 0.94rem;
-  }
-
-  .livekit-student-page .student-room-shell .livekit-student-poll-option-copy span,
+  .livekit-student-page .student-room-shell .livekit-student-poll-option-label,
   .livekit-student-page .student-room-shell .livekit-student-poll-footer .subtitle {
     font-size: 0.84rem;
   }
@@ -1087,6 +1438,61 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
     display: flex;
   }
 
+
+@media (max-width: 480px) {
+  .livekit-student-page .student-room-shell .livekit-student-poll-layer {
+    padding: 10px;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-popup {
+    width: 100%;
+    max-height: min(58vh, 460px);
+    padding: 12px;
+    gap: 9px;
+    border-radius: 20px;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-head strong {
+    font-size: 0.94rem;
+    line-height: 1.24;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-badge,
+  .livekit-student-page .student-room-shell .livekit-student-poll-meta-pill {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-options {
+    gap: 8px;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-option {
+    min-height: 62px;
+    padding: 9px 10px;
+    border-radius: 16px;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-option-key {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-option-label {
+    font-size: 0.8rem;
+  }
+
+  .livekit-student-page .student-room-shell .livekit-student-poll-footer,
+  .livekit-student-page .student-room-shell .livekit-poll-answer-pending,
+  .livekit-student-page .student-room-shell .livekit-poll-answer-reveal {
+    padding: 10px 12px;
+    border-radius: 16px;
+  }
+}
   .livekit-student-page .livekit-student-mini-calendar-toggle {
     width: 100%;
     justify-content: center;
@@ -1185,6 +1591,61 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
     padding: 9px 10px;
   }
 
+  .livekit-student-page .student-room-shell {
+    padding: 8px;
+    border-radius: 20px;
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference {
+    gap: 10px;
+    min-height: min(84vh, 680px);
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-status strong {
+    font-size: 0.88rem;
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-primary,
+  .livekit-student-page .student-room-shell .student-video-conference-grid-wrapper {
+    min-height: clamp(220px, 42vh, 360px);
+    border-radius: 20px;
+  }
+
+  .livekit-student-page .student-room-shell .student-video-conference-support-rail .lk-participant-tile {
+    flex-basis: min(52vw, 156px);
+    min-height: 96px;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-controls-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-chat-panel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat {
+    height: min(42vh, 320px);
+  }
+
+  .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-button,
+  .livekit-student-page .student-room-shell .student-room-chat-close-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-controls-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .livekit-student-page .student-room-shell .livekit-student-poll-layer {
     padding: 8px;
   }
@@ -1199,19 +1660,10 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
     font-size: 0.92rem;
   }
 
-  .livekit-student-page .student-room-shell .livekit-student-poll-question-label {
-    font-size: 0.68rem;
-  }
-
-  .livekit-student-page .student-room-shell .livekit-student-poll-question-card h3 {
-    font-size: 0.94rem;
-    line-height: 1.3;
-  }
-
   .livekit-student-page .student-room-shell .livekit-student-poll-option {
-    min-height: 78px;
+    min-height: 72px;
     padding: 12px;
-    gap: 10px;
+    gap: 8px;
   }
 
   .livekit-student-page .student-room-shell .livekit-student-poll-option-key {
@@ -1220,14 +1672,573 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
     font-size: 0.86rem;
   }
 
-  .livekit-student-page .student-room-shell .livekit-student-poll-option-copy strong {
+  .livekit-student-page .student-room-shell .livekit-student-poll-option-label {
     font-size: 0.9rem;
   }
 
-  .livekit-student-page .student-room-shell .livekit-student-poll-option-copy span,
   .livekit-student-page .student-room-shell .livekit-student-poll-footer strong,
   .livekit-student-page .student-room-shell .livekit-poll-answer-pending,
   .livekit-student-page .student-room-shell .livekit-poll-answer-reveal {
     font-size: 0.82rem;
   }
+}
+
+.livekit-student-page .student-room-shell:fullscreen,
+.livekit-student-page .student-room-shell:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 12px;
+  border-radius: 0;
+  border: none;
+}
+
+.livekit-student-page .student-room-shell:fullscreen .student-video-conference,
+.livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference {
+  min-height: calc(100vh - 24px);
+}
+
+.livekit-student-page .student-room-shell:fullscreen .student-video-conference-primary,
+.livekit-student-page .student-room-shell:fullscreen .student-video-conference-grid-wrapper,
+.livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-primary,
+.livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-grid-wrapper {
+  min-height: calc(100vh - 180px);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell,
+:root[data-theme='light'] .livekit-student-page .student-room-shell {
+  border-color: rgba(191, 219, 254, 0.84);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(242, 247, 255, 0.98) 100%);
+  box-shadow: 0 24px 48px rgba(148, 163, 184, 0.18);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-status strong,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel-head strong,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-status strong,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel-head strong {
+  color: #10233a;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-status-pill,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-status-pill {
+  border-color: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-fullscreen-btn,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-controls,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-fullscreen-btn,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-controls,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel {
+  border-color: rgba(191, 219, 254, 0.84);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 32px rgba(148, 163, 184, 0.18);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-pill,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-pill {
+  border-color: rgba(191, 219, 254, 0.84);
+  background: rgba(239, 246, 255, 0.92);
+  color: #36506b;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-pill.is-alert,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-pill.is-alert {
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(254, 242, 242, 0.96);
+  color: #b91c1c;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-btn,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-close-btn,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-btn,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-close-btn {
+  border-color: rgba(191, 219, 254, 0.84);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(239, 246, 255, 0.96) 100%);
+  color: #10233a;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-btn.is-live,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-btn.is-live {
+  border-color: rgba(59, 130, 246, 0.28);
+  background: rgba(219, 234, 254, 0.98);
+  color: #1d4ed8;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-btn--ghost,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-control-btn--ghost {
+  background: rgba(248, 250, 252, 0.98);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-disabled-copy,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-disabled-copy {
+  color: #5c7088;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-primary,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-grid-wrapper,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-primary,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-video-conference-grid-wrapper {
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  background: linear-gradient(180deg, rgba(235, 245, 255, 0.98) 0%, rgba(219, 234, 254, 0.94) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-tile,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-tile {
+  border-color: rgba(191, 219, 254, 0.8);
+  box-shadow: 0 14px 28px rgba(148, 163, 184, 0.14);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-media-video,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-placeholder,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-media-video,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-placeholder {
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.96) 0%, rgba(241, 245, 249, 0.98) 100%);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-placeholder svg,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-placeholder path,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-placeholder svg,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-placeholder path {
+  color: rgba(71, 85, 105, 0.66);
+  fill: rgba(71, 85, 105, 0.66);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-metadata,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-metadata {
+  border-color: rgba(191, 219, 254, 0.76);
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: #10233a !important;
+  box-shadow: 0 10px 24px rgba(148, 163, 184, 0.16);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-metadata *,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-name,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-identity,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-connection-quality,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-metadata *,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-name,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-participant-identity,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-connection-quality {
+  color: #10233a !important;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-control-bar,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-button-group,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-control-bar,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-button-group {
+  border-color: rgba(191, 219, 254, 0.84);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 28px rgba(148, 163, 184, 0.16);
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-button,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-disconnect-button,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-button *,
+html[data-theme='light'] .livekit-student-page .student-room-shell .lk-disconnect-button *,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-button,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-disconnect-button,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-button *,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .lk-disconnect-button * {
+  color: #10233a !important;
+  fill: currentColor;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header *,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry *,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input,
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-disabled-copy,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header *,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry *,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-disabled-copy {
+  color: #10233a !important;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input::placeholder,
+:root[data-theme='light'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input::placeholder {
+  color: #64748b;
+}
+
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-controls,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-fullscreen-btn,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-controls,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-fullscreen-btn {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form {
+  border-color: rgba(71, 85, 105, 0.36);
+  background: linear-gradient(180deg, rgba(10, 15, 27, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
+}
+
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header *,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry *,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input,
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-disabled-copy,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header *,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry *,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-disabled-copy {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input {
+  border-color: rgba(71, 85, 105, 0.44);
+  background: rgba(15, 23, 42, 0.98);
+}
+
+html[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input::placeholder,
+:root[data-theme='dark'] .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input::placeholder {
+  color: #94a3b8;
+}
+
+.livekit-student-page {
+  --student-room-shell-border: rgba(191, 219, 254, 0.84);
+  --student-room-shell-bg:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(242, 247, 255, 0.98) 100%);
+  --student-room-shell-shadow: 0 24px 48px rgba(148, 163, 184, 0.18);
+  --student-room-title: #10233a;
+  --student-room-copy: #5c7088;
+  --student-stage-badge-bg: rgba(59, 130, 246, 0.1);
+  --student-stage-badge-border: rgba(59, 130, 246, 0.2);
+  --student-stage-badge-text: #1d4ed8;
+  --student-stage-surface: linear-gradient(180deg, rgba(235, 245, 255, 0.98) 0%, rgba(219, 234, 254, 0.94) 100%);
+  --student-stage-surface-border: rgba(191, 219, 254, 0.8);
+  --student-stage-placeholder: linear-gradient(180deg, rgba(226, 232, 240, 0.96) 0%, rgba(241, 245, 249, 0.98) 100%);
+  --student-stage-meta-bg: rgba(255, 255, 255, 0.88);
+  --student-stage-meta-border: rgba(191, 219, 254, 0.76);
+  --student-stage-meta-text: #10233a;
+  --student-stage-controls-bg: rgba(255, 255, 255, 0.92);
+  --student-stage-controls-border: rgba(191, 219, 254, 0.84);
+  --student-stage-controls-text: #10233a;
+  --student-stage-group-bg: rgba(236, 243, 252, 0.94);
+  --student-stage-group-border: rgba(191, 219, 254, 0.84);
+  --student-chat-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 250, 255, 0.98) 100%);
+  --student-chat-border: rgba(214, 223, 238, 0.84);
+  --student-chat-input-bg: rgba(255, 255, 255, 0.98);
+  --student-poll-surface:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(13, 148, 136, 0.12), transparent 28%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.99) 0%, rgba(241, 245, 255, 0.98) 100%);
+  --student-poll-option-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(239, 246, 255, 0.96) 100%);
+  --student-poll-option-border: rgba(147, 197, 253, 0.42);
+}
+
+html[data-theme='dark'] .livekit-student-page,
+:root[data-theme='dark'] .livekit-student-page {
+  --student-room-shell-border: rgba(71, 85, 105, 0.46);
+  --student-room-shell-bg:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(3, 7, 18, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
+  --student-room-shell-shadow: 0 26px 54px rgba(2, 6, 23, 0.34);
+  --student-room-title: #f8fafc;
+  --student-room-copy: #aab9cf;
+  --student-stage-badge-bg: rgba(14, 165, 233, 0.14);
+  --student-stage-badge-border: rgba(125, 211, 252, 0.24);
+  --student-stage-badge-text: #bae6fd;
+  --student-stage-surface: linear-gradient(180deg, rgba(6, 11, 27, 0.98) 0%, rgba(10, 16, 32, 0.94) 100%);
+  --student-stage-surface-border: rgba(71, 85, 105, 0.34);
+  --student-stage-placeholder: linear-gradient(180deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.96) 100%);
+  --student-stage-meta-bg: rgba(15, 23, 42, 0.84);
+  --student-stage-meta-border: rgba(148, 163, 184, 0.2);
+  --student-stage-meta-text: #f8fafc;
+  --student-stage-controls-bg: rgba(10, 15, 27, 0.9);
+  --student-stage-controls-border: rgba(148, 163, 184, 0.16);
+  --student-stage-controls-text: #f8fafc;
+  --student-stage-group-bg: rgba(255, 255, 255, 0.04);
+  --student-stage-group-border: rgba(148, 163, 184, 0.14);
+  --student-chat-surface: linear-gradient(180deg, rgba(10, 15, 27, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
+  --student-chat-border: rgba(71, 85, 105, 0.42);
+  --student-chat-input-bg: rgba(15, 23, 42, 0.98);
+  --student-poll-surface:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(13, 148, 136, 0.1), transparent 28%),
+    linear-gradient(155deg, rgba(10, 15, 27, 0.99) 0%, rgba(18, 24, 38, 0.98) 100%);
+  --student-poll-option-bg: linear-gradient(180deg, rgba(18, 24, 38, 0.99) 0%, rgba(30, 41, 59, 0.96) 100%);
+  --student-poll-option-border: rgba(71, 85, 105, 0.42);
+}
+
+.livekit-student-page .student-room-shell {
+  border-color: var(--student-room-shell-border) !important;
+  background: var(--student-room-shell-bg) !important;
+  box-shadow: var(--student-room-shell-shadow) !important;
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme],
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-room-container,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-video-conference,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-layout-wrapper,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-video-conference-inner,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-focus-layout,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-grid-layout {
+  background: transparent !important;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-status strong,
+.livekit-student-page .student-room-shell .student-room-chat-panel-head strong {
+  color: var(--student-room-title) !important;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-status-pill {
+  border-color: var(--student-stage-badge-border) !important;
+  background: var(--student-stage-badge-bg) !important;
+  color: var(--student-stage-badge-text) !important;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-primary,
+.livekit-student-page .student-room-shell .student-video-conference-grid-wrapper {
+  border-color: var(--student-stage-surface-border) !important;
+  background: var(--student-stage-surface) !important;
+}
+
+.livekit-student-page .student-room-shell .lk-participant-tile {
+  border-color: var(--student-stage-surface-border) !important;
+}
+
+.livekit-student-page .student-room-shell .lk-participant-media-video,
+.livekit-student-page .student-room-shell .lk-participant-placeholder {
+  background: var(--student-stage-placeholder) !important;
+}
+
+.livekit-student-page .student-room-shell .lk-participant-metadata {
+  border-color: var(--student-stage-meta-border) !important;
+  background: var(--student-stage-meta-bg) !important;
+  color: var(--student-stage-meta-text) !important;
+}
+
+.livekit-student-page .student-room-shell .lk-participant-metadata *,
+.livekit-student-page .student-room-shell .lk-participant-name,
+.livekit-student-page .student-room-shell .lk-participant-identity,
+.livekit-student-page .student-room-shell .lk-connection-quality,
+.livekit-student-page .student-room-shell .student-room-control-btn,
+.livekit-student-page .student-room-shell .student-room-chat-close-btn,
+.livekit-student-page .student-room-shell .lk-button,
+.livekit-student-page .student-room-shell .lk-disconnect-button,
+.livekit-student-page .student-room-shell .lk-button *,
+.livekit-student-page .student-room-shell .lk-disconnect-button * {
+  color: var(--student-stage-controls-text) !important;
+  fill: currentColor;
+}
+
+.livekit-student-page .student-room-shell .lk-control-bar,
+.livekit-student-page .student-room-shell .student-room-controls,
+.livekit-student-page .student-room-shell .student-room-chat-panel,
+.livekit-student-page .student-room-shell .student-room-fullscreen-btn {
+  border-color: var(--student-stage-controls-border) !important;
+  background: var(--student-stage-controls-bg) !important;
+}
+
+.livekit-student-page .student-room-shell .student-room-fullscreen-btn {
+  color: var(--student-stage-controls-text) !important;
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--student-stage-controls-border) 42%, rgba(15, 23, 42, 0.12)) !important;
+}
+
+.livekit-student-page .student-room-shell .student-room-fullscreen-btn:hover {
+  border-color: color-mix(in srgb, var(--student-stage-controls-border) 72%, var(--student-stage-controls-text)) !important;
+  background: color-mix(in srgb, var(--student-stage-controls-bg) 88%, var(--student-stage-group-bg)) !important;
+}
+
+.livekit-student-page .student-room-shell .lk-button-group,
+.livekit-student-page .student-room-shell .student-room-control-pill {
+  border-color: var(--student-stage-group-border) !important;
+  background: var(--student-stage-group-bg) !important;
+}
+
+.livekit-student-page .student-room-shell .student-room-control-pill,
+.livekit-student-page .student-room-shell .student-room-chat-disabled-copy {
+  color: var(--student-room-copy) !important;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form {
+  border-color: var(--student-chat-border) !important;
+  background: var(--student-chat-surface) !important;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-header *,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-entry *,
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input {
+  color: var(--student-room-title) !important;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input {
+  background: var(--student-chat-input-bg) !important;
+  border-color: var(--student-chat-border) !important;
+}
+
+.livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input::placeholder {
+  color: var(--student-room-copy) !important;
+}
+
+.livekit-student-page .student-room-shell .livekit-student-poll-popup {
+  background: var(--student-poll-surface) !important;
+  color: var(--student-room-title) !important;
+}
+
+.livekit-student-page .student-room-shell .livekit-student-poll-head strong,
+.livekit-student-page .student-room-shell .livekit-student-poll-option-label,
+.livekit-student-page .student-room-shell .livekit-student-poll-footer strong,
+.livekit-student-page .student-room-shell .livekit-student-poll-dismiss-btn {
+  color: var(--student-room-title) !important;
+}
+
+.livekit-student-page .student-room-shell .livekit-student-poll-option,
+.livekit-student-page .student-room-shell .livekit-student-poll-footer,
+.livekit-student-page .student-room-shell .livekit-student-poll-dismiss-btn {
+  border-color: var(--student-poll-option-border) !important;
+  background: var(--student-poll-option-bg) !important;
+}
+
+.livekit-student-page .student-room-shell .livekit-student-poll-footer .subtitle,
+.livekit-student-page .student-room-shell .livekit-student-poll-head .eyebrow {
+  color: var(--student-room-copy) !important;
+}
+
+html[data-theme='light'] .livekit-student-page .student-room-shell [data-lk-theme='default'],
+:root[data-theme='light'] .livekit-student-page .student-room-shell [data-lk-theme='default'] {
+  color-scheme: light;
+  --lk-bg: #f8fbff;
+  --lk-bg2: #f3f7fd;
+  --lk-bg3: #eaf1fb;
+  --lk-bg4: #dbeafe;
+  --lk-bg5: #bfdbfe;
+  --lk-fg: #10233a;
+  --lk-fg2: #20364f;
+  --lk-fg3: #36506b;
+  --lk-fg4: #4e6a86;
+  --lk-fg5: #64748b;
+  --lk-border-color: rgba(191, 219, 254, 0.84);
+  --lk-control-bg: rgba(255, 255, 255, 0.96);
+  --lk-control-fg: #10233a;
+  --lk-control-hover-bg: #eaf2ff;
+  --lk-control-active-bg: #dbeafe;
+  --lk-control-active-hover-bg: #bfdbfe;
+  --lk-accent-bg: #2563eb;
+  --lk-accent-fg: #ffffff;
+  --lk-accent2: #1d4ed8;
+  --lk-accent3: #1e40af;
+  --lk-accent4: rgba(219, 234, 254, 0.98);
+  --lk-danger: #dc2626;
+  --lk-danger2: #ef4444;
+  --lk-danger3: #b91c1c;
+  --lk-danger-fg: #ffffff;
+  --lk-box-shadow: 0 18px 36px rgba(148, 163, 184, 0.18);
+  --lk-drop-shadow: rgba(37, 99, 235, 0.14) 0 0 24px;
+}
+
+html[data-theme='dark'] .livekit-student-page .student-room-shell [data-lk-theme='black'],
+:root[data-theme='dark'] .livekit-student-page .student-room-shell [data-lk-theme='black'] {
+  color-scheme: dark;
+  --lk-bg: #05070b;
+  --lk-bg2: #0b1220;
+  --lk-bg3: #121b2d;
+  --lk-bg4: #182338;
+  --lk-bg5: #223049;
+  --lk-fg: #f7fbff;
+  --lk-fg2: #e5edf8;
+  --lk-fg3: #d4dfef;
+  --lk-fg4: #c2d1e5;
+  --lk-fg5: #aebfd8;
+  --lk-border-color: rgba(148, 163, 184, 0.18);
+  --lk-control-bg: rgba(15, 23, 42, 0.92);
+  --lk-control-fg: #f8fafc;
+  --lk-control-hover-bg: rgba(30, 41, 59, 0.96);
+  --lk-control-active-bg: #2563eb;
+  --lk-control-active-hover-bg: #1d4ed8;
+  --lk-accent-bg: #2563eb;
+  --lk-accent-fg: #ffffff;
+  --lk-accent2: #1d4ed8;
+  --lk-accent3: #1e3a8a;
+  --lk-accent4: rgba(37, 99, 235, 0.24);
+  --lk-danger: #f87171;
+  --lk-danger2: #ef4444;
+  --lk-danger3: #dc2626;
+  --lk-danger-fg: #ffffff;
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme] {
+  color: var(--lk-fg) !important;
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-form-control,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-media-device-menu,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-settings-menu-modal,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-toast,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-participant-metadata-item {
+  border-color: var(--lk-border-color) !important;
+  background: var(--lk-bg2) !important;
+  color: var(--lk-fg) !important;
+  box-shadow: var(--lk-box-shadow);
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-media-device-menu *,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-settings-menu-modal *,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-toast *,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-form-control,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-form-control::placeholder,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry .lk-meta-data,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry .lk-meta-data *,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry .lk-message-body,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry .lk-message-body *,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-button-menu,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-button-menu::after,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-participant-metadata-item * {
+  color: var(--lk-fg) !important;
+  fill: currentColor;
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-form-control::placeholder,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry .lk-meta-data,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry .lk-meta-data *,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-media-device-select,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-media-device-select * {
+  color: var(--lk-fg5) !important;
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry[data-lk-message-origin='local'] .lk-message-body {
+  background: var(--lk-bg4) !important;
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-entry[data-lk-message-origin='remote'] .lk-message-body {
+  background: var(--lk-accent4) !important;
+}
+
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-header .lk-close-button:hover,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-button:not(:disabled):hover,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-disconnect-button:not(:disabled):hover,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-chat-toggle:not(:disabled):hover,
+.livekit-student-page .student-room-shell [data-lk-theme] .lk-start-audio-button:not(:disabled):hover {
+  background-color: var(--lk-control-hover-bg) !important;
 }

@@ -2579,39 +2579,75 @@ export default function StudentDashboard() {
       ) : null}
 
       {hasAnyUnlockedModule && !selectedModule ? (
-        <section
-          id="section-quiz-performance"
-          className="card student-route-entry-card quiz-performance-entry-card"
-          role="button"
-          tabIndex={0}
-          onClick={() => navigate('/student/quiz-performance')}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              navigate('/student/quiz-performance');
-            }
-          }}
-        >
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Quiz Performance</p>
-              <h2>Open your organized performance board</h2>
-              <p className="subtitle">Review module-wise and topic-wise quiz progress in a dedicated premium workspace.</p>
+        <div className="student-performance-spotlight-grid">
+          <section
+            id="section-quiz-performance"
+            className="card student-route-entry-card quiz-performance-entry-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('/student/quiz-performance')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                navigate('/student/quiz-performance');
+              }
+            }}
+          >
+            <div className="section-header compact">
+              <div>
+                <p className="eyebrow">Quiz Performance</p>
+                <h2>Open your organized performance board</h2>
+                <p className="subtitle">Review module-wise and topic-wise quiz progress in a dedicated premium workspace.</p>
+              </div>
             </div>
-          </div>
-          <div className="student-route-entry-copy">
-            <div className="student-route-chip-row" aria-hidden="true">
-              <span>Module trends</span>
-              <span>Topic breakdown</span>
-              <span>Recent attempts</span>
+            <div className="student-route-entry-copy">
+              <div className="student-route-chip-row" aria-hidden="true">
+                <span>Module trends</span>
+                <span>Topic breakdown</span>
+                <span>Recent attempts</span>
+              </div>
+              <div className="workspace-link-actions">
+                <button type="button" className="primary-btn" onClick={() => navigate('/student/quiz-performance')}>
+                  Open Quiz Performance →
+                </button>
+              </div>
             </div>
-            <div className="workspace-link-actions">
-              <button type="button" className="primary-btn" onClick={() => navigate('/student/quiz-performance')}>
-                Open Quiz Performance →
-              </button>
+          </section>
+
+          <section
+            id="section-test-series-performance"
+            className="card student-route-entry-card test-series-performance-entry-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('/student/test-series-performance')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                navigate('/student/test-series-performance');
+              }
+            }}
+          >
+            <div className="section-header compact">
+              <div>
+                <p className="eyebrow">Test Series Performance</p>
+                <h2>Track topic tests and full mocks separately</h2>
+                <p className="subtitle">Dive into module-wise topic test results and a dedicated full mock performance board with clearer spacing and cleaner visuals.</p>
+              </div>
             </div>
-          </div>
-        </section>
+            <div className="student-route-entry-copy">
+              <div className="student-route-chip-row" aria-hidden="true">
+                <span>Topic test modules</span>
+                <span>Full mock scores</span>
+                <span>Premium layout</span>
+              </div>
+              <div className="workspace-link-actions">
+                <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series-performance')}>
+                  Open Series Performance →
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {shouldShowLeaderboard ? (
@@ -2778,42 +2814,6 @@ export default function StudentDashboard() {
             <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series')}>
               Go to Test Series →
             </button>
-          </div>
-        </section>
-      ) : null}
-
-      {!selectedModule ? (
-        <section
-          id="section-test-series-performance"
-          className="card student-route-entry-card test-series-performance-entry-card"
-          role="button"
-          tabIndex={0}
-          onClick={() => navigate('/student/test-series-performance')}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              navigate('/student/test-series-performance');
-            }
-          }}
-        >
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Test Series Performance</p>
-              <h2>Track topic tests and full mocks separately</h2>
-              <p className="subtitle">Dive into module-wise topic test results and a dedicated full mock performance board with clearer spacing and cleaner visuals.</p>
-            </div>
-          </div>
-          <div className="student-route-entry-copy">
-            <div className="student-route-chip-row" aria-hidden="true">
-              <span>Topic test modules</span>
-              <span>Full mock scores</span>
-              <span>Premium layout</span>
-            </div>
-            <div className="workspace-link-actions">
-              <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series-performance')}>
-                Open Series Performance →
-              </button>
-            </div>
           </div>
         </section>
       ) : null}

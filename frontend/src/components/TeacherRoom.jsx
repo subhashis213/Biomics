@@ -27,28 +27,22 @@ import {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+function getDocumentTheme() {
+  if (typeof document === 'undefined') return 'dark';
+  return document.documentElement.getAttribute('data-theme')
+    || document.body?.getAttribute('data-theme')
+    || 'dark';
+}
+
+function getLiveKitTheme(theme) {
+  return 'black';
+}
+
 function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-async function waitWithCountdown(totalMs, setCountdown) {
-  const duration = Math.max(0, Number(totalMs || 0));
-  if (!duration) {
-    setCountdown(0);
-    return;
-  }
-
-  const deadline = Date.now() + duration;
-  while (true) {
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) break;
-    setCountdown(Math.ceil(remainingMs / 1000));
-    // eslint-disable-next-line no-await-in-loop
-    await wait(Math.min(1000, remainingMs));
-  }
-
-  setCountdown(0);
-}
+const BOOT_COUNTDOWN_SECONDS = 60;
 
 function formatCountdown(value) {
   const total = Math.max(0, Number(value || 0));
@@ -83,6 +77,13 @@ function formatDisconnectReason(reason) {
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .replace(/^./, (value) => value.toUpperCase());
+}
+
+function createDefaultRoomPolicy() {
+  return {
+    studentsMuted: false,
+    chatDisabled: false
+  };
 }
 
 function getTrackIdentity(trackReference) {
@@ -148,14 +149,80 @@ function TeacherStageConference() {
   );
 }
 
+function TeacherAudienceControlPanel({ onError, policy, onPolicyChange }) {
+  const room = useRoomContext();
+
+  const publishPolicy = useCallback(async (nextPolicy) => {
+    if (!room) return;
+    try {
+      await room.localParticipant.publishData(encoder.encode(JSON.stringify({
+        type: 'room-policy',
+        policy: nextPolicy
+      })), { reliable: true });
+    } catch (error) {
+      onError?.(error.message || 'Failed to update audience controls.');
+    }
+  }, [onError, room]);
+
+  useEffect(() => {
+    if (!room) return undefined;
+
+    function syncPolicyToNewParticipant() {
+      publishPolicy(policy);
+    }
+
+    room.on(RoomEvent.ParticipantConnected, syncPolicyToNewParticipant);
+    return () => room.off(RoomEvent.ParticipantConnected, syncPolicyToNewParticipant);
+  }, [policy, publishPolicy, room]);
+
+  async function handleTogglePolicy(key) {
+    const nextPolicy = {
+      ...policy,
+      [key]: !policy[key]
+    };
+
+    onPolicyChange(nextPolicy);
+    await publishPolicy(nextPolicy);
+  }
+
+  return (
+    <section className="card livekit-audience-controls-panel">
+      <div className="section-header compact livekit-audience-controls-headline">
+        <div>
+          <p className="eyebrow">Audience Controls</p>
+          <h3>Student room locks</h3>
+          <p className="subtitle">Control room-wide student audio and chat access from the studio sidebar.</p>
+        </div>
+      </div>
+
+      <div className="livekit-audience-controls-grid">
+        <article className={`livekit-audience-control-card${policy.studentsMuted ? ' is-active' : ''}`}>
+          <div>
+            <strong>Mute all students</strong>
+            <p>Forces every student mic off and keeps the student mic control locked until you allow it again.</p>
+          </div>
+          <button type="button" className={`secondary-btn livekit-audience-toggle-btn${policy.studentsMuted ? ' is-active' : ''}`} onClick={() => handleTogglePolicy('studentsMuted')}>
+            {policy.studentsMuted ? 'Allow student mics' : 'Mute all now'}
+          </button>
+        </article>
+
+        <article className={`livekit-audience-control-card${policy.chatDisabled ? ' is-active' : ''}`}>
+          <div>
+            <strong>Turn off chat</strong>
+            <p>Locks the live chat panel so room messaging stays closed until you reopen it.</p>
+          </div>
+          <button type="button" className={`secondary-btn livekit-audience-toggle-btn${policy.chatDisabled ? ' is-active' : ''}`} onClick={() => handleTogglePolicy('chatDisabled')}>
+            {policy.chatDisabled ? 'Turn chat back on' : 'Turn chat off'}
+          </button>
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function TeacherPollConsole({ onError }) {
   const room = useRoomContext();
   const [draft, setDraft] = useState({
-    question: '',
-    optionA: '',
-    optionB: '',
-    optionC: '',
-    optionD: '',
     correctOption: 'A'
   });
   const [activePoll, setActivePoll] = useState(null);
@@ -201,22 +268,16 @@ function TeacherPollConsole({ onError }) {
   }
 
   async function handleSendPoll() {
-    const question = String(draft.question || '').trim();
     const options = {
-      A: String(draft.optionA || '').trim(),
-      B: String(draft.optionB || '').trim(),
-      C: String(draft.optionC || '').trim(),
-      D: String(draft.optionD || '').trim()
+      A: 'Option A',
+      B: 'Option B',
+      C: 'Option C',
+      D: 'Option D'
     };
-
-    if (!question || Object.values(options).some((value) => !value)) {
-      onError?.('Complete the poll question and all four options before sending the poll.');
-      return;
-    }
 
     const nextPoll = {
       id: `poll-${Date.now().toString(36)}`,
-      question,
+      question: '',
       options,
       correctOption: draft.correctOption,
       revealed: false
@@ -239,16 +300,19 @@ function TeacherPollConsole({ onError }) {
   async function handleClearPoll() {
     if (!activePoll) return;
     const pollId = activePoll.id;
-    setActivePoll((current) => current ? ({ ...current, closed: true }) : current);
+    votesRef.current = new Map();
+    setResults(createEmptyResults());
+    setVoteSnapshots([]);
+    setActivePoll(null);
     await publishDataMessage({ type: 'poll-clear', pollId });
   }
 
   const resultRows = useMemo(() => [
-    { key: 'A', label: draft.optionA || activePoll?.options?.A || 'Option A', count: results.A },
-    { key: 'B', label: draft.optionB || activePoll?.options?.B || 'Option B', count: results.B },
-    { key: 'C', label: draft.optionC || activePoll?.options?.C || 'Option C', count: results.C },
-    { key: 'D', label: draft.optionD || activePoll?.options?.D || 'Option D', count: results.D }
-  ], [draft.optionA, draft.optionB, draft.optionC, draft.optionD, activePoll, results]);
+    { key: 'A', label: 'Option A', count: results.A },
+    { key: 'B', label: 'Option B', count: results.B },
+    { key: 'C', label: 'Option C', count: results.C },
+    { key: 'D', label: 'Option D', count: results.D }
+  ], [results]);
 
   const totalResponses = useMemo(
     () => resultRows.reduce((sum, item) => sum + item.count, 0),
@@ -278,7 +342,7 @@ function TeacherPollConsole({ onError }) {
         <div>
           <p className="eyebrow">Live Polls</p>
           <h3>MCQ Command Deck</h3>
-          <p className="subtitle">Launch a four-option poll instantly, watch response momentum build live, and reveal the correct answer when the class is ready.</p>
+          <p className="subtitle">Show fixed A, B, C, and D choices to students while the question stays on your PPT or shared screen, then reveal the correct option and clear the poll when you are done.</p>
         </div>
       </div>
 
@@ -301,27 +365,9 @@ function TeacherPollConsole({ onError }) {
       </div>
 
       <div className="livekit-poll-composer">
-        <label>
-          <span>Question</span>
-          <input
-            type="text"
-            value={draft.question}
-            onChange={(event) => setDraft((current) => ({ ...current, question: event.target.value }))}
-            placeholder="Ask the class a quick MCQ"
-          />
-        </label>
-
-        <div className="livekit-poll-option-grid">
+        <div className="livekit-poll-fixed-options-strip" aria-label="Student option set preview">
           {['A', 'B', 'C', 'D'].map((key) => (
-            <label key={key}>
-              <span>Option {key}</span>
-              <input
-                type="text"
-                value={draft[`option${key}`]}
-                onChange={(event) => setDraft((current) => ({ ...current, [`option${key}`]: event.target.value }))}
-                placeholder={`Option ${key}`}
-              />
-            </label>
+            <span key={key} className="livekit-poll-fixed-option-pill">Option {key}</span>
           ))}
         </div>
 
@@ -340,13 +386,13 @@ function TeacherPollConsole({ onError }) {
           </label>
 
           <button type="button" className="primary-btn" onClick={handleSendPoll}>
-            Send Poll
+            Show Options
           </button>
           <button type="button" className="secondary-btn" onClick={handleRevealAnswer} disabled={!activePoll || activePoll.revealed}>
-            {activePoll?.revealed ? 'Answer Revealed' : 'Reveal Correct Answer'}
+            {activePoll?.revealed ? 'Answer Revealed' : 'Reveal Answer'}
           </button>
-          <button type="button" className="secondary-btn" onClick={handleClearPoll} disabled={!activePoll || activePoll.closed}>
-            {activePoll?.closed ? 'Poll Closed For Students' : 'Close Poll For Students'}
+          <button type="button" className="secondary-btn" onClick={handleClearPoll} disabled={!activePoll}>
+            Clear Poll
           </button>
         </div>
       </div>
@@ -393,10 +439,54 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
   const [optimisticLiveClassId, setOptimisticLiveClassId] = useState('');
   const [isStartingClass, setIsStartingClass] = useState(false);
   const [livekitServiceReady, setLivekitServiceReady] = useState(false);
+  const [roomPolicy, setRoomPolicy] = useState(createDefaultRoomPolicy);
+  const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
   const intentionalDisconnectRef = useRef(false);
   const suppressedRoomNameRef = useRef('');
   const autoStartRequestKeyRef = useRef('');
   const serverPollRequestRef = useRef(0);
+  const bootCountdownDeadlineRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return undefined;
+
+    const syncTheme = () => setLiveKitTheme(getLiveKitTheme(getDocumentTheme()));
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    if (document.body) {
+      observer.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isBooting) {
+      bootCountdownDeadlineRef.current = 0;
+      if (countdown !== 0) {
+        setCountdown(0);
+      }
+      return undefined;
+    }
+
+    const tickCountdown = () => {
+      const deadline = Number(bootCountdownDeadlineRef.current || 0);
+      if (!deadline) {
+        setCountdown(BOOT_COUNTDOWN_SECONDS);
+        return;
+      }
+
+      const remainingSeconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setCountdown(remainingSeconds);
+    };
+
+    tickCountdown();
+    const intervalId = window.setInterval(tickCountdown, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isBooting]);
 
   const pollServerStatusUntilStopped = useCallback(async (options = {}) => {
     const { initialDelay = 4000, maxAttempts = 18, intervalMs = 5000 } = options;
@@ -438,7 +528,7 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
     const { initialDelay = 2500, maxAttempts = 18, intervalMs = 5000 } = options;
 
     if (initialDelay > 0) {
-      await waitWithCountdown(initialDelay, setCountdown);
+      await wait(initialDelay);
     }
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -447,7 +537,6 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
         setServerStatus(refreshed.server);
         const nextState = String(refreshed.server.state || '').trim().toLowerCase();
         if (nextState === 'running') {
-          setCountdown(0);
           return refreshed.server;
         }
       }
@@ -455,10 +544,9 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
       const remainingAttempts = maxAttempts - attempt - 1;
       if (remainingAttempts <= 0) break;
       // eslint-disable-next-line no-await-in-loop
-      await waitWithCountdown(intervalMs, setCountdown);
+      await wait(intervalMs);
     }
 
-    setCountdown(0);
     const error = new Error('EC2 server did not become ready in time. Please try again.');
     error.statusCode = 504;
     throw error;
@@ -469,14 +557,13 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
     let lastFailureMessage = '';
 
     if (initialDelay > 0) {
-      await waitWithCountdown(initialDelay, setCountdown);
+      await wait(initialDelay);
     }
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const response = await fetchLivekitServiceState().catch(() => null);
       if (response?.ready) {
         setLivekitServiceReady(true);
-        setCountdown(0);
         return response;
       }
 
@@ -486,10 +573,9 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
       const remainingAttempts = maxAttempts - attempt - 1;
       if (remainingAttempts <= 0) break;
       // eslint-disable-next-line no-await-in-loop
-      await waitWithCountdown(intervalMs, setCountdown);
+      await wait(intervalMs);
     }
 
-    setCountdown(0);
     const error = new Error(lastFailureMessage || 'LiveKit signal service is not ready yet. Please wait a few seconds and try again.');
     error.statusCode = 504;
     throw error;
@@ -595,6 +681,8 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
     }
 
     setErrorMessage('');
+    bootCountdownDeadlineRef.current = Date.now() + (BOOT_COUNTDOWN_SECONDS * 1000);
+    setCountdown(BOOT_COUNTDOWN_SECONDS);
     setIsBooting(true);
     setIsStartingClass(true);
     setConnectionState('connecting');
@@ -645,7 +733,7 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
       setIsStartingClass(false);
       setIsBooting(false);
     }
-  }, [classSession, onSessionStarted, serverStatus?.state, waitForServerReady]);
+  }, [classSession, onSessionStarted, serverStatus?.state, waitForLiveKitReady, waitForServerReady]);
 
   const handleEndClass = useCallback(async () => {
     if (!classSession?._id) return;
@@ -794,7 +882,7 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
             <span className="livekit-studio-toolbar-icon" aria-hidden="true">🗳️</span>
             <div>
               <strong>Live Poll Control</strong>
-              <p>Launch MCQ polls instantly and watch vote bars update inside the studio sidebar.</p>
+              <p>Launch MCQ polls instantly and review responses in the command deck placed directly below the teaching stage.</p>
             </div>
           </article>
         </div>
@@ -819,7 +907,7 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
           connect={shouldConnect}
           audio
           video
-          data-lk-theme="black"
+          data-lk-theme={liveKitTheme}
           onConnected={() => {
             intentionalDisconnectRef.current = false;
             setConnectionState('connected');
@@ -849,40 +937,45 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
           }}
         >
           <div className="livekit-studio-grid">
-            <section className="card livekit-conference-card livekit-studio-room-panel">
-              <div className="livekit-studio-room-head">
-                <div className="livekit-studio-room-copy">
-                  <div className="livekit-stage-title-band">
-                    <span className="livekit-stage-live-indicator">
-                      <span className="livekit-stage-live-dot" aria-hidden="true" />
-                      Live Broadcast
-                    </span>
-                    <p className="eyebrow">Live Room</p>
+            <div className="livekit-studio-main-column">
+              <section className="card livekit-conference-card livekit-studio-room-panel">
+                <div className="livekit-studio-room-head">
+                  <div className="livekit-studio-room-copy">
+                    <div className="livekit-stage-title-band">
+                      <span className="livekit-stage-live-indicator">
+                        <span className="livekit-stage-live-dot" aria-hidden="true" />
+                        Live Broadcast
+                      </span>
+                      <p className="eyebrow">Live Room</p>
+                    </div>
+                    <h4>Teacher broadcast and classroom stage</h4>
+                    <p className="subtitle">This panel is your teaching stage. Use the room controls below for microphone, camera, and screen share, then manage live polls from the command deck right underneath the video area.</p>
                   </div>
-                  <h4>Teacher broadcast and classroom stage</h4>
-                  <p className="subtitle">This panel is your teaching stage. Use the room controls below for microphone, camera, and screen share while polls and class operations stay in the studio sidebar.</p>
+                  <div className="livekit-studio-room-pills">
+                    <span className={`livekit-server-pill state-${normalizedServerState}`}>{serverStatus?.state || 'unknown'}</span>
+                    <span className={`livekit-server-pill connection-${normalizedConnectionState}`}>{connectionState}</span>
+                  </div>
                 </div>
-                <div className="livekit-studio-room-pills">
-                  <span className={`livekit-server-pill state-${normalizedServerState}`}>{serverStatus?.state || 'unknown'}</span>
-                  <span className={`livekit-server-pill connection-${normalizedConnectionState}`}>{connectionState}</span>
+                <div className="livekit-teacher-stage-shell">
+                  <div className="livekit-teacher-stage-toolbar" aria-hidden="true">
+                    <span className="livekit-teacher-stage-chip">Mic</span>
+                    <span className="livekit-teacher-stage-chip">Camera</span>
+                    <span className="livekit-teacher-stage-chip">Share Screen</span>
+                  </div>
+                  <TeacherStageConference />
                 </div>
-              </div>
-              <div className="livekit-teacher-stage-shell">
-                <div className="livekit-teacher-stage-toolbar" aria-hidden="true">
-                  <span className="livekit-teacher-stage-chip">Mic</span>
-                  <span className="livekit-teacher-stage-chip">Camera</span>
-                  <span className="livekit-teacher-stage-chip">Share Screen</span>
+                <div className="livekit-teacher-stage-note">
+                  <strong>Room controls stay visible at the bottom of the stage.</strong>
+                  <span>Use them to mute or unmute, start video, pick devices, and share your screen during class.</span>
                 </div>
-                <TeacherStageConference />
-              </div>
-              <div className="livekit-teacher-stage-note">
-                <strong>Room controls stay visible at the bottom of the stage.</strong>
-                <span>Use them to mute or unmute, start video, pick devices, and share your screen during class.</span>
-              </div>
-              <RoomAudioRenderer />
-            </section>
+                <RoomAudioRenderer />
+              </section>
+
+              <TeacherPollConsole onError={setErrorMessage} />
+            </div>
 
             <aside className="livekit-studio-side-column">
+              <TeacherAudienceControlPanel onError={setErrorMessage} policy={roomPolicy} onPolicyChange={setRoomPolicy} />
               <section className="card livekit-studio-chat-panel">
                 <div className="section-header compact livekit-chat-headline">
                   <div>
@@ -891,9 +984,13 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
                     <p className="subtitle">Send updates to students and follow replies in real time while the class is live.</p>
                   </div>
                 </div>
-                <Chat />
+                {roomPolicy.chatDisabled ? (
+                  <div className="livekit-chat-disabled-state" role="status" aria-live="polite">
+                    <strong>Chat is turned off for the room.</strong>
+                    <p>Students cannot use chat until you switch it back on from Audience Controls.</p>
+                  </div>
+                ) : <Chat />}
               </section>
-              <TeacherPollConsole onError={setErrorMessage} />
             </aside>
           </div>
         </LiveKitRoom>

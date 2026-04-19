@@ -31,167 +31,195 @@
 }
 
 .livekit-admin-page .livekit-hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 4px;
+    display: grid !important;
+    gap: 18px;
+    border-radius: 26px;
+    border: 1px solid rgba(197, 210, 234, 0.76);
+    background:
+      radial-gradient(circle at top right, rgba(14, 165, 233, 0.10), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(243, 248, 255, 0.975) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .livekit-admin-page .livekit-calendar-board-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 16px;
+  }
+
+  .livekit-admin-page .livekit-calendar-board-head h4 {
+    margin: 2px 0 0;
+    color: var(--admin-live-ink);
+    font-size: 1.08rem;
+  }
+
+  .livekit-admin-page .livekit-calendar-agenda {
+    display: grid !important;
+    gap: 18px;
+  }
+
+  .livekit-admin-page .livekit-calendar-day-group {
+    display: grid !important;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .livekit-admin-page .livekit-calendar-day-rail {
+    display: grid !important;
+    gap: 6px;
+    position: sticky;
+    top: 18px;
+    padding: 16px 18px;
+    border-radius: 22px;
+    border: 1px solid rgba(186, 230, 253, 0.9);
+    background:
+      linear-gradient(180deg, rgba(240, 249, 255, 0.98) 0%, rgba(224, 242, 254, 0.95) 100%);
+  }
+
+  .livekit-admin-page .livekit-calendar-day-rail strong {
+    color: #0f3b57;
+    font-size: 0.98rem;
+  }
+
+  .livekit-admin-page .livekit-calendar-day-rail span {
+    color: #567089;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .livekit-admin-page .livekit-calendar-day-items {
+    display: grid !important;
+    gap: 14px;
+  }
+
+  .livekit-admin-page .livekit-calendar-event-card {
+    display: grid !important;
+    gap: 12px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 1px solid rgba(191, 219, 254, 0.76);
+    background:
+      radial-gradient(circle at top right, rgba(14, 165, 233, 0.08), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.97) 100%);
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+  }
+
+  .livekit-admin-page .livekit-calendar-event-card.kind-blocked-slot {
+    border-color: rgba(14, 165, 233, 0.24);
+  }
+
+  .livekit-admin-page .livekit-calendar-event-topline,
+  .livekit-admin-page .livekit-calendar-event-actions {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .livekit-admin-page .livekit-calendar-event-topline span:last-child,
+  .livekit-admin-page .livekit-calendar-event-actions span {
+    color: #5c7088;
+    font-size: 0.84rem;
+    font-weight: 700;
+  }
+
+  .livekit-admin-page .livekit-calendar-course-pill {
+    display: inline-flex !important;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(12, 74, 110, 0.96) 0%, rgba(3, 105, 161, 0.92) 100%);
+    color: #eff6ff;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .livekit-admin-page .livekit-calendar-event-card strong {
+    color: var(--admin-live-ink);
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+
+  .livekit-admin-page .livekit-studio-layout {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 26px;
+    align-items: start;
+  }
+
+  .livekit-admin-page .livekit-studio-shell,
+  .livekit-admin-page .livekit-studio-control-column {
+    display: grid !important;
+    gap: 20px;
+    align-self: start;
+  }
+
+  .livekit-admin-page .livekit-studio-shell {
+    min-width: 0;
+  }
+
+  .livekit-admin-page .livekit-studio-control-column {
+    position: static;
+    gap: 24px;
+  }
+
+  .livekit-admin-page .livekit-studio-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.56fr) minmax(340px, 0.78fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .livekit-admin-page .livekit-studio-main-column {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+    align-content: start;
+  }
+
+  .livekit-admin-page .livekit-studio-grid > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .livekit-admin-page .livekit-studio-side-column {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .livekit-admin-page .livekit-studio-side-column > * {
+    min-width: 0;
+    max-width: 100%;
 }
 
-.livekit-admin-page .livekit-server-stop-btn {
-  min-height: 42px;
-  padding: 0 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(183, 195, 220, 0.56);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 249, 255, 0.95) 100%);
-  color: var(--admin-live-ink);
-  font-weight: 700;
-}
+  .livekit-admin-page .livekit-session-card-content {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
 
-.livekit-admin-page .livekit-server-stop-btn:not(:disabled):hover {
-  border-color: rgba(79, 57, 246, 0.28);
-  box-shadow: 0 10px 18px rgba(79, 57, 246, 0.08);
-}
+  .livekit-admin-page .livekit-session-card-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
 
-.livekit-admin-page .livekit-hero-action-note {
-  color: var(--admin-live-muted);
-  font-size: 0.88rem;
-  line-height: 1.55;
-}
-
-.livekit-admin-page .workspace-hero-stats.livekit-hero-stats {
-  display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.livekit-admin-page .livekit-admin-grid--primary,
-.livekit-admin-page .livekit-admin-grid.lower-grid {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) !important;
-  gap: 24px !important;
-}
-
-.livekit-admin-page .livekit-creation-panel,
-.livekit-admin-page .livekit-session-list-panel,
-.livekit-admin-page .livekit-calendar-panel {
-  display: grid !important;
-  gap: 18px;
-  padding: 24px;
-  border-radius: 30px;
-  border: 1px solid rgba(183, 195, 220, 0.34);
-  background:
-    radial-gradient(circle at top right, rgba(109, 94, 252, 0.09), transparent 30%),
-    radial-gradient(circle at bottom left, rgba(215, 169, 75, 0.08), transparent 26%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 249, 255, 0.97) 100%);
-}
-
-.livekit-admin-page .livekit-session-list-panel {
-  margin-top: 22px;
-}
-
-.livekit-admin-page .livekit-panel-head {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 16px;
-}
-
-.livekit-admin-page .livekit-panel-head .subtitle {
-  margin-top: 8px;
-  max-width: 64ch;
-  line-height: 1.65;
-  color: var(--admin-live-muted);
-}
-
-.livekit-admin-page .livekit-class-form {
-  display: grid !important;
-  gap: 16px;
-}
-
-.livekit-admin-page .livekit-form-grid-2 {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.livekit-admin-page .livekit-class-form label {
-  display: grid !important;
-  gap: 8px;
-}
-
-.livekit-admin-page .livekit-class-form input,
-.livekit-admin-page .livekit-class-form textarea,
-.livekit-admin-page .livekit-class-form select {
-  min-height: 48px;
-  width: 100%;
-  min-width: 0;
-  border-radius: 16px;
-  border: 1px solid rgba(177, 190, 217, 0.56);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 255, 0.94) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
-}
-
-.livekit-admin-page .livekit-class-form textarea {
-  min-height: 108px;
-}
-
-.livekit-admin-page .livekit-session-list {
-  display: grid !important;
-  gap: 18px;
-}
-
-.livekit-admin-page .livekit-session-card {
-  display: grid !important;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 24px;
-  border: 1px solid rgba(197, 210, 234, 0.82);
-  background:
-    radial-gradient(circle at top right, rgba(109, 94, 252, 0.06), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 248, 255, 0.97) 100%);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
-}
-
-.livekit-admin-page .livekit-session-card.status-live {
-  border-color: rgba(79, 57, 246, 0.28);
-  background:
-    radial-gradient(circle at top right, rgba(79, 57, 246, 0.11), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(242, 240, 255, 0.97) 100%);
-}
-
-.livekit-admin-page .livekit-session-card.status-scheduled {
-  border-color: rgba(215, 169, 75, 0.34);
-  background:
-    radial-gradient(circle at top right, rgba(215, 169, 75, 0.11), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 250, 239, 0.97) 100%);
-}
-
-.livekit-admin-page .livekit-session-card--calendar-block {
-  border-color: rgba(14, 165, 233, 0.35);
-  background:
-    radial-gradient(circle at top right, rgba(14, 165, 233, 0.14), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(240, 249, 255, 0.98) 100%);
-}
-
-.livekit-admin-page .livekit-session-card-content {
-  display: grid !important;
-  gap: 12px;
-}
-
-.livekit-admin-page .livekit-session-card-head {
-  display: flex !important;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.livekit-admin-page .livekit-session-card-head strong {
-  color: var(--admin-live-ink);
-  font-size: 1.05rem;
-  line-height: 1.25;
-}
+  .livekit-admin-page .livekit-session-card-head strong {
+    color: var(--admin-room-head-title);
+    font-size: 1.05rem;
+    line-height: 1.25;
+  }
 
 .livekit-admin-page .livekit-session-card p {
   margin: 0;
@@ -212,20 +240,15 @@
   letter-spacing: 0.05em;
 }
 
-.livekit-admin-page .livekit-session-status.status-live {
-  background: rgba(79, 57, 246, 0.14);
-  color: #4630dc;
-}
-
 .livekit-admin-page .livekit-session-status.status-scheduled {
   background: rgba(215, 169, 75, 0.16);
   color: #946200;
 }
 
 .livekit-admin-page .livekit-session-status.status-calendar-block {
-  background: rgba(14, 165, 233, 0.12);
-  color: #0369a1;
-  border: 1px solid rgba(14, 165, 233, 0.24);
+  background: var(--admin-room-chip-bg);
+  border: 1px solid var(--admin-room-chip-border);
+  color: var(--admin-room-chip-text);
 }
 
 .livekit-admin-page .livekit-session-meta-row {
@@ -240,10 +263,11 @@
   min-height: 38px;
   padding: 0 12px;
   border-radius: 14px;
-  border: 1px solid rgba(201, 210, 228, 0.88);
-  background: rgba(255, 255, 255, 0.82);
-  color: #47607a;
+  border: 1px solid var(--admin-room-head-border);
+  border-bottom: 1px solid var(--admin-room-head-border);
+  background: var(--admin-room-head-bg);
   font-size: 0.82rem;
+  color: var(--admin-room-head-copy);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -291,9 +315,9 @@
   padding: 20px;
   border-radius: 24px;
   border: 1px solid rgba(197, 210, 234, 0.76);
-  background:
-    radial-gradient(circle at top right, rgba(109, 94, 252, 0.08), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(245, 248, 255, 0.97) 100%);
+  border: 1px solid var(--admin-room-chip-border);
+  background: var(--admin-room-chip-bg);
+  color: var(--admin-room-chip-text);
 }
 
 .livekit-admin-page .livekit-calendar-board {
@@ -443,7 +467,14 @@
   display: grid !important;
   grid-template-columns: minmax(0, 1.56fr) minmax(340px, 0.78fr);
   gap: 24px;
-  align-items: stretch;
+  align-items: start;
+}
+
+.livekit-admin-page .livekit-studio-main-column {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  align-content: start;
 }
 
 .livekit-admin-page .livekit-studio-grid > * {
@@ -634,7 +665,7 @@
 
 .livekit-admin-page .livekit-studio-room-panel .lk-room-container,
 .livekit-admin-page .livekit-studio-room-panel .lk-video-conference {
-  min-height: clamp(560px, 82vh, 980px);
+  min-height: clamp(360px, 58vh, 680px);
 }
 
 .livekit-admin-page .teacher-video-conference {
@@ -655,7 +686,8 @@
 .livekit-admin-page .teacher-video-conference-primary,
 .livekit-admin-page .teacher-video-conference-grid-wrapper {
   min-width: 0;
-  min-height: clamp(420px, 64vh, 860px);
+  min-height: clamp(260px, 36vw, 480px);
+  aspect-ratio: 16 / 9;
   border-radius: 28px;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(6, 11, 27, 0.98) 0%, rgba(10, 16, 32, 0.94) 100%);
@@ -813,7 +845,7 @@
 .livekit-admin-page .livekit-teacher-stage-note {
   display: grid;
   gap: 4px;
-  padding: 14px 18px 18px;
+  padding: 12px 16px 14px;
   border-top: 1px solid rgba(148, 163, 184, 0.14);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
 }
@@ -977,6 +1009,81 @@
   overflow: hidden;
 }
 
+.livekit-admin-page .livekit-audience-controls-panel {
+  display: grid !important;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(197, 210, 234, 0.76);
+  background:
+    radial-gradient(circle at top right, rgba(248, 113, 113, 0.1), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(243, 248, 255, 0.975) 100%);
+}
+
+.livekit-admin-page .livekit-audience-controls-headline .subtitle {
+  margin-top: 8px;
+}
+
+.livekit-admin-page .livekit-audience-controls-grid {
+  display: grid !important;
+  gap: 12px;
+}
+
+.livekit-admin-page .livekit-audience-control-card {
+  display: grid !important;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(197, 210, 234, 0.76);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.livekit-admin-page .livekit-audience-control-card.is-active {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.98) 0%, rgba(255, 255, 255, 0.94) 100%);
+}
+
+.livekit-admin-page .livekit-audience-control-card strong {
+  color: var(--admin-live-ink);
+}
+
+.livekit-admin-page .livekit-audience-control-card p {
+  margin: 6px 0 0;
+  color: var(--admin-live-muted);
+  line-height: 1.55;
+}
+
+.livekit-admin-page .livekit-audience-toggle-btn {
+  min-height: 42px;
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.livekit-admin-page .livekit-audience-toggle-btn.is-active {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(254, 242, 242, 0.94);
+  color: #b91c1c;
+}
+
+.livekit-admin-page .livekit-chat-disabled-state {
+  display: grid !important;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px dashed rgba(248, 113, 113, 0.3);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.livekit-admin-page .livekit-chat-disabled-state strong {
+  color: #b91c1c !important;
+}
+
+.livekit-admin-page .livekit-chat-disabled-state p {
+  margin: 0;
+  color: var(--admin-live-muted);
+}
+
 .livekit-admin-page .livekit-chat-headline {
   display: grid;
   gap: 10px;
@@ -1096,6 +1203,11 @@
   overflow: hidden;
 }
 
+.livekit-admin-page .livekit-studio-main-column > .livekit-poll-panel {
+  width: 100%;
+  min-height: 0;
+}
+
 .livekit-admin-page .livekit-poll-headline {
   display: grid;
   gap: 12px;
@@ -1140,6 +1252,27 @@
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.72), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(240, 247, 255, 0.96) 100%);
+}
+
+.livekit-admin-page .livekit-poll-fixed-options-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.livekit-admin-page .livekit-poll-fixed-option-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(191, 219, 254, 0.76);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(235, 245, 255, 0.96) 100%);
+  color: var(--admin-live-ink);
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
 }
 
 .livekit-admin-page .livekit-poll-option-grid {
@@ -1187,6 +1320,30 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+
+.livekit-admin-page .livekit-studio-main-column .livekit-poll-panel {
+  grid-template-columns: 1fr;
+  align-items: start;
+  row-gap: 18px;
+}
+
+.livekit-admin-page .livekit-studio-main-column .livekit-poll-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.livekit-admin-page .livekit-studio-main-column .livekit-poll-composer {
+  padding: 18px;
+}
+
+.livekit-admin-page .livekit-studio-main-column .livekit-poll-fixed-options-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.livekit-admin-page .livekit-studio-main-column .livekit-poll-results {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .livekit-admin-page .livekit-poll-result-card {
@@ -1273,6 +1430,248 @@
   color: #4c3fd7;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-studio-room-panel,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-room-panel {
+  border-color: rgba(191, 219, 254, 0.84);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(242, 247, 255, 0.985) 100%);
+  box-shadow: 0 24px 52px rgba(148, 163, 184, 0.18);
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-studio-room-head,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-room-head {
+  border-bottom-color: rgba(191, 219, 254, 0.84);
+  background:
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.08), transparent 20%),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.7) 100%);
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-stage-live-indicator,
+:root[data-theme='light'] .livekit-admin-page .livekit-stage-live-indicator {
+  color: #fff7ed;
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-studio-room-head .eyebrow,
+html[data-theme='light'] .livekit-admin-page .livekit-studio-room-head h4,
+html[data-theme='light'] .livekit-admin-page .livekit-studio-room-head .subtitle,
+html[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-note strong,
+html[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-note span,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-room-head .eyebrow,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-room-head h4,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-room-head .subtitle,
+:root[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-note strong,
+:root[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-note span {
+  color: #10233a !important;
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-server-pill,
+html[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-chip,
+:root[data-theme='light'] .livekit-admin-page .livekit-server-pill,
+:root[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-chip {
+  border-color: rgba(191, 219, 254, 0.84);
+  background: rgba(255, 255, 255, 0.88);
+  color: #36506b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference-primary,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference-grid-wrapper,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-video-conference,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference-primary,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference-grid-wrapper,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-video-conference {
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  background: linear-gradient(180deg, rgba(235, 245, 255, 0.98) 0%, rgba(219, 234, 254, 0.94) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-tile,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-tile {
+  border-color: rgba(191, 219, 254, 0.8);
+  box-shadow: 0 14px 28px rgba(148, 163, 184, 0.14);
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-media-video,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-placeholder,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-media-video,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-placeholder {
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.96) 0%, rgba(241, 245, 249, 0.98) 100%);
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-placeholder svg,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-placeholder path,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-placeholder svg,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-placeholder path {
+  color: rgba(71, 85, 105, 0.66);
+  fill: rgba(71, 85, 105, 0.66);
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-metadata,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-metadata {
+  border-color: rgba(191, 219, 254, 0.76);
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: #10233a !important;
+  box-shadow: 0 10px 24px rgba(148, 163, 184, 0.16);
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-metadata *,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-name,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-identity,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-connection-quality,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-metadata *,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-name,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-participant-identity,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-connection-quality {
+  color: #10233a !important;
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-control-bar,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-button-group,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-control-bar,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-button-group {
+  border-color: rgba(191, 219, 254, 0.84);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 28px rgba(148, 163, 184, 0.16);
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-button,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-disconnect-button,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-button,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-disconnect-button {
+  color: #10233a;
+}
+
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-button *,
+html[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-disconnect-button *,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-button *,
+:root[data-theme='light'] .livekit-admin-page .teacher-video-conference .lk-disconnect-button * {
+  color: #10233a !important;
+  fill: currentColor;
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+html[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header *,
+html[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+html[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry *,
+html[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header *,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry *,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input {
+  color: #10233a !important;
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input::placeholder,
+:root[data-theme='light'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input::placeholder {
+  color: #64748b;
+}
+
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat,
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form {
+  border-color: rgba(71, 85, 105, 0.36);
+  background: linear-gradient(180deg, rgba(10, 15, 27, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
+}
+
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header *,
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry *,
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-header *,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry *,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input {
+  color: #f8fafc !important;
+}
+
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input {
+  border-color: rgba(71, 85, 105, 0.44);
+  background: rgba(15, 23, 42, 0.98);
+}
+
+html[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input::placeholder,
+:root[data-theme='dark'] .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input::placeholder {
+  color: #94a3b8;
+}
+
+html[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-note,
+:root[data-theme='light'] .livekit-admin-page .livekit-teacher-stage-note {
+  border-top-color: rgba(191, 219, 254, 0.84);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.4) 100%);
+}
+
+@media (max-width: 1180px) {
+  .livekit-admin-page .livekit-studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-admin-page .livekit-studio-main-column .livekit-poll-results {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .livekit-admin-page .livekit-studio-side-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+@media (max-width: 768px) {
+  .livekit-admin-page .livekit-studio-room-head {
+    grid-template-columns: 1fr;
+    padding: 20px 18px 16px;
+  }
+
+  .livekit-admin-page .livekit-teacher-stage-shell {
+    padding: 14px 14px 0;
+  }
+
+  .livekit-admin-page .teacher-video-conference-primary,
+  .livekit-admin-page .teacher-video-conference-grid-wrapper {
+    min-height: clamp(220px, 52vw, 320px);
+    border-radius: 22px;
+  }
+
+  .livekit-admin-page .livekit-studio-side-column {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-admin-page .livekit-studio-main-column .livekit-poll-summary-grid,
+  .livekit-admin-page .livekit-studio-main-column .livekit-poll-results {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-admin-page .livekit-studio-main-column .livekit-poll-composer {
+    padding: 16px;
+  }
+
+  .livekit-admin-page .livekit-poll-fixed-options-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .livekit-admin-page .livekit-poll-actions {
+    align-items: stretch;
+  }
+
+  .livekit-admin-page .livekit-poll-actions label,
+  .livekit-admin-page .livekit-poll-actions .primary-btn,
+  .livekit-admin-page .livekit-poll-actions .secondary-btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
 }
 
 .livekit-admin-page .livekit-studio-student-list {
@@ -1743,19 +2142,9 @@
   display: flex !important;
   gap: 10px;
   flex-wrap: wrap;
-}
 
-.livekit-admin-page .livekit-calendar-empty-card {
-  min-height: 180px;
-}
-
-@media (max-width: 900px) {
   .livekit-admin-page .workspace-hero-stats.livekit-hero-stats,
   .livekit-admin-page .livekit-form-grid-2,
-  .livekit-admin-page .livekit-session-meta-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .livekit-admin-page .livekit-panel-head {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1765,15 +2154,772 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .livekit-admin-page .livekit-calendar-day-rail {
-    position: static;
-  }
-
   .livekit-admin-page .livekit-hero,
   .livekit-admin-page .livekit-creation-panel,
   .livekit-admin-page .livekit-session-list-panel,
   .livekit-admin-page .livekit-calendar-panel {
     padding: 20px;
     border-radius: 24px;
+  }
+}
+
+.livekit-admin-page {
+  --admin-room-shell-border: rgba(191, 219, 254, 0.84);
+  --admin-room-shell-bg:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(242, 247, 255, 0.985) 100%);
+  --admin-room-shell-shadow: 0 24px 52px rgba(148, 163, 184, 0.18);
+  --admin-room-head-bg:
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.08), transparent 20%),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.7) 100%);
+  --admin-room-head-border: rgba(191, 219, 254, 0.84);
+  --admin-room-head-title: #10233a;
+  --admin-room-head-copy: #4f647d;
+  --admin-room-chip-bg: rgba(255, 255, 255, 0.88);
+  --admin-room-chip-border: rgba(191, 219, 254, 0.84);
+  --admin-room-chip-text: #36506b;
+  --admin-stage-surface: linear-gradient(180deg, rgba(244, 249, 255, 0.98) 0%, rgba(231, 239, 250, 0.95) 100%);
+  --admin-stage-surface-border: rgba(191, 219, 254, 0.82);
+  --admin-stage-placeholder: linear-gradient(180deg, rgba(226, 232, 240, 0.96) 0%, rgba(241, 245, 249, 0.98) 100%);
+  --admin-stage-meta-bg: rgba(255, 255, 255, 0.9);
+  --admin-stage-meta-border: rgba(191, 219, 254, 0.76);
+  --admin-stage-meta-text: #10233a;
+  --admin-stage-controls-bg: rgba(255, 255, 255, 0.92);
+  --admin-stage-controls-border: rgba(191, 219, 254, 0.84);
+  --admin-stage-controls-text: #10233a;
+  --admin-stage-group-bg: rgba(236, 243, 252, 0.94);
+  --admin-stage-group-border: rgba(191, 219, 254, 0.84);
+  --admin-stage-note-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(245, 249, 255, 0.54) 100%);
+  --admin-stage-note-border: rgba(191, 219, 254, 0.84);
+  --admin-stage-note-title: #10233a;
+  --admin-stage-note-copy: #5c7088;
+  --admin-panel-bg:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(243, 248, 255, 0.985) 100%);
+  --admin-panel-border: rgba(191, 219, 254, 0.76);
+  --admin-panel-shadow: 0 18px 40px rgba(148, 163, 184, 0.12);
+  --admin-panel-title: #10233a;
+  --admin-panel-copy: #5d7088;
+  --admin-panel-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(242, 247, 255, 0.96) 100%);
+  --admin-panel-card-border: rgba(191, 219, 254, 0.76);
+  --admin-chat-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 250, 255, 0.98) 100%);
+  --admin-chat-border: rgba(214, 223, 238, 0.84);
+  --admin-chat-input-bg: rgba(255, 255, 255, 0.98);
+}
+
+html[data-theme='dark'] .livekit-admin-page,
+:root[data-theme='dark'] .livekit-admin-page {
+  --admin-live-ink: #f3f7ff;
+  --admin-live-muted: #9db0cc;
+  --admin-room-shell-border: rgba(71, 85, 105, 0.46);
+  --admin-room-shell-bg:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 22%),
+    radial-gradient(circle at bottom left, rgba(79, 70, 229, 0.18), transparent 28%),
+    linear-gradient(180deg, rgba(7, 14, 32, 0.985) 0%, rgba(12, 20, 40, 0.97) 52%, rgba(15, 23, 42, 0.98) 100%);
+  --admin-room-shell-shadow: 0 28px 60px rgba(2, 6, 23, 0.44);
+  --admin-room-head-bg:
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.12), transparent 20%),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+  --admin-room-head-border: rgba(71, 85, 105, 0.34);
+  --admin-room-head-title: #f8fbff;
+  --admin-room-head-copy: rgba(203, 213, 225, 0.86);
+  --admin-room-chip-bg: rgba(255, 255, 255, 0.08);
+  --admin-room-chip-border: rgba(255, 255, 255, 0.12);
+  --admin-room-chip-text: rgba(226, 232, 240, 0.92);
+  --admin-stage-surface: linear-gradient(180deg, rgba(6, 11, 27, 0.98) 0%, rgba(10, 16, 32, 0.94) 100%);
+  --admin-stage-surface-border: rgba(71, 85, 105, 0.34);
+  --admin-stage-placeholder: linear-gradient(180deg, rgba(11, 18, 32, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
+  --admin-stage-meta-bg: rgba(8, 14, 24, 0.9);
+  --admin-stage-meta-border: rgba(148, 163, 184, 0.18);
+  --admin-stage-meta-text: #f8fafc;
+  --admin-stage-controls-bg: linear-gradient(180deg, rgba(8, 14, 24, 0.94) 0%, rgba(15, 23, 42, 0.92) 100%);
+  --admin-stage-controls-border: rgba(148, 163, 184, 0.16);
+  --admin-stage-controls-text: #f8fafc;
+  --admin-stage-group-bg: rgba(255, 255, 255, 0.04);
+  --admin-stage-group-border: rgba(148, 163, 184, 0.14);
+  --admin-stage-note-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+  --admin-stage-note-border: rgba(148, 163, 184, 0.14);
+  --admin-stage-note-title: #f8fbff;
+  --admin-stage-note-copy: rgba(203, 213, 225, 0.82);
+  --admin-panel-bg:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(18, 26, 42, 0.98) 0%, rgba(24, 34, 52, 0.98) 100%);
+  --admin-panel-border: rgba(71, 85, 105, 0.42);
+  --admin-panel-shadow: 0 18px 40px rgba(2, 6, 23, 0.28);
+  --admin-panel-title: #f3f7ff;
+  --admin-panel-copy: #9db0cc;
+  --admin-panel-card-bg: linear-gradient(180deg, rgba(25, 35, 56, 0.98) 0%, rgba(17, 24, 39, 0.98) 100%);
+  --admin-panel-card-border: rgba(71, 85, 105, 0.42);
+  --admin-chat-surface: linear-gradient(180deg, rgba(10, 15, 27, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
+  --admin-chat-border: rgba(71, 85, 105, 0.42);
+  --admin-chat-input-bg: rgba(15, 23, 42, 0.98);
+}
+
+.livekit-admin-page .livekit-studio-room-panel {
+  border-color: var(--admin-room-shell-border) !important;
+  background: var(--admin-room-shell-bg) !important;
+  box-shadow: var(--admin-room-shell-shadow) !important;
+}
+
+.livekit-admin-page .livekit-studio-room-panel [data-lk-theme],
+.livekit-admin-page .livekit-studio-room-panel [data-lk-theme] .lk-room-container,
+.livekit-admin-page .livekit-studio-room-panel [data-lk-theme] .lk-video-conference,
+.livekit-admin-page .livekit-studio-room-panel [data-lk-theme] .lk-layout-wrapper,
+.livekit-admin-page .livekit-studio-room-panel [data-lk-theme] .lk-video-conference-inner,
+.livekit-admin-page .livekit-studio-room-panel [data-lk-theme] .lk-focus-layout,
+.livekit-admin-page .livekit-studio-room-panel [data-lk-theme] .lk-grid-layout {
+  background: transparent !important;
+}
+
+.livekit-admin-page .livekit-studio-room-head {
+  border-bottom-color: var(--admin-room-head-border) !important;
+  background: var(--admin-room-head-bg) !important;
+}
+
+.livekit-admin-page .livekit-studio-room-head .eyebrow,
+.livekit-admin-page .livekit-studio-room-head .subtitle {
+  color: var(--admin-room-head-copy) !important;
+}
+
+.livekit-admin-page .livekit-studio-room-head h4 {
+  color: var(--admin-room-head-title) !important;
+}
+
+.livekit-admin-page .livekit-server-pill,
+.livekit-admin-page .livekit-teacher-stage-chip {
+  border-color: var(--admin-room-chip-border) !important;
+  background: var(--admin-room-chip-bg) !important;
+  color: var(--admin-room-chip-text) !important;
+}
+
+.livekit-admin-page .livekit-studio-room-panel .lk-room-container,
+.livekit-admin-page .livekit-studio-room-panel .lk-video-conference {
+  min-height: clamp(320px, 50vh, 620px) !important;
+}
+
+.livekit-admin-page .teacher-video-conference {
+  padding-bottom: 12px;
+}
+
+.livekit-admin-page .teacher-video-conference-primary,
+.livekit-admin-page .teacher-video-conference-grid-wrapper,
+.livekit-admin-page .teacher-video-conference .lk-video-conference {
+  border: 1px solid var(--admin-stage-surface-border) !important;
+  background: var(--admin-stage-surface) !important;
+}
+
+.livekit-admin-page .teacher-video-conference .lk-participant-tile {
+  border-color: var(--admin-stage-surface-border) !important;
+}
+
+.livekit-admin-page .teacher-video-conference .lk-participant-media-video,
+.livekit-admin-page .teacher-video-conference .lk-participant-placeholder {
+  background: var(--admin-stage-placeholder) !important;
+}
+
+.livekit-admin-page .teacher-video-conference .lk-participant-metadata {
+  border-color: var(--admin-stage-meta-border) !important;
+  background: var(--admin-stage-meta-bg) !important;
+  color: var(--admin-stage-meta-text) !important;
+}
+
+.livekit-admin-page .teacher-video-conference .lk-participant-metadata *,
+.livekit-admin-page .teacher-video-conference .lk-participant-name,
+.livekit-admin-page .teacher-video-conference .lk-participant-identity,
+.livekit-admin-page .teacher-video-conference .lk-connection-quality,
+.livekit-admin-page .teacher-video-conference .lk-button,
+.livekit-admin-page .teacher-video-conference .lk-disconnect-button,
+.livekit-admin-page .teacher-video-conference .lk-button *,
+.livekit-admin-page .teacher-video-conference .lk-disconnect-button * {
+  color: var(--admin-stage-controls-text) !important;
+  fill: currentColor;
+}
+
+.livekit-admin-page .teacher-video-conference .lk-control-bar,
+.livekit-admin-page .teacher-video-conference .lk-button-group {
+  border-color: var(--admin-stage-controls-border) !important;
+  background: var(--admin-stage-controls-bg) !important;
+}
+
+.livekit-admin-page .teacher-video-conference .lk-button-group {
+  background: var(--admin-stage-group-bg) !important;
+  border-color: var(--admin-stage-group-border) !important;
+}
+
+.livekit-admin-page .livekit-teacher-stage-note {
+  border-top-color: var(--admin-stage-note-border) !important;
+  background: var(--admin-stage-note-bg) !important;
+}
+
+.livekit-admin-page .livekit-teacher-stage-note strong {
+  color: var(--admin-stage-note-title) !important;
+}
+
+.livekit-admin-page .livekit-teacher-stage-note span {
+  color: var(--admin-stage-note-copy) !important;
+}
+
+.livekit-admin-page .livekit-studio-status-card,
+.livekit-admin-page .livekit-studio-chat-panel,
+.livekit-admin-page .livekit-poll-panel,
+.livekit-admin-page .livekit-studio-students-panel,
+.livekit-admin-page .livekit-audience-controls-panel,
+.livekit-admin-page .livekit-room-toolbar {
+  border-color: var(--admin-panel-border) !important;
+  background: var(--admin-panel-bg) !important;
+  box-shadow: var(--admin-panel-shadow) !important;
+}
+
+.livekit-admin-page .livekit-studio-status-card h3,
+.livekit-admin-page .livekit-studio-status-card h4,
+.livekit-admin-page .livekit-studio-chat-panel h3,
+.livekit-admin-page .livekit-poll-panel h3,
+.livekit-admin-page .livekit-studio-students-panel h3,
+.livekit-admin-page .livekit-room-toolbar h3,
+.livekit-admin-page .livekit-audience-control-card strong,
+.livekit-admin-page .livekit-studio-toolbar-card strong,
+.livekit-admin-page .livekit-studio-status-grid strong,
+.livekit-admin-page .livekit-poll-summary-card strong,
+.livekit-admin-page .livekit-poll-result-title strong,
+.livekit-admin-page .livekit-poll-result-metrics strong,
+.livekit-admin-page .livekit-studio-student-card strong,
+.livekit-admin-page .livekit-studio-student-group-head h4 {
+  color: var(--admin-panel-title) !important;
+}
+
+.livekit-admin-page .livekit-studio-status-card .eyebrow,
+.livekit-admin-page .livekit-studio-chat-panel .eyebrow,
+.livekit-admin-page .livekit-poll-panel .eyebrow,
+.livekit-admin-page .livekit-studio-students-panel .eyebrow,
+.livekit-admin-page .livekit-room-toolbar .eyebrow,
+.livekit-admin-page .livekit-studio-status-grid span,
+.livekit-admin-page .livekit-poll-summary-card span,
+.livekit-admin-page .livekit-poll-composer label span,
+.livekit-admin-page .livekit-poll-actions label span,
+.livekit-admin-page .livekit-studio-student-group-kicker,
+.livekit-admin-page .livekit-server-status-strip,
+.livekit-admin-page .livekit-room-toolbar .subtitle,
+.livekit-admin-page .livekit-studio-chat-panel .subtitle,
+.livekit-admin-page .livekit-poll-panel .subtitle,
+.livekit-admin-page .livekit-studio-students-panel .subtitle,
+.livekit-admin-page .livekit-audience-control-card p,
+.livekit-admin-page .livekit-studio-toolbar-card p,
+.livekit-admin-page .livekit-studio-student-head p,
+.livekit-admin-page .livekit-studio-student-group-head p:last-child,
+.livekit-admin-page .livekit-muted-note,
+.livekit-admin-page .livekit-poll-voter-empty,
+.livekit-admin-page .livekit-poll-result-title span,
+.livekit-admin-page .livekit-poll-result-metrics small {
+  color: var(--admin-panel-copy) !important;
+}
+
+.livekit-admin-page .livekit-studio-status-grid article,
+.livekit-admin-page .livekit-poll-summary-card,
+.livekit-admin-page .livekit-poll-result-card,
+.livekit-admin-page .livekit-poll-composer,
+.livekit-admin-page .livekit-studio-student-card,
+.livekit-admin-page .livekit-studio-student-group,
+.livekit-admin-page .livekit-audience-control-card,
+.livekit-admin-page .livekit-server-status-strip > span:not(.livekit-server-pill),
+.livekit-admin-page .livekit-poll-fixed-option-pill,
+.livekit-admin-page .livekit-poll-composer input,
+.livekit-admin-page .livekit-poll-composer select {
+  border-color: var(--admin-panel-card-border) !important;
+  background: var(--admin-panel-card-bg) !important;
+  color: var(--admin-panel-title) !important;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-form {
+  border-color: var(--admin-chat-border) !important;
+  background: var(--admin-chat-surface) !important;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-header,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-header *,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry *,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input {
+  color: var(--admin-panel-title) !important;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input {
+  background: var(--admin-chat-input-bg) !important;
+  border-color: var(--admin-chat-border) !important;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input::placeholder {
+  color: var(--admin-panel-copy) !important;
+}
+
+.livekit-admin-page.livekit-studio-page {
+  --admin-studio-canvas-bg:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 22%),
+    radial-gradient(circle at bottom left, rgba(79, 70, 229, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(8, 14, 24, 0.52) 0%, rgba(10, 18, 34, 0.76) 100%);
+  --admin-studio-canvas-border: rgba(71, 85, 105, 0.32);
+  --admin-studio-canvas-shadow: 0 28px 60px rgba(2, 6, 23, 0.18);
+  padding: 4px 0 20px;
+}
+
+html[data-theme='dark'] .livekit-admin-page.livekit-studio-page,
+:root[data-theme='dark'] .livekit-admin-page.livekit-studio-page {
+  --admin-studio-canvas-bg:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 22%),
+    radial-gradient(circle at bottom left, rgba(79, 70, 229, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(8, 14, 24, 0.52) 0%, rgba(10, 18, 34, 0.76) 100%);
+  --admin-studio-canvas-border: rgba(71, 85, 105, 0.32);
+  --admin-studio-canvas-shadow: 0 28px 60px rgba(2, 6, 23, 0.18);
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-layout {
+  padding: 18px;
+  border-radius: 34px;
+  border: 1px solid var(--admin-studio-canvas-border);
+  background: var(--admin-studio-canvas-bg);
+  box-shadow: var(--admin-studio-canvas-shadow);
+  overflow: hidden;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell {
+  width: 100%;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+  width: 100%;
+  padding: 18px;
+  border-radius: 30px;
+  border: 1px solid var(--admin-studio-canvas-border);
+  background: var(--admin-studio-canvas-bg) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme],
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-room-container,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-layout-wrapper,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-video-conference,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-video-conference-inner {
+  background-color: transparent !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-grid {
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 380px);
+  gap: 24px;
+  align-items: start;
+  background: transparent;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-main-column,
+.livekit-admin-page.livekit-studio-page .livekit-studio-main-column > *,
+.livekit-admin-page.livekit-studio-page .livekit-studio-room-panel,
+.livekit-admin-page.livekit-studio-page .livekit-teacher-stage-shell,
+.livekit-admin-page.livekit-studio-page .teacher-video-conference,
+.livekit-admin-page.livekit-studio-page .teacher-video-conference-stage,
+.livekit-admin-page.livekit-studio-page .teacher-video-conference-primary,
+.livekit-admin-page.livekit-studio-page .teacher-video-conference-grid-wrapper,
+.livekit-admin-page.livekit-studio-page .livekit-studio-room-panel .lk-room-container,
+.livekit-admin-page.livekit-studio-page .livekit-studio-room-panel .lk-video-conference {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-side-column {
+  width: 100%;
+  max-width: clamp(320px, 27vw, 380px);
+  justify-self: end;
+  align-content: start;
+}
+
+.livekit-admin-page.livekit-studio-page .teacher-video-conference-primary,
+.livekit-admin-page.livekit-studio-page .teacher-video-conference-grid-wrapper {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.livekit-admin-page {
+  --admin-workspace-hero-border: rgba(191, 219, 254, 0.82);
+  --admin-workspace-hero-bg:
+    radial-gradient(circle at top left, rgba(109, 94, 252, 0.16), transparent 28%),
+    radial-gradient(circle at top right, rgba(215, 169, 75, 0.16), transparent 24%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 247, 255, 0.98) 52%, rgba(255, 251, 242, 0.96) 100%);
+  --admin-workspace-hero-shadow: 0 22px 42px rgba(148, 163, 184, 0.14);
+  --admin-workspace-hero-title: #10233a;
+  --admin-workspace-hero-copy: #5d7088;
+  --admin-workspace-hero-kicker: #577089;
+  --admin-workspace-action-bg:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(243, 248, 255, 0.975) 100%);
+  --admin-workspace-action-border: rgba(197, 210, 234, 0.76);
+  --admin-workspace-action-copy: #5d7088;
+  --admin-workspace-stat-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 255, 0.95) 100%);
+  --admin-workspace-stat-border: rgba(154, 167, 193, 0.22);
+  --admin-workspace-stat-title: #10233a;
+  --admin-workspace-stat-copy: #5d7088;
+  --admin-form-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 255, 0.94) 100%);
+  --admin-form-border: rgba(177, 190, 217, 0.55);
+  --admin-form-text: #10233a;
+  --admin-form-placeholder: #6b7f97;
+}
+
+html[data-theme='dark'] .livekit-admin-page,
+:root[data-theme='dark'] .livekit-admin-page {
+  --admin-workspace-hero-border: rgba(71, 85, 105, 0.44);
+  --admin-workspace-hero-bg:
+    radial-gradient(circle at top left, rgba(79, 70, 229, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 24%),
+    linear-gradient(135deg, rgba(17, 24, 39, 0.98) 0%, rgba(15, 23, 42, 0.98) 52%, rgba(12, 20, 36, 0.98) 100%);
+  --admin-workspace-hero-shadow: 0 24px 48px rgba(2, 6, 23, 0.28);
+  --admin-workspace-hero-title: #f3f7ff;
+  --admin-workspace-hero-copy: #a7bad4;
+  --admin-workspace-hero-kicker: #9db0cc;
+  --admin-workspace-action-bg:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(24, 34, 52, 0.98) 0%, rgba(18, 26, 42, 0.98) 100%);
+  --admin-workspace-action-border: rgba(71, 85, 105, 0.42);
+  --admin-workspace-action-copy: #a7bad4;
+  --admin-workspace-stat-bg: linear-gradient(180deg, rgba(25, 35, 56, 0.98) 0%, rgba(17, 24, 39, 0.98) 100%);
+  --admin-workspace-stat-border: rgba(71, 85, 105, 0.42);
+  --admin-workspace-stat-title: #f3f7ff;
+  --admin-workspace-stat-copy: #9db0cc;
+  --admin-form-surface: linear-gradient(180deg, rgba(20, 30, 48, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
+  --admin-form-border: rgba(71, 85, 105, 0.44);
+  --admin-form-text: #f3f7ff;
+  --admin-form-placeholder: #9db0cc;
+}
+
+.livekit-admin-page .livekit-hero,
+.livekit-admin-page .livekit-studio-hero {
+  border-color: var(--admin-workspace-hero-border) !important;
+  background: var(--admin-workspace-hero-bg) !important;
+  box-shadow: var(--admin-workspace-hero-shadow) !important;
+}
+
+.livekit-admin-page .livekit-hero .eyebrow,
+.livekit-admin-page .livekit-studio-hero .eyebrow {
+  color: var(--admin-workspace-hero-kicker) !important;
+}
+
+.livekit-admin-page .livekit-hero h2,
+.livekit-admin-page .livekit-studio-hero h2 {
+  color: var(--admin-workspace-hero-title) !important;
+}
+
+.livekit-admin-page .livekit-hero .subtitle,
+.livekit-admin-page .livekit-studio-hero .subtitle,
+.livekit-admin-page .livekit-hero-action-note {
+  color: var(--admin-workspace-hero-copy) !important;
+}
+
+.livekit-admin-page .livekit-hero-actions {
+  border-color: var(--admin-workspace-action-border) !important;
+  background: var(--admin-workspace-action-bg) !important;
+}
+
+.livekit-admin-page .livekit-hero-stats .stat-card,
+.livekit-admin-page .livekit-panel-head .stat-card {
+  border-color: var(--admin-workspace-stat-border) !important;
+  background: var(--admin-workspace-stat-bg) !important;
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.06);
+}
+
+.livekit-admin-page .livekit-hero-stats .stat-card span,
+.livekit-admin-page .livekit-panel-head .stat-card span {
+  color: var(--admin-workspace-stat-copy) !important;
+}
+
+.livekit-admin-page .livekit-hero-stats .stat-card strong,
+.livekit-admin-page .livekit-panel-head .stat-card strong {
+  color: var(--admin-workspace-stat-title) !important;
+}
+
+.livekit-admin-page .livekit-creation-panel,
+.livekit-admin-page .livekit-session-list-panel,
+.livekit-admin-page .livekit-calendar-panel,
+.livekit-admin-page .livekit-audience-controls-panel,
+.livekit-admin-page .livekit-studio-chat-panel,
+.livekit-admin-page .livekit-poll-panel,
+.livekit-admin-page .livekit-room-toolbar,
+.livekit-admin-page .livekit-studio-status-card,
+.livekit-admin-page .livekit-studio-students-panel {
+  border-color: var(--admin-panel-border) !important;
+  background: var(--admin-panel-bg) !important;
+  box-shadow: var(--admin-panel-shadow) !important;
+}
+
+.livekit-admin-page .livekit-class-form label,
+.livekit-admin-page .livekit-calendar-composer label,
+.livekit-admin-page .livekit-calendar-edit-form label {
+  color: var(--admin-panel-title) !important;
+}
+
+.livekit-admin-page .livekit-class-form label span,
+.livekit-admin-page .livekit-calendar-composer label span,
+.livekit-admin-page .livekit-calendar-edit-form label span {
+  color: var(--admin-panel-copy) !important;
+}
+
+.livekit-admin-page .livekit-class-form input,
+.livekit-admin-page .livekit-class-form textarea,
+.livekit-admin-page .livekit-class-form select,
+.livekit-admin-page .livekit-calendar-composer input,
+.livekit-admin-page .livekit-calendar-composer textarea,
+.livekit-admin-page .livekit-calendar-composer select,
+.livekit-admin-page .livekit-calendar-edit-form input,
+.livekit-admin-page .livekit-calendar-edit-form textarea,
+.livekit-admin-page .livekit-calendar-edit-form select {
+  border-color: var(--admin-form-border) !important;
+  background: var(--admin-form-surface) !important;
+  color: var(--admin-form-text) !important;
+}
+
+.livekit-admin-page .livekit-class-form input::placeholder,
+.livekit-admin-page .livekit-class-form textarea::placeholder,
+.livekit-admin-page .livekit-calendar-composer input::placeholder,
+.livekit-admin-page .livekit-calendar-composer textarea::placeholder,
+.livekit-admin-page .livekit-calendar-edit-form input::placeholder,
+.livekit-admin-page .livekit-calendar-edit-form textarea::placeholder {
+  color: var(--admin-form-placeholder) !important;
+}
+
+.livekit-admin-page .livekit-session-card,
+.livekit-admin-page .livekit-calendar-event-card,
+.livekit-admin-page .livekit-calendar-composer,
+.livekit-admin-page .livekit-calendar-board,
+.livekit-admin-page .livekit-audience-control-card,
+.livekit-admin-page .livekit-poll-summary-card,
+.livekit-admin-page .livekit-poll-result-card,
+.livekit-admin-page .livekit-poll-composer,
+.livekit-admin-page .livekit-studio-status-grid article,
+.livekit-admin-page .livekit-studio-student-card,
+.livekit-admin-page .livekit-studio-student-group,
+.livekit-admin-page .livekit-chat-disabled-state,
+.livekit-admin-page .livekit-server-status-strip > span:not(.livekit-server-pill),
+.livekit-admin-page .livekit-poll-fixed-option-pill {
+  border-color: var(--admin-panel-card-border) !important;
+  background: var(--admin-panel-card-bg) !important;
+}
+
+.livekit-admin-page .livekit-session-card strong,
+.livekit-admin-page .livekit-calendar-event-card strong,
+.livekit-admin-page .livekit-calendar-board-head h4,
+.livekit-admin-page .livekit-calendar-day-rail strong {
+  color: var(--admin-panel-title) !important;
+}
+
+.livekit-admin-page .livekit-session-card p,
+.livekit-admin-page .livekit-session-meta-pill,
+.livekit-admin-page .livekit-calendar-event-card p,
+.livekit-admin-page .livekit-calendar-day-rail span,
+.livekit-admin-page .livekit-calendar-event-topline span:last-child,
+.livekit-admin-page .livekit-calendar-event-actions span {
+  color: var(--admin-panel-copy) !important;
+}
+
+html[data-theme='light'] .livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme='default'],
+:root[data-theme='light'] .livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme='default'] {
+  color-scheme: light;
+  --lk-bg: #f8fbff;
+  --lk-bg2: #f3f7fd;
+  --lk-bg3: #eaf1fb;
+  --lk-bg4: #dbeafe;
+  --lk-bg5: #bfdbfe;
+  --lk-fg: #10233a;
+  --lk-fg2: #20364f;
+  --lk-fg3: #36506b;
+  --lk-fg4: #4e6a86;
+  --lk-fg5: #64748b;
+  --lk-border-color: rgba(191, 219, 254, 0.84);
+  --lk-control-bg: rgba(255, 255, 255, 0.96);
+  --lk-control-fg: #10233a;
+  --lk-control-hover-bg: #eaf2ff;
+  --lk-control-active-bg: #dbeafe;
+  --lk-control-active-hover-bg: #bfdbfe;
+  --lk-accent-bg: #2563eb;
+  --lk-accent-fg: #ffffff;
+  --lk-accent2: #1d4ed8;
+  --lk-accent3: #1e40af;
+  --lk-accent4: rgba(219, 234, 254, 0.98);
+  --lk-box-shadow: 0 14px 28px rgba(148, 163, 184, 0.14);
+  --lk-drop-shadow: rgba(37, 99, 235, 0.12) 0px 0px 24px;
+}
+
+html[data-theme='dark'] .livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme='black'],
+:root[data-theme='dark'] .livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme='black'] {
+  color-scheme: dark;
+  --lk-bg: #05070b;
+  --lk-bg2: #0b1220;
+  --lk-bg3: #121b2d;
+  --lk-bg4: #182338;
+  --lk-bg5: #223049;
+  --lk-fg: #f7fbff;
+  --lk-fg2: #e5edf8;
+  --lk-fg3: #d4dfef;
+  --lk-fg4: #c2d1e5;
+  --lk-fg5: #aebfd8;
+  --lk-border-color: rgba(148, 163, 184, 0.18);
+  --lk-control-bg: rgba(15, 23, 42, 0.92);
+  --lk-control-fg: #f8fafc;
+  --lk-control-hover-bg: rgba(30, 41, 59, 0.96);
+  --lk-control-active-bg: #2563eb;
+  --lk-control-active-hover-bg: #1d4ed8;
+  --lk-accent-bg: #2563eb;
+  --lk-accent-fg: #ffffff;
+  --lk-accent2: #1d4ed8;
+  --lk-accent3: #1e3a8a;
+  --lk-accent4: rgba(37, 99, 235, 0.24);
+  --lk-box-shadow: 0 18px 32px rgba(2, 6, 23, 0.32);
+  --lk-drop-shadow: rgba(148, 163, 184, 0.18) 0px 0px 24px;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-form-control,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-media-device-menu,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-settings-menu-modal,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-toast,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-participant-metadata-item {
+  border-color: var(--lk-border-color) !important;
+  background: var(--lk-bg2) !important;
+  color: var(--lk-fg) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-media-device-menu *,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-settings-menu-modal *,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-toast *,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-form-control,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-form-control::placeholder,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-menu,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-menu::after,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry .lk-meta-data,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry .lk-meta-data *,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry .lk-message-body,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry .lk-message-body *,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-participant-metadata-item * {
+  color: var(--lk-fg) !important;
+  fill: currentColor;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-form-control::placeholder,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry .lk-meta-data,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry .lk-meta-data *,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-media-device-select,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-media-device-select * {
+  color: var(--lk-fg5) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry[data-lk-message-origin='local'] .lk-message-body {
+  background: var(--lk-bg4) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-entry[data-lk-message-origin='remote'] .lk-message-body {
+  background: var(--lk-accent4) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-room-container,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-control-bar,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-group,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-start-audio-button,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-toggle,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-disconnect-button,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-group-menu > .lk-button,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-group-menu > .lk-disconnect-button {
+  color: var(--lk-control-fg) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-room-container {
+  background: transparent !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-control-bar {
+  border-color: var(--lk-border-color) !important;
+  background: var(--lk-bg2) !important;
+  box-shadow: var(--lk-box-shadow) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-group {
+  border-color: var(--lk-border-color) !important;
+  background: var(--lk-bg3) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-start-audio-button,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-toggle,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-group-menu > .lk-button {
+  background-color: var(--lk-control-bg) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button[aria-pressed='true'],
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-toggle[aria-pressed='true'],
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-start-audio-button[aria-pressed='true'] {
+  background-color: var(--lk-control-active-bg) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button:not(:disabled):hover,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-start-audio-button:not(:disabled):hover,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-toggle:not(:disabled):hover,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-group-menu > .lk-button:not(:disabled):hover {
+  background-color: var(--lk-control-hover-bg) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button[aria-pressed='true']:not(:disabled):hover,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-toggle[aria-pressed='true']:not(:disabled):hover,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-start-audio-button[aria-pressed='true']:not(:disabled):hover {
+  background-color: var(--lk-control-active-hover-bg) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-disconnect-button {
+  background-color: transparent !important;
+  border-color: var(--lk-danger) !important;
+  color: var(--lk-danger) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-disconnect-button:not(:disabled):hover {
+  background-color: var(--lk-danger2) !important;
+  color: var(--lk-danger-fg) !important;
+}
+
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button > svg,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-start-audio-button > svg,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-chat-toggle > svg,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-disconnect-button > svg,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-label,
+.livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] .lk-button-menu::after {
+  color: currentColor !important;
+  fill: currentColor !important;
+}
+
+@media (max-width: 1360px) {
+  .livekit-admin-page.livekit-studio-page .livekit-studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-admin-page.livekit-studio-page .livekit-studio-side-column {
+    max-width: none;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 768px) {
+  .livekit-admin-page.livekit-studio-page .livekit-studio-layout {
+    padding: 12px;
+    border-radius: 24px;
+  }
+
+  .livekit-admin-page.livekit-studio-page .livekit-studio-shell > [data-lk-theme] {
+    padding: 12px;
+    border-radius: 22px;
+  }
+}
+
+@media (max-width: 720px) {
+  .livekit-admin-page.livekit-studio-page {
+    padding-bottom: 12px;
   }
 }
