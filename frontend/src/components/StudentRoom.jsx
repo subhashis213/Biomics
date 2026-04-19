@@ -88,6 +88,11 @@ function isMicrophonePermissionError(error) {
 
 function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
   const [screenShareZoom, setScreenShareZoom] = useState(1);
+  const [floatingPreviewPosition, setFloatingPreviewPosition] = useState({ x: 16, y: 16 });
+  const [isDraggingPreview, setIsDraggingPreview] = useState(false);
+  const stageRef = useRef(null);
+  const previewRef = useRef(null);
+  const previewDragRef = useRef(null);
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -137,9 +142,68 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
     }
   }, [screenShareTrack]);
 
+  useEffect(() => {
+    if (!(screenShareTrack && isFullscreen)) {
+      setFloatingPreviewPosition({ x: 16, y: 16 });
+      setIsDraggingPreview(false);
+      previewDragRef.current = null;
+    }
+  }, [isFullscreen, screenShareTrack]);
+
+  useEffect(() => {
+    if (!isDraggingPreview) return undefined;
+
+    function clampPreviewPosition(clientX, clientY) {
+      const stageRect = stageRef.current?.getBoundingClientRect();
+      const previewRect = previewRef.current?.getBoundingClientRect();
+      const dragState = previewDragRef.current;
+      if (!stageRect || !previewRect || !dragState) return null;
+
+      const maxX = Math.max(8, stageRect.width - previewRect.width - 8);
+      const maxY = Math.max(8, stageRect.height - previewRect.height - 8);
+      return {
+        x: Math.min(Math.max(8, clientX - stageRect.left - dragState.offsetX), maxX),
+        y: Math.min(Math.max(8, clientY - stageRect.top - dragState.offsetY), maxY)
+      };
+    }
+
+    function handlePointerMove(event) {
+      const nextPosition = clampPreviewPosition(event.clientX, event.clientY);
+      if (!nextPosition) return;
+      setFloatingPreviewPosition(nextPosition);
+    }
+
+    function handlePointerUp() {
+      setIsDraggingPreview(false);
+      previewDragRef.current = null;
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [isDraggingPreview]);
+
   const hasScreenShare = Boolean(screenShareTrack);
   const canZoomOut = screenShareZoom > 1;
   const canZoomIn = screenShareZoom < 2.5;
+  const showImmersiveStage = hasScreenShare && isFullscreen;
+
+  function handlePreviewPointerDown(event) {
+    if (!showImmersiveStage || !previewRef.current) return;
+    const previewRect = previewRef.current.getBoundingClientRect();
+    previewDragRef.current = {
+      offsetX: event.clientX - previewRect.left,
+      offsetY: event.clientY - previewRect.top
+    };
+    setIsDraggingPreview(true);
+    event.preventDefault();
+  }
 
   function handleZoomIn() {
     setScreenShareZoom((current) => Math.min(2.5, Number((current + 0.25).toFixed(2))));
@@ -155,42 +219,59 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
 
   return (
     <div className="student-video-conference student-video-conference--custom">
-      <div className="student-video-conference-toolbar">
-        <div className="student-video-conference-status">
-          <span className="student-video-conference-status-pill">Classroom Focus</span>
-          <strong>{screenShareTrack ? 'Teacher screen is being shared' : 'Teacher stage is pinned for mobile view'}</strong>
+      {!showImmersiveStage ? (
+        <div className="student-video-conference-toolbar">
+          <div className="student-video-conference-status">
+            <span className="student-video-conference-status-pill">Classroom Focus</span>
+            <strong>{screenShareTrack ? 'Teacher screen is being shared' : 'Teacher stage is pinned for mobile view'}</strong>
+          </div>
+          <button type="button" className="student-room-fullscreen-btn" onClick={onToggleFullscreen}>
+            {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          </button>
         </div>
-        <button type="button" className="student-room-fullscreen-btn" onClick={onToggleFullscreen}>
-          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-        </button>
-      </div>
+      ) : null}
 
-      <div className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}`}>
+      <div ref={stageRef} className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-immersive-stage' : ''}`}>
         {primaryTrack ? (
           <div className={`student-video-conference-primary${hasScreenShare ? ' is-screen-share' : ''}`}>
             {hasScreenShare ? (
               <>
-                <div className="student-screen-share-toolbar">
-                  <div className="student-screen-share-copy">
-                    <span className="student-screen-share-badge">Shared screen mode</span>
-                    <strong>
-                      {isFullscreen
-                        ? 'Rotate or zoom if the shared slide looks cropped.'
-                        : 'Use zoom controls when the shared question needs a closer look.'}
-                    </strong>
+                {!showImmersiveStage ? (
+                  <div className="student-screen-share-toolbar">
+                    <div className="student-screen-share-copy">
+                      <span className="student-screen-share-badge">Shared screen mode</span>
+                      <strong>
+                        Use zoom controls when the shared question needs a closer look.
+                      </strong>
+                    </div>
+                    <div className="student-screen-share-zoom-controls" role="group" aria-label="Screen share zoom controls">
+                      <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomOut} disabled={!canZoomOut}>
+                        -
+                      </button>
+                      <button type="button" className="student-screen-share-zoom-btn student-screen-share-zoom-btn--reset" onClick={handleZoomReset} disabled={screenShareZoom === 1}>
+                        {Math.round(screenShareZoom * 100)}%
+                      </button>
+                      <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomIn} disabled={!canZoomIn}>
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <div className="student-screen-share-zoom-controls" role="group" aria-label="Screen share zoom controls">
-                    <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomOut} disabled={!canZoomOut}>
+                ) : (
+                  <div className="student-screen-share-floating-actions" role="group" aria-label="Screen share controls">
+                    <button type="button" className="student-screen-share-floating-btn" onClick={handleZoomOut} disabled={!canZoomOut}>
                       -
                     </button>
-                    <button type="button" className="student-screen-share-zoom-btn student-screen-share-zoom-btn--reset" onClick={handleZoomReset} disabled={screenShareZoom === 1}>
+                    <button type="button" className="student-screen-share-floating-btn student-screen-share-floating-btn--label" onClick={handleZoomReset} disabled={screenShareZoom === 1}>
                       {Math.round(screenShareZoom * 100)}%
                     </button>
-                    <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomIn} disabled={!canZoomIn}>
+                    <button type="button" className="student-screen-share-floating-btn" onClick={handleZoomIn} disabled={!canZoomIn}>
                       +
                     </button>
+                    <button type="button" className="student-screen-share-floating-btn student-screen-share-floating-btn--exit" onClick={onToggleFullscreen}>
+                      Exit
+                    </button>
                   </div>
-                </div>
+                )}
 
                 <div className="student-screen-share-viewport">
                   <div
@@ -201,11 +282,13 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
                   </div>
                 </div>
 
-                <p className="student-screen-share-footnote">
-                  {screenShareZoom > 1
-                    ? 'Drag the shared screen to inspect hidden corners and detailed text.'
-                    : 'If rotation makes the teacher slide look small, zoom in here without affecting the rest of the room.'}
-                </p>
+                {!showImmersiveStage ? (
+                  <p className="student-screen-share-footnote">
+                    {screenShareZoom > 1
+                      ? 'Drag the shared screen to inspect hidden corners and detailed text.'
+                      : 'If rotation makes the teacher slide look small, zoom in here without affecting the rest of the room.'}
+                  </p>
+                ) : null}
               </>
             ) : (
               <ParticipantTile trackRef={primaryTrack} className="student-video-conference-focus-tile" />
@@ -220,7 +303,12 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
         )}
 
         {primaryTrack && supportingTracks.length ? (
-          <div className={`student-video-conference-support-rail${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}`}>
+          <div
+            ref={previewRef}
+            className={`student-video-conference-support-rail${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-draggable' : ''}${isDraggingPreview ? ' is-dragging' : ''}`}
+            style={showImmersiveStage ? { '--student-preview-left': `${floatingPreviewPosition.x}px`, '--student-preview-top': `${floatingPreviewPosition.y}px` } : undefined}
+            onPointerDown={handlePreviewPointerDown}
+          >
             <TrackLoop tracks={supportingTracks}>
               <ParticipantTile />
             </TrackLoop>
@@ -720,7 +808,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   }
 
   return (
-    <section ref={roomShellRef} className={`card livekit-conference-card student-room-shell${isImmersive ? ' is-immersive' : ''}`}>
+    <section ref={roomShellRef} className={`card livekit-conference-card student-room-shell${isImmersive ? ' is-immersive' : ''}${isChatOpen ? ' has-chat-open' : ''}`}>
       <LiveKitRoom
         token={connectionInfo.token}
         serverUrl={connectionInfo.livekitUrl}
@@ -753,6 +841,12 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
             setErrorMessage('');
             onLeave?.();
           }}
+        />
+        <button
+          type="button"
+          className={`student-room-chat-backdrop${isChatOpen ? ' is-open' : ''}`}
+          aria-label="Close chat"
+          onClick={() => setIsChatOpen(false)}
         />
         <StudentRoomChatPanel
           policy={roomPolicy}
