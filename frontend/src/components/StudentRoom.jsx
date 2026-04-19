@@ -65,6 +65,7 @@ function StudentPollOverlay({ participantIdentity, onError }) {
   const room = useRoomContext();
   const [activePoll, setActivePoll] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState('');
+  const [isClosingPoll, setIsClosingPoll] = useState(false);
   const optionEntries = Object.entries(activePoll?.options || {});
 
   useEffect(() => {
@@ -76,9 +77,18 @@ function StudentPollOverlay({ participantIdentity, onError }) {
         if (message?.type === 'poll-create' && message?.poll) {
           setActivePoll(message.poll);
           setSelectedAnswer('');
+          setIsClosingPoll(false);
         }
         if (message?.type === 'poll-reveal' && activePoll && message?.pollId === activePoll.id) {
           setActivePoll((current) => current ? ({ ...current, revealed: true, correctOption: message.correctOption }) : current);
+        }
+        if (message?.type === 'poll-clear' && activePoll && message?.pollId === activePoll.id) {
+          setIsClosingPoll(true);
+          window.setTimeout(() => {
+            setActivePoll(null);
+            setSelectedAnswer('');
+            setIsClosingPoll(false);
+          }, 220);
         }
       } catch (_) {
         // Ignore invalid payloads.
@@ -105,12 +115,21 @@ function StudentPollOverlay({ participantIdentity, onError }) {
     }
   }
 
+  function handleDismissPoll() {
+    setIsClosingPoll(true);
+    window.setTimeout(() => {
+      setActivePoll(null);
+      setSelectedAnswer('');
+      setIsClosingPoll(false);
+    }, 220);
+  }
+
   if (!activePoll) return null;
 
   return (
     <div className="livekit-student-poll-layer" aria-live="polite">
       <aside
-        className={`livekit-student-poll-popup${selectedAnswer ? ' is-answered' : ''}${activePoll.revealed ? ' is-revealed' : ''}`}
+        className={`livekit-student-poll-popup${selectedAnswer ? ' is-answered' : ''}${activePoll.revealed ? ' is-revealed' : ''}${isClosingPoll ? ' is-closing' : ''}`}
         role="dialog"
         aria-live="polite"
         aria-label="Live poll"
@@ -170,7 +189,14 @@ function StudentPollOverlay({ participantIdentity, onError }) {
           <p className="livekit-poll-answer-pending">Waiting for teacher to reveal answer.</p>
         ) : null}
         {activePoll.revealed ? (
-          <p className="livekit-poll-answer-reveal">Correct answer: Option {activePoll.correctOption}</p>
+          <>
+            <p className="livekit-poll-answer-reveal">Correct answer: Option {activePoll.correctOption}</p>
+            <div className="livekit-student-poll-dismiss-row">
+              <button type="button" className="livekit-student-poll-dismiss-btn" onClick={handleDismissPoll}>
+                Close poll
+              </button>
+            </div>
+          </>
         ) : null}
       </aside>
     </div>

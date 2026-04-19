@@ -663,6 +663,50 @@
   border-radius: 20px;
   overflow: hidden;
 }
+.livekit-admin-page .teacher-video-conference .lk-participant-tile {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.22);
+}
+.livekit-admin-page .teacher-video-conference .lk-participant-media-video,
+.livekit-admin-page .teacher-video-conference .lk-participant-placeholder {
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
+}
+.livekit-admin-page .teacher-video-conference .lk-participant-placeholder svg,
+.livekit-admin-page .teacher-video-conference .lk-participant-placeholder path {
+  color: rgba(226, 232, 240, 0.72);
+  fill: rgba(226, 232, 240, 0.72);
+}
+.livekit-admin-page .teacher-video-conference .lk-participant-metadata {
+  left: 12px;
+  right: auto;
+  bottom: 12px;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  min-height: 36px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(8, 14, 24, 0.9) !important;
+  backdrop-filter: blur(12px);
+  color: #f8fafc !important;
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.26);
+}
+.livekit-admin-page .teacher-video-conference .lk-participant-metadata *,
+.livekit-admin-page .teacher-video-conference .lk-participant-name,
+.livekit-admin-page .teacher-video-conference .lk-participant-identity,
+.livekit-admin-page .teacher-video-conference .lk-connection-quality {
+  color: #f8fafc !important;
+  fill: currentColor;
+}
+.livekit-admin-page .teacher-video-conference .lk-participant-name,
+.livekit-admin-page .teacher-video-conference .lk-participant-identity {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
 
 .livekit-admin-page .teacher-video-conference .lk-video-conference {
   border-radius: 28px;
@@ -1463,6 +1507,28 @@
     padding: 14px 14px 0;
   }
 
+  .livekit-admin-page .teacher-video-conference-support-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .livekit-admin-page .teacher-video-conference-support-rail .lk-participant-tile {
+    min-height: 116px;
+  }
+
+  .livekit-admin-page .teacher-video-conference .lk-participant-metadata {
+    left: 10px;
+    bottom: 10px;
+    max-width: calc(100% - 20px);
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .livekit-admin-page .teacher-video-conference .lk-participant-name,
+  .livekit-admin-page .teacher-video-conference .lk-participant-identity {
+    font-size: 0.76rem;
+  }
+
   .livekit-admin-page .teacher-video-conference .lk-control-bar {
     margin: 0;
     padding: 10px;
@@ -1472,6 +1538,22 @@
   .livekit-admin-page .livekit-studio-room-panel .lk-room-container,
   .livekit-admin-page .livekit-studio-room-panel .lk-video-conference {
     min-height: 60dvh;
+  }
+}
+
+@media (max-width: 540px) {
+  .livekit-admin-page .teacher-video-conference-support-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-admin-page .teacher-video-conference .lk-participant-metadata {
+    min-height: 30px;
+    padding: 0 9px;
+  }
+
+  .livekit-admin-page .teacher-video-conference .lk-participant-name,
+  .livekit-admin-page .teacher-video-conference .lk-participant-identity {
+    font-size: 0.72rem;
   }
 }
 

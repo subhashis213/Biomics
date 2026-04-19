@@ -235,6 +235,13 @@ function TeacherPollConsole({ onError }) {
     await publishDataMessage({ type: 'poll-reveal', pollId: activePoll.id, correctOption: activePoll.correctOption });
   }
 
+  async function handleClearPoll() {
+    if (!activePoll) return;
+    const pollId = activePoll.id;
+    setActivePoll((current) => current ? ({ ...current, closed: true }) : current);
+    await publishDataMessage({ type: 'poll-clear', pollId });
+  }
+
   const resultRows = useMemo(() => [
     { key: 'A', label: draft.optionA || activePoll?.options?.A || 'Option A', count: results.A },
     { key: 'B', label: draft.optionB || activePoll?.options?.B || 'Option B', count: results.B },
@@ -336,6 +343,9 @@ function TeacherPollConsole({ onError }) {
           </button>
           <button type="button" className="secondary-btn" onClick={handleRevealAnswer} disabled={!activePoll || activePoll.revealed}>
             {activePoll?.revealed ? 'Answer Revealed' : 'Reveal Correct Answer'}
+          </button>
+          <button type="button" className="secondary-btn" onClick={handleClearPoll} disabled={!activePoll || activePoll.closed}>
+            {activePoll?.closed ? 'Poll Closed For Students' : 'Close Poll For Students'}
           </button>
         </div>
       </div>
