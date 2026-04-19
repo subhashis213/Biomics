@@ -143,7 +143,7 @@ function TeacherStageConference() {
         ) : null}
       </div>
 
-      <ControlBar controls={{ chat: true, settings: false }} />
+      <ControlBar controls={{ chat: false, settings: false }} />
     </div>
   );
 }
