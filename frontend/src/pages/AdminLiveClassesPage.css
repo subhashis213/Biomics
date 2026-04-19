@@ -11,6 +11,10 @@
   gap: 24px;
 }
 
+.livekit-admin-page > * {
+  min-width: 0;
+}
+
 .livekit-admin-page .livekit-hero {
   padding: 28px 30px;
   border-radius: 32px;
@@ -442,11 +446,22 @@
   align-items: stretch;
 }
 
+.livekit-admin-page .livekit-studio-grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .livekit-admin-page .livekit-studio-side-column {
   display: grid !important;
   grid-template-columns: 1fr;
   gap: 20px;
   align-items: stretch;
+  min-width: 0;
+}
+
+.livekit-admin-page .livekit-studio-side-column > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .livekit-admin-page .livekit-studio-room-panel {
@@ -506,6 +521,7 @@
 .livekit-admin-page .livekit-studio-room-copy {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .livekit-admin-page .livekit-stage-title-band {
@@ -566,6 +582,7 @@
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .livekit-admin-page .livekit-server-pill {
@@ -956,16 +973,20 @@
     radial-gradient(circle at bottom left, rgba(79, 57, 246, 0.08), transparent 24%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(242, 247, 255, 0.975) 100%);
   min-height: 320px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .livekit-admin-page .livekit-chat-headline {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .section-header.compact {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .section-header.compact::after {
@@ -980,6 +1001,9 @@
   display: grid;
   grid-template-rows: auto minmax(180px, 1fr) auto;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   height: min(420px, 52vh);
   border-radius: 22px;
   border: 1px solid rgba(191, 219, 254, 0.76);
@@ -993,10 +1017,12 @@
   justify-content: space-between;
   min-height: 52px;
   padding: 0 16px;
+  gap: 10px;
   border-bottom: 1px solid rgba(214, 223, 238, 0.84);
   background: rgba(255, 255, 255, 0.82);
   color: var(--admin-live-ink);
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .lk-close-button {
@@ -1007,11 +1033,13 @@
   padding: 14px;
   gap: 10px;
   overflow: auto;
+  min-width: 0;
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
 .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry * {
   color: var(--admin-live-ink);
+  overflow-wrap: anywhere;
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry {
@@ -1019,6 +1047,7 @@
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(214, 223, 238, 0.82);
+  min-width: 0;
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form {
@@ -1026,12 +1055,16 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   padding: 14px;
+  min-width: 0;
+  width: 100%;
   border-top: 1px solid rgba(214, 223, 238, 0.84);
   background: rgba(255, 255, 255, 0.88);
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
   min-height: 44px;
   border-radius: 14px;
   border: 1px solid rgba(177, 190, 217, 0.56);
@@ -1040,6 +1073,7 @@
 }
 
 .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-button {
+  min-width: 0;
   min-height: 44px;
   padding: 0 16px;
   border-radius: 14px;
@@ -1047,6 +1081,7 @@
   border-color: rgba(79, 57, 246, 0.84);
   color: #fff;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .livekit-admin-page .livekit-poll-panel {
@@ -1057,6 +1092,8 @@
     radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.1), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(244, 248, 255, 0.985) 100%);
   min-height: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .livekit-admin-page .livekit-poll-headline {
@@ -1539,6 +1576,18 @@
 }
 
 @media (max-width: 1480px) {
+  .livekit-admin-page .livekit-studio-grid {
+    grid-template-columns: minmax(0, 1.48fr) minmax(300px, 0.82fr);
+  }
+
+  .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-button {
+    width: 100%;
+  }
+
   .livekit-admin-page .livekit-studio-student-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
