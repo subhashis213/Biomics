@@ -1518,12 +1518,11 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   }
 
   .livekit-student-page .student-room-shell .student-room-chat-panel {
-    display: grid;
     position: fixed;
     left: max(12px, env(safe-area-inset-left));
     right: max(12px, env(safe-area-inset-right));
     bottom: max(12px, env(safe-area-inset-bottom));
-    z-index: 26;
+    z-index: 6200;
     max-height: min(74dvh, 560px);
     border-radius: 24px;
     backdrop-filter: blur(16px);
@@ -1537,7 +1536,7 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   .livekit-student-page .student-room-shell .student-room-chat-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 24;
+    z-index: 6100;
     display: block;
     opacity: 0;
     visibility: hidden;
@@ -1556,6 +1555,7 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
 
   .livekit-student-page .student-room-shell .student-room-chat-panel.is-open,
   .livekit-student-page .student-room-shell .student-room-chat-panel.is-disabled {
+    display: grid;
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
@@ -2044,10 +2044,13 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
 
 .livekit-student-page .student-room-shell.is-immersive .student-room-controls,
 .livekit-student-page .student-room-shell.is-immersive .student-video-conference-toolbar,
+.livekit-student-page .student-room-shell.is-immersive .student-room-chat-panel:not(.is-open):not(.is-disabled),
 .livekit-student-page .student-room-shell:fullscreen .student-room-controls,
 .livekit-student-page .student-room-shell:fullscreen .student-video-conference-toolbar,
+.livekit-student-page .student-room-shell:fullscreen .student-room-chat-panel:not(.is-open):not(.is-disabled),
 .livekit-student-page .student-room-shell:-webkit-full-screen .student-room-controls,
-.livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-toolbar {
+.livekit-student-page .student-room-shell:-webkit-full-screen .student-video-conference-toolbar,
+.livekit-student-page .student-room-shell:-webkit-full-screen .student-room-chat-panel:not(.is-open):not(.is-disabled) {
   display: none;
 }
 

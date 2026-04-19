@@ -1810,13 +1810,18 @@ html[data-theme='light'] .field-hint {
 }
 
 html.student-room-immersive,
-body.student-room-immersive {
+body.student-room-immersive,
+html.student-room-fullscreen-active,
+body.student-room-fullscreen-active {
   overflow: hidden;
 }
 
 .student-room-immersive .topbar,
 .student-room-immersive .hub-side-overlay,
-.student-room-immersive .hub-side-panel {
+.student-room-immersive .hub-side-panel,
+.student-room-fullscreen-active .topbar,
+.student-room-fullscreen-active .hub-side-overlay,
+.student-room-fullscreen-active .hub-side-panel {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1824,8 +1829,14 @@ body.student-room-immersive {
   transition: opacity 220ms ease, visibility 220ms ease, transform 220ms ease;
 }
 
-.student-room-immersive .app-shell-layout {
+.student-room-immersive .app-shell-layout,
+.student-room-fullscreen-active .app-shell-layout {
   padding-top: 0 !important;
+}
+
+.student-room-fullscreen-active body,
+body.student-room-fullscreen-active {
+  background: #000 !important;
 }
 
 .topbar-main {

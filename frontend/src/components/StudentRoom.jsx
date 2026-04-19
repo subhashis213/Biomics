@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import {
   Chat,
   GridLayout,
@@ -84,6 +87,90 @@ async function ensureMicrophonePermission() {
 function isMicrophonePermissionError(error) {
   const message = String(error?.message || error || '').toLowerCase();
   return message.includes('permission') || message.includes('denied') || message.includes('notallowed');
+}
+
+function isNativeMobileApp() {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch (_) {
+    return false;
+  }
+}
+
+async function enterImmersiveMobilePresentation() {
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.add('student-room-fullscreen-active');
+    document.body?.classList.add('student-room-fullscreen-active');
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.screen?.orientation?.lock) {
+      await window.screen.orientation.lock('landscape');
+    }
+  } catch (_) {
+    // Mobile browsers may reject orientation locks outside supported fullscreen contexts.
+  }
+
+  if (!isNativeMobileApp()) return;
+
+  try {
+    await StatusBar.setOverlaysWebView({ overlay: true });
+  } catch (_) {
+    // Ignore unsupported overlay operations.
+  }
+
+  try {
+    await StatusBar.setStyle({ style: Style.Dark });
+  } catch (_) {
+    // Ignore style adjustment failures.
+  }
+
+  try {
+    await StatusBar.hide();
+  } catch (_) {
+    // Ignore hide failures on unsupported platforms.
+  }
+
+  try {
+    await ScreenOrientation.lock({ orientation: 'landscape' });
+  } catch (_) {
+    // Ignore orientation failures when the plugin/platform cannot lock.
+  }
+}
+
+async function exitImmersiveMobilePresentation() {
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.remove('student-room-fullscreen-active');
+    document.body?.classList.remove('student-room-fullscreen-active');
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.screen?.orientation?.unlock) {
+      window.screen.orientation.unlock();
+    }
+  } catch (_) {
+    // Ignore browser orientation unlock failures.
+  }
+
+  if (!isNativeMobileApp()) return;
+
+  try {
+    await ScreenOrientation.unlock();
+  } catch (_) {
+    // Ignore unlock failures.
+  }
+
+  try {
+    await StatusBar.show();
+  } catch (_) {
+    // Ignore show failures on unsupported platforms.
+  }
+
+  try {
+    await StatusBar.setOverlaysWebView({ overlay: false });
+  } catch (_) {
+    // Ignore unsupported overlay operations.
+  }
 }
 
 function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
@@ -402,7 +489,7 @@ function StudentRoomControls({ policy, onError, onLeave, isChatOpen, onToggleCha
   );
 }
 
-function StudentRoomChatPanel({ policy, isOpen, onClose }) {
+function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
   if (policy.chatDisabled) {
     return (
       <section className="student-room-chat-panel is-disabled" aria-live="polite">
@@ -418,7 +505,7 @@ function StudentRoomChatPanel({ policy, isOpen, onClose }) {
   }
 
   return (
-    <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}`} aria-live="polite">
+    <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}${isMobileViewport ? ' is-mobile-sheet' : ''}`} aria-live="polite">
       <div className="student-room-chat-panel-head">
         <div>
           <p className="eyebrow">Class Chat</p>
@@ -646,6 +733,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   const [errorMessage, setErrorMessage] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImmersiveFallback, setIsImmersiveFallback] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [roomPolicy, setRoomPolicy] = useState(createDefaultRoomPolicy);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
@@ -672,6 +760,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
 
     const mediaQuery = window.matchMedia('(max-width: 768px)');
     const syncChatState = (event) => {
+      setIsMobileViewport(event.matches);
       setIsChatOpen(!event.matches);
     };
 
@@ -698,6 +787,23 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
 
     return () => {
       targets.forEach((target) => target.classList.remove('student-room-immersive'));
+    };
+  }, [isImmersive]);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      if (!active) return;
+      if (isImmersive) {
+        await enterImmersiveMobilePresentation();
+      } else {
+        await exitImmersiveMobilePresentation();
+      }
+    })();
+
+    return () => {
+      active = false;
     };
   }, [isImmersive]);
 
@@ -752,7 +858,10 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   useEffect(() => () => {
     if (typeof document === 'undefined') return;
     document.documentElement.classList.remove('student-room-immersive');
+    document.documentElement.classList.remove('student-room-fullscreen-active');
     document.body?.classList.remove('student-room-immersive');
+    document.body?.classList.remove('student-room-fullscreen-active');
+    exitImmersiveMobilePresentation();
   }, []);
 
   useEffect(() => {
@@ -852,6 +961,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
           policy={roomPolicy}
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
+          isMobileViewport={isMobileViewport}
         />
         <StudentPollOverlay participantIdentity={`student-${session?.username || 'viewer'}-${classSession?._id || 'room'}`} onError={setErrorMessage} />
       </LiveKitRoom>
