@@ -299,6 +299,52 @@ function serializeLiveClass(classDoc, user, role = 'user', accessState = {}) {
   };
 }
 
+function serializeCalendarBlock(entry, fallback = {}) {
+  return {
+    _id: String(entry?._id || fallback._id || ''),
+    course: String(entry?.course || fallback.course || '').trim(),
+    title: String(entry?.title || fallback.title || '').trim(),
+    description: String(entry?.description || fallback.description || '').trim(),
+    startsAt: entry?.startsAt || fallback.startsAt || null,
+    endsAt: entry?.endsAt || fallback.endsAt || null,
+    kind: String(entry?.kind || fallback.kind || 'blocked-slot').trim() || 'blocked-slot',
+    createdBy: String(entry?.createdBy || fallback.createdBy || '').trim()
+  };
+}
+
+function getCalendarBlockSignature(entry) {
+  const startsAt = entry?.startsAt ? new Date(entry.startsAt) : null;
+  const endsAt = entry?.endsAt ? new Date(entry.endsAt) : null;
+
+  return [
+    normalizeCourseName(entry?.course),
+    String(entry?.title || '').trim().toLowerCase(),
+    startsAt && !Number.isNaN(startsAt.getTime()) ? startsAt.toISOString() : '',
+    endsAt && !Number.isNaN(endsAt.getTime()) ? endsAt.toISOString() : '',
+    String(entry?.kind || 'blocked-slot').trim().toLowerCase()
+  ].join('::');
+}
+
+function dedupeCalendarBlocks(entries = []) {
+  const seen = new Set();
+
+  return entries.filter((entry) => {
+    const signature = getCalendarBlockSignature(entry);
+    if (!signature || seen.has(signature)) {
+      return false;
+    }
+    seen.add(signature);
+    return true;
+  });
+}
+
+function collectLegacyCalendarBlocks(users = []) {
+  return (Array.isArray(users) ? users : [])
+    .flatMap((user) => (Array.isArray(user?.liveClassCalendarBlocks) ? user.liveClassCalendarBlocks : []).map((entry) => (
+      serializeCalendarBlock(entry, { createdBy: String(user?.username || '').trim() })
+    )));
+}
+
 function buildCalendarEntries(user, classes = [], accessibleCourseNames = []) {
   const activeCourses = new Set([
     ...Array.from(getUserActiveCourseNames(user)),
@@ -318,24 +364,29 @@ function buildCalendarEntries(user, classes = [], accessibleCourseNames = []) {
     status: String(classDoc?.status || '').trim() || 'scheduled'
   }));
 
-  const manualBlocks = Array.isArray(user?.calendarBlocks)
-    ? user.calendarBlocks
-      .filter((entry) => {
-        const course = normalizeCourseName(entry?.course);
-        return Boolean(course) && activeCourses.has(course);
-      })
-      .map((entry) => ({
-        id: String(entry?._id || ''),
-        title: String(entry?.title || '').trim(),
-        description: String(entry?.description || '').trim(),
-        startsAt: entry?.startsAt || null,
-        endsAt: entry?.endsAt || null,
-        kind: String(entry?.kind || 'blocked-slot').trim() || 'blocked-slot',
-        course: normalizeCourseName(entry?.course),
-        liveClassId: entry?.liveClassId ? String(entry.liveClassId) : '',
-        status: 'blocked'
-      }))
+  const sharedCalendarBlocks = Array.isArray(user?.calendarBlocks)
+    ? user.calendarBlocks.map((entry) => serializeCalendarBlock(entry))
     : [];
+  const legacyCalendarBlocks = Array.isArray(user?.liveClassCalendarBlocks)
+    ? user.liveClassCalendarBlocks.map((entry) => serializeCalendarBlock(entry))
+    : [];
+
+  const manualBlocks = dedupeCalendarBlocks([...sharedCalendarBlocks, ...legacyCalendarBlocks])
+    .filter((entry) => {
+      const course = normalizeCourseName(entry?.course);
+      return Boolean(course) && activeCourses.has(course);
+    })
+    .map((entry) => ({
+      id: String(entry?._id || ''),
+      title: String(entry?.title || '').trim(),
+      description: String(entry?.description || '').trim(),
+      startsAt: entry?.startsAt || null,
+      endsAt: entry?.endsAt || null,
+      kind: String(entry?.kind || 'blocked-slot').trim() || 'blocked-slot',
+      course: normalizeCourseName(entry?.course),
+      liveClassId: entry?.liveClassId ? String(entry.liveClassId) : '',
+      status: 'blocked'
+    }));
 
   return [...classEntries, ...manualBlocks]
     .filter((entry) => entry.startsAt)
@@ -455,9 +506,15 @@ router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
         city: 1,
         purchasedCourses: 1,
         liveClassAccess: 1,
+        liveClassCalendarBlocks: 1,
         _id: 0
       }).sort({ username: 1 }).lean(),
       LiveClassCalendarBlock.find().sort({ startsAt: 1, createdAt: -1 }).lean()
+    ]);
+
+    const mergedCalendarBlocks = dedupeCalendarBlocks([
+      ...calendarBlocks.map((entry) => serializeCalendarBlock(entry)),
+      ...collectLegacyCalendarBlocks(students)
     ]);
 
     const availableCourses = Array.from(new Set(
@@ -468,16 +525,7 @@ router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
 
     return res.json({
       classes: classes.map((item) => serializeLiveClass(item, null, 'admin')),
-      calendarBlocks: calendarBlocks.map((entry) => ({
-        _id: String(entry?._id || ''),
-        course: String(entry?.course || '').trim(),
-        title: String(entry?.title || '').trim(),
-        description: String(entry?.description || '').trim(),
-        startsAt: entry?.startsAt || null,
-        endsAt: entry?.endsAt || null,
-        kind: String(entry?.kind || 'blocked-slot').trim(),
-        createdBy: String(entry?.createdBy || '').trim()
-      })),
+      calendarBlocks: mergedCalendarBlocks.map((entry) => serializeCalendarBlock(entry)),
       availableCourses,
       students: students.map((student) => ({
         username: student.username,
@@ -1067,16 +1115,65 @@ router.patch('/calendar/blocks/:blockId', authenticateToken('admin'), validate(u
 router.delete('/calendar/blocks/:blockId', authenticateToken('admin'), async (req, res) => {
   try {
     const blockId = String(req.params.blockId || '').trim();
+    const objectId = mongoose.Types.ObjectId.isValid(blockId) ? new mongoose.Types.ObjectId(blockId) : null;
     const block = await LiveClassCalendarBlock.findByIdAndDelete(blockId);
-    if (!block) {
+    let legacyRemovedCount = 0;
+
+    if (objectId) {
+      const deleteLegacyById = await User.collection.updateMany(
+        {
+          $or: [
+            { 'liveClassCalendarBlocks._id': objectId },
+            { 'calendarBlocks._id': objectId }
+          ]
+        },
+        {
+          $pull: {
+            liveClassCalendarBlocks: { _id: objectId },
+            calendarBlocks: { _id: objectId }
+          }
+        }
+      ).catch(() => ({ modifiedCount: 0 }));
+
+      legacyRemovedCount += Number(deleteLegacyById?.modifiedCount || 0);
+    }
+
+    if (block) {
+      const matchingLegacyBlock = {
+        course: String(block?.course || '').trim(),
+        title: String(block?.title || '').trim(),
+        startsAt: block?.startsAt || null,
+        endsAt: block?.endsAt || null,
+        kind: String(block?.kind || 'blocked-slot').trim() || 'blocked-slot'
+      };
+
+      const deleteLegacyBySignature = await User.collection.updateMany(
+        {
+          $or: [
+            { liveClassCalendarBlocks: { $elemMatch: matchingLegacyBlock } },
+            { calendarBlocks: { $elemMatch: matchingLegacyBlock } }
+          ]
+        },
+        {
+          $pull: {
+            liveClassCalendarBlocks: matchingLegacyBlock,
+            calendarBlocks: matchingLegacyBlock
+          }
+        }
+      ).catch(() => ({ modifiedCount: 0 }));
+
+      legacyRemovedCount += Number(deleteLegacyBySignature?.modifiedCount || 0);
+    }
+
+    if (!block && !legacyRemovedCount) {
       return res.status(404).json({ error: 'Calendar block not found.' });
     }
 
     await logAdminAction(req, {
       action: 'DELETE_LIVEKIT_CALENDAR_BLOCK',
       targetType: 'Course',
-      targetId: String(block?.course || '').trim(),
-      details: { blockId }
+      targetId: String(block?.course || blockId).trim(),
+      details: { blockId, legacyRemovedCount }
     });
 
     notifyStudentWorkspaceUpdated('calendar-block-deleted');
