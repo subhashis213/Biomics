@@ -11,6 +11,7 @@
     "migrate:avatars": "node migrateAvatarsToCloudinary.js"
   },
   "dependencies": {
+    "aws-sdk": "^2.1693.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.5",

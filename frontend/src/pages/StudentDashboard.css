@@ -1,0 +1,183 @@
+.student-learning-spotlight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.student-learning-spotlight-grid > * {
+  min-width: 0;
+}
+
+.student-learning-spotlight-grid .course-chooser-wrap {
+  justify-content: stretch;
+  padding: 0;
+}
+
+.student-learning-spotlight-grid .course-chooser-card {
+  max-width: none;
+  min-height: 100%;
+  height: 100%;
+  border-radius: 30px;
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  box-shadow:
+    0 20px 45px color-mix(in srgb, var(--accent) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+}
+
+.student-learning-live-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 100%;
+  padding: 28px;
+  border-radius: 30px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  overflow: hidden;
+  box-shadow:
+    0 22px 48px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+}
+
+.student-learning-live-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(240px 140px at 100% 0%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 72%),
+    radial-gradient(180px 120px at 0% 100%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 72%);
+  pointer-events: none;
+}
+
+.student-learning-live-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.student-learning-live-card--live {
+  background: linear-gradient(150deg, color-mix(in srgb, #ef4444 13%, var(--bg-card)), color-mix(in srgb, var(--bg-card-soft) 88%, transparent));
+  border-color: color-mix(in srgb, #ef4444 40%, var(--line));
+}
+
+.student-learning-live-card--locked {
+  background: linear-gradient(150deg, color-mix(in srgb, #f59e0b 15%, var(--bg-card)), color-mix(in srgb, var(--bg-card-soft) 88%, transparent));
+  border-color: color-mix(in srgb, #f59e0b 40%, var(--line));
+}
+
+.student-learning-live-card--upcoming {
+  background: linear-gradient(150deg, color-mix(in srgb, #0f766e 15%, var(--bg-card)), color-mix(in srgb, var(--bg-card-soft) 88%, transparent));
+  border-color: color-mix(in srgb, #0f766e 36%, var(--line));
+}
+
+.student-learning-live-card--default {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 14%, var(--bg-card)), color-mix(in srgb, var(--bg-card-soft) 90%, transparent));
+}
+
+.student-learning-live-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.student-learning-live-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.student-learning-live-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+  background: color-mix(in srgb, var(--bg-card-soft) 72%, transparent);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.student-learning-live-copy-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-learning-live-title {
+  font-size: 1.28rem;
+  line-height: 1.2;
+  color: var(--text-strong);
+}
+
+.student-learning-live-copy {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.6;
+  font-size: 0.94rem;
+}
+
+.student-learning-live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.student-learning-live-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-card-soft) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.student-learning-live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.student-learning-live-actions .primary-btn,
+.student-learning-live-actions .secondary-btn {
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 0 18px;
+}
+
+@media (max-width: 980px) {
+  .student-learning-spotlight-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-learning-spotlight-grid {
+    gap: 16px;
+  }
+
+  .student-learning-live-card {
+    padding: 22px 18px;
+    border-radius: 24px;
+  }
+
+  .student-learning-live-actions {
+    flex-direction: column;
+  }
+
+  .student-learning-live-actions .primary-btn,
+  .student-learning-live-actions .secondary-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -17,6 +17,7 @@ import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import FinalWorkingVideoCard from '../components/FinalWorkingVideoCard';
 import StudentChatAgent, { StudentAnnouncementBell } from '../components/StudentChatAgent';
+import './StudentDashboard.css';
 import { useCourseData } from '../hooks/useCourseData';
 import { useFeedback } from '../hooks/useFeedback';
 import { useQuizSession } from '../hooks/useQuizSession';
@@ -64,6 +65,7 @@ export default function StudentDashboard() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [liveClass, setLiveClass] = useState(null); // { active, title, meetUrl, startedAt }
+  const [lockedLiveClass, setLockedLiveClass] = useState(null);
   const [upcomingClass, setUpcomingClass] = useState(null); // { _id, title, scheduledAt, meetUrl }
   const [upcomingCountdown, setUpcomingCountdown] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
@@ -161,6 +163,19 @@ export default function StudentDashboard() {
       }
     : getModuleAccessInfo(selectedAccessTarget, selectedModuleCourse || course);
   const selectedTargetPlans = Array.isArray(selectedTargetAccess?.pricing?.plans) ? selectedTargetAccess.pricing.plans : [];
+  const liveClassBundlePlans = bundlePlanOptions.filter((plan) => Number(plan?.amountInPaise || 0) > 0);
+  const preferredLiveClassPlan = useMemo(() => {
+    if (!liveClassBundlePlans.length) return null;
+
+    const selectedPlanMatch = liveClassBundlePlans.find((plan) => plan.type === selectedPlan);
+    if (selectedPlanMatch) return selectedPlanMatch;
+
+    return [...liveClassBundlePlans].sort((left, right) => {
+      const amountDiff = Number(left.amountInPaise || 0) - Number(right.amountInPaise || 0);
+      if (amountDiff !== 0) return amountDiff;
+      return Number(left.durationMonths || 0) - Number(right.durationMonths || 0);
+    })[0] || null;
+  }, [liveClassBundlePlans, selectedPlan]);
   const quizEnabledForSelection = Boolean(selectedModuleName) &&
     normalizeCourseName(selectedModuleCourse).toLowerCase() === normalizeCourseName(course || '').toLowerCase();
 
@@ -204,6 +219,14 @@ export default function StudentDashboard() {
       return window.sessionStorage.getItem(storageKey);
     } catch {
       return null;
+    }
+  }
+
+  function openCourseUnlockPanel() {
+    setSelectedAccessTarget(ALL_MODULES);
+    const unlockSection = document.getElementById('section-course-bundle-unlock');
+    if (unlockSection) {
+      unlockSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
@@ -702,7 +725,7 @@ export default function StudentDashboard() {
       }
       await refreshAttempts();
       if (reloadOnSuccess) window.location.reload();
-      return { status: 'already-unlocked' };
+      return { status: orderResponse?.purchaseRequired ? 'already-unlocked' : 'free' };
     }
 
     const scriptReady = await loadRazorpayCheckoutScript();
@@ -1433,7 +1456,18 @@ export default function StudentDashboard() {
         });
       })
       .catch((error) => {
-        if (!cancelled) setBanner({ type: 'error', text: error.message });
+        if (cancelled) return;
+
+        if (error?.message === 'Student profile not found') {
+          const fallbackUsername = String(session?.username || '').trim();
+          if (fallbackUsername) {
+            setProfile({ username: fallbackUsername, phone: '', class: '', city: '', avatarUrl: '' });
+            setProfileForm({ username: fallbackUsername, phone: '', city: '', password: '' });
+          }
+          return;
+        }
+
+        setBanner({ type: 'error', text: error.message });
       })
       .finally(() => {
         if (!cancelled) setIsProfileLoading(false);
@@ -1442,7 +1476,7 @@ export default function StudentDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [session?.username]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1505,11 +1539,13 @@ export default function StudentDashboard() {
       try {
         const data = await requestJson('/live/status');
         if (!cancelled) {
-          if (data.active) {
-            setLiveClass(data);
+          if (data.active && data.activeClass) {
+            setLiveClass(data.activeClass);
+            setLockedLiveClass(null);
             setUpcomingClass(null);
           } else {
             setLiveClass(null);
+            setLockedLiveClass(data.lockedActiveClass || null);
             setUpcomingClass(data.upcoming || null);
           }
         }
@@ -1586,6 +1622,40 @@ export default function StudentDashboard() {
       });
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to start payment.' });
+    } finally {
+      setIsUnlockingCourse(false);
+    }
+  }
+
+  async function handlePayForLockedLiveClass() {
+    if (isUnlockingCourse || !preferredLiveClassPlan) return;
+
+    const targetCourse = normalizeCourseName(lockedLiveClass?.course || course || '');
+    setIsUnlockingCourse(true);
+    setSelectedAccessTarget(ALL_MODULES);
+    setSelectedPlan(preferredLiveClassPlan.type);
+    setBanner(null);
+
+    try {
+      const result = await startMembershipCheckout({
+        targetCourse,
+        targetModuleName: ALL_MODULES,
+        planType: preferredLiveClassPlan.type,
+        voucher: '',
+        reloadOnSuccess: false,
+        showSuccessBanner: false,
+        showCancelBanner: true
+      });
+
+      if (['paid', 'already-unlocked', 'free'].includes(result?.status)) {
+        setBanner({
+          type: 'success',
+          text: `${targetCourse || 'Course'} access is ready. Opening live classes...`
+        });
+        navigate('/student/live-classes');
+      }
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to start course payment.' });
     } finally {
       setIsUnlockingCourse(false);
     }
@@ -1753,6 +1823,130 @@ export default function StudentDashboard() {
     const clearance = parseFloat(rootStyles.getPropertyValue('--app-shell-topbar-clearance')) || 96;
     const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - clearance - 12);
     window.scrollTo({ top, behavior: 'smooth' });
+  }
+
+  function renderLearningLiveCard() {
+    if (liveClass) {
+      return (
+        <section className="card student-learning-live-card student-learning-live-card--live">
+          <div className="student-learning-live-header">
+            <div className="student-learning-live-topline">
+              <span className="live-badge pulsing">LIVE NOW</span>
+              <span className="student-learning-live-kicker">Classroom Active</span>
+            </div>
+            <div className="student-learning-live-copy-block">
+              <strong className="student-learning-live-title">{liveClass.title}</strong>
+              <p className="student-learning-live-copy">Teacher is already inside the classroom. Join now or open the full live class section.</p>
+            </div>
+            <div className="student-learning-live-meta">
+              <span className="student-learning-live-pill">Started {new Date(liveClass.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              {liveClass.course ? <span className="student-learning-live-pill">{liveClass.course}</span> : null}
+            </div>
+          </div>
+          <div className="student-learning-live-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/student/live-classes')}>
+              Join Live Class
+            </button>
+            <button type="button" className="secondary-btn" onClick={() => navigate('/student/live-classes')}>
+              Open Live Section
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    if (lockedLiveClass) {
+      return (
+        <section className="card student-learning-live-card student-learning-live-card--locked">
+          <div className="student-learning-live-header">
+            <div className="student-learning-live-topline">
+              <span className="live-badge offline">LOCKED</span>
+              <span className="student-learning-live-kicker">Course Access Needed</span>
+            </div>
+            <div className="student-learning-live-copy-block">
+              <strong className="student-learning-live-title">{lockedLiveClass.title}</strong>
+              <p className="student-learning-live-copy">
+                {preferredLiveClassPlan
+                  ? `A live class is running for ${lockedLiveClass.course || 'this course'}. Pay ${formatPriceInPaise(preferredLiveClassPlan.amountInPaise)} for ${preferredLiveClassPlan.label} access to enter the room.`
+                  : `A live class is running for ${lockedLiveClass.course || 'this course'}. Unlock the course content to enter the room.`}
+              </p>
+            </div>
+            <div className="student-learning-live-meta">
+              {lockedLiveClass.course ? <span className="student-learning-live-pill">{lockedLiveClass.course}</span> : null}
+              <span className="student-learning-live-pill">Live room locked</span>
+              {preferredLiveClassPlan ? <span className="student-learning-live-pill">{preferredLiveClassPlan.label} {formatPriceInPaise(preferredLiveClassPlan.amountInPaise)}</span> : null}
+            </div>
+          </div>
+          <div className="student-learning-live-actions">
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={preferredLiveClassPlan ? handlePayForLockedLiveClass : openCourseUnlockPanel}
+              disabled={isUnlockingCourse}
+            >
+              {isUnlockingCourse
+                ? 'Processing...'
+                : preferredLiveClassPlan
+                  ? `Pay ${formatPriceInPaise(preferredLiveClassPlan.amountInPaise)}`
+                  : 'Unlock Course Content'}
+            </button>
+            <button type="button" className="secondary-btn" onClick={openCourseUnlockPanel}>
+              See All Plans
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    if (upcomingClass) {
+      return (
+        <section className="card student-learning-live-card student-learning-live-card--upcoming">
+          <div className="student-learning-live-header">
+            <div className="student-learning-live-topline">
+              <span className="live-badge">UPCOMING</span>
+              <span className="student-learning-live-kicker">Next Live Session</span>
+            </div>
+            <div className="student-learning-live-copy-block">
+              <strong className="student-learning-live-title">{upcomingClass.title}</strong>
+              <p className="student-learning-live-copy">Your next live class is scheduled soon. Open the live section to view details and calendar timing.</p>
+            </div>
+            <div className="student-learning-live-meta">
+              <span className="student-learning-live-pill">{upcomingCountdown || 'Starting soon'}</span>
+              <span className="student-learning-live-pill">{new Date(upcomingClass.scheduledAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            </div>
+          </div>
+          <div className="student-learning-live-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/student/live-classes')}>
+              Open Live Section
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    return (
+      <section className="card student-learning-live-card student-learning-live-card--default">
+        <div className="student-learning-live-header">
+          <div className="student-learning-live-topline">
+            <span className="live-badge">LIVE</span>
+            <span className="student-learning-live-kicker">Course Live Classes</span>
+          </div>
+          <div className="student-learning-live-copy-block">
+            <strong className="student-learning-live-title">Live Class Section</strong>
+            <p className="student-learning-live-copy">See blocked calendar slots, upcoming classes, and enter the live classroom from one focused section.</p>
+          </div>
+          <div className="student-learning-live-meta">
+            <span className="student-learning-live-pill">Calendar ready</span>
+            <span className="student-learning-live-pill">Join when live</span>
+          </div>
+        </div>
+        <div className="student-learning-live-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/student/live-classes')}>
+            Open Live Section
+          </button>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -2019,66 +2213,6 @@ export default function StudentDashboard() {
           </aside>
         ) : null}
 
-        {/* ── Live Class Banner ──────────────────────────── */}
-        {liveClass ? (
-          <section className="live-class-student-banner card">
-            <div className="live-class-banner-info">
-              <span className="live-badge pulsing">LIVE NOW</span>
-              <div>
-                <strong className="live-class-title-display">{liveClass.title}</strong>
-                <span className="live-class-since">⏰ Live since {new Date(liveClass.startedAt).toLocaleTimeString()}</span>
-              </div>
-            </div>
-            <a
-              href={liveClass.meetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="primary-btn live-join-btn"
-            >
-              📹 Join Google Meet
-            </a>
-          </section>
-        ) : null}
-
-        {/* ── Upcoming Class Banner ──────────────────────── */}
-        {!liveClass && upcomingClass ? (
-          <section className="upcoming-class-banner">
-            <div className="upcoming-banner-glow" aria-hidden="true" />
-            <div className="upcoming-banner-left">
-              <div className="upcoming-banner-icon">📅</div>
-              <div className="upcoming-banner-text">
-                <span className="upcoming-banner-label">Upcoming Class</span>
-                <strong className="upcoming-banner-title">{upcomingClass.title}</strong>
-                <span className="upcoming-banner-time">
-                  {(() => {
-                    const d = new Date(upcomingClass.scheduledAt);
-                    const now = new Date();
-                    const isToday = d.toDateString() === now.toDateString();
-                    const isTomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString();
-                    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    if (isToday) return `Today at ${timeStr}`;
-                    if (isTomorrow) return `Tomorrow at ${timeStr}`;
-                    return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ` at ${timeStr}`;
-                  })()}
-                </span>
-              </div>
-            </div>
-            <div className="upcoming-banner-right">
-              <div className="upcoming-countdown-chip">
-                <span className="upcoming-countdown-dot" />
-                <span className="upcoming-countdown-text">{upcomingCountdown}</span>
-              </div>
-              {upcomingClass.meetUrl ? (
-                <a href={upcomingClass.meetUrl} target="_blank" rel="noopener noreferrer" className="upcoming-join-btn">
-                  Set Reminder &rarr;
-                </a>
-              ) : (
-                <span className="upcoming-link-pending">Link coming soon</span>
-              )}
-            </div>
-          </section>
-        ) : null}
-
       {hasAnyUnlockedModule && !selectedModule && favoriteVideos.length ? (
         <section className="card favorites-panel">
           <div className="section-header compact">
@@ -2136,7 +2270,7 @@ export default function StudentDashboard() {
       </section>
 
       {!selectedModule && bundlePlanOptions.some((plan) => plan.amountInPaise > 0) && !allModulesUnlocked ? (
-        <section className="card course-lock-panel membership-lock-panel">
+        <section id="section-course-bundle-unlock" className="card course-lock-panel membership-lock-panel">
           <div className="section-header compact">
             <div>
               <p className="eyebrow">All Modules Bundle</p>
@@ -2207,8 +2341,7 @@ export default function StudentDashboard() {
           ))}
         </div>
       ) : !selectedModule ? (
-        // Single course chooser card
-        availableCourses.length ? (() => {
+        (() => {
           const activeCourse = pickerCourse || availableCourses[0] || '';
           const activeCourseKey = normalizeCourseName(activeCourse).toLowerCase();
           const activeModuleNameSet = new Set(
@@ -2232,72 +2365,81 @@ export default function StudentDashboard() {
             : 0;
 
           return (
-            <div className="course-chooser-wrap">
-              <div className="course-chooser-card">
-                <div className="course-chooser-top">
-                  <span className="course-chooser-icon" aria-hidden="true">🎓</span>
-                  <div className="course-chooser-intro">
-                    <h3 className="course-chooser-title">Select a Course</h3>
-                    <p className="course-chooser-subtitle">Pick one below, then tap Go to explore its modules</p>
-                  </div>
-                </div>
-
-                <div className="course-chooser-pills" role="group" aria-label="Available courses">
-                  {availableCourses.map((cName) => (
-                    <button
-                      key={cName}
-                      type="button"
-                      className={`course-chooser-pill${normalizeCourseName(cName).toLowerCase() === activeCourseKey ? ' active' : ''}`}
-                      onClick={() => setPickerCourse(cName)}
-                    >
-                      {cName}
-                    </button>
-                  ))}
-                </div>
-
-                {activeCourse && (
-                  <div className="course-chooser-details">
-                    <div className="course-chooser-stats-row">
-                      <span className="course-chooser-stat">
-                        <strong>{activeModuleCount}</strong> module{activeModuleCount === 1 ? '' : 's'}
-                      </span>
-                      <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
-                      <span className="course-chooser-stat">
-                        <strong>{activeVideos.length}</strong> lecture{activeVideos.length === 1 ? '' : 's'}
-                      </span>
-                      {activeQuizCount > 0 && (
-                        <>
-                          <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
-                          <span className="course-chooser-stat">
-                            <strong>{activeQuizCount}</strong> quiz{activeQuizCount === 1 ? '' : 'zes'}
-                          </span>
-                        </>
-                      )}
+            <div className="student-learning-spotlight-grid">
+              <div className="course-chooser-wrap">
+                <div className="course-chooser-card">
+                  <div className="course-chooser-top">
+                    <span className="course-chooser-icon" aria-hidden="true">🎓</span>
+                    <div className="course-chooser-intro">
+                      <h3 className="course-chooser-title">Select a Course</h3>
+                      <p className="course-chooser-subtitle">Pick one below, then tap Go to explore its modules</p>
                     </div>
+                  </div>
 
-                    <div className="course-chooser-progress-row">
-                      <span className="course-chooser-progress-label">Progress</span>
-                      <div className="course-chooser-progress-track" role="progressbar" aria-valuenow={activeProgress} aria-valuemin={0} aria-valuemax={100}>
-                        <div className="course-chooser-progress-fill" style={{ width: `${activeProgress}%` }} />
+                  {availableCourses.length ? (
+                    <>
+                      <div className="course-chooser-pills" role="group" aria-label="Available courses">
+                        {availableCourses.map((cName) => (
+                          <button
+                            key={cName}
+                            type="button"
+                            className={`course-chooser-pill${normalizeCourseName(cName).toLowerCase() === activeCourseKey ? ' active' : ''}`}
+                            onClick={() => setPickerCourse(cName)}
+                          >
+                            {cName}
+                          </button>
+                        ))}
                       </div>
-                      <span className="course-chooser-progress-pct">{activeProgress}%</span>
-                    </div>
 
-                    <button
-                      type="button"
-                      className="course-chooser-go-btn"
-                      onClick={() => navigate(`/student/course/${encodeURIComponent(activeCourse)}/modules`)}
-                    >
-                      Go <span aria-hidden="true">→</span>
-                    </button>
-                  </div>
-                )}
+                      {activeCourse ? (
+                        <div className="course-chooser-details">
+                          <div className="course-chooser-stats-row">
+                            <span className="course-chooser-stat">
+                              <strong>{activeModuleCount}</strong> module{activeModuleCount === 1 ? '' : 's'}
+                            </span>
+                            <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
+                            <span className="course-chooser-stat">
+                              <strong>{activeVideos.length}</strong> lecture{activeVideos.length === 1 ? '' : 's'}
+                            </span>
+                            {activeQuizCount > 0 && (
+                              <>
+                                <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
+                                <span className="course-chooser-stat">
+                                  <strong>{activeQuizCount}</strong> quiz{activeQuizCount === 1 ? '' : 'zes'}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="course-chooser-progress-row">
+                            <span className="course-chooser-progress-label">Progress</span>
+                            <div className="course-chooser-progress-track" role="progressbar" aria-valuenow={activeProgress} aria-valuemin={0} aria-valuemax={100}>
+                              <div className="course-chooser-progress-fill" style={{ width: `${activeProgress}%` }} />
+                            </div>
+                            <span className="course-chooser-progress-pct">{activeProgress}%</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="course-chooser-go-btn"
+                            onClick={() => navigate(`/student/course/${encodeURIComponent(activeCourse)}/modules`)}
+                          >
+                            Go <span aria-hidden="true">→</span>
+                          </button>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="course-chooser-details">
+                      <p className="course-chooser-subtitle">No courses available yet.</p>
+                    </div>
+                  )}
+                </div>
               </div>
+              {renderLearningLiveCard()}
             </div>
           );
-        })() : (
-          <p className="empty-state">No courses available yet.</p>
-        )
+        })()
       ) : selectedModule && moduleLocked ? (
         <section className="card membership-lock-panel module-membership-lock-panel">
           <div className="section-header compact">

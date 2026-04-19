@@ -8475,6 +8475,3125 @@ html[data-theme='dark'] .course-manager-card .course-tile {
     grid-template-columns: 1fr;
   }
 
+
+.livekit-admin-page,
+.livekit-student-page {
+  display: grid;
+  gap: 16px;
+}
+
+.livekit-hero {
+  background:
+    radial-gradient(480px 220px at 0% 0%, rgba(14, 165, 233, 0.16), transparent 60%),
+    radial-gradient(420px 220px at 100% 0%, rgba(16, 185, 129, 0.14), transparent 62%),
+    linear-gradient(160deg, color-mix(in srgb, #0f172a 6%, var(--bg-card-soft)) 0%, color-mix(in srgb, #164e63 10%, var(--bg-card-soft)) 100%);
+}
+
+.livekit-student-hero {
+  background:
+    radial-gradient(420px 220px at 0% 0%, rgba(168, 85, 247, 0.14), transparent 60%),
+    radial-gradient(360px 220px at 100% 0%, rgba(34, 197, 94, 0.14), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, #1f2937 5%, var(--bg-card-soft)) 0%, color-mix(in srgb, #14532d 9%, var(--bg-card-soft)) 100%);
+}
+
+.livekit-hero-stats {
+  width: 100%;
+}
+
+.livekit-admin-grid,
+.livekit-student-grid,
+.livekit-form-grid-2,
+.livekit-form-grid-3,
+.livekit-access-summary-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-admin-grid {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+}
+
+.livekit-admin-grid--primary {
+  grid-template-columns: minmax(320px, 0.82fr) minmax(420px, 1.18fr);
+  align-items: start;
+}
+
+.livekit-admin-grid.lower-grid,
+.livekit-student-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.livekit-form-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.livekit-form-grid-3,
+.livekit-access-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.livekit-class-form,
+.livekit-poll-composer,
+.livekit-calendar-feed,
+.livekit-session-list,
+.livekit-calendar-block-list,
+.livekit-student-access-list,
+.livekit-calendar-student-list,
+.livekit-room-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-class-form label,
+.livekit-poll-composer label {
+  display: grid;
+  gap: 6px;
+}
+
+.livekit-class-form label span,
+.livekit-poll-composer label span,
+.livekit-access-summary-card span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.teacher-room-shell [data-lk-theme='black'] {
+  color-scheme: dark;
+  --lk-bg: #05070b;
+  --lk-bg2: #0b1220;
+  --lk-bg3: #121b2d;
+  --lk-bg4: #182338;
+  --lk-bg5: #223049;
+  --lk-fg: #f7fbff;
+  --lk-fg2: #e5edf8;
+  --lk-fg3: #d4dfef;
+  --lk-fg4: #c2d1e5;
+  --lk-fg5: #aebfd8;
+  --lk-border-color: rgba(148, 163, 184, 0.18);
+  --lk-accent-bg: #2563eb;
+  --lk-accent-fg: #ffffff;
+  --lk-control-bg: rgba(15, 23, 42, 0.92);
+  --lk-control-fg: #f8fafc;
+  --lk-control-active-bg: #2563eb;
+  --lk-control-active-fg: #ffffff;
+  --lk-connection-quality-good: #22c55e;
+  --lk-connection-quality-poor: #f59e0b;
+  --lk-connection-quality-lost: #ef4444;
+}
+
+.teacher-room-shell [data-lk-theme='black'] .lk-room-container,
+.teacher-room-shell [data-lk-theme='black'] .lk-video-conference,
+.teacher-room-shell [data-lk-theme='black'] .lk-focus-layout,
+.teacher-room-shell [data-lk-theme='black'] .lk-grid-layout {
+  background: linear-gradient(180deg, #060a12 0%, #0d1524 100%);
+}
+
+.teacher-room-shell [data-lk-theme='black'] .lk-control-bar,
+.teacher-room-shell [data-lk-theme='black'] .lk-media-device-menu,
+.teacher-room-shell [data-lk-theme='black'] .lk-participant-metadata,
+.teacher-room-shell [data-lk-theme='black'] .lk-chat,
+.teacher-room-shell [data-lk-theme='black'] .lk-button-group {
+  background-color: rgba(8, 14, 24, 0.88);
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+.teacher-room-shell [data-lk-theme='black'] .lk-button,
+.teacher-room-shell [data-lk-theme='black'] .lk-disconnect-button {
+  color: var(--lk-control-fg);
+}
+
+.livekit-class-form input,
+.livekit-class-form textarea,
+.livekit-class-form select,
+.livekit-poll-composer input,
+.livekit-poll-composer select,
+.livekit-student-access-card input,
+.livekit-student-access-card textarea {
+  width: 100%;
+  min-width: 0;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, #ffffff 12%, var(--line));
+  background: color-mix(in srgb, #ffffff 3%, var(--bg-card));
+  color: var(--text);
+  padding: 12px 14px;
+}
+
+.livekit-class-form textarea,
+.livekit-student-access-card textarea {
+  resize: vertical;
+}
+
+.livekit-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.livekit-session-card,
+.livekit-student-access-card,
+.livekit-calendar-student-card,
+.livekit-calendar-feed-card,
+.livekit-access-summary-card,
+.livekit-poll-result-card {
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  border-radius: 18px;
+  padding: 14px;
+  background: color-mix(in srgb, #ffffff 4%, var(--bg-card));
+  min-width: 0;
+}
+
+.livekit-session-card-head,
+.livekit-student-access-head,
+.livekit-poll-result-head,
+.livekit-session-meta-row,
+.livekit-room-toolbar-actions,
+.livekit-server-status-strip,
+.livekit-calendar-block-row,
+.livekit-live-banner-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-session-status,
+.livekit-server-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.livekit-session-status.status-live,
+.livekit-server-pill.state-running {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.livekit-session-status.status-scheduled,
+.livekit-server-pill.state-pending,
+.livekit-server-pill.state-stopping {
+  background: rgba(234, 179, 8, 0.16);
+  color: #854d0e;
+}
+
+.livekit-session-status.status-ended,
+.livekit-session-status.status-cancelled,
+.livekit-server-pill.state-stopped,
+.livekit-server-pill.state-unknown {
+  background: rgba(148, 163, 184, 0.16);
+  color: #475569;
+}
+
+.livekit-session-actions,
+.livekit-poll-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.livekit-session-meta-row,
+.livekit-calendar-feed-card span,
+.livekit-calendar-student-card p,
+.livekit-session-card p,
+.livekit-live-banner-copy p,
+.livekit-room-toolbar .subtitle,
+.livekit-empty-room-card p,
+.livekit-boot-card p {
+  color: var(--text-soft);
+}
+
+.livekit-room-toolbar,
+.livekit-conference-card,
+.livekit-empty-room-card,
+.livekit-boot-card,
+.livekit-access-summary-panel {
+  border-radius: 22px;
+}
+
+.livekit-room-toolbar {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-conference-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.livekit-conference-card .lk-room-container {
+  min-height: 72dvh;
+}
+
+.livekit-conference-card .lk-video-conference {
+  min-height: 72dvh;
+}
+
+.livekit-empty-room-card,
+.livekit-boot-card {
+  padding: 24px;
+  text-align: center;
+}
+
+.livekit-spinner {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  margin: 0 auto 8px;
+  border: 4px solid rgba(14, 165, 233, 0.16);
+  border-top-color: #0ea5e9;
+  animation: livekit-spin 0.9s linear infinite;
+}
+
+@keyframes livekit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.livekit-poll-option-grid,
+.livekit-access-summary-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.livekit-poll-option-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.livekit-poll-results {
+  display: grid;
+  gap: 10px;
+}
+
+.livekit-poll-result-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 80%, transparent);
+  overflow: hidden;
+}
+
+.livekit-poll-result-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0ea5e9 0%, #10b981 100%);
+}
+
+.livekit-poll-result-card.is-correct .livekit-poll-result-fill {
+  background: linear-gradient(90deg, #84cc16 0%, #22c55e 100%);
+}
+
+.livekit-student-poll-popup {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  width: min(360px, calc(100vw - 24px));
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  background: color-mix(in srgb, #ffffff 96%, var(--bg-card));
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.livekit-student-poll-options {
+  display: grid;
+  gap: 10px;
+}
+
+.livekit-student-poll-option {
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in srgb, #ffffff 5%, var(--bg-card));
+  color: var(--text);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.livekit-student-poll-option.is-selected {
+  border-color: rgba(14, 165, 233, 0.3);
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.livekit-student-poll-option.is-correct {
+  border-color: rgba(34, 197, 94, 0.36);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.livekit-poll-answer-reveal {
+  color: #166534;
+  font-weight: 800;
+}
+
+.livekit-access-summary-card.wide {
+  grid-column: span 2;
+}
+
+.premium-live-access-card {
+  border-color: rgba(168, 85, 247, 0.18);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(247, 244, 255, 0.96) 100%);
+}
+
+@media (max-width: 1080px) {
+  .livekit-admin-grid,
+  .livekit-admin-grid.lower-grid,
+  .livekit-student-grid,
+  .livekit-form-grid-3,
+  .livekit-access-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-access-summary-card.wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .livekit-admin-page,
+  .livekit-student-page {
+    gap: 12px;
+  }
+
+  .livekit-poll-option-grid,
+  .livekit-form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-conference-card .lk-room-container,
+  .livekit-conference-card .lk-video-conference {
+    min-height: 58dvh;
+  }
+
+  .livekit-student-poll-popup {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    bottom: 12px;
+  }
+}
+
+.teacher-room-shell {
+  gap: 22px;
+}
+
+.livekit-student-page.focus-mode {
+  gap: 18px;
+}
+
+.livekit-student-room-section.focus-mode {
+  display: grid;
+  gap: 18px;
+}
+
+.livekit-student-room-section.focus-mode .livekit-live-banner-panel {
+  margin-bottom: 0;
+}
+
+.student-room-shell {
+  min-height: 78dvh;
+  position: relative;
+}
+
+.student-room-shell .lk-room-container,
+.student-room-shell .lk-video-conference,
+.student-room-shell .lk-focus-layout,
+.student-room-shell .lk-grid-layout {
+  min-height: 78dvh;
+}
+
+.livekit-student-video-overlay {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  right: 24px;
+  z-index: 4;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(14px);
+  color: #e2e8f0;
+  display: grid;
+  gap: 6px;
+}
+
+.teacher-video-conference .lk-disconnect-button {
+  display: none;
+}
+
+.livekit-student-video-overlay strong {
+  color: #ffffff;
+}
+
+.livekit-student-video-overlay p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.86);
+}
+
+.livekit-room-toolbar {
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  background:
+    radial-gradient(420px 220px at 0% 0%, rgba(14, 165, 233, 0.1), transparent 60%),
+    linear-gradient(155deg, color-mix(in srgb, #ffffff 4%, var(--bg-card)) 0%, color-mix(in srgb, #0f172a 3%, var(--bg-card)) 100%);
+}
+
+.livekit-server-pill.connection-idle,
+.livekit-server-pill.connection-connecting {
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+}
+
+.livekit-server-pill.connection-connected {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.livekit-server-pill.connection-disconnected,
+.livekit-server-pill.connection-error {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+.livekit-studio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.78fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.livekit-studio-room-panel {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #ffffff 8%, var(--line));
+  background: linear-gradient(180deg, rgba(6, 11, 27, 0.96) 0%, rgba(10, 16, 32, 0.94) 100%);
+}
+
+.livekit-studio-room-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+}
+
+.livekit-studio-room-head h4,
+.livekit-studio-status-card h4,
+.livekit-poll-panel h3 {
+  margin: 4px 0 6px;
+  color: #122033;
+}
+
+.livekit-studio-room-head .subtitle,
+.livekit-studio-status-card .subtitle,
+.livekit-poll-panel .subtitle {
+  color: #4b5d78;
+}
+
+.livekit-studio-room-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.livekit-studio-room-panel .lk-room-container,
+.livekit-studio-room-panel .lk-video-conference {
+  min-height: clamp(420px, 70vh, 860px);
+}
+
+.livekit-studio-side-column {
+  display: grid;
+  gap: 16px;
+  align-self: start;
+}
+
+.livekit-studio-status-card,
+.livekit-poll-panel {
+  padding: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(251, 191, 36, 0.16), transparent 34%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 255, 0.98) 52%, rgba(238, 244, 252, 0.98) 100%);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+}
+
+.livekit-studio-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.livekit-studio-status-grid article {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.92) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.livekit-studio-status-grid span {
+  color: #61738f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.livekit-studio-status-grid strong {
+  color: #10233a;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.livekit-poll-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.livekit-poll-panel .section-header.compact {
+  margin-bottom: 0;
+}
+
+.livekit-poll-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.livekit-poll-summary-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(191, 219, 254, 0.76);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.livekit-poll-summary-card span {
+  color: #61738f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.livekit-poll-summary-card strong {
+  color: #10233a;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.livekit-poll-summary-card p {
+  margin: 0;
+  color: #53657f;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.livekit-poll-summary-card.accent-cyan {
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.98) 0%, rgba(224, 242, 254, 0.9) 100%);
+}
+
+.livekit-poll-summary-card.accent-amber {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.98) 0%, rgba(254, 243, 199, 0.9) 100%);
+}
+
+.livekit-poll-summary-card.accent-emerald {
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.98) 0%, rgba(209, 250, 229, 0.9) 100%);
+}
+
+.livekit-poll-composer {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(239, 246, 255, 0.92) 100%);
+}
+
+.livekit-poll-composer label span,
+.livekit-poll-actions label span {
+  color: #3d516c;
+}
+
+.livekit-poll-composer input,
+.livekit-poll-composer select {
+  border-color: rgba(148, 163, 184, 0.32);
+  background: rgba(255, 255, 255, 0.98);
+  color: #10233a;
+}
+
+.livekit-poll-actions {
+  align-items: end;
+}
+
+.livekit-poll-actions label {
+  flex: 1 1 180px;
+}
+
+.livekit-poll-actions .primary-btn,
+.livekit-poll-actions .secondary-btn {
+  min-width: 150px;
+}
+
+.livekit-session-list-panel,
+.livekit-creation-panel,
+.livekit-access-panel,
+.livekit-calendar-panel,
+.livekit-live-banner-panel,
+.livekit-upcoming-panel {
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  background: linear-gradient(160deg, color-mix(in srgb, #ffffff 3%, var(--bg-card)) 0%, color-mix(in srgb, #0f172a 2%, var(--bg-card)) 100%);
+}
+
+.livekit-live-banner-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.livekit-student-hero .subtitle,
+.livekit-hero .subtitle {
+  max-width: 72ch;
+}
+
+.livekit-access-summary-panel {
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  background: linear-gradient(160deg, color-mix(in srgb, #ffffff 3%, var(--bg-card)) 0%, color-mix(in srgb, #14532d 4%, var(--bg-card)) 100%);
+}
+
+@media (max-width: 1200px) {
+  .livekit-studio-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-studio-side-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .livekit-room-toolbar,
+  .livekit-studio-status-card,
+  .livekit-poll-panel {
+    padding: 14px;
+  }
+
+  .livekit-studio-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-studio-room-panel .lk-room-container,
+  .livekit-studio-room-panel .lk-video-conference {
+    min-height: 54dvh;
+  }
+
+  .livekit-live-banner-panel {
+    align-items: stretch;
+  }
+
+  .livekit-live-banner-panel .primary-btn {
+    width: 100%;
+  }
+}
+
+.livekit-admin-page,
+.livekit-student-page {
+  display: grid;
+  gap: 16px;
+}
+
+.livekit-hero {
+  background:
+    radial-gradient(480px 220px at 0% 0%, rgba(14, 165, 233, 0.16), transparent 60%),
+    radial-gradient(420px 220px at 100% 0%, rgba(16, 185, 129, 0.14), transparent 62%),
+    linear-gradient(160deg, color-mix(in srgb, #0f172a 6%, var(--bg-card-soft)) 0%, color-mix(in srgb, #164e63 10%, var(--bg-card-soft)) 100%);
+}
+
+.livekit-student-hero {
+  background:
+    radial-gradient(420px 220px at 0% 0%, rgba(168, 85, 247, 0.14), transparent 60%),
+    radial-gradient(360px 220px at 100% 0%, rgba(34, 197, 94, 0.14), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, #1f2937 5%, var(--bg-card-soft)) 0%, color-mix(in srgb, #14532d 9%, var(--bg-card-soft)) 100%);
+}
+
+.livekit-hero-stats {
+  width: 100%;
+}
+
+.livekit-admin-grid,
+.livekit-student-grid,
+.livekit-form-grid-2,
+.livekit-form-grid-3,
+.livekit-access-summary-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-admin-grid {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+}
+
+.livekit-admin-grid.lower-grid,
+.livekit-student-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.livekit-form-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.livekit-form-grid-3,
+.livekit-access-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.livekit-class-form,
+.livekit-poll-composer,
+.livekit-calendar-feed,
+.livekit-session-list,
+.livekit-calendar-block-list,
+.livekit-student-access-list,
+.livekit-calendar-student-list,
+.livekit-room-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-class-form label,
+.livekit-poll-composer label {
+  display: grid;
+  gap: 6px;
+}
+
+.livekit-class-form label span,
+.livekit-poll-composer label span,
+.livekit-access-summary-card span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.livekit-class-form input,
+.livekit-class-form textarea,
+.livekit-class-form select,
+.livekit-poll-composer input,
+.livekit-poll-composer select,
+.livekit-student-access-card input,
+.livekit-student-access-card textarea {
+  width: 100%;
+  min-width: 0;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, #ffffff 12%, var(--line));
+  background: color-mix(in srgb, #ffffff 3%, var(--bg-card));
+  color: var(--text);
+  padding: 12px 14px;
+}
+
+.livekit-class-form textarea,
+.livekit-student-access-card textarea {
+  resize: vertical;
+}
+
+.livekit-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.livekit-session-card,
+.livekit-student-access-card,
+.livekit-calendar-student-card,
+.livekit-calendar-feed-card,
+.livekit-access-summary-card,
+.livekit-poll-result-card {
+  border: 1px solid color-mix(in srgb, #ffffff 10%, var(--line));
+  border-radius: 18px;
+  padding: 14px;
+  background: color-mix(in srgb, #ffffff 4%, var(--bg-card));
+  min-width: 0;
+}
+
+.livekit-session-card-head,
+.livekit-student-access-head,
+.livekit-poll-result-head,
+.livekit-session-meta-row,
+.livekit-room-toolbar-actions,
+.livekit-server-status-strip,
+.livekit-calendar-block-row,
+.livekit-live-banner-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-session-status,
+.livekit-server-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.livekit-session-status.status-live,
+.livekit-server-pill.state-running {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.livekit-session-status.status-scheduled,
+.livekit-server-pill.state-pending,
+.livekit-server-pill.state-stopping {
+  background: rgba(234, 179, 8, 0.16);
+  color: #854d0e;
+}
+
+.livekit-session-status.status-ended,
+.livekit-session-status.status-cancelled,
+.livekit-server-pill.state-stopped,
+.livekit-server-pill.state-unknown {
+  background: rgba(148, 163, 184, 0.16);
+  color: #475569;
+}
+
+.livekit-session-actions,
+.livekit-poll-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.livekit-session-meta-row,
+.livekit-calendar-feed-card span,
+.livekit-calendar-student-card p,
+.livekit-session-card p,
+.livekit-live-banner-copy p,
+.livekit-room-toolbar .subtitle,
+.livekit-empty-room-card p,
+.livekit-boot-card p {
+  color: var(--text-soft);
+}
+
+.livekit-room-toolbar,
+.livekit-conference-card,
+.livekit-empty-room-card,
+.livekit-boot-card,
+.livekit-access-summary-panel {
+  border-radius: 22px;
+}
+
+.livekit-room-toolbar {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-conference-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.livekit-conference-card .lk-room-container {
+  min-height: 72dvh;
+}
+
+.livekit-conference-card .lk-video-conference {
+  min-height: 72dvh;
+}
+
+.livekit-empty-room-card,
+.livekit-boot-card {
+  min-height: 176px;
+  padding: 30px 28px;
+  text-align: center;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+}
+
+.livekit-spinner {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  margin: 0 auto 8px;
+  border: 4px solid rgba(14, 165, 233, 0.16);
+  border-top-color: #0ea5e9;
+  animation: livekit-spin 0.9s linear infinite;
+}
+
+@keyframes livekit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.livekit-poll-option-grid,
+.livekit-access-summary-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.livekit-poll-option-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.livekit-poll-results {
+  display: grid;
+  gap: 12px;
+}
+
+.livekit-poll-result-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.85) 0%, rgba(241, 245, 249, 0.95) 100%);
+  overflow: hidden;
+}
+
+.livekit-poll-result-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f766e 0%, #0ea5e9 52%, #22c55e 100%);
+}
+
+.livekit-poll-result-card.is-correct .livekit-poll-result-fill {
+  background: linear-gradient(90deg, #65a30d 0%, #22c55e 50%, #16a34a 100%);
+}
+
+.livekit-poll-result-card {
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(191, 219, 254, 0.76);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.livekit-poll-result-head {
+  align-items: start;
+  gap: 14px;
+}
+
+.livekit-poll-result-title {
+  display: grid;
+  gap: 2px;
+}
+
+.livekit-poll-result-title strong {
+  color: #10233a;
+  font-size: 1rem;
+}
+
+.livekit-poll-result-title span {
+  color: #4c607b;
+  font-weight: 600;
+}
+
+.livekit-poll-result-metrics {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.livekit-poll-result-metrics strong {
+  color: #10233a;
+  font-size: 1.1rem;
+}
+
+.livekit-poll-result-metrics small {
+  color: #61738f;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.livekit-poll-voter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.livekit-poll-voter-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(224, 242, 254, 0.95) 0%, rgba(186, 230, 253, 0.95) 100%);
+  color: #0f3b57;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.livekit-poll-voter-empty {
+  color: #70839d;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.livekit-student-poll-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  pointer-events: none;
+  animation: livekit-student-poll-layer-in 220ms ease-out both;
+}
+
+.livekit-student-poll-layer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top, rgba(59, 130, 246, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(7, 16, 31, 0.18) 0%, rgba(7, 16, 31, 0.34) 100%);
+  backdrop-filter: blur(6px);
+  animation: livekit-student-poll-scrim-in 240ms ease-out both;
+}
+
+.livekit-student-poll-popup {
+  --student-poll-accent: #3b82f6;
+  --student-poll-accent-soft: #06b6d4;
+  --student-poll-ink: #10233a;
+  position: relative;
+  z-index: 1;
+  width: min(620px, 100%);
+  max-height: min(76vh, 760px);
+  overflow: auto;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--student-poll-accent) 24%, rgba(255, 255, 255, 0.32));
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--student-poll-accent-soft) 24%, transparent), transparent 30%),
+    radial-gradient(circle at bottom left, color-mix(in srgb, var(--student-poll-accent) 16%, transparent), transparent 28%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.985) 0%, rgba(242, 248, 255, 0.98) 100%);
+  box-shadow: 0 24px 72px rgba(9, 16, 30, 0.3);
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+  color: var(--student-poll-ink);
+  pointer-events: auto;
+  transform-origin: center center;
+  animation: livekit-student-poll-popup-in 260ms cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+
+.livekit-student-poll-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.livekit-student-poll-head strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--student-poll-ink);
+  font-size: 1.02rem;
+}
+
+.livekit-student-poll-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.livekit-student-poll-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.96) 0%, rgba(191, 219, 254, 0.94) 100%);
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.livekit-student-poll-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--student-poll-accent-soft) 10%, white);
+  color: #0f766e;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.livekit-student-poll-question-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #0f3b57 0%, #135f8a 55%, #0f766e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.livekit-student-poll-question-label {
+  color: rgba(191, 219, 254, 0.86);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.livekit-student-poll-question-card h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: clamp(1.08rem, 1.8vw, 1.28rem);
+  line-height: 1.4;
+}
+
+.livekit-student-poll-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.livekit-student-poll-option {
+  min-width: 0;
+  min-height: 100%;
+  border: 1px solid color-mix(in srgb, var(--student-poll-accent) 18%, rgba(148, 163, 184, 0.52));
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.985) 0%, rgba(239, 246, 255, 0.95) 100%);
+  color: var(--student-poll-ink);
+  padding: 16px 16px 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  box-shadow: 0 12px 22px rgba(9, 16, 30, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.livekit-student-poll-option:hover:enabled {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(9, 16, 30, 0.12);
+}
+
+.livekit-student-poll-option-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--student-poll-accent) 0%, var(--student-poll-accent-soft) 100%);
+  color: #f8fafc;
+  font-weight: 800;
+  flex: 0 0 auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.livekit-student-poll-option-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.livekit-student-poll-option-copy strong {
+  color: var(--student-poll-ink);
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.livekit-student-poll-option-copy span {
+  color: #4f6480;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.livekit-student-poll-option.is-selected {
+  border-color: color-mix(in srgb, var(--student-poll-accent) 54%, white);
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.98) 0%, rgba(224, 242, 254, 0.94) 100%);
+}
+
+.livekit-student-poll-option.is-correct {
+  border-color: rgba(13, 148, 136, 0.44);
+  background: linear-gradient(180deg, rgba(204, 251, 241, 0.98) 0%, rgba(153, 246, 228, 0.9) 100%);
+  animation: livekit-student-poll-correct-reveal 360ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.livekit-student-poll-footer {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--student-poll-accent) 14%, rgba(226, 232, 240, 0.9));
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(239, 246, 255, 0.94) 100%);
+}
+
+.livekit-student-poll-footer strong {
+  color: var(--student-poll-ink);
+  font-size: 0.95rem;
+}
+
+.livekit-student-poll-footer .subtitle {
+  margin: 0;
+  color: #58708e;
+}
+
+.livekit-poll-answer-pending {
+  margin: 0;
+  padding: 13px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98) 0%, rgba(224, 242, 254, 0.94) 100%);
+  color: #1d4ed8;
+  font-weight: 700;
+  animation: livekit-student-poll-pending-pulse 1.8s ease-in-out infinite;
+}
+
+.livekit-poll-answer-reveal {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(204, 251, 241, 0.98) 0%, rgba(153, 246, 228, 0.92) 100%);
+  color: #0f766e;
+  font-weight: 800;
+  animation: livekit-student-poll-reveal-in 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.livekit-student-poll-popup.is-answered .livekit-student-poll-option:not(.is-selected) {
+  opacity: 0.86;
+}
+
+.livekit-student-poll-popup.is-revealed .livekit-poll-answer-reveal {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.livekit-student-poll-popup.is-revealed .livekit-poll-answer-pending {
+  animation: none;
+}
+
+@keyframes livekit-student-poll-layer-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes livekit-student-poll-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes livekit-student-poll-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes livekit-student-poll-pending-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.06);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+}
+
+@keyframes livekit-student-poll-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes livekit-student-poll-correct-reveal {
+  0% {
+    transform: scale(0.985);
+    box-shadow: 0 10px 20px rgba(9, 16, 30, 0.08);
+  }
+  60% {
+    transform: scale(1.01);
+    box-shadow: 0 18px 28px rgba(15, 118, 110, 0.16);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 14px 24px rgba(15, 118, 110, 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .livekit-student-poll-layer,
+  .livekit-student-poll-layer::before,
+  .livekit-student-poll-popup,
+  .livekit-student-poll-option.is-correct,
+  .livekit-poll-answer-pending,
+  .livekit-poll-answer-reveal {
+    animation: none;
+  }
+}
+
+.livekit-access-summary-card.wide {
+  grid-column: span 2;
+}
+
+.premium-live-access-card {
+  border-color: rgba(168, 85, 247, 0.18);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94) 0%, rgba(247, 244, 255, 0.96) 100%);
+}
+
+@media (max-width: 1080px) {
+  .livekit-admin-grid,
+  .livekit-admin-grid.lower-grid,
+  .livekit-student-grid,
+  .livekit-form-grid-3,
+  .livekit-access-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-access-summary-card.wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .livekit-admin-page,
+  .livekit-student-page {
+    gap: 12px;
+  }
+
+  .livekit-poll-option-grid,
+  .livekit-poll-summary-grid,
+  .livekit-form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-conference-card .lk-room-container,
+  .livekit-conference-card .lk-video-conference {
+    min-height: 58dvh;
+  }
+
+  .student-room-shell,
+  .student-room-shell .lk-room-container,
+  .student-room-shell .lk-video-conference,
+  .student-room-shell .lk-focus-layout,
+  .student-room-shell .lk-grid-layout {
+    min-height: 62dvh;
+  }
+
+  .livekit-student-video-overlay {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .livekit-student-poll-layer {
+    padding: 14px;
+  }
+
+  .livekit-student-poll-popup {
+    width: min(100%, 520px);
+    max-height: min(72vh, 680px);
+    padding: 18px;
+  }
+
+  .livekit-student-poll-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .livekit-student-poll-head-meta {
+    justify-content: flex-start;
+  }
+
+  .livekit-student-poll-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.livekit-admin-page {
+  color: #112033;
+}
+
+.livekit-admin-page {
+  --livekit-admin-accent: #6d5efc;
+  --livekit-admin-accent-strong: #4f39f6;
+  --livekit-admin-accent-soft: rgba(109, 94, 252, 0.14);
+  --livekit-admin-gold: #d4a94f;
+  --livekit-admin-ink: #10233a;
+  --livekit-admin-muted: #5c7088;
+}
+
+.livekit-admin-page .workspace-panel,
+.livekit-admin-page .workspace-hero,
+.livekit-admin-page .card {
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.livekit-admin-page .livekit-hero {
+  padding: 28px 30px;
+  border-radius: 32px;
+  border: 1px solid rgba(168, 85, 247, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(109, 94, 252, 0.16), transparent 28%),
+    radial-gradient(circle at top right, rgba(212, 169, 79, 0.16), transparent 24%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 247, 255, 0.98) 52%, rgba(255, 251, 242, 0.96) 100%);
+}
+
+.livekit-admin-page .livekit-hero h2 {
+  color: var(--livekit-admin-ink);
+  font-size: clamp(1.55rem, 2vw, 2rem);
+  line-height: 1.15;
+}
+
+.livekit-admin-page .livekit-hero .subtitle {
+  max-width: 62ch;
+  color: var(--livekit-admin-muted);
+  line-height: 1.65;
+}
+
+.livekit-admin-page .workspace-hero-stats.livekit-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.livekit-admin-page .livekit-hero-stats .stat-card {
+  min-width: 0;
+  border-radius: 22px;
+  border: 1px solid rgba(154, 167, 193, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 255, 0.95) 100%);
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.06);
+}
+
+.livekit-admin-page .livekit-admin-grid--primary,
+.livekit-admin-page .livekit-admin-grid.lower-grid {
+  gap: 22px;
+}
+
+.livekit-admin-page .livekit-admin-grid--primary {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 30px;
+}
+
+.livekit-admin-page .livekit-admin-grid.lower-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.livekit-creation-panel,
+.livekit-session-list-panel,
+.livekit-access-panel,
+.livekit-calendar-panel,
+.livekit-studio-students-panel {
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(181, 197, 219, 0.38);
+  background:
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 255, 0.96) 100%);
+}
+
+.livekit-admin-page .livekit-creation-panel,
+.livekit-admin-page .livekit-session-list-panel,
+.livekit-admin-page .livekit-calendar-panel,
+.livekit-admin-page .livekit-studio-students-panel {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 30px;
+  border: 1px solid rgba(183, 195, 220, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(109, 94, 252, 0.09), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(212, 169, 79, 0.08), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 249, 255, 0.97) 100%);
+}
+
+.livekit-admin-page .livekit-session-list-panel {
+  margin-top: 18px;
+}
+
+.livekit-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+}
+
+.livekit-panel-head h3 {
+  margin: 2px 0 0;
+  font-size: 1.18rem;
+}
+
+.livekit-panel-head .subtitle {
+  margin-top: 8px;
+  max-width: 62ch;
+  line-height: 1.65;
+}
+
+.livekit-panel-head .stat-card {
+  min-width: 116px;
+}
+
+.livekit-admin-grid--primary .livekit-session-list-panel {
+  padding: 24px 24px 26px;
+}
+
+.livekit-admin-grid--primary .livekit-session-list {
+  gap: 16px;
+}
+
+.livekit-creation-panel .subtitle,
+.livekit-session-list-panel .subtitle,
+.livekit-access-panel .subtitle,
+.livekit-calendar-panel .subtitle,
+.livekit-studio-students-panel .subtitle,
+.livekit-session-card p,
+.livekit-calendar-student-card p,
+.livekit-muted-note {
+  color: #58708b;
+}
+
+.livekit-creation-panel h3,
+.livekit-session-list-panel h3,
+.livekit-access-panel h3,
+.livekit-calendar-panel h3,
+.livekit-studio-students-panel h3,
+.livekit-room-toolbar h3 {
+  color: #10233a;
+}
+
+.livekit-admin-page .eyebrow,
+.livekit-studio-status-card .eyebrow,
+.livekit-poll-panel .eyebrow,
+.livekit-studio-students-panel .eyebrow {
+  color: #577089;
+}
+
+.livekit-session-card,
+.livekit-student-access-card,
+.livekit-calendar-student-card,
+.livekit-studio-student-card {
+  border: 1px solid rgba(191, 219, 254, 0.8);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 255, 0.95) 100%);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.livekit-admin-page .livekit-class-form {
+  gap: 16px;
+}
+
+.livekit-admin-page .livekit-class-form label {
+  gap: 8px;
+}
+
+.livekit-admin-page .livekit-class-form input,
+.livekit-admin-page .livekit-class-form textarea,
+.livekit-admin-page .livekit-class-form select {
+  min-height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(177, 190, 217, 0.55);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 255, 0.94) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.livekit-admin-page .livekit-class-form textarea {
+  min-height: 108px;
+}
+
+.livekit-admin-page .livekit-class-form input:focus,
+.livekit-admin-page .livekit-class-form textarea:focus,
+.livekit-admin-page .livekit-class-form select:focus {
+  outline: none;
+  border-color: rgba(109, 94, 252, 0.56);
+  box-shadow: 0 0 0 4px rgba(109, 94, 252, 0.12);
+}
+
+.livekit-admin-page .livekit-session-list {
+  gap: 18px;
+}
+
+.livekit-admin-page .livekit-session-card {
+  display: grid;
+  gap: 16px;
+  padding: 20px 20px 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(197, 210, 234, 0.82);
+  background:
+    radial-gradient(circle at top right, rgba(109, 94, 252, 0.06), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 248, 255, 0.97) 100%);
+}
+
+.livekit-admin-page .livekit-session-card.status-live {
+  border-color: rgba(79, 57, 246, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(79, 57, 246, 0.11), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(242, 240, 255, 0.97) 100%);
+}
+
+.livekit-admin-page .livekit-session-card.status-scheduled {
+  border-color: rgba(212, 169, 79, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(212, 169, 79, 0.11), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 250, 239, 0.97) 100%);
+}
+
+.livekit-session-card--calendar-block {
+  border-color: rgba(14, 165, 233, 0.35);
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(240, 249, 255, 0.98) 100%);
+}
+
+.livekit-session-status.status-calendar-block {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+  border: 1px solid rgba(14, 165, 233, 0.24);
+}
+
+.livekit-session-card strong,
+.livekit-student-access-card strong,
+.livekit-calendar-student-card strong,
+.livekit-studio-student-card strong {
+  color: #10233a;
+}
+
+.livekit-admin-page .livekit-session-card-content {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.livekit-admin-page .livekit-session-card-head {
+  align-items: start;
+}
+
+.livekit-admin-page .livekit-session-card-head strong {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.livekit-admin-page .livekit-session-card p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.livekit-admin-page .livekit-session-meta-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.livekit-admin-page .livekit-session-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 210, 228, 0.88);
+  background: rgba(255, 255, 255, 0.78);
+  color: #47607a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.livekit-admin-page .livekit-session-actions {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.livekit-admin-page .livekit-session-actions .primary-btn,
+.livekit-admin-page .livekit-session-actions .secondary-btn,
+.livekit-admin-page .livekit-session-actions .danger-btn,
+.livekit-admin-page .livekit-calendar-inline-actions .secondary-btn,
+.livekit-admin-page .livekit-class-form .primary-btn {
+  min-height: 42px;
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.livekit-admin-page .livekit-session-actions .primary-btn,
+.livekit-admin-page .livekit-class-form .primary-btn {
+  background: linear-gradient(135deg, var(--livekit-admin-accent) 0%, var(--livekit-admin-accent-strong) 100%);
+  border-color: rgba(79, 57, 246, 0.84);
+  color: #fff;
+  box-shadow: 0 12px 20px rgba(79, 57, 246, 0.18);
+}
+
+.livekit-admin-page .livekit-session-actions .primary-btn:hover,
+.livekit-admin-page .livekit-class-form .primary-btn:hover {
+  background: linear-gradient(135deg, #5b4df7 0%, #4530eb 100%);
+  border-color: #4530eb;
+}
+
+.livekit-admin-page .livekit-session-actions .secondary-btn,
+.livekit-admin-page .livekit-calendar-inline-actions .secondary-btn {
+  border-color: rgba(191, 201, 223, 0.82);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.livekit-admin-page .livekit-calendar-shell {
+  gap: 20px;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+}
+
+.livekit-admin-page .livekit-calendar-composer,
+.livekit-admin-page .livekit-calendar-board {
+  align-self: stretch;
+}
+
+.livekit-admin-page .livekit-calendar-composer {
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(197, 210, 234, 0.76);
+  background:
+    radial-gradient(circle at top right, rgba(109, 94, 252, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(245, 248, 255, 0.97) 100%);
+}
+
+.livekit-admin-page .livekit-calendar-board {
+  padding: 20px;
+}
+
+.livekit-admin-page .livekit-calendar-day-group {
+  gap: 16px;
+}
+
+.livekit-admin-page .livekit-calendar-event-card {
+  border-radius: 24px;
+}
+
+.livekit-admin-page .livekit-calendar-event-actions {
+  padding-top: 4px;
+  border-top: 1px solid rgba(214, 223, 238, 0.7);
+}
+
+@media (max-width: 1180px) {
+  .livekit-admin-page .workspace-hero-stats.livekit-hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .livekit-admin-page .livekit-admin-grid--primary,
+  .livekit-admin-page .livekit-calendar-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-admin-page .livekit-session-list-panel {
+    margin-top: 22px;
+  }
+}
+
+@media (max-width: 820px) {
+  .livekit-panel-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-admin-page .livekit-session-meta-row,
+  .livekit-admin-page .workspace-hero-stats.livekit-hero-stats,
+  .livekit-admin-page .livekit-form-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-admin-page .livekit-hero,
+  .livekit-admin-page .livekit-creation-panel,
+  .livekit-admin-page .livekit-session-list-panel,
+  .livekit-admin-page .livekit-calendar-panel {
+    padding: 20px;
+    border-radius: 24px;
+  }
+}
+
+.livekit-student-access-card.compact {
+  gap: 12px;
+}
+
+.livekit-student-access-actions,
+.livekit-studio-student-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.livekit-calendar-shell,
+.livekit-calendar-board,
+.livekit-calendar-agenda,
+.livekit-calendar-day-items,
+.livekit-calendar-composer,
+.livekit-calendar-feed {
+  display: grid;
+  gap: 16px;
+}
+
+.livekit-calendar-shell {
+  grid-template-columns: minmax(280px, 0.88fr) minmax(0, 1.12fr);
+  align-items: start;
+}
+
+.livekit-calendar-board {
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(191, 219, 254, 0.78);
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 255, 0.96) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.livekit-calendar-board-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-calendar-board-head h4 {
+  margin: 0;
+  color: #10233a;
+  font-size: 1.05rem;
+}
+
+.livekit-calendar-day-group {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.livekit-calendar-day-rail {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(186, 230, 253, 0.84);
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.98) 0%, rgba(224, 242, 254, 0.95) 100%);
+}
+
+.livekit-calendar-day-rail strong {
+  color: #0f3b57;
+}
+
+.livekit-calendar-day-rail span {
+  color: #4f6b84;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.livekit-calendar-event-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(191, 219, 254, 0.76);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.97) 100%);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.livekit-calendar-event-card.kind-live-class {
+  border-color: rgba(34, 197, 94, 0.26);
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.09), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(240, 253, 244, 0.94) 100%);
+}
+
+.livekit-calendar-event-card.kind-blocked-slot {
+  border-color: rgba(14, 165, 233, 0.24);
+}
+
+.livekit-calendar-event-topline,
+.livekit-calendar-event-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-calendar-event-topline span:last-child,
+.livekit-calendar-event-actions span {
+  color: #5c7088;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.livekit-calendar-course-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(12, 74, 110, 0.96) 0%, rgba(3, 105, 161, 0.92) 100%);
+  color: #eff6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.livekit-calendar-event-card strong {
+  color: #10233a;
+  font-size: 1rem;
+}
+
+.livekit-calendar-event-card p {
+  margin: 0;
+  color: #58708b;
+  line-height: 1.55;
+}
+
+.livekit-calendar-inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.livekit-calendar-edit-modal {
+  max-width: min(680px, calc(100vw - 32px));
+}
+
+.livekit-calendar-edit-form {
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-student-calendar-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.livekit-calendar-panel--teams {
+  padding: 22px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 98%, white 2%) 0%, color-mix(in srgb, var(--bg-card-soft) 98%, white 2%) 100%);
+}
+
+.livekit-student-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.livekit-student-calendar-sidebar,
+.livekit-student-calendar-main {
+  display: grid;
+  gap: 18px;
+}
+
+.livekit-student-calendar-spotlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 20px 22px;
+  border-radius: 26px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 18%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--bg-card) 90%, #08111f) 0%, color-mix(in srgb, var(--bg-card-soft) 96%, #0f172a) 100%);
+  box-shadow: var(--shadow-md);
+}
+
+.livekit-student-calendar-spotlight-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.livekit-student-calendar-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: color-mix(in srgb, var(--text-main) 84%, var(--accent));
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.livekit-student-calendar-spotlight-copy strong {
+  color: var(--text-strong);
+  font-size: 1.2rem;
+}
+
+.livekit-student-calendar-spotlight-copy p {
+  margin: 0;
+  color: var(--text-soft);
+  max-width: 56ch;
+  line-height: 1.6;
+}
+
+.livekit-student-calendar-spotlight-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.livekit-student-calendar-summary-pill,
+.livekit-calendar-kind-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.livekit-student-calendar-summary-pill {
+  background: color-mix(in srgb, var(--bg-card-soft) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
+  color: var(--text-main);
+}
+
+.livekit-student-calendar-summary-pill.is-premium {
+  background: color-mix(in srgb, #10b981 16%, transparent);
+  border-color: color-mix(in srgb, #10b981 34%, transparent);
+  color: color-mix(in srgb, #dcfce7 78%, var(--text-main));
+}
+
+.livekit-student-calendar-toolbar {
+  position: relative;
+  overflow: hidden;
+}
+
+.livekit-student-mini-calendar,
+.livekit-student-week-strip {
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 98%, white 2%) 0%, color-mix(in srgb, var(--bg-card-soft) 98%, white 2%) 100%);
+}
+
+.livekit-student-mini-calendar {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.livekit-student-mini-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-student-mini-calendar-head strong {
+  color: var(--text-strong);
+  font-size: 1rem;
+}
+
+.livekit-student-mini-calendar-head span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.livekit-student-mini-calendar-weekdays,
+.livekit-student-mini-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.livekit-student-mini-calendar-weekdays span {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.livekit-student-mini-day,
+.livekit-student-week-day {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+}
+
+.livekit-student-mini-day {
+  min-height: 48px;
+  border-radius: 14px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.livekit-student-mini-day span {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.livekit-student-mini-day small {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.livekit-student-mini-day.is-muted {
+  opacity: 0.42;
+}
+
+.livekit-student-mini-day.has-events {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.livekit-student-mini-day.is-selected {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent-2) 18%, transparent));
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+  transform: translateY(-1px);
+}
+
+.livekit-student-week-strip {
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.livekit-student-week-day {
+  min-height: 96px;
+  padding: 12px 10px;
+  border-radius: 18px;
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 6px;
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card-soft) 92%, transparent) 0%, transparent 100%);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.livekit-student-week-day:hover,
+.livekit-student-mini-day:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.livekit-student-week-day.is-selected {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, transparent) 0%, color-mix(in srgb, var(--accent-2) 10%, transparent) 100%);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 10px 18px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.livekit-student-week-day.has-events:not(.is-selected) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent) 0%, transparent 100%);
+}
+
+.livekit-student-week-day-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.livekit-student-week-day strong {
+  color: var(--text-strong);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.livekit-student-week-day small {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.livekit-student-week-board {
+  border-radius: 26px;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 99%, white 1%) 0%, color-mix(in srgb, var(--bg-card-soft) 99%, white 1%) 100%);
+  overflow: hidden;
+}
+
+.livekit-student-week-board-head {
+  display: grid;
+  grid-template-columns: 88px repeat(7, minmax(120px, 1fr));
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  background: color-mix(in srgb, var(--bg-card-soft) 92%, transparent);
+}
+
+.livekit-student-week-board-head-spacer {
+  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.livekit-student-week-board-day {
+  min-height: 68px;
+  padding: 10px 12px;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: transparent;
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 3px;
+}
+
+.livekit-student-week-board-day span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.livekit-student-week-board-day strong {
+  color: var(--text-strong);
+  font-size: 1.2rem;
+}
+
+.livekit-student-week-board-day.is-selected {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.livekit-student-week-board-body {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  min-height: calc((12 * 64px) + 1px);
+}
+
+.livekit-student-week-time-rail {
+  display: grid;
+  grid-template-rows: repeat(13, 64px);
+  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-card-soft) 90%, transparent);
+}
+
+.livekit-student-week-time-slot {
+  position: relative;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 56%, transparent);
+}
+
+.livekit-student-week-time-slot span {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.livekit-student-week-columns {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+}
+
+.livekit-student-week-column {
+  position: relative;
+  min-height: calc(12 * 64px);
+  border-left: 1px solid color-mix(in srgb, var(--line) 56%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 72%, transparent) 0%, transparent 100%);
+}
+
+.livekit-student-week-column.is-selected {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 100%);
+}
+
+.livekit-student-week-grid-lines,
+.livekit-student-week-events-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.livekit-student-week-grid-lines {
+  display: grid;
+  grid-template-rows: repeat(12, 64px);
+}
+
+.livekit-student-week-grid-line {
+  border-bottom: 1px dashed color-mix(in srgb, var(--line) 56%, transparent);
+}
+
+.livekit-student-week-events-layer {
+  padding: 6px;
+}
+
+.livekit-student-week-event {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  text-align: left;
+  color: inherit;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.livekit-student-week-event.kind-live-class {
+  background: linear-gradient(180deg, rgba(224, 231, 255, 0.96) 0%, rgba(199, 210, 254, 0.96) 100%);
+  border-color: rgba(99, 102, 241, 0.28);
+}
+
+.livekit-student-week-event.kind-blocked-slot {
+  background: linear-gradient(180deg, rgba(251, 207, 232, 0.96) 0%, rgba(244, 114, 182, 0.22) 100%);
+  border-color: rgba(236, 72, 153, 0.28);
+}
+
+.livekit-student-week-event.is-actionable {
+  cursor: pointer;
+}
+
+.livekit-student-week-event-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.livekit-student-week-event-copy strong {
+  color: #1e1b4b;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.livekit-student-week-event-copy span,
+.livekit-student-week-event-copy small {
+  color: #4c1d95;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.livekit-student-week-event.kind-blocked-slot .livekit-student-week-event-copy strong {
+  color: #831843;
+}
+
+.livekit-student-week-event.kind-blocked-slot .livekit-student-week-event-copy span,
+.livekit-student-week-event.kind-blocked-slot .livekit-student-week-event-copy small {
+  color: #9d174d;
+}
+
+.livekit-calendar-agenda--student {
+  gap: 18px;
+}
+
+.livekit-calendar-day-rail-month {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: color-mix(in srgb, var(--accent) 72%, var(--text-main));
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.livekit-calendar-day-rail strong {
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.livekit-calendar-event-grid {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.livekit-calendar-event-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.livekit-calendar-event-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--line) 74%, transparent);
+  background: color-mix(in srgb, var(--bg-card-soft) 92%, transparent);
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+
+.livekit-calendar-event-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.livekit-calendar-event-icon.kind-live-class {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #15803d;
+}
+
+.livekit-calendar-event-icon.kind-blocked-slot {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.2);
+  color: #0369a1;
+}
+
+.livekit-calendar-timeblock {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-card-soft) 94%, white 6%);
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+}
+
+.livekit-calendar-timeblock strong {
+  font-size: 1rem;
+  color: var(--text-strong);
+}
+
+.livekit-calendar-timeblock span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.livekit-calendar-event-main {
+  display: grid;
+  gap: 10px;
+}
+
+.livekit-calendar-kind-pill {
+  background: color-mix(in srgb, var(--bg-card-soft) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  color: var(--text-soft);
+}
+
+.livekit-calendar-kind-pill.kind-live-class {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.24);
+  color: #15803d;
+}
+
+.livekit-calendar-kind-pill.kind-blocked-slot {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.22);
+  color: #0369a1;
+}
+
+html[data-theme='dark'] .livekit-calendar-board,
+html[data-theme='dark'] .livekit-calendar-day-rail,
+html[data-theme='dark'] .livekit-calendar-event-card {
+  border-color: color-mix(in srgb, var(--line-strong) 78%, transparent);
+  box-shadow: none;
+}
+
+html[data-theme='dark'] .livekit-calendar-board {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 12%, transparent), transparent 32%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 94%, #0f172a) 0%, color-mix(in srgb, var(--bg-card-soft) 96%, #0b1220) 100%);
+}
+
+html[data-theme='dark'] .livekit-calendar-day-rail {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card-soft) 96%, #101828) 0%, color-mix(in srgb, var(--bg-card) 98%, #0b1220) 100%);
+}
+
+html[data-theme='dark'] .livekit-calendar-day-rail strong,
+html[data-theme='dark'] .livekit-calendar-event-card strong,
+html[data-theme='dark'] .livekit-calendar-board-head h4 {
+  color: var(--text-strong);
+}
+
+html[data-theme='dark'] .livekit-calendar-day-rail span,
+html[data-theme='dark'] .livekit-calendar-event-topline span:last-child,
+html[data-theme='dark'] .livekit-calendar-event-actions span,
+html[data-theme='dark'] .livekit-calendar-event-card p {
+  color: var(--text-soft);
+}
+
+html[data-theme='dark'] .livekit-calendar-event-card {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 96%, #111827) 0%, color-mix(in srgb, var(--bg-card-soft) 98%, #0f172a) 100%);
+}
+
+html[data-theme='dark'] .livekit-calendar-event-card.kind-live-class {
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.11), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 96%, #111827) 0%, rgba(20, 83, 45, 0.28) 100%);
+}
+
+html[data-theme='dark'] .livekit-calendar-timeblock {
+  background: color-mix(in srgb, var(--bg-base) 84%, var(--bg-card));
+}
+
+html[data-theme='light'] .livekit-student-calendar-spotlight {
+  background:
+    radial-gradient(circle at top right, rgba(79, 70, 229, 0.12), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 245, 255, 0.98) 100%);
+}
+
+html[data-theme='dark'] .livekit-student-mini-calendar,
+html[data-theme='dark'] .livekit-student-week-strip,
+html[data-theme='dark'] .livekit-student-week-board,
+html[data-theme='dark'] .livekit-calendar-panel--teams {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 96%, #101828) 0%, color-mix(in srgb, var(--bg-card-soft) 98%, #0b1220) 100%);
+}
+
+html[data-theme='dark'] .livekit-student-week-day,
+html[data-theme='dark'] .livekit-student-mini-day.has-events,
+html[data-theme='dark'] .livekit-calendar-timeblock,
+html[data-theme='dark'] .livekit-calendar-event-icon {
+  background: color-mix(in srgb, var(--bg-base) 72%, var(--bg-card));
+}
+
+html[data-theme='dark'] .livekit-student-week-board-head,
+html[data-theme='dark'] .livekit-student-week-time-rail,
+html[data-theme='dark'] .livekit-student-week-column {
+  background: color-mix(in srgb, var(--bg-base) 64%, var(--bg-card));
+}
+
+html[data-theme='dark'] .livekit-student-week-event.kind-live-class {
+  background: linear-gradient(180deg, rgba(67, 56, 202, 0.44) 0%, rgba(79, 70, 229, 0.32) 100%);
+  border-color: rgba(129, 140, 248, 0.34);
+}
+
+html[data-theme='dark'] .livekit-student-week-event.kind-blocked-slot {
+  background: linear-gradient(180deg, rgba(157, 23, 77, 0.42) 0%, rgba(244, 114, 182, 0.18) 100%);
+  border-color: rgba(244, 114, 182, 0.28);
+}
+
+html[data-theme='dark'] .livekit-student-week-event-copy strong,
+html[data-theme='dark'] .livekit-student-week-event-copy span,
+html[data-theme='dark'] .livekit-student-week-event-copy small {
+  color: #f5f3ff;
+}
+
+html[data-theme='dark'] .livekit-student-mini-day span,
+html[data-theme='dark'] .livekit-student-week-day strong {
+  color: var(--text-strong);
+}
+
+.livekit-calendar-empty-card {
+  min-height: 180px;
+}
+
+.livekit-danger-soft-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.98) 0%, rgba(254, 226, 226, 0.98) 100%);
+  color: #b42318;
+  font-weight: 800;
+}
+
+.livekit-danger-soft-btn:disabled {
+  opacity: 0.65;
+}
+
+.livekit-studio-launch-card {
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(181, 197, 219, 0.38);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 250, 255, 0.97) 100%);
+}
+
+.livekit-studio-launch-body {
+  display: grid;
+  gap: 16px;
+}
+
+.livekit-session-card--featured {
+  padding: 18px;
+}
+
+.livekit-empty-state-card {
+  min-height: 180px;
+  border-style: dashed;
+  border-color: rgba(148, 163, 184, 0.36);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.98) 100%);
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 10px;
+}
+
+.livekit-empty-state-card strong {
+  font-size: 1.02rem;
+}
+
+.livekit-empty-state-card p {
+  margin: 0;
+  max-width: 56ch;
+  color: #5b6f87;
+  line-height: 1.6;
+}
+
+.livekit-empty-state-card--studio {
+  min-height: 220px;
+}
+
+.livekit-studio-launch-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-studio-page {
+  gap: 18px;
+}
+
+.livekit-studio-hero {
+  border-radius: 30px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background:
+    radial-gradient(520px 240px at 0% 0%, rgba(14, 165, 233, 0.2), transparent 55%),
+    radial-gradient(480px 240px at 100% 0%, rgba(16, 185, 129, 0.14), transparent 58%),
+    linear-gradient(145deg, #ffffff 0%, #f3f8ff 46%, #eef5ff 100%);
+}
+
+.livekit-studio-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 26px;
+  align-items: start;
+}
+
+.livekit-studio-shell,
+.livekit-studio-control-column {
+  min-width: 0;
+}
+
+.livekit-studio-shell {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+}
+
+.livekit-studio-control-column {
+  display: grid;
+  gap: 24px;
+  position: static;
+}
+
+.livekit-studio-students-panel {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.livekit-studio-student-list {
+  display: grid;
+  gap: 12px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.livekit-studio-student-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 22px;
+}
+
+.livekit-studio-student-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.livekit-studio-student-head p {
+  margin: 4px 0 0;
+  color: #58708b;
+}
+
+.livekit-studio-student-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.livekit-status-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.livekit-status-tag.tag-cyan {
+  background: rgba(14, 165, 233, 0.12);
+  color: #075985;
+}
+
+.livekit-status-tag.tag-emerald {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.livekit-status-tag.tag-rose {
+  background: rgba(244, 63, 94, 0.14);
+  color: #be123c;
+}
+
+.livekit-room-toolbar {
+  padding: 20px;
+  border-radius: 28px;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  background:
+    radial-gradient(520px 220px at 0% 0%, rgba(125, 211, 252, 0.16), transparent 56%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.99) 0%, rgba(241, 247, 255, 0.97) 100%);
+}
+
+.livekit-room-toolbar .subtitle,
+.livekit-room-toolbar .eyebrow,
+.livekit-server-status-strip {
+  color: #58708b;
+}
+
+.livekit-studio-room-panel {
+  border-radius: 30px;
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.24);
+}
+
+.livekit-studio-room-head {
+  padding: 18px 20px 16px;
+}
+
+.livekit-studio-room-head .eyebrow {
+  color: rgba(191, 219, 254, 0.8);
+}
+
+.livekit-studio-room-head h4 {
+  color: #f8fafc;
+}
+
+.livekit-studio-room-head .subtitle {
+  color: rgba(203, 213, 225, 0.86);
+}
+
+.livekit-studio-status-card,
+.livekit-poll-panel,
+.livekit-studio-students-panel {
+  color: #10233a;
+  border-radius: 28px;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  background:
+    radial-gradient(circle at top right, rgba(251, 191, 36, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 249, 255, 0.98) 100%);
+}
+
+.livekit-studio-side-column .livekit-studio-status-card,
+.livekit-studio-side-column .livekit-poll-panel,
+.livekit-studio-control-column .livekit-studio-students-panel {
+  color: #10233a !important;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card *,
+.livekit-studio-side-column .livekit-poll-panel *,
+.livekit-studio-control-column .livekit-studio-students-panel * {
+  color: inherit;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card h3,
+.livekit-studio-side-column .livekit-studio-status-card h4,
+.livekit-studio-side-column .livekit-poll-panel h3,
+.livekit-studio-control-column .livekit-studio-students-panel h3,
+.livekit-studio-side-column .livekit-studio-status-grid strong,
+.livekit-studio-side-column .livekit-poll-summary-card strong,
+.livekit-studio-side-column .livekit-poll-result-title strong,
+.livekit-studio-side-column .livekit-poll-result-metrics strong,
+.livekit-studio-control-column .livekit-studio-student-card strong {
+  color: #10233a !important;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card .subtitle,
+.livekit-studio-side-column .livekit-poll-panel .subtitle,
+.livekit-studio-side-column .livekit-poll-summary-card p,
+.livekit-studio-side-column .livekit-poll-result-title span,
+.livekit-studio-side-column .livekit-poll-result-metrics small,
+.livekit-studio-side-column .livekit-poll-voter-empty,
+.livekit-studio-control-column .livekit-studio-students-panel .subtitle,
+.livekit-studio-control-column .livekit-studio-student-head p,
+.livekit-studio-control-column .livekit-muted-note {
+  color: #58708b !important;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card .eyebrow,
+.livekit-studio-side-column .livekit-poll-panel .eyebrow,
+.livekit-studio-control-column .livekit-studio-students-panel .eyebrow,
+.livekit-studio-side-column .livekit-studio-status-grid span,
+.livekit-studio-side-column .livekit-poll-summary-card span {
+  color: #577089 !important;
+}
+
+.livekit-studio-side-column .livekit-poll-composer input,
+.livekit-studio-side-column .livekit-poll-composer select {
+  color: #10233a !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+}
+
+html[data-theme='light'] .livekit-studio-side-column .livekit-studio-status-card,
+html[data-theme='light'] .livekit-studio-side-column .livekit-poll-panel,
+:root[data-theme='light'] .livekit-studio-side-column .livekit-studio-status-card,
+:root[data-theme='light'] .livekit-studio-side-column .livekit-poll-panel {
+  --livekit-studio-panel-title: #0f172a;
+  --livekit-studio-panel-body: #334155;
+  --livekit-studio-panel-muted: #64748b;
+  --livekit-studio-panel-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 249, 255, 0.98) 100%);
+  background:
+    radial-gradient(circle at top right, rgba(251, 191, 36, 0.12), transparent 32%),
+    var(--livekit-studio-panel-surface) !important;
+}
+
+html[data-theme='dark'] .livekit-studio-side-column .livekit-studio-status-card,
+html[data-theme='dark'] .livekit-studio-side-column .livekit-poll-panel,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-studio-status-card,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-poll-panel {
+  --livekit-studio-panel-title: #f3f7ff;
+  --livekit-studio-panel-body: #d7e0f2;
+  --livekit-studio-panel-muted: #9db0cc;
+  --livekit-studio-panel-surface: linear-gradient(180deg, rgba(18, 26, 42, 0.98) 0%, rgba(25, 35, 56, 0.98) 100%);
+  border-color: rgba(96, 165, 250, 0.2);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 32%),
+    var(--livekit-studio-panel-surface) !important;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card,
+.livekit-studio-side-column .livekit-poll-panel {
+  color: var(--livekit-studio-panel-body, #334155) !important;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card,
+.livekit-studio-side-column .livekit-poll-panel,
+.livekit-studio-side-column .livekit-studio-status-card *,
+.livekit-studio-side-column .livekit-poll-panel * {
+  opacity: 1 !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card h3,
+.livekit-studio-side-column .livekit-studio-status-card h4,
+.livekit-studio-side-column .livekit-poll-panel h3,
+.livekit-studio-side-column .livekit-studio-status-grid strong,
+.livekit-studio-side-column .livekit-poll-summary-card strong,
+.livekit-studio-side-column .livekit-poll-result-title strong,
+.livekit-studio-side-column .livekit-poll-result-metrics strong,
+.livekit-studio-side-column .livekit-poll-composer label,
+.livekit-studio-side-column .livekit-poll-composer input,
+.livekit-studio-side-column .livekit-poll-composer select,
+.livekit-studio-side-column .livekit-poll-actions button {
+  color: var(--livekit-studio-panel-title, #0f172a) !important;
+}
+
+.livekit-studio-side-column .livekit-studio-status-card .eyebrow,
+.livekit-studio-side-column .livekit-poll-panel .eyebrow,
+.livekit-studio-side-column .livekit-studio-status-grid span,
+.livekit-studio-side-column .livekit-poll-summary-card span,
+.livekit-studio-side-column .livekit-poll-composer label span,
+.livekit-studio-side-column .livekit-poll-actions label span,
+.livekit-studio-side-column .livekit-poll-result-metrics small,
+.livekit-studio-side-column .livekit-poll-result-title span,
+.livekit-studio-side-column .livekit-poll-summary-card p,
+.livekit-studio-side-column .livekit-poll-voter-empty,
+.livekit-studio-side-column .livekit-studio-status-card .subtitle,
+.livekit-studio-side-column .livekit-poll-panel .subtitle {
+  color: var(--livekit-studio-panel-muted, #64748b) !important;
+}
+
+html[data-theme='dark'] .livekit-studio-side-column .livekit-studio-status-grid article,
+html[data-theme='dark'] .livekit-studio-side-column .livekit-poll-summary-card,
+html[data-theme='dark'] .livekit-studio-side-column .livekit-poll-result-card,
+html[data-theme='dark'] .livekit-studio-side-column .livekit-poll-composer,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-studio-status-grid article,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-poll-summary-card,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-poll-result-card,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-poll-composer {
+  border-color: rgba(96, 165, 250, 0.18);
+  background: linear-gradient(180deg, rgba(20, 30, 48, 0.96) 0%, rgba(28, 39, 62, 0.96) 100%) !important;
+}
+
+html[data-theme='dark'] .livekit-studio-side-column .livekit-poll-composer input,
+html[data-theme='dark'] .livekit-studio-side-column .livekit-poll-composer select,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-poll-composer input,
+:root[data-theme='dark'] .livekit-studio-side-column .livekit-poll-composer select {
+  background: rgba(10, 16, 28, 0.95) !important;
+  border-color: rgba(96, 165, 250, 0.16);
+  color: #f3f7ff !important;
+}
+
+.livekit-studio-status-card p,
+.livekit-poll-panel p,
+.livekit-studio-students-panel p,
+.livekit-poll-panel span,
+.livekit-studio-status-card span {
+  color: inherit;
+}
+
+.livekit-studio-status-card .subtitle,
+.livekit-poll-panel .subtitle,
+.livekit-studio-students-panel .subtitle,
+.livekit-poll-voter-empty,
+.livekit-poll-summary-card p {
+  color: #58708b;
+}
+
+.livekit-poll-summary-card strong,
+.livekit-poll-result-title strong,
+.livekit-poll-result-metrics strong,
+.livekit-studio-status-grid strong,
+.livekit-studio-students-panel strong {
+  color: #10233a;
+}
+
+.livekit-poll-composer,
+.livekit-poll-result-card,
+.livekit-poll-summary-card {
+  border-color: rgba(191, 219, 254, 0.82);
+}
+
+.livekit-class-form input,
+.livekit-class-form textarea,
+.livekit-class-form select,
+.livekit-poll-composer input,
+.livekit-poll-composer select,
+.livekit-student-access-card input,
+.livekit-student-access-card textarea {
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(255, 255, 255, 0.98);
+  color: #10233a;
+}
+
+@media (max-width: 1280px) {
+  .livekit-studio-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-studio-control-column {
+    position: static;
+  }
+
+  .livekit-studio-student-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .livekit-creation-panel,
+  .livekit-session-list-panel,
+  .livekit-access-panel,
+  .livekit-calendar-panel,
+  .livekit-studio-students-panel,
+  .livekit-room-toolbar,
+  .livekit-studio-status-card,
+  .livekit-poll-panel {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .livekit-studio-student-head,
+  .livekit-studio-student-actions,
+  .livekit-student-access-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .livekit-danger-soft-btn,
+  .livekit-studio-student-actions .primary-btn,
+  .livekit-student-access-actions .primary-btn,
+  .livekit-studio-launch-actions .primary-btn,
+  .livekit-studio-launch-actions .danger-btn {
+    width: 100%;
+  }
+}
+
   .registered-learners-mobile-head {
     flex-direction: column;
     align-items: stretch;
@@ -8909,7 +12028,62 @@ html[data-theme='light'] .community-chat-shell .str-chat__message--me .str-chat_
     --chat-message-gap: 9px;
     --chat-input-pad-y: 8px;
     --chat-input-pad-x: 12px;
+
+  .livekit-calendar-shell,
+  .livekit-calendar-day-group {
+    grid-template-columns: 1fr;
   }
+
+  .livekit-student-calendar-layout,
+  .livekit-student-calendar-spotlight,
+  .livekit-calendar-event-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-student-week-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .livekit-student-week-board-head {
+    grid-template-columns: 72px repeat(7, minmax(110px, 1fr));
+  }
+
+  .livekit-student-week-board-body {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .livekit-student-calendar-spotlight-meta {
+    justify-content: flex-start;
+  }
+
+  .livekit-calendar-day-rail {
+    position: static;
+  }
+  }
+
+@media (max-width: 640px) {
+  .livekit-student-week-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .livekit-student-week-board {
+    overflow-x: auto;
+  }
+
+  .livekit-student-week-board-head,
+  .livekit-student-week-board-body {
+    min-width: 820px;
+  }
+
+  .livekit-student-mini-calendar-weekdays,
+  .livekit-student-mini-calendar-grid {
+    gap: 6px;
+  }
+
+  .livekit-student-mini-day {
+    min-height: 42px;
+  }
+}
 
   .community-chat-frame,
   .community-chat-shell .str-chat {
@@ -9274,10 +12448,19 @@ html[data-theme='light'] .live-badge {
   .section-undo-alert {
     flex-direction: column;
     align-items: stretch;
+
+  .livekit-studio-layout {
+    gap: 20px;
+  }
   }
 
   .section-undo-alert .undo-btn {
     width: 100%;
+
+  .livekit-studio-control-column {
+    position: static;
+    top: auto;
+  }
   }
 }
 
@@ -15030,6 +18213,10 @@ html[data-theme='light'] .empty-note {
   border: 1.5px solid rgba(239,68,68,0.3);
   padding: 1rem 1.5rem;
 }
+.live-class-student-banner--locked {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, var(--surface, #fff) 100%);
+  border-color: rgba(245, 158, 11, 0.35);
+}
 .live-class-banner-info {
   display: flex;
   align-items: center;
@@ -15050,6 +18237,14 @@ html[data-theme='light'] .empty-note {
   transition: background 0.18s, border-color 0.18s;
 }
 .live-join-btn:hover { background: #1557b0; border-color: #1557b0; }
+.live-join-btn--locked {
+  background: #b45309;
+  border-color: #b45309;
+}
+.live-join-btn--locked:hover {
+  background: #92400e;
+  border-color: #92400e;
+}
 
 /* ── Admin: Schedule a Class section ────────────────────── */
 .schedule-class-section {

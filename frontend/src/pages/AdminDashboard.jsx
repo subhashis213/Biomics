@@ -2377,197 +2377,37 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {!liveClass ? (
-            <div className="live-class-start-panel">
-              <p className="subtitle">Create a Google Meet, paste the link below, then start the session. Students see a join button within 5 seconds.</p>
-              <div className="live-class-form">
-                <div className="live-class-form-row">
-                  <label className="live-field-label">
-                    Class title
-                    <input
-                      type="text"
-                      className="live-class-title-input"
-                      placeholder="e.g. Cell Biology – Chapter 3"
-                      value={liveClassTitle}
-                      onChange={(e) => setLiveClassTitle(e.target.value)}
-                      maxLength={100}
-                    />
-                  </label>
-                  <label className="live-field-label">
-                    Google Meet link
-                    <input
-                      type="url"
-                      className="live-class-title-input meet-url-input"
-                      placeholder="https://meet.google.com/abc-defg-hij"
-                      value={liveClassMeetUrl}
-                      onChange={(e) => setLiveClassMeetUrl(e.target.value)}
-                    />
-                  </label>
-                </div>
-                <div className="live-class-form-actions">
-                  <button
-                    type="button"
-                    className="primary-btn live-start-btn"
-                    onClick={handleStartClass}
-                    disabled={isStartingClass || !liveClassMeetUrl.trim()}
-                  >
-                    {isStartingClass ? 'Starting…' : '🟢 Go Live'}
-                  </button>
-                  <a
-                    href="https://meet.google.com/new"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="secondary-btn meet-new-link"
-                  >
-                    📹 Create Google Meet
-                  </a>
-                </div>
-                <p className="live-help-text">
-                  Don’t have a link yet?
-                  Click “Create Google Meet” → copy the link → paste it above.
-                </p>
-              </div>
-
-              {/* ── Schedule a class ── */}
-{/* ── Schedule a class ── */}
-              <div className="schedule-class-section">
-                <div className="schedule-section-header">
-                  <div>
-                    <h3 className="schedule-section-title">📅 Schedule a Class</h3>
-                    <p className="schedule-section-sub">Students see a countdown banner before the class starts.</p>
-                  </div>
-                  {!showScheduleForm && !scheduledClass && (
-                    <button type="button" className="secondary-btn schedule-toggle-btn" onClick={() => setShowScheduleForm(true)}>
-                      + Schedule
-                    </button>
-                  )}
-                </div>
-
-                {scheduledClass ? (
-                  <div className="scheduled-class-card">
-                    <div className="scheduled-card-icon">📅</div>
-                    <div className="scheduled-card-info">
-                      <strong className="scheduled-card-title">{scheduledClass.title}</strong>
-                      <span className="scheduled-card-time">
-                        {new Date(scheduledClass.scheduledAt).toLocaleString([], {
-                          weekday: 'short', month: 'short', day: 'numeric',
-                          hour: '2-digit', minute: '2-digit'
-                        })}
-                      </span>
-                      {scheduledClass.meetUrl && (
-                        <a href={scheduledClass.meetUrl} target="_blank" rel="noopener noreferrer" className="scheduled-card-url">
-                          {scheduledClass.meetUrl}
-                        </a>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      className="danger-btn schedule-cancel-btn"
-                      onClick={handleCancelSchedule}
-                      disabled={isCancellingSchedule}
-                    >
-                      {isCancellingSchedule ? 'Cancelling…' : '✕ Cancel'}
-                    </button>
-                  </div>
-                ) : showScheduleForm ? (
-                  <form className="schedule-form" onSubmit={handleScheduleClass}>
-                    <div className="schedule-form-row">
-                      <label className="live-field-label">
-                        Class title
-                        <input
-                          type="text"
-                          className="live-class-title-input"
-                          placeholder="e.g. Cell Biology – Chapter 3"
-                          value={scheduleForm.title}
-                          onChange={(e) => setScheduleForm((p) => ({ ...p, title: e.target.value }))}
-                          maxLength={100}
-                        />
-                      </label>
-                      <label className="live-field-label">
-                        Google Meet link <span className="schedule-optional-label">(optional — can add later)</span>
-                        <input
-                          type="url"
-                          className="live-class-title-input"
-                          placeholder="https://meet.google.com/abc-defg-hij"
-                          value={scheduleForm.meetUrl}
-                          onChange={(e) => setScheduleForm((p) => ({ ...p, meetUrl: e.target.value }))}
-                        />
-                      </label>
-                    </div>
-                    <div className="schedule-form-row">
-                      <label className="live-field-label">
-                        Date
-                        <input
-                          type="date"
-                          className="live-class-title-input"
-                          value={scheduleForm.date}
-                          min={new Date().toISOString().split('T')[0]}
-                          onChange={(e) => setScheduleForm((p) => ({ ...p, date: e.target.value }))}
-                          required
-                        />
-                      </label>
-                      <label className="live-field-label">
-                        Time
-                        <input
-                          type="time"
-                          className="live-class-title-input"
-                          value={scheduleForm.time}
-                          onChange={(e) => setScheduleForm((p) => ({ ...p, time: e.target.value }))}
-                          required
-                        />
-                      </label>
-                    </div>
-                    <div className="live-class-form-actions">
-                      <button type="submit" className="primary-btn" disabled={isScheduling || !scheduleForm.date || !scheduleForm.time}>
-                        {isScheduling ? 'Scheduling…' : '📅 Set Schedule'}
-                      </button>
-                      <button type="button" className="secondary-btn" onClick={() => { setShowScheduleForm(false); setScheduleForm({ title: '', meetUrl: '', date: '', time: '' }); }}>
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : null}
-              </div>
-            </div>
-          ) : (
+          <div className="live-class-start-panel">
+            <p className="subtitle">Live classes now run from the dedicated LiveKit workspace with AWS EC2 boot control, premium student access, calendar blocking, and the teacher studio.</p>
             <div className="live-class-active-panel">
               <div className="live-class-info-bar">
                 <div className="live-class-info-text">
-                  <strong className="live-class-title-display">{liveClass.title}</strong>
-                  <span className="live-class-since">⏰ Started at {new Date(liveClass.startedAt).toLocaleTimeString()}</span>
+                  <strong className="live-class-title-display">{liveClass?.title || scheduledClass?.title || 'No active class right now'}</strong>
+                  <span className="live-class-since">
+                    {liveClass
+                      ? `⏰ Live since ${new Date(liveClass.startedAt).toLocaleTimeString()}`
+                      : scheduledClass
+                        ? `📅 Scheduled for ${new Date(scheduledClass.scheduledAt).toLocaleString()}`
+                        : 'Create and manage premium LiveKit classes from the new workspace.'}
+                  </span>
                 </div>
                 <div className="live-class-controls">
-                  <a
-                    href={liveClass.meetUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="primary-btn meet-open-btn"
-                  >
-                    📹 Open Google Meet
-                  </a>
-                  <button
-                    type="button"
-                    className="danger-btn"
-                    onClick={handleEndClass}
-                    disabled={isEndingClass}
-                  >
-                    {isEndingClass ? 'Ending…' : '⏹️ End Class'}
+                  <button type="button" className="primary-btn meet-open-btn" onClick={() => navigate('/admin/live-classes')}>
+                    Open Live Class Workspace
                   </button>
+                  {liveClass ? (
+                    <button type="button" className="secondary-btn" onClick={() => navigate('/admin/live-classes')}>
+                      Open Teacher Studio
+                    </button>
+                  ) : null}
                 </div>
               </div>
               <div className="live-meet-info-box">
-                <span className="live-meet-url-label">Meet link shared with students:</span>
-                <a
-                  href={liveClass.meetUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="live-meet-url-text"
-                >
-                  {liveClass.meetUrl}
-                </a>
+                <span className="live-meet-url-label">Workspace features:</span>
+                <span className="live-meet-url-text">AWS EC2 start and stop, LiveKit teacher and student rooms, poll datachannel, premium access control, and calendar blocking.</span>
               </div>
             </div>
-          )}
+          </div>
         </section>
 
         <section id="section-community-chat" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card community-link-card">

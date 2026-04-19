@@ -1,7 +1,9 @@
 const express = require('express');
 const LiveClass = require('../models/LiveClass');
+const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLog');
+const { getActiveCourseMembership, hasCourseAccess, normalizeCourseName } = require('../utils/courseAccess');
 
 const router = express.Router();
 
@@ -15,31 +17,122 @@ function isValidMeetUrl(url) {
   }
 }
 
+function normalizeUsername(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeUsernameList(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => normalizeUsername(value))
+    .filter(Boolean))];
+}
+
+async function canUserDiscoverClass(user, liveClass) {
+  const targetCourse = normalizeCourseName(liveClass?.course);
+  if (!targetCourse) return true;
+
+  if (await hasCourseAccess(user, targetCourse)) return true;
+
+  const enrolledCourse = normalizeCourseName(user?.class);
+  return Boolean(enrolledCourse) && enrolledCourse === targetCourse;
+}
+
+async function canUserAccessClass(user, liveClass) {
+  const username = normalizeUsername(user?.username);
+  const removedUsernames = normalizeUsernameList(liveClass?.removedUsernames || []);
+  if (username && removedUsernames.includes(username)) return false;
+
+  const allowedUsernames = normalizeUsernameList(liveClass?.allowedUsernames || []);
+  if (username && allowedUsernames.includes(username)) return true;
+
+  const targetCourse = normalizeCourseName(liveClass?.course);
+  if (!targetCourse) return true;
+
+  return hasCourseAccess(user, targetCourse);
+}
+
+async function loadCurrentUser(username) {
+  const normalizedUsername = normalizeUsername(username);
+  if (!normalizedUsername) return null;
+  return User.findOne({ username: new RegExp(`^${normalizedUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }).lean();
+}
+
+function serializeStatusClass(liveClass, options = {}) {
+  if (!liveClass) return null;
+
+  return {
+    _id: String(liveClass._id || ''),
+    title: String(liveClass.title || '').trim(),
+    description: String(liveClass.description || '').trim(),
+    course: String(liveClass.course || '').trim(),
+    meetUrl: String(liveClass.meetUrl || '').trim(),
+    startedAt: liveClass.startedAt || null,
+    scheduledAt: liveClass.scheduledAt || null,
+    status: String(liveClass.status || '').trim() || (liveClass.isActive ? 'live' : liveClass.isScheduled ? 'scheduled' : 'ended'),
+    isLocked: Boolean(options.isLocked),
+    lockMessage: options.isLocked ? 'Unlock the course content to enter this live class room.' : ''
+  };
+}
+
 // GET /live/status — any authenticated user checks if a class is active or scheduled
 router.get('/status', authenticateToken(), async (req, res) => {
   try {
-    const activeClass = await LiveClass.findOne({ isActive: true }).sort({ startedAt: -1 }).lean();
-    if (activeClass) {
+    const role = String(req.user?.role || 'user').trim();
+    const currentUser = role === 'admin' ? null : await loadCurrentUser(req.user?.username);
+    const activeClass = await LiveClass.findOne({ $or: [{ isActive: true }, { status: 'live' }] }).sort({ startedAt: -1, updatedAt: -1 }).lean();
+    if (activeClass && role === 'admin') {
+      const serialized = serializeStatusClass(activeClass);
       return res.json({
         active: true,
-        title: activeClass.title,
-        meetUrl: activeClass.meetUrl,
-        startedAt: activeClass.startedAt
+        title: serialized.title,
+        meetUrl: serialized.meetUrl,
+        startedAt: serialized.startedAt,
+        activeClass: serialized,
+        lockedActiveClass: null,
+        upcoming: null
       });
     }
+
+    if (activeClass && currentUser) {
+      const canAccessActiveClass = await canUserAccessClass(currentUser, activeClass);
+      if (canAccessActiveClass) {
+        const serialized = serializeStatusClass(activeClass);
+        return res.json({
+          active: true,
+          title: serialized.title,
+          meetUrl: serialized.meetUrl,
+          startedAt: serialized.startedAt,
+          activeClass: serialized,
+          lockedActiveClass: null,
+          upcoming: null
+        });
+      }
+
+      if (await canUserDiscoverClass(currentUser, activeClass)) {
+        return res.json({
+          active: false,
+          activeClass: null,
+          lockedActiveClass: serializeStatusClass(activeClass, { isLocked: true }),
+          upcoming: null
+        });
+      }
+    }
+
     // Check for the next upcoming scheduled class
     const upcoming = await LiveClass
-      .findOne({ isScheduled: true, isActive: false, scheduledAt: { $gt: new Date() } })
+      .findOne({ isScheduled: true, isActive: false, status: 'scheduled', scheduledAt: { $gt: new Date() } })
       .sort({ scheduledAt: 1 })
       .lean();
+
+    const canAccessUpcoming = role === 'admin' || (currentUser && upcoming && canUserAccessClass(currentUser, upcoming));
+    const resolvedUpcomingAccess = role === 'admin' || Boolean(currentUser && upcoming && await canUserAccessClass(currentUser, upcoming));
+    const serializedUpcoming = upcoming && resolvedUpcomingAccess ? serializeStatusClass(upcoming) : null;
+
     return res.json({
       active: false,
-      upcoming: upcoming ? {
-        _id: upcoming._id,
-        title: upcoming.title,
-        scheduledAt: upcoming.scheduledAt,
-        meetUrl: upcoming.meetUrl || null
-      } : null
+      activeClass: null,
+      lockedActiveClass: null,
+      upcoming: serializedUpcoming
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to get live class status' });

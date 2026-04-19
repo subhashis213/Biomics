@@ -11,6 +11,7 @@ import AdminMockExamPage from './pages/AdminMockExamPage';
 import AdminPricingWorkspacePage from './pages/AdminPricingWorkspacePage';
 import AdminQuizBuilderPage from './pages/AdminQuizBuilderPage';
 import AdminLearnerInsightsPage from './pages/AdminLearnerInsightsPage';
+import AdminLiveClassesPage from './pages/AdminLiveClassesPage';
 import AdminRegisteredLearnersPage from './pages/AdminRegisteredLearnersPage';
 import AdminRecoveryCenterPage from './pages/AdminRecoveryCenterPage';
 import AdminRevenueTrackingPage from './pages/AdminRevenueTrackingPage';
@@ -26,6 +27,7 @@ import AuthPage from './pages/AuthPage';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const CommunityChatPage = lazy(() => import('./pages/CommunityChatPage'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const StudentLiveClassesPage = lazy(() => import('./pages/StudentLiveClassesPage'));
 const StudentLecturePage = lazy(() => import('./pages/StudentLecturePage'));
 const StudentModuleDetailsPage = lazy(() => import('./pages/StudentModuleDetailsPage'));
 const StudentMockExamPage = lazy(() => import('./pages/StudentMockExamPage'));
@@ -80,6 +82,22 @@ export default function App() {
         element={(
           <ProtectedRoute role="admin">
             <AdminAnnouncementsWorkspacePage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/live-classes"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminLiveClassesPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/live-classes/:classId/studio"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminLiveClassesPage />
           </ProtectedRoute>
         )}
       />
@@ -219,6 +237,26 @@ export default function App() {
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading student dashboard...</div>}>
               <StudentDashboard />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/live-classes"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading live classes...</div>}>
+              <StudentLiveClassesPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/live-classes/:classId"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading live classes...</div>}>
+              <StudentLiveClassesPage />
             </Suspense>
           </ProtectedRoute>
         )}

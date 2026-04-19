@@ -13,6 +13,8 @@ const authRoutes = require('./routes/authRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const liveClassRoutes = require('./routes/liveClassRoutes');
+const livekitRoutes = require('./routes/livekitRoutes');
+const classServerRoutes = require('./routes/classServerRoutes');
 const moduleRoutes = require('./routes/moduleRoutes');
 const mockExamRoutes = require('./routes/mockExamRoutes');
 const announcementRoutes = require('./routes/announcementRoutes');
@@ -21,6 +23,24 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const testSeriesRoutes = require('./routes/testSeriesRoutes');
 
 const app = express();
+const livekitPublicUrl = String(process.env.LIVEKIT_URL || '').trim();
+let livekitHttpOrigin = '';
+let livekitWsOrigin = '';
+
+if (livekitPublicUrl) {
+  try {
+    const parsedLivekitUrl = new URL(livekitPublicUrl);
+    livekitHttpOrigin = parsedLivekitUrl.origin;
+    if (parsedLivekitUrl.protocol === 'https:') {
+      livekitWsOrigin = `wss://${parsedLivekitUrl.host}`;
+    } else if (parsedLivekitUrl.protocol === 'http:') {
+      livekitWsOrigin = `ws://${parsedLivekitUrl.host}`;
+    }
+  } catch (_) {
+    livekitHttpOrigin = '';
+    livekitWsOrigin = '';
+  }
+}
 
 // ABSOLUTE FIRST MIDDLEWARE: answer every OPTIONS preflight immediately before
 // Helmet, rate-limiters, or any route handler can run. This guarantees browsers
@@ -144,7 +164,13 @@ app.use(helmet({
       // Allow Jitsi Meet to be embedded as an iframe for live classes
       'frame-src': ["'self'", 'https://meet.jit.si'],
       'img-src': ["'self'", 'data:', 'https:'],
-      'connect-src': ["'self'", 'https://chat.stream-io-api.com', 'wss://chat.stream-io-api.com'],
+      'connect-src': [
+        "'self'",
+        'https://chat.stream-io-api.com',
+        'wss://chat.stream-io-api.com',
+        ...(livekitHttpOrigin ? [livekitHttpOrigin] : []),
+        ...(livekitWsOrigin ? [livekitWsOrigin] : [])
+      ],
     }
   }
 }));
@@ -162,6 +188,8 @@ app.use('/auth', authLimiterMiddleware, authRoutes);
 app.use('/feedback', feedbackRoutes);
 app.use('/quizzes', quizRoutes);
 app.use('/live', liveClassRoutes);
+app.use('/api/class', classServerRoutes);
+app.use('/api/livekit', livekitRoutes);
 app.use('/modules', moduleRoutes);
 app.use('/mock-exams', mockExamRoutes);
 app.use('/announcements', announcementRoutes);
@@ -177,7 +205,7 @@ if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/modules') || req.path.startsWith('/mock-exams') || req.path.startsWith('/announcements') || req.path.startsWith('/chat') || req.path.startsWith('/payments') || req.path.startsWith('/test-series')) {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/api/class') || req.path.startsWith('/api/livekit') || req.path.startsWith('/modules') || req.path.startsWith('/mock-exams') || req.path.startsWith('/announcements') || req.path.startsWith('/chat') || req.path.startsWith('/payments') || req.path.startsWith('/test-series')) {
       return next();
     }
     return res.sendFile(path.join(frontendDistPath, 'index.html'));

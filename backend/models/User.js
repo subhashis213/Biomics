@@ -28,6 +28,22 @@ const userSchema = new mongoose.Schema({
 		expiresAt: { type: Date, default: null },
 		paymentId: { type: String, default: '' }
 	}],
+	liveClassAccess: {
+		premiumEnabled: { type: Boolean, default: false },
+		premiumLabel: { type: String, trim: true, default: 'Premium Access' },
+		premiumExpiresAt: { type: Date, default: null },
+		notes: { type: String, trim: true, default: '' }
+	},
+	liveClassCalendarBlocks: [{
+		title: { type: String, required: true, trim: true },
+		description: { type: String, trim: true, default: '' },
+		startsAt: { type: Date, required: true },
+		endsAt: { type: Date, required: true },
+		kind: { type: String, enum: ['live-class', 'blocked-slot'], default: 'blocked-slot' },
+		liveClassId: { type: mongoose.Schema.Types.ObjectId, ref: 'LiveClass', default: null },
+		createdBy: { type: String, trim: true, default: '' },
+		createdAt: { type: Date, default: Date.now }
+	}]
 });
 
 userSchema.pre('save', async function(next) {

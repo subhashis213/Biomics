@@ -103,6 +103,38 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function buildUserTokenPayload(user) {
+  return {
+    sub: String(user?._id || ''),
+    userId: String(user?._id || ''),
+    username: String(user?.username || '').trim(),
+    role: 'user'
+  };
+}
+
+function buildAuthenticatedUserQuery(payload) {
+  const candidates = [];
+  const userId = String(payload?.userId || payload?.sub || '').trim();
+  const username = String(payload?.username || '').trim();
+
+  if (mongoose.Types.ObjectId.isValid(userId)) {
+    candidates.push({ _id: userId });
+  }
+
+  if (username) {
+    candidates.push({ username: new RegExp(`^${escapeRegex(username)}$`, 'i') });
+  }
+
+  if (!candidates.length) return null;
+  return candidates.length === 1 ? candidates[0] : { $or: candidates };
+}
+
+function findAuthenticatedUser(payload, projection) {
+  const query = buildAuthenticatedUserQuery(payload);
+  if (!query) return null;
+  return User.findOne(query, projection);
+}
+
 function formatReadyStateLabel(state) {
   if (state === 1) return 'connected';
   if (state === 2) return 'connecting';
@@ -1518,10 +1550,10 @@ router.post('/admin/recovery-actions/:id/apply', authenticateToken('admin'), asy
 
 router.get('/me', authenticateToken('user'), async (req, res) => {
   try {
-    const user = await User.findOne(
-      { username: req.user.username },
+    const user = await findAuthenticatedUser(
+      req.user,
       { username: 1, phone: 1, class: 1, city: 1, avatar: 1, _id: 0 }
-    ).lean();
+    )?.lean();
 
     if (!user) return res.status(404).json({ error: 'Student profile not found' });
 
@@ -1549,7 +1581,7 @@ router.get('/me', authenticateToken('user'), async (req, res) => {
 
 router.patch('/me', authenticateToken('user'), validate(updateProfileSchema), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username });
+    const user = await findAuthenticatedUser(req.user);
     if (!user) return res.status(404).json({ error: 'Student profile not found' });
 
     const nextUsername = req.body.username ? String(req.body.username).trim() : user.username;
@@ -1558,7 +1590,7 @@ router.patch('/me', authenticateToken('user'), validate(updateProfileSchema), as
     const nextPassword = req.body.password ? String(req.body.password).trim() : '';
 
     if (nextUsername !== user.username) {
-      const existingByUsername = await User.findOne({ username: nextUsername }).lean();
+      const existingByUsername = await User.findOne({ username: new RegExp(`^${escapeRegex(nextUsername)}$`, 'i') }).lean();
       if (existingByUsername) return res.status(400).json({ error: 'Username already in use' });
       user.username = nextUsername;
     }
@@ -1580,7 +1612,7 @@ router.patch('/me', authenticateToken('user'), validate(updateProfileSchema), as
     await user.save();
 
     const token = jwt.sign(
-      { username: user.username, role: 'user' },
+      buildUserTokenPayload(user),
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -1603,7 +1635,7 @@ router.patch('/me', authenticateToken('user'), validate(updateProfileSchema), as
 
 router.post('/me/avatar', authenticateToken('user'), avatarUpload.single('avatar'), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username });
+    const user = await findAuthenticatedUser(req.user);
     if (!user) return res.status(404).json({ error: 'Student profile not found' });
     if (!req.file) return res.status(400).json({ error: 'Profile image is required' });
 
@@ -1660,7 +1692,7 @@ router.post('/me/avatar', authenticateToken('user'), avatarUpload.single('avatar
 
 router.delete('/me/avatar', authenticateToken('user'), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username });
+    const user = await findAuthenticatedUser(req.user);
     if (!user) return res.status(404).json({ error: 'Student profile not found' });
 
     const previousFilename = user.avatar?.filename;
@@ -1757,7 +1789,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 
     if (!valid) return res.status(400).json({ error: 'Invalid password' });
     const token = jwt.sign(
-      { username: user.username, role: 'user' },
+      buildUserTokenPayload(user),
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -1860,7 +1892,7 @@ router.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
     await otpRecord.save();
 
     const token = jwt.sign(
-      { username: user.username, role: 'user' },
+      buildUserTokenPayload(user),
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -1949,7 +1981,7 @@ router.post('/verify-email-otp', validate(verifyEmailOtpSchema), async (req, res
     await otpRecord.save();
 
     const token = jwt.sign(
-      { username: user.username, role: 'user' },
+      buildUserTokenPayload(user),
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );

@@ -85,6 +85,16 @@ export function getApiBase() {
   return API_BASE;
 }
 
+export function openStudentLivekitWorkspaceStream() {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Authentication required. Please login again.');
+  }
+
+  const streamUrl = buildUrl(`/api/livekit/student/workspace/stream?token=${encodeURIComponent(token)}`);
+  return new EventSource(streamUrl);
+}
+
 function buildUrl(path, base = API_BASE) {
   return `${base}${path}`;
 }
@@ -447,6 +457,120 @@ export function fetchAdminUsers(params = {}) {
 
 export function fetchAdminUserInsights(username) {
   return requestJson(`/auth/users/${encodeURIComponent(username)}/insights`);
+}
+
+export function removeStudentFromLivekitClass(classId, username) {
+  return requestJson(`/api/livekit/classes/${encodeURIComponent(classId)}/remove-student`, {
+    method: 'POST',
+    body: JSON.stringify({ username })
+  });
+}
+
+export function fetchLiveClassServerStatus() {
+  return requestJson('/api/class/server-status');
+}
+
+export function startLiveClassServer() {
+  return requestJson('/api/class/start-server', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export function stopLiveClassServer() {
+  return requestJson('/api/class/stop-server', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export function fetchAdminLivekitWorkspace() {
+  return requestJson('/api/livekit/admin/workspace');
+}
+
+export function fetchStudentLivekitWorkspace() {
+  return requestJson('/api/livekit/student/workspace');
+}
+
+export function fetchLivekitStatus() {
+  return requestJson('/api/livekit/status');
+}
+
+export function fetchLivekitServiceState() {
+  return requestJson('/api/livekit/service-state');
+}
+
+export function createLivekitClass(payload) {
+  return requestJson('/api/livekit/classes', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateLivekitClass(classId, payload) {
+  return requestJson(`/api/livekit/classes/${encodeURIComponent(classId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteLivekitClass(classId) {
+  return requestJson(`/api/livekit/classes/${encodeURIComponent(classId)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function startLivekitClass(classId) {
+  return requestJson(`/api/livekit/classes/${encodeURIComponent(classId)}/start`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export function endLivekitClass(classId) {
+  return requestJson(`/api/livekit/classes/${encodeURIComponent(classId)}/end`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
+export function fetchTeacherLivekitToken(classId) {
+  return requestJson(`/api/livekit/teacher-token?classId=${encodeURIComponent(classId)}`);
+}
+
+export function fetchStudentLivekitToken(classId) {
+  return requestJson(`/api/livekit/student-token?classId=${encodeURIComponent(classId)}`);
+}
+
+export function fetchLivekitStudentAccessList() {
+  return requestJson('/api/livekit/access/students');
+}
+
+export function updateLivekitStudentAccess(username, payload) {
+  return requestJson(`/api/livekit/access/students/${encodeURIComponent(username)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function createLivekitCalendarBlock(payload) {
+  return requestJson('/api/livekit/calendar/blocks', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteLivekitCalendarBlock(blockId) {
+  return requestJson(`/api/livekit/calendar/blocks/${encodeURIComponent(blockId)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function updateLivekitCalendarBlock(blockId, payload) {
+  return requestJson(`/api/livekit/calendar/blocks/${encodeURIComponent(blockId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function postSessionActivity(payload, options = {}) {

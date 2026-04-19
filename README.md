@@ -180,6 +180,31 @@ URLs:
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:5002`
 
+## One-Command Local Startup
+
+If you want MongoDB, backend, and frontend to come up together from the project root, use:
+
+```bash
+npm run dev:up
+```
+
+This script will:
+- start MongoDB if port `27017` is not already in use
+- start the backend if port `5002` is not already in use
+- start the frontend on `127.0.0.1:5173` if port `5173` is not already in use
+- write logs and PID files into `.local-run/`
+
+Useful companion commands:
+
+```bash
+npm run dev:status
+npm run dev:down
+```
+
+Notes:
+- `dev:down` only stops processes started through `npm run dev:up`
+- if you already started frontend/backend/MongoDB manually, `dev:up` will detect the busy ports and skip relaunching them
+
 ## Known Ports and URLs
 
 | Service | Local URL | Port | Notes |

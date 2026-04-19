@@ -23,6 +23,7 @@ backend/.mongodb-data/
 backend/.mongodb-data.bak.*/
 backend/.mongodb-log/
 backend/.mongodb-sock/
+.local-run/
 tmp/
 temp/
 

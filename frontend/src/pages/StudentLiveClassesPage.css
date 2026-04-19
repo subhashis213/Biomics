@@ -1,0 +1,740 @@
+.livekit-student-page .livekit-calendar-panel--teams {
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  background:
+    radial-gradient(circle at top right, rgba(129, 140, 248, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(244, 247, 255, 0.98) 100%);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.livekit-student-topbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.livekit-student-topbar-actions .secondary-btn {
+  min-width: 0;
+  max-width: 210px;
+  white-space: normal;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.livekit-student-page .livekit-student-calendar-shell,
+.livekit-student-page .livekit-student-calendar-layout,
+.livekit-student-page .livekit-student-calendar-sidebar,
+.livekit-student-page .livekit-student-calendar-main {
+  display: grid;
+  gap: 18px;
+}
+
+.livekit-student-page .livekit-hero-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.livekit-student-page .livekit-hero-stats .stat-card {
+  min-width: 0;
+}
+
+.livekit-student-page .livekit-hero-stats .stat-card span,
+.livekit-student-page .livekit-hero-stats .stat-card strong {
+  overflow-wrap: anywhere;
+}
+
+.livekit-student-page .livekit-student-calendar-layout {
+  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.livekit-student-page .livekit-student-calendar-main {
+  min-width: 0;
+}
+
+.livekit-student-page .livekit-student-calendar-sidebar-toggle-row {
+  display: none;
+}
+
+.livekit-student-page .livekit-student-calendar-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 20px 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(165, 180, 252, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.14), transparent 34%),
+    linear-gradient(135deg, rgba(248, 250, 255, 0.98) 0%, rgba(237, 242, 255, 0.96) 100%);
+}
+
+.livekit-student-page .livekit-student-calendar-spotlight-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.livekit-student-page .livekit-student-calendar-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.1);
+  color: #4f46e5;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.livekit-student-page .livekit-student-calendar-spotlight-copy strong {
+  color: #172554;
+  font-size: 1.18rem;
+}
+
+.livekit-student-page .livekit-student-calendar-spotlight-copy p {
+  margin: 0;
+  color: #5b6b86;
+  line-height: 1.6;
+}
+
+.livekit-student-page .livekit-student-calendar-spotlight-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.livekit-student-page .livekit-student-calendar-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.78);
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.livekit-student-page .livekit-student-calendar-summary-pill.is-premium {
+  border-color: rgba(34, 197, 94, 0.24);
+  background: rgba(220, 252, 231, 0.88);
+  color: #166534;
+}
+
+.livekit-student-page .livekit-student-mini-calendar,
+.livekit-student-page .livekit-student-week-board {
+  border-radius: 24px;
+  border: 1px solid rgba(191, 219, 254, 0.7);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 249, 255, 0.98) 100%);
+}
+
+.livekit-student-page .livekit-student-mini-calendar {
+  padding: 18px;
+}
+
+.livekit-student-page .livekit-student-mini-calendar.is-collapsed {
+  display: none;
+}
+
+.livekit-student-page .livekit-student-mini-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.livekit-student-page .livekit-student-mini-calendar-head strong {
+  color: #172554;
+}
+
+.livekit-student-page .livekit-student-mini-calendar-head span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.livekit-student-page .livekit-student-mini-calendar-weekdays,
+.livekit-student-page .livekit-student-mini-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.livekit-student-page .livekit-student-mini-calendar-weekdays {
+  margin-bottom: 8px;
+}
+
+.livekit-student-page .livekit-student-mini-calendar-weekdays span {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.livekit-student-page .livekit-student-mini-day,
+.livekit-student-page .livekit-student-week-board-day,
+.livekit-student-page .livekit-student-week-event {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid transparent;
+  outline: none;
+  font: inherit;
+}
+
+.livekit-student-page .livekit-student-mini-day {
+  min-height: 46px;
+  border-radius: 14px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  background: transparent;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.livekit-student-page .livekit-student-mini-day span {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.livekit-student-page .livekit-student-mini-day small {
+  color: #4f46e5;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.livekit-student-page .livekit-student-mini-day.has-events {
+  background: rgba(224, 231, 255, 0.66);
+  border-color: rgba(129, 140, 248, 0.26);
+}
+
+.livekit-student-page .livekit-student-mini-day.is-selected {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(165, 180, 252, 0.3));
+  border-color: rgba(79, 70, 229, 0.34);
+}
+
+.livekit-student-page .livekit-student-mini-day.is-muted {
+  opacity: 0.42;
+}
+
+.livekit-student-page .livekit-student-week-board {
+  position: relative;
+  max-height: min(70vh, 760px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable both-edges;
+}
+
+.livekit-student-page .livekit-student-week-board-head {
+  display: grid;
+  grid-template-columns: 76px repeat(7, minmax(104px, 1fr));
+  width: max-content;
+  min-width: 100%;
+  border-bottom: 1px solid rgba(191, 219, 254, 0.58);
+  background: rgba(248, 250, 255, 0.95);
+  position: sticky;
+  top: 0;
+  z-index: 7;
+}
+
+.livekit-student-page .livekit-student-week-board-head-spacer {
+  border-right: 1px solid rgba(191, 219, 254, 0.58);
+  position: sticky;
+  left: 0;
+  z-index: 9;
+  background: rgba(248, 250, 255, 0.98);
+}
+
+.livekit-student-page .livekit-student-week-board-day {
+  min-height: 70px;
+  padding: 10px 10px;
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 2px;
+  background: transparent;
+  border-left: 1px solid rgba(191, 219, 254, 0.58);
+}
+
+.livekit-student-page .livekit-student-week-board-day span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.livekit-student-page .livekit-student-week-board-day strong {
+  color: #172554;
+  font-size: 1.18rem;
+}
+
+.livekit-student-page .livekit-student-week-board-day.is-selected {
+  background: rgba(224, 231, 255, 0.72);
+}
+
+.livekit-student-page .livekit-student-week-board-body {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  width: max-content;
+  min-width: 100%;
+  min-height: calc(var(--calendar-row-count, 12) * var(--calendar-hour-height, 64px));
+}
+
+.livekit-student-page .livekit-student-week-time-rail {
+  display: grid;
+  grid-template-rows: repeat(var(--calendar-slot-count, 13), var(--calendar-hour-height, 64px));
+  background: rgba(248, 250, 255, 0.95);
+  border-right: 1px solid rgba(191, 219, 254, 0.58);
+  position: sticky;
+  left: 0;
+  z-index: 6;
+}
+
+.livekit-student-page .livekit-student-week-time-slot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 6px 8px 0 0;
+  border-bottom: 1px dashed rgba(191, 219, 254, 0.72);
+}
+
+.livekit-student-page .livekit-student-week-time-slot span {
+  color: #64748b;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.livekit-student-page .livekit-student-week-columns {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(104px, 1fr));
+}
+
+.livekit-student-page .livekit-student-week-column {
+  position: relative;
+  min-height: calc(var(--calendar-row-count, 12) * var(--calendar-hour-height, 64px));
+  border-left: 1px solid rgba(191, 219, 254, 0.48);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(250, 252, 255, 0.72) 100%);
+}
+
+.livekit-student-page .livekit-student-week-column.is-selected {
+  background: linear-gradient(180deg, rgba(238, 242, 255, 0.9) 0%, rgba(248, 250, 255, 0.9) 100%);
+}
+
+.livekit-student-page .livekit-student-week-grid-lines,
+.livekit-student-page .livekit-student-week-events-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.livekit-student-page .livekit-student-week-grid-lines {
+  display: grid;
+  grid-template-rows: repeat(var(--calendar-row-count, 12), var(--calendar-hour-height, 64px));
+}
+
+.livekit-student-page .livekit-student-week-grid-line {
+  border-bottom: 1px dashed rgba(191, 219, 254, 0.72);
+}
+
+.livekit-student-page .livekit-student-week-events-layer {
+  padding: 6px;
+}
+
+.livekit-student-page .livekit-student-week-board::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.livekit-student-page .livekit-student-week-board::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+.livekit-student-page .livekit-student-week-board::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.45);
+}
+
+.livekit-student-page .livekit-student-week-event {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  border-radius: 14px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  text-align: left;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.livekit-student-page .livekit-student-week-event.kind-live-class {
+  border-color: rgba(99, 102, 241, 0.28);
+  background: linear-gradient(180deg, rgba(224, 231, 255, 0.98) 0%, rgba(199, 210, 254, 0.98) 100%);
+}
+
+.livekit-student-page .livekit-student-week-event.kind-blocked-slot {
+  border-color: rgba(236, 72, 153, 0.26);
+  background: linear-gradient(180deg, rgba(251, 207, 232, 0.98) 0%, rgba(244, 114, 182, 0.28) 100%);
+}
+
+.livekit-student-page .livekit-student-week-event.is-actionable {
+  cursor: pointer;
+}
+
+.livekit-student-page .livekit-calendar-event-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #312e81;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.livekit-student-page .livekit-calendar-event-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.livekit-student-page .livekit-student-week-event.kind-blocked-slot .livekit-calendar-event-icon {
+  color: #9d174d;
+}
+
+.livekit-student-page .livekit-student-week-event-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.livekit-student-page .livekit-student-week-event-copy strong {
+  color: #1e1b4b;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.livekit-student-page .livekit-student-week-event-copy span,
+.livekit-student-page .livekit-student-week-event-copy small {
+  color: #4338ca;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.livekit-student-page .livekit-student-week-event.is-compact {
+  padding: 6px 8px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.livekit-student-page .livekit-student-week-event.is-compact .livekit-calendar-event-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+}
+
+.livekit-student-page .livekit-student-week-event.is-compact .livekit-calendar-event-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.livekit-student-page .livekit-student-week-event.is-compact .livekit-student-week-event-copy {
+  gap: 1px;
+}
+
+.livekit-student-page .livekit-student-week-event.is-compact .livekit-student-week-event-copy strong {
+  font-size: 0.76rem;
+  line-height: 1.15;
+}
+
+.livekit-student-page .livekit-student-week-event.is-compact .livekit-student-week-event-copy span,
+.livekit-student-page .livekit-student-week-event.is-compact .livekit-student-week-event-copy small {
+  font-size: 0.64rem;
+  line-height: 1.1;
+}
+
+.livekit-student-page .livekit-student-week-event.is-ultra-compact {
+  padding: 4px 8px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.livekit-student-page .livekit-student-week-event.is-ultra-compact .livekit-calendar-event-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.livekit-student-page .livekit-student-week-event.is-ultra-compact .livekit-calendar-event-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.livekit-student-page .livekit-student-week-event.is-ultra-compact .livekit-student-week-event-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.livekit-student-page .livekit-student-week-event.is-ultra-compact .livekit-student-week-event-copy strong,
+.livekit-student-page .livekit-student-week-event.is-ultra-compact .livekit-student-week-event-copy span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.livekit-student-page .livekit-student-week-event.is-ultra-compact .livekit-student-week-event-copy strong {
+  flex: 1 1 auto;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.livekit-student-page .livekit-student-week-event.is-ultra-compact .livekit-student-week-event-copy span {
+  flex: 0 0 auto;
+  max-width: 48%;
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.livekit-student-page .livekit-student-week-event.kind-blocked-slot .livekit-student-week-event-copy strong {
+  color: #831843;
+}
+
+.livekit-student-page .livekit-student-week-event.kind-blocked-slot .livekit-student-week-event-copy span,
+.livekit-student-page .livekit-student-week-event.kind-blocked-slot .livekit-student-week-event-copy small {
+  color: #9d174d;
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-calendar-panel--teams,
+html[data-theme='dark'] .livekit-student-page .livekit-student-mini-calendar,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-board,
+html[data-theme='dark'] .livekit-student-page .livekit-student-calendar-toolbar {
+  background: linear-gradient(180deg, rgba(18, 24, 38, 0.98) 0%, rgba(12, 18, 31, 0.98) 100%);
+  border-color: rgba(99, 102, 241, 0.22);
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-student-calendar-spotlight-copy strong,
+html[data-theme='dark'] .livekit-student-page .livekit-student-mini-calendar-head strong,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-board-day strong,
+html[data-theme='dark'] .livekit-student-page .livekit-student-mini-day span {
+  color: #eef2ff;
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-student-calendar-spotlight-copy p,
+html[data-theme='dark'] .livekit-student-page .livekit-student-mini-calendar-head span,
+html[data-theme='dark'] .livekit-student-page .livekit-student-mini-calendar-weekdays span,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-board-day span,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-time-slot span {
+  color: #a5b4fc;
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-board-head,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-time-rail,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-column {
+  background: rgba(17, 24, 39, 0.92);
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-column.is-selected,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-board-day.is-selected {
+  background: rgba(67, 56, 202, 0.18);
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-event.kind-live-class {
+  background: linear-gradient(180deg, rgba(67, 56, 202, 0.52) 0%, rgba(99, 102, 241, 0.36) 100%);
+  border-color: rgba(129, 140, 248, 0.32);
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-event.kind-blocked-slot {
+  background: linear-gradient(180deg, rgba(190, 24, 93, 0.44) 0%, rgba(244, 114, 182, 0.2) 100%);
+  border-color: rgba(244, 114, 182, 0.3);
+}
+
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy strong,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy span,
+html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy small {
+  color: #f8fafc;
+}
+
+@media (max-width: 1080px) {
+  .livekit-student-page .livekit-student-calendar-layout,
+  .livekit-student-page .livekit-student-calendar-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-student-page .livekit-student-calendar-spotlight-meta {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .livekit-student-page .livekit-student-hero {
+    padding: 18px;
+    gap: 14px;
+  }
+
+  .livekit-student-page .livekit-student-hero h2 {
+    font-size: 1.05rem;
+    line-height: 1.35;
+    margin-bottom: 6px;
+  }
+
+  .livekit-student-page .livekit-student-hero .subtitle {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    margin-bottom: 0;
+  }
+
+  .livekit-student-page .livekit-hero-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .livekit-student-page .livekit-hero-stats .stat-card {
+    padding: 12px;
+    min-height: 0;
+  }
+
+  .livekit-student-topbar-actions {
+    max-width: min(46vw, 188px);
+  }
+
+  .livekit-student-topbar-actions .secondary-btn {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 0.92rem;
+  }
+
+  .livekit-student-page .livekit-calendar-panel--teams {
+    padding: 16px;
+  }
+
+  .livekit-student-page .livekit-student-calendar-sidebar {
+    gap: 12px;
+  }
+
+  .livekit-student-page .livekit-student-calendar-sidebar-toggle-row {
+    display: flex;
+  }
+
+  .livekit-student-page .livekit-student-mini-calendar-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .livekit-student-page .livekit-student-mini-calendar {
+    padding: 14px;
+  }
+
+  .livekit-student-page .livekit-student-week-board {
+    max-height: 62vh;
+    border-radius: 20px;
+  }
+
+  .livekit-student-page .livekit-student-week-board-head {
+    grid-template-columns: 64px repeat(7, minmax(88px, 1fr));
+  }
+
+  .livekit-student-page .livekit-student-week-board-day {
+    min-height: 58px;
+    padding: 8px 8px;
+  }
+
+  .livekit-student-page .livekit-student-week-board-day span {
+    font-size: 0.64rem;
+  }
+
+  .livekit-student-page .livekit-student-week-board-day strong {
+    font-size: 1rem;
+  }
+
+  .livekit-student-page .livekit-student-week-board-body {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .livekit-student-page .livekit-student-week-columns {
+    grid-template-columns: repeat(7, minmax(88px, 1fr));
+  }
+
+  .livekit-student-page .livekit-student-week-time-slot {
+    padding-right: 6px;
+  }
+
+  .livekit-student-page .livekit-student-week-time-slot span {
+    font-size: 0.58rem;
+  }
+
+  .livekit-student-page .livekit-student-week-board-head,
+  .livekit-student-page .livekit-student-week-board-body {
+    min-width: 680px;
+  }
+}
+
+@media (max-width: 480px) {
+  .livekit-student-page .livekit-student-hero {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .livekit-student-page .livekit-student-hero .eyebrow {
+    margin-bottom: 6px;
+  }
+
+  .livekit-student-page .livekit-student-hero h2 {
+    font-size: 0.96rem;
+    line-height: 1.32;
+  }
+
+  .livekit-student-page .livekit-student-hero .subtitle {
+    display: none;
+  }
+
+  .livekit-student-page .livekit-hero-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .livekit-student-page .livekit-hero-stats .stat-card {
+    padding: 10px;
+  }
+
+  .livekit-student-page .livekit-hero-stats .stat-card span {
+    font-size: 0.74rem;
+  }
+
+  .livekit-student-page .livekit-hero-stats .stat-card strong {
+    font-size: 0.96rem;
+  }
+
+  .livekit-student-topbar-actions {
+    max-width: 154px;
+  }
+
+  .livekit-student-topbar-actions .secondary-btn {
+    font-size: 0.86rem;
+    padding: 9px 10px;
+  }
+}
