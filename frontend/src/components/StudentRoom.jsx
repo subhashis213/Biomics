@@ -182,7 +182,10 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
   const previewRef = useRef(null);
   const previewDragRef = useRef(null);
   const screenShareViewportRef = useRef(null);
+  const screenShareCanvasRef = useRef(null);
   const pinchGestureRef = useRef(null);
+  const screenShareZoomRef = useRef(1);
+  const screenShareZoomFrameRef = useRef(0);
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -229,8 +232,16 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
   useEffect(() => {
     if (!screenShareTrack) {
       setScreenShareZoom(1);
+      screenShareZoomRef.current = 1;
+      pinchGestureRef.current = null;
     }
   }, [screenShareTrack]);
+
+  useEffect(() => () => {
+    if (screenShareZoomFrameRef.current) {
+      window.cancelAnimationFrame(screenShareZoomFrameRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!(screenShareTrack && isFullscreen)) {
@@ -286,6 +297,39 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
     return Math.min(3, Math.max(1, Number(nextScale.toFixed(2))));
   }
 
+  function renderScreenShareZoom(nextScale, immediate = false) {
+    const applyZoom = () => {
+      screenShareZoomFrameRef.current = 0;
+      const normalizedScale = clampScreenShareZoom(nextScale);
+      screenShareCanvasRef.current?.style.setProperty('--student-screen-share-scale', String(normalizedScale));
+      screenShareViewportRef.current?.classList.toggle('is-zoomed', normalizedScale > 1.01);
+    };
+
+    if (immediate) {
+      applyZoom();
+      return;
+    }
+
+    if (screenShareZoomFrameRef.current) {
+      window.cancelAnimationFrame(screenShareZoomFrameRef.current);
+    }
+
+    screenShareZoomFrameRef.current = window.requestAnimationFrame(applyZoom);
+  }
+
+  function applyScreenShareZoom(nextScale, { commit = false, immediate = false } = {}) {
+    const normalizedScale = clampScreenShareZoom(nextScale);
+    screenShareZoomRef.current = normalizedScale;
+    renderScreenShareZoom(normalizedScale, immediate);
+    if (commit) {
+      setScreenShareZoom(normalizedScale);
+    }
+  }
+
+  useEffect(() => {
+    applyScreenShareZoom(1, { commit: true, immediate: true });
+  }, [screenShareTrack]);
+
   function getTouchDistance(touchA, touchB) {
     return Math.hypot(touchA.clientX - touchB.clientX, touchA.clientY - touchB.clientY);
   }
@@ -305,7 +349,7 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
     if (event.touches.length !== 2) return;
     pinchGestureRef.current = {
       distance: getTouchDistance(event.touches[0], event.touches[1]),
-      scale: screenShareZoom
+      scale: screenShareZoomRef.current
     };
   }
 
@@ -316,12 +360,13 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
     if (!nextDistance) return;
 
     const nextScale = clampScreenShareZoom((nextDistance / pinchGestureRef.current.distance) * pinchGestureRef.current.scale);
-    setScreenShareZoom(nextScale);
+    applyScreenShareZoom(nextScale);
     event.preventDefault();
   }
 
   function handleScreenShareTouchEnd(event) {
     if (event.touches.length < 2) {
+      setScreenShareZoom(screenShareZoomRef.current);
       pinchGestureRef.current = null;
     }
   }
@@ -377,8 +422,8 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
                   onTouchCancel={handleScreenShareTouchEnd}
                 >
                   <div
+                    ref={screenShareCanvasRef}
                     className="student-screen-share-canvas"
-                    style={{ '--student-screen-share-scale': screenShareZoom }}
                   >
                     <ParticipantTile trackRef={primaryTrack} className="student-video-conference-focus-tile student-screen-share-tile" />
                   </div>
@@ -564,7 +609,12 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
   );
 
   if (isMobileViewport && typeof document !== 'undefined') {
-    return createPortal(panel, document.body);
+    return createPortal(
+      <div className={`livekit-student-page student-room-chat-portal${isOpen ? ' is-open' : ''}${isDisabled ? ' is-disabled' : ''}`}>
+        {panel}
+      </div>,
+      document.body
+    );
   }
 
   return panel;

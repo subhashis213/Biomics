@@ -197,13 +197,17 @@
   touch-action: pan-x pan-y pinch-zoom;
   border-radius: 22px;
   background: rgba(2, 6, 23, 0.48);
+  -webkit-overflow-scrolling: touch;
 }
 
 .livekit-student-page .student-room-shell .student-screen-share-canvas {
-  width: max(100%, calc(100% * var(--student-screen-share-scale, 1)));
-  height: max(100%, calc(100% * var(--student-screen-share-scale, 1)));
+  width: 100%;
+  height: 100%;
   min-width: 100%;
   min-height: 100%;
+  transform: translateZ(0) scale(var(--student-screen-share-scale, 1));
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .livekit-student-page .student-room-shell .student-screen-share-tile {
@@ -217,6 +221,8 @@
   height: 100%;
   object-fit: contain !important;
   background: #020617;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .livekit-student-page .student-room-shell .student-screen-share-footnote {
@@ -2047,6 +2053,7 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   height: 100%;
   border-radius: 0;
   background: #000;
+  contain: layout paint size;
 }
 
 .livekit-student-page .student-room-shell.is-immersive .student-screen-share-tile,
@@ -2606,6 +2613,203 @@ html[data-theme='dark'] .livekit-student-page,
 
 .livekit-student-page .student-room-shell .student-room-chat-panel .lk-chat-form-input::placeholder {
   color: var(--student-room-copy) !important;
+}
+
+.livekit-student-page.student-room-chat-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 6400;
+  pointer-events: none;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  border: none;
+  background: rgba(2, 6, 23, 0.48);
+  backdrop-filter: blur(8px);
+  transition: opacity 220ms ease, visibility 220ms ease;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 14px;
+  max-height: min(74dvh, 560px);
+  border-radius: 24px;
+  border: 1px solid var(--student-stage-controls-border);
+  background: var(--student-stage-controls-bg);
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.34);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(calc(100% + 18px));
+  transition: transform 220ms ease, opacity 220ms ease, visibility 220ms ease;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel.is-open,
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel.is-disabled {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel-head .eyebrow {
+  margin: 0 0 4px;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel-head strong {
+  color: var(--student-room-title) !important;
+  font-size: 1rem;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-close-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--student-stage-group-border);
+  background: var(--student-stage-group-bg);
+  color: var(--student-stage-controls-text) !important;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-disabled-copy {
+  margin: 0;
+  color: var(--student-room-copy) !important;
+  line-height: 1.6;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat {
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1fr) auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  height: min(52dvh, 400px);
+  border-radius: 18px;
+  border: 1px solid var(--student-chat-border) !important;
+  background: var(--student-chat-surface) !important;
+  overflow: hidden;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--student-chat-border);
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-close-button {
+  display: none;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-messages {
+  padding: 12px;
+  gap: 10px;
+  overflow: auto;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-entry,
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-entry * {
+  color: var(--student-room-title) !important;
+  overflow-wrap: anywhere;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-entry {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--student-chat-border) !important;
+  background: var(--student-chat-surface) !important;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--student-chat-border);
+  background: var(--student-chat-surface) !important;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-header,
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-header *,
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-form-input {
+  color: var(--student-room-title) !important;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-form-input {
+  min-width: 0;
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid var(--student-chat-border) !important;
+  background: var(--student-chat-input-bg) !important;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-form-input::placeholder {
+  color: var(--student-room-copy) !important;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-form-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+  border-color: rgba(37, 99, 235, 0.84);
+  color: #fff;
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .livekit-student-page.student-room-chat-portal .student-room-chat-panel {
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 12px;
+    max-height: min(78dvh, 520px);
+    border-radius: 20px;
+  }
+
+  .livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat {
+    height: min(56dvh, 420px);
+  }
+
+  .livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .livekit-student-page.student-room-chat-portal .student-room-chat-panel .lk-chat-form-button {
+    width: 100%;
+  }
 }
 
 .livekit-student-page .student-room-shell .livekit-student-poll-popup {
