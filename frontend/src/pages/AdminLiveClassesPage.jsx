@@ -9,7 +9,6 @@ import {
   endLivekitClass,
   fetchAdminLivekitWorkspace,
   fetchLiveClassServerStatus,
-  removeStudentFromLivekitClass,
   stopLiveClassServer,
   updateLivekitCalendarBlock
 } from '../api';
@@ -108,47 +107,6 @@ function toLocalInputIsoString(value) {
   return parsed ? parsed.toISOString() : null;
 }
 
-function normalizeUsername(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function normalizeCourse(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function sortStudentsByUsername(left, right) {
-  return String(left?.username || '').localeCompare(String(right?.username || ''), undefined, { sensitivity: 'base' });
-}
-
-function hasActiveCoursePurchase(student, courseName) {
-  const targetCourse = normalizeCourse(courseName);
-  if (!targetCourse) return true;
-
-  return (Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []).some((entry) => {
-    if (normalizeCourse(entry?.course) !== targetCourse) return false;
-    if (!entry?.expiresAt) return true;
-
-    const expiresAt = new Date(entry.expiresAt).getTime();
-    return Number.isFinite(expiresAt) && expiresAt > Date.now();
-  });
-}
-
-function getActivePurchasedCourses(student) {
-  const activeCourses = new Set();
-
-  (Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []).forEach((entry) => {
-    const courseName = String(entry?.course || '').trim();
-    if (!courseName) return;
-    if (entry?.expiresAt) {
-      const expiresAt = new Date(entry.expiresAt).getTime();
-      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return;
-    }
-    activeCourses.add(courseName);
-  });
-
-  return Array.from(activeCourses);
-}
-
 export default function AdminLiveClassesPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -187,7 +145,6 @@ export default function AdminLiveClassesPage() {
     endsAt: ''
   });
   const [isUpdatingBlockId, setIsUpdatingBlockId] = useState('');
-  const [removingStudentUsername, setRemovingStudentUsername] = useState('');
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     classId: '',
@@ -290,16 +247,6 @@ export default function AdminLiveClassesPage() {
     return visibleClasses.find((item) => item.status === 'live') || visibleClasses[0] || null;
   }, [classId, visibleClasses]);
 
-  const selectedAllowedUsernames = useMemo(
-    () => new Set((Array.isArray(selectedClass?.allowedUsernames) ? selectedClass.allowedUsernames : []).map(normalizeUsername).filter(Boolean)),
-    [selectedClass?.allowedUsernames]
-  );
-
-  const selectedRemovedUsernames = useMemo(
-    () => new Set((Array.isArray(selectedClass?.removedUsernames) ? selectedClass.removedUsernames : []).map(normalizeUsername).filter(Boolean)),
-    [selectedClass?.removedUsernames]
-  );
-
   function openStudioRoute(targetClassId, options = {}) {
     const normalizedClassId = String(targetClassId || '').trim();
     if (!normalizedClassId) return;
@@ -309,50 +256,6 @@ export default function AdminLiveClassesPage() {
       state: options.autoStart ? { autoStartClass: true } : null
     });
   }
-
-  const studioStudents = useMemo(() => {
-    if (!selectedClass) return [];
-
-    return workspace.students.filter((student) => {
-      const normalizedStudentUsername = normalizeUsername(student.username);
-      const selectedCourse = normalizeCourse(selectedClass.course);
-
-      if (selectedRemovedUsernames.has(normalizedStudentUsername)) return true;
-      if (selectedAllowedUsernames.has(normalizedStudentUsername)) return true;
-      if (selectedCourse && !hasActiveCoursePurchase(student, selectedClass.course)) return false;
-      return true;
-    });
-  }, [workspace.students, selectedClass, selectedAllowedUsernames, selectedRemovedUsernames]);
-
-  const studioStudentGroups = useMemo(() => {
-    const grouped = {
-      allowlisted: [],
-      active: [],
-      removed: []
-    };
-
-    studioStudents.forEach((student) => {
-      const normalizedStudentUsername = normalizeUsername(student.username);
-
-      if (selectedRemovedUsernames.has(normalizedStudentUsername)) {
-        grouped.removed.push(student);
-        return;
-      }
-
-      if (selectedAllowedUsernames.has(normalizedStudentUsername)) {
-        grouped.allowlisted.push(student);
-        return;
-      }
-
-      grouped.active.push(student);
-    });
-
-    return {
-      allowlisted: grouped.allowlisted.sort(sortStudentsByUsername),
-      active: grouped.active.sort(sortStudentsByUsername),
-      removed: grouped.removed.sort(sortStudentsByUsername)
-    };
-  }, [selectedAllowedUsernames, selectedRemovedUsernames, studioStudents]);
 
   const calendarCourseOptions = useMemo(
     () => Array.from(new Set([...COURSE_CATEGORIES, ...(workspace.availableCourses || [])])).filter(Boolean),
@@ -558,26 +461,6 @@ export default function AdminLiveClassesPage() {
     }
   }
 
-  async function handleRemoveStudent(username) {
-    const normalizedUsername = String(username || '').trim();
-    const targetClassId = String(selectedClass?._id || '').trim();
-    if (!normalizedUsername || !targetClassId) return;
-
-    const confirmed = window.confirm(`Remove ${normalizedUsername} only from the current live class session?`);
-    if (!confirmed) return;
-
-    setRemovingStudentUsername(normalizedUsername);
-    try {
-      await removeStudentFromLivekitClass(targetClassId, normalizedUsername);
-      setBanner({ type: 'success', text: `${normalizedUsername} was removed from the current session.` });
-      await loadWorkspace();
-    } catch (error) {
-      setBanner({ type: 'error', text: error.message || `Failed to remove ${normalizedUsername} from the current session.` });
-    } finally {
-      setRemovingStudentUsername('');
-    }
-  }
-
   function handleUseBlockForSession(block) {
     if (!block?._id) return;
 
@@ -606,51 +489,14 @@ export default function AdminLiveClassesPage() {
 
   const studioNavItems = [
     { id: 'section-livekit-studio-hero', label: 'Studio', icon: '🎬' },
-    { id: 'section-livekit-studio', label: 'Room', icon: '🧑‍🏫' },
-    { id: 'section-livekit-student-control', label: 'Students', icon: '👥' }
+    { id: 'section-livekit-studio', label: 'Room', icon: '🧑‍🏫' }
   ];
-
-  function renderStudioStudentCard(student) {
-    const normalizedStudentUsername = normalizeUsername(student.username);
-    const isAllowlisted = selectedAllowedUsernames.has(normalizedStudentUsername);
-    const isRemoved = selectedRemovedUsernames.has(normalizedStudentUsername);
-
-    return (
-      <article key={`studio-${student.username}`} className="livekit-studio-student-card">
-        <div className="livekit-studio-student-head">
-          <div>
-            <strong>{student.username}</strong>
-            <p>{student.class || 'No class'} • {student.city || 'City unavailable'}</p>
-          </div>
-          <div className="livekit-studio-student-tags">
-            {isAllowlisted ? <span className="livekit-status-tag tag-cyan">Allowlisted</span> : null}
-            {isRemoved ? <span className="livekit-status-tag tag-rose">Removed</span> : null}
-          </div>
-        </div>
-        <p className="livekit-muted-note">{student.email || 'No email available'}</p>
-        <div className="livekit-studio-student-actions">
-          <button
-            type="button"
-            className="livekit-danger-soft-btn"
-            onClick={() => handleRemoveStudent(student.username)}
-            disabled={isRemoved || removingStudentUsername === student.username}
-          >
-            {isRemoved
-              ? 'Removed From Session'
-              : removingStudentUsername === student.username
-                ? 'Removing...'
-                : 'Remove From Current Session'}
-          </button>
-        </div>
-      </article>
-    );
-  }
 
   if (isStudioRoute) {
     return (
       <AppShell
         title="Studio Room"
-        subtitle="Dedicated teacher studio for live class control, polling, and student management"
+        subtitle="Dedicated teacher studio for live class control, polling, and course-based access"
         roleLabel="Admin"
         showThemeSwitch
         navTitle="Studio"
@@ -670,12 +516,12 @@ export default function AdminLiveClassesPage() {
             <div>
               <p className="eyebrow">Teacher Studio</p>
               <h2>{selectedClass?.title || 'Live Class Studio'}</h2>
-              <p className="subtitle">This page is the dedicated studio room for the teacher. Start the class, manage the room, run live polls, and control student access from one clean interface.</p>
+              <p className="subtitle">This page is the dedicated studio room for the teacher. Start the class, manage the room, and run live polls while paid course access handles attendance automatically.</p>
             </div>
             <div className="workspace-hero-stats livekit-hero-stats">
               <StatCard label="Room" value={selectedClass?.roomName || 'Not assigned'} />
               <StatCard label="Class Status" value={selectedClass?.status || 'Not ready'} />
-              <StatCard label="Eligible Students" value={studioStudents.length} />
+              <StatCard label="Course Access" value={selectedClass?.course || 'All Courses'} />
               <StatCard label="Server" value={serverStatus?.state || 'unknown'} />
             </div>
           </section>
@@ -694,64 +540,6 @@ export default function AdminLiveClassesPage() {
                 onSessionEnded={() => loadWorkspace()}
               />
             </div>
-
-            <aside id="section-livekit-student-control" className="livekit-studio-control-column">
-              <section className="card workspace-panel livekit-studio-students-panel">
-                <div className="livekit-studio-section-heading">
-                  <span className="livekit-studio-section-icon" aria-hidden="true">🎓</span>
-                  <div>
-                    <p className="eyebrow">Student Control</p>
-                    <h3>Eligible students for this class</h3>
-                    <p className="subtitle">Review eligible students for this course, track session eligibility at a glance, and remove a student from the current session when needed.</p>
-                  </div>
-                </div>
-                <div className="livekit-studio-section-divider" aria-hidden="true" />
-
-                <div className="livekit-studio-student-list">
-                  {[
-                    {
-                      key: 'allowlisted',
-                      title: 'Allowlisted',
-                      subtitle: 'Priority access students pinned for this session.',
-                      count: studioStudentGroups.allowlisted.length,
-                      toneClass: 'tone-cyan',
-                      students: studioStudentGroups.allowlisted
-                    },
-                    {
-                      key: 'active',
-                      title: 'Active',
-                      subtitle: 'Students currently eligible through course access.',
-                      count: studioStudentGroups.active.length,
-                      toneClass: 'tone-violet',
-                      students: studioStudentGroups.active
-                    },
-                    {
-                      key: 'removed',
-                      title: 'Removed',
-                      subtitle: 'Students removed from the current live session.',
-                      count: studioStudentGroups.removed.length,
-                      toneClass: 'tone-rose',
-                      students: studioStudentGroups.removed
-                    }
-                  ].map((group) => (
-                    <section key={group.key} className="livekit-studio-student-group">
-                      <div className="livekit-studio-student-group-head">
-                        <div>
-                          <p className={`livekit-studio-student-group-kicker ${group.toneClass}`}>{group.title}</p>
-                          <h4>{group.count} student{group.count === 1 ? '' : 's'}</h4>
-                          <p>{group.subtitle}</p>
-                        </div>
-                      </div>
-                      <div className="livekit-studio-student-group-list">
-                        {group.students.map(renderStudioStudentCard)}
-                        {!group.students.length ? <p className="empty-note">No students in this section right now.</p> : null}
-                      </div>
-                    </section>
-                  ))}
-                  {!studioStudents.length ? <p className="empty-note">No students match this class access configuration yet.</p> : null}
-                </div>
-              </section>
-            </aside>
           </section>
         </main>
       </AppShell>
