@@ -455,6 +455,7 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
 
   const waitForLiveKitReady = useCallback(async (options = {}) => {
     const { initialDelay = 1500, maxAttempts = 24, intervalMs = 2500 } = options;
+    let lastFailureMessage = '';
 
     if (initialDelay > 0) {
       await waitWithCountdown(initialDelay, setCountdown);
@@ -468,6 +469,8 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
         return response;
       }
 
+      lastFailureMessage = String(response?.hint || response?.message || '').trim();
+
       setLivekitServiceReady(false);
       const remainingAttempts = maxAttempts - attempt - 1;
       if (remainingAttempts <= 0) break;
@@ -476,7 +479,7 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
     }
 
     setCountdown(0);
-    const error = new Error('LiveKit signal service is not ready yet. Please wait a few seconds and try again.');
+    const error = new Error(lastFailureMessage || 'LiveKit signal service is not ready yet. Please wait a few seconds and try again.');
     error.statusCode = 504;
     throw error;
   }, []);
@@ -605,8 +608,13 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
         await waitForServerReady();
       }
 
-      setBootStatusMessage('EC2 is ready. Waiting for the LiveKit signal service to come online...');
-      await waitForLiveKitReady();
+      setBootStatusMessage('EC2 is ready. Checking the LiveKit signal service...');
+      try {
+        await waitForLiveKitReady({ maxAttempts: 8, intervalMs: 2000 });
+      } catch (error) {
+        setLivekitServiceReady(false);
+        setBootStatusMessage((error?.message || 'LiveKit readiness check did not confirm the signal service.') + ' Continuing to activate the class and connect...');
+      }
 
       setBootStatusMessage('LiveKit is ready. Activating the live class and fetching teacher access...');
       const startResponse = await startLivekitClass(classSession._id);

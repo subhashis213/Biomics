@@ -101,6 +101,28 @@ function getRoomServiceClient() {
   return new RoomServiceClient(LIVEKIT_SERVICE_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
 }
 
+function getLiveKitFailureHint(error) {
+  const message = String(error?.message || '').toLowerCase();
+  const code = String(error?.code || '').toLowerCase();
+
+  if (message.includes('permissions denied') || message.includes('unauthenticated') || code === 'unauthenticated') {
+    return 'LiveKit rejected the backend credentials. Verify LIVEKIT_API_KEY and LIVEKIT_API_SECRET in Render, then redeploy the backend service.';
+  }
+
+  if (
+    message.includes('fetch failed')
+    || message.includes('enotfound')
+    || message.includes('econnrefused')
+    || message.includes('network')
+    || code === 'enotfound'
+    || code === 'econnrefused'
+  ) {
+    return 'Render could not reach the LiveKit host. Verify LIVEKIT_URL, DNS, SSL, and that the LiveKit nginx proxy is publicly reachable.';
+  }
+
+  return 'Check the Render backend environment values for LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET, then redeploy the service.';
+}
+
 async function getLiveKitServiceState() {
   ensureLiveKitConfig();
 
@@ -120,7 +142,9 @@ async function getLiveKitServiceState() {
       ready: false,
       livekitUrl: LIVEKIT_URL,
       serviceUrl: LIVEKIT_SERVICE_URL,
-      message: error?.message || 'LiveKit signal service is not reachable yet.'
+      message: error?.message || 'LiveKit signal service is not reachable yet.',
+      failureCode: String(error?.code || '').trim(),
+      hint: getLiveKitFailureHint(error)
     };
   }
 }
