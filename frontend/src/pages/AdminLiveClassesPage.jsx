@@ -58,6 +58,15 @@ function sortBySchedule(left, right) {
   return leftTime - rightTime;
 }
 
+function isVisibleQueueClass(item) {
+  const status = String(item?.status || '').trim().toLowerCase();
+  if (status === 'live') return true;
+  if (status !== 'scheduled') return false;
+
+  const scheduledTime = new Date(item?.scheduledAt || item?.startedAt || 0).getTime();
+  return Number.isFinite(scheduledTime) && scheduledTime >= Date.now() - (6 * 60 * 60 * 1000);
+}
+
 function groupAgendaEntries(entries) {
   const grouped = new Map();
 
@@ -198,7 +207,7 @@ export default function AdminLiveClassesPage() {
   }, [workspace.availableCourses, blockForm.course]);
 
   const visibleClasses = useMemo(
-    () => workspace.classes.filter((item) => item.status === 'live' || item.status === 'scheduled'),
+    () => workspace.classes.filter((item) => isVisibleQueueClass(item)),
     [workspace.classes]
   );
 
@@ -208,8 +217,8 @@ export default function AdminLiveClassesPage() {
   );
 
   const scheduledClassCount = useMemo(
-    () => workspace.classes.filter((item) => item.status === 'scheduled').length,
-    [workspace.classes]
+    () => visibleClasses.filter((item) => item.status === 'scheduled').length,
+    [visibleClasses]
   );
 
   const visibleCalendarQueueBlocks = useMemo(
