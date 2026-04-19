@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Capacitor } from '@capacitor/core';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -173,13 +174,15 @@ async function exitImmersiveMobilePresentation() {
   }
 }
 
-function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
+function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInteract }) {
   const [screenShareZoom, setScreenShareZoom] = useState(1);
   const [floatingPreviewPosition, setFloatingPreviewPosition] = useState({ x: 16, y: 16 });
   const [isDraggingPreview, setIsDraggingPreview] = useState(false);
   const stageRef = useRef(null);
   const previewRef = useRef(null);
   const previewDragRef = useRef(null);
+  const screenShareViewportRef = useRef(null);
+  const pinchGestureRef = useRef(null);
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -277,9 +280,15 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
   }, [isDraggingPreview]);
 
   const hasScreenShare = Boolean(screenShareTrack);
-  const canZoomOut = screenShareZoom > 1;
-  const canZoomIn = screenShareZoom < 2.5;
   const showImmersiveStage = hasScreenShare && isFullscreen;
+
+  function clampScreenShareZoom(nextScale) {
+    return Math.min(3, Math.max(1, Number(nextScale.toFixed(2))));
+  }
+
+  function getTouchDistance(touchA, touchB) {
+    return Math.hypot(touchA.clientX - touchB.clientX, touchA.clientY - touchB.clientY);
+  }
 
   function handlePreviewPointerDown(event) {
     if (!showImmersiveStage || !previewRef.current) return;
@@ -292,16 +301,29 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
     event.preventDefault();
   }
 
-  function handleZoomIn() {
-    setScreenShareZoom((current) => Math.min(2.5, Number((current + 0.25).toFixed(2))));
+  function handleScreenShareTouchStart(event) {
+    if (event.touches.length !== 2) return;
+    pinchGestureRef.current = {
+      distance: getTouchDistance(event.touches[0], event.touches[1]),
+      scale: screenShareZoom
+    };
   }
 
-  function handleZoomOut() {
-    setScreenShareZoom((current) => Math.max(1, Number((current - 0.25).toFixed(2))));
+  function handleScreenShareTouchMove(event) {
+    if (event.touches.length !== 2 || !pinchGestureRef.current) return;
+
+    const nextDistance = getTouchDistance(event.touches[0], event.touches[1]);
+    if (!nextDistance) return;
+
+    const nextScale = clampScreenShareZoom((nextDistance / pinchGestureRef.current.distance) * pinchGestureRef.current.scale);
+    setScreenShareZoom(nextScale);
+    event.preventDefault();
   }
 
-  function handleZoomReset() {
-    setScreenShareZoom(1);
+  function handleScreenShareTouchEnd(event) {
+    if (event.touches.length < 2) {
+      pinchGestureRef.current = null;
+    }
   }
 
   return (
@@ -318,7 +340,11 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
         </div>
       ) : null}
 
-      <div ref={stageRef} className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-immersive-stage' : ''}`}>
+      <div
+        ref={stageRef}
+        className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-immersive-stage' : ''}`}
+        onPointerDownCapture={showImmersiveStage ? onStageInteract : undefined}
+      >
         {primaryTrack ? (
           <div className={`student-video-conference-primary${hasScreenShare ? ' is-screen-share' : ''}`}>
             {hasScreenShare ? (
@@ -328,39 +354,28 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
                     <div className="student-screen-share-copy">
                       <span className="student-screen-share-badge">Shared screen mode</span>
                       <strong>
-                        Use zoom controls when the shared question needs a closer look.
+                        Use pinch in and pinch out on the shared screen when the question needs a closer look.
                       </strong>
                     </div>
-                    <div className="student-screen-share-zoom-controls" role="group" aria-label="Screen share zoom controls">
-                      <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomOut} disabled={!canZoomOut}>
-                        -
-                      </button>
-                      <button type="button" className="student-screen-share-zoom-btn student-screen-share-zoom-btn--reset" onClick={handleZoomReset} disabled={screenShareZoom === 1}>
-                        {Math.round(screenShareZoom * 100)}%
-                      </button>
-                      <button type="button" className="student-screen-share-zoom-btn" onClick={handleZoomIn} disabled={!canZoomIn}>
-                        +
-                      </button>
-                    </div>
+                    <span className="student-screen-share-gesture-pill">Pinch to zoom</span>
                   </div>
                 ) : (
                   <div className="student-screen-share-floating-actions" role="group" aria-label="Screen share controls">
-                    <button type="button" className="student-screen-share-floating-btn" onClick={handleZoomOut} disabled={!canZoomOut}>
-                      -
-                    </button>
-                    <button type="button" className="student-screen-share-floating-btn student-screen-share-floating-btn--label" onClick={handleZoomReset} disabled={screenShareZoom === 1}>
-                      {Math.round(screenShareZoom * 100)}%
-                    </button>
-                    <button type="button" className="student-screen-share-floating-btn" onClick={handleZoomIn} disabled={!canZoomIn}>
-                      +
-                    </button>
+                    <span className="student-screen-share-floating-chip">Pinch to zoom</span>
                     <button type="button" className="student-screen-share-floating-btn student-screen-share-floating-btn--exit" onClick={onToggleFullscreen}>
                       Exit
                     </button>
                   </div>
                 )}
 
-                <div className="student-screen-share-viewport">
+                <div
+                  ref={screenShareViewportRef}
+                  className="student-screen-share-viewport"
+                  onTouchStart={handleScreenShareTouchStart}
+                  onTouchMove={handleScreenShareTouchMove}
+                  onTouchEnd={handleScreenShareTouchEnd}
+                  onTouchCancel={handleScreenShareTouchEnd}
+                >
                   <div
                     className="student-screen-share-canvas"
                     style={{ '--student-screen-share-scale': screenShareZoom }}
@@ -373,7 +388,7 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
                   <p className="student-screen-share-footnote">
                     {screenShareZoom > 1
                       ? 'Drag the shared screen to inspect hidden corners and detailed text.'
-                      : 'If rotation makes the teacher slide look small, zoom in here without affecting the rest of the room.'}
+                      : 'Use a two-finger pinch on the shared content to zoom without affecting the rest of the room.'}
                   </p>
                 ) : null}
               </>
@@ -406,7 +421,16 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
   );
 }
 
-function StudentRoomControls({ policy, onError, onLeave, isChatOpen, onToggleChat }) {
+function StudentRoomControls({
+  policy,
+  onError,
+  onLeave,
+  isChatOpen,
+  onToggleChat,
+  isImmersive,
+  isMobileViewport,
+  isOverlayVisible
+}) {
   const room = useRoomContext();
   const [isMicEnabled, setIsMicEnabled] = useState(false);
 
@@ -463,8 +487,13 @@ function StudentRoomControls({ policy, onError, onLeave, isChatOpen, onToggleCha
     onLeave?.();
   }
 
+  const isImmersiveOverlay = isImmersive && isMobileViewport;
+
   return (
-    <div className="student-room-controls" aria-label="Student room controls">
+    <div
+      className={`student-room-controls${isImmersiveOverlay ? ' is-immersive-overlay' : ''}${isOverlayVisible ? ' is-visible' : ''}`}
+      aria-label="Student room controls"
+    >
       <div className="student-room-controls-status">
         {policy.studentsMuted ? <span className="student-room-control-pill is-alert">Mic locked by teacher</span> : null}
         {policy.chatDisabled ? <span className="student-room-control-pill">Chat off for all</span> : null}
@@ -490,34 +519,55 @@ function StudentRoomControls({ policy, onError, onLeave, isChatOpen, onToggleCha
 }
 
 function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
-  if (policy.chatDisabled) {
-    return (
-      <section className="student-room-chat-panel is-disabled" aria-live="polite">
-        <div className="student-room-chat-panel-head">
-          <div>
-            <p className="eyebrow">Class Chat</p>
-            <strong>Chat is turned off</strong>
+  const isDisabled = policy.chatDisabled;
+  const shouldShowBackdrop = isMobileViewport && (isOpen || isDisabled);
+  const panel = (
+    <>
+      {isMobileViewport ? (
+        <button
+          type="button"
+          className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}`}
+          aria-label="Close chat"
+          onClick={onClose}
+        />
+      ) : null}
+      {isDisabled ? (
+        <section className={`student-room-chat-panel is-disabled${isMobileViewport ? ' is-mobile-sheet' : ''}`} aria-live="polite">
+          <div className="student-room-chat-panel-head">
+            <div>
+              <p className="eyebrow">Class Chat</p>
+              <strong>Chat is turned off</strong>
+            </div>
+            {isMobileViewport ? (
+              <button type="button" className="student-room-chat-close-btn" onClick={onClose}>
+                Close
+              </button>
+            ) : null}
           </div>
-        </div>
-        <p className="student-room-chat-disabled-copy">The teacher has locked chat for this live class. You can use it again when they reopen it.</p>
-      </section>
-    );
+          <p className="student-room-chat-disabled-copy">The teacher has locked chat for this live class. You can use it again when they reopen it.</p>
+        </section>
+      ) : (
+        <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}${isMobileViewport ? ' is-mobile-sheet' : ''}`} aria-live="polite">
+          <div className="student-room-chat-panel-head">
+            <div>
+              <p className="eyebrow">Class Chat</p>
+              <strong>Messages</strong>
+            </div>
+            <button type="button" className="student-room-chat-close-btn" onClick={onClose}>
+              Close
+            </button>
+          </div>
+          <Chat />
+        </section>
+      )}
+    </>
+  );
+
+  if (isMobileViewport && typeof document !== 'undefined') {
+    return createPortal(panel, document.body);
   }
 
-  return (
-    <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}${isMobileViewport ? ' is-mobile-sheet' : ''}`} aria-live="polite">
-      <div className="student-room-chat-panel-head">
-        <div>
-          <p className="eyebrow">Class Chat</p>
-          <strong>Messages</strong>
-        </div>
-        <button type="button" className="student-room-chat-close-btn" onClick={onClose}>
-          Close
-        </button>
-      </div>
-      <Chat />
-    </section>
-  );
+  return panel;
 }
 
 function StudentRoomPolicySync({ onPolicyChange }) {
@@ -736,8 +786,10 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [roomPolicy, setRoomPolicy] = useState(createDefaultRoomPolicy);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isFullscreenControlsVisible, setIsFullscreenControlsVisible] = useState(false);
   const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
   const roomShellRef = useRef(null);
+  const hasInitializedViewportRef = useRef(false);
   const isImmersive = isFullscreen || isImmersiveFallback;
 
   useEffect(() => {
@@ -758,26 +810,70 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
 
-    const mediaQuery = window.matchMedia('(max-width: 768px)');
-    const syncChatState = (event) => {
-      setIsMobileViewport(event.matches);
-      setIsChatOpen(!event.matches);
+    const compactQuery = window.matchMedia('(max-width: 900px)');
+    const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
+
+    const syncViewportState = () => {
+      const nextIsMobile = compactQuery.matches || coarsePointerQuery.matches;
+      setIsMobileViewport(nextIsMobile);
+      setIsChatOpen((current) => {
+        if (!hasInitializedViewportRef.current) {
+          hasInitializedViewportRef.current = true;
+          return nextIsMobile ? false : true;
+        }
+        return nextIsMobile ? current : true;
+      });
+      if (!nextIsMobile) {
+        setIsFullscreenControlsVisible(false);
+      }
     };
 
-    syncChatState(mediaQuery);
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', syncChatState);
-      return () => mediaQuery.removeEventListener('change', syncChatState);
+    syncViewportState();
+
+    if (typeof compactQuery.addEventListener === 'function') {
+      compactQuery.addEventListener('change', syncViewportState);
+      coarsePointerQuery.addEventListener('change', syncViewportState);
+      window.addEventListener('resize', syncViewportState);
+      return () => {
+        compactQuery.removeEventListener('change', syncViewportState);
+        coarsePointerQuery.removeEventListener('change', syncViewportState);
+        window.removeEventListener('resize', syncViewportState);
+      };
     }
 
-    mediaQuery.addListener(syncChatState);
-    return () => mediaQuery.removeListener(syncChatState);
+    compactQuery.addListener(syncViewportState);
+    coarsePointerQuery.addListener(syncViewportState);
+    window.addEventListener('resize', syncViewportState);
+    return () => {
+      compactQuery.removeListener(syncViewportState);
+      coarsePointerQuery.removeListener(syncViewportState);
+      window.removeEventListener('resize', syncViewportState);
+    };
   }, []);
 
   useEffect(() => {
     if (!roomPolicy.chatDisabled) return;
     setIsChatOpen(false);
   }, [roomPolicy.chatDisabled]);
+
+  useEffect(() => {
+    if (!(isImmersive && isMobileViewport && isFullscreenControlsVisible)) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setIsFullscreenControlsVisible(false);
+    }, 2600);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isFullscreenControlsVisible, isImmersive, isMobileViewport]);
+
+  useEffect(() => {
+    if (isImmersive && isMobileViewport) {
+      setIsFullscreenControlsVisible(true);
+      return;
+    }
+
+    setIsFullscreenControlsVisible(false);
+  }, [isImmersive, isMobileViewport]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -834,25 +930,36 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
           document.webkitExitFullscreen();
         }
         setIsImmersiveFallback(false);
+        setIsFullscreenControlsVisible(false);
         return;
       }
 
       if (isImmersiveFallback) {
         setIsImmersiveFallback(false);
+        setIsFullscreenControlsVisible(false);
         return;
       }
 
       if (target.requestFullscreen) {
         await target.requestFullscreen();
+        setIsFullscreenControlsVisible(true);
       } else if (target.webkitRequestFullscreen) {
         target.webkitRequestFullscreen();
+        setIsFullscreenControlsVisible(true);
       } else {
         setIsImmersiveFallback(true);
+        setIsFullscreenControlsVisible(true);
       }
     } catch (error) {
       setIsImmersiveFallback(true);
+      setIsFullscreenControlsVisible(true);
       setErrorMessage('Browser fullscreen is limited on this device. Immersive mode is enabled instead.');
     }
+  }
+
+  function handleStageInteract() {
+    if (!(isImmersive && isMobileViewport)) return;
+    setIsFullscreenControlsVisible(true);
   }
 
   useEffect(() => () => {
@@ -935,13 +1042,16 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
         }}
       >
         <StudentRoomPolicySync onPolicyChange={setRoomPolicy} />
-        <StudentStageConference isFullscreen={isImmersive} onToggleFullscreen={handleToggleFullscreen} />
+        <StudentStageConference isFullscreen={isImmersive} onToggleFullscreen={handleToggleFullscreen} onStageInteract={handleStageInteract} />
         <StudentRoomStatusOverlay />
         <RoomAudioRenderer />
         <StudentRoomControls
           policy={roomPolicy}
           onError={setErrorMessage}
           isChatOpen={isChatOpen}
+          isImmersive={isImmersive}
+          isMobileViewport={isMobileViewport}
+          isOverlayVisible={!isImmersive || !isMobileViewport || isFullscreenControlsVisible}
           onToggleChat={() => setIsChatOpen((current) => !current)}
           onLeave={() => {
             setConnectionInfo(null);
@@ -950,12 +1060,6 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
             setErrorMessage('');
             onLeave?.();
           }}
-        />
-        <button
-          type="button"
-          className={`student-room-chat-backdrop${isChatOpen ? ' is-open' : ''}`}
-          aria-label="Close chat"
-          onClick={() => setIsChatOpen(false)}
         />
         <StudentRoomChatPanel
           policy={roomPolicy}
