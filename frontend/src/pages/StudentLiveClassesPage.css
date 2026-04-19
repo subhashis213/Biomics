@@ -1541,7 +1541,7 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
 
   .livekit-student-page .student-room-shell .student-room-controls-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .livekit-student-page .student-room-shell .student-room-control-btn {
@@ -1586,6 +1586,9 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   .livekit-student-page .student-room-shell .student-room-chat-backdrop.is-open {
     opacity: 1;
     visibility: visible;
+  }
+
+  .livekit-student-page .student-room-shell .student-room-chat-backdrop.is-open.is-interactive {
     pointer-events: auto;
   }
 
@@ -2249,7 +2252,7 @@ html[data-theme='dark'] .livekit-student-page .livekit-student-week-event-copy s
   }
 
   .livekit-student-page .student-room-shell .student-room-controls.is-immersive-overlay .student-room-controls-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .livekit-student-page .student-room-shell .student-room-controls.is-immersive-overlay .student-room-control-btn {
@@ -2679,6 +2682,9 @@ html[data-theme='dark'] .livekit-student-page,
 .livekit-student-page.student-room-chat-portal .student-room-chat-backdrop.is-open {
   opacity: 1;
   visibility: visible;
+}
+
+.livekit-student-page.student-room-chat-portal .student-room-chat-backdrop.is-open.is-interactive {
   pointer-events: auto;
 }
 

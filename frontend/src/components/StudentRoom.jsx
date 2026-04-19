@@ -481,6 +481,7 @@ function StudentRoomControls({
   onLeave,
   isChatOpen,
   onToggleChat,
+  onToggleFullscreen,
   isImmersive,
   isMobileViewport,
   isOverlayVisible
@@ -564,6 +565,11 @@ function StudentRoomControls({
         >
           {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
         </button>
+        {isImmersiveOverlay ? (
+          <button type="button" className="student-room-control-btn" onClick={onToggleFullscreen}>
+            Exit fullscreen
+          </button>
+        ) : null}
         <button type="button" className="student-room-control-btn student-room-control-btn--ghost" onClick={handleLeaveRoom}>
           Leave class
         </button>
@@ -575,6 +581,20 @@ function StudentRoomControls({
 function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
   const isDisabled = policy.chatDisabled;
   const shouldShowBackdrop = isMobileViewport && (isOpen || isDisabled);
+  const [isBackdropInteractive, setIsBackdropInteractive] = useState(false);
+
+  useEffect(() => {
+    if (!shouldShowBackdrop || typeof window === 'undefined') {
+      setIsBackdropInteractive(false);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsBackdropInteractive(true);
+    }, 180);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [shouldShowBackdrop]);
 
   if (isMobileViewport && !shouldShowBackdrop) {
     return null;
@@ -585,8 +605,9 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
       {isMobileViewport ? (
         <button
           type="button"
-          className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}`}
+          className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}${isBackdropInteractive ? ' is-interactive' : ''}`}
           aria-label="Close chat"
+          disabled={!isBackdropInteractive}
           onClick={onClose}
         />
       ) : null}
@@ -1168,6 +1189,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
           isImmersive={isImmersive}
           isMobileViewport={isMobileViewport}
           isOverlayVisible={!isImmersive || !isMobileViewport || isFullscreenControlsVisible}
+          onToggleFullscreen={handleToggleFullscreen}
           onToggleChat={() => setIsChatOpen((current) => !current)}
           onLeave={() => {
             setConnectionInfo(null);
