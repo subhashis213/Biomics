@@ -1809,6 +1809,25 @@ html[data-theme='light'] .field-hint {
   pointer-events: none;
 }
 
+html.student-room-immersive,
+body.student-room-immersive {
+  overflow: hidden;
+}
+
+.student-room-immersive .topbar,
+.student-room-immersive .hub-side-overlay,
+.student-room-immersive .hub-side-panel {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-18px);
+  transition: opacity 220ms ease, visibility 220ms ease, transform 220ms ease;
+}
+
+.student-room-immersive .app-shell-layout {
+  padding-top: 0 !important;
+}
+
 .topbar-main {
   display: flex;
   justify-content: space-between;

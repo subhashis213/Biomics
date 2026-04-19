@@ -67,6 +67,25 @@ function isLocalMicEnabled(room) {
   return publications.some((publication) => publication?.source === Track.Source.Microphone && !publication?.isMuted);
 }
 
+async function ensureMicrophonePermission() {
+  if (typeof navigator === 'undefined') return;
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') return;
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  stream.getTracks().forEach((track) => {
+    try {
+      track.stop();
+    } catch (_) {
+      // Ignore track cleanup failures.
+    }
+  });
+}
+
+function isMicrophonePermissionError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('permission') || message.includes('denied') || message.includes('notallowed');
+}
+
 function StudentStageConference({ isFullscreen, onToggleFullscreen }) {
   const [screenShareZoom, setScreenShareZoom] = useState(1);
   const tracks = useTracks(
@@ -250,9 +269,16 @@ function StudentRoomControls({ policy, onError, onLeave, isChatOpen, onToggleCha
 
     try {
       const nextEnabled = !isMicEnabled;
+      if (nextEnabled) {
+        await ensureMicrophonePermission();
+      }
       await room.localParticipant.setMicrophoneEnabled(nextEnabled);
       setIsMicEnabled(nextEnabled);
     } catch (error) {
+      if (isMicrophonePermissionError(error)) {
+        onError?.('Microphone access is blocked. Allow the mic permission for Biomics Hub on this device, then try again.');
+        return;
+      }
       onError?.(error.message || 'Failed to update microphone state.');
     }
   }
@@ -531,10 +557,12 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isImmersiveFallback, setIsImmersiveFallback] = useState(false);
   const [roomPolicy, setRoomPolicy] = useState(createDefaultRoomPolicy);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
   const roomShellRef = useRef(null);
+  const isImmersive = isFullscreen || isImmersiveFallback;
 
   useEffect(() => {
     if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return undefined;
@@ -575,6 +603,17 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   }, [roomPolicy.chatDisabled]);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const targets = [document.documentElement, document.body].filter(Boolean);
+    targets.forEach((target) => target.classList.toggle('student-room-immersive', isImmersive));
+
+    return () => {
+      targets.forEach((target) => target.classList.remove('student-room-immersive'));
+    };
+  }, [isImmersive]);
+
+  useEffect(() => {
     function syncFullscreenState() {
       const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
       setIsFullscreen(Boolean(fullscreenElement && roomShellRef.current && fullscreenElement === roomShellRef.current));
@@ -600,6 +639,12 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
         } else if (document.webkitExitFullscreen) {
           document.webkitExitFullscreen();
         }
+        setIsImmersiveFallback(false);
+        return;
+      }
+
+      if (isImmersiveFallback) {
+        setIsImmersiveFallback(false);
         return;
       }
 
@@ -607,11 +652,20 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
         await target.requestFullscreen();
       } else if (target.webkitRequestFullscreen) {
         target.webkitRequestFullscreen();
+      } else {
+        setIsImmersiveFallback(true);
       }
     } catch (error) {
-      setErrorMessage(error?.message || 'Fullscreen mode is not available on this device.');
+      setIsImmersiveFallback(true);
+      setErrorMessage('Browser fullscreen is limited on this device. Immersive mode is enabled instead.');
     }
   }
+
+  useEffect(() => () => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.classList.remove('student-room-immersive');
+    document.body?.classList.remove('student-room-immersive');
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -666,7 +720,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   }
 
   return (
-    <section ref={roomShellRef} className="card livekit-conference-card student-room-shell">
+    <section ref={roomShellRef} className={`card livekit-conference-card student-room-shell${isImmersive ? ' is-immersive' : ''}`}>
       <LiveKitRoom
         token={connectionInfo.token}
         serverUrl={connectionInfo.livekitUrl}
@@ -684,7 +738,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
         }}
       >
         <StudentRoomPolicySync onPolicyChange={setRoomPolicy} />
-        <StudentStageConference isFullscreen={isFullscreen} onToggleFullscreen={handleToggleFullscreen} />
+        <StudentStageConference isFullscreen={isImmersive} onToggleFullscreen={handleToggleFullscreen} />
         <StudentRoomStatusOverlay />
         <RoomAudioRenderer />
         <StudentRoomControls
