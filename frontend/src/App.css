@@ -1812,7 +1812,9 @@ html[data-theme='light'] .field-hint {
 html.student-room-immersive,
 body.student-room-immersive,
 html.student-room-fullscreen-active,
-body.student-room-fullscreen-active {
+body.student-room-fullscreen-active,
+html.student-room-ios-web-immersive,
+body.student-room-ios-web-immersive {
   overflow: hidden;
 }
 
@@ -1830,13 +1832,22 @@ body.student-room-fullscreen-active {
 }
 
 .student-room-immersive .app-shell-layout,
-.student-room-fullscreen-active .app-shell-layout {
+.student-room-fullscreen-active .app-shell-layout,
+.student-room-ios-web-immersive .app-shell-layout {
   padding-top: 0 !important;
 }
 
 .student-room-fullscreen-active body,
 body.student-room-fullscreen-active {
   background: #000 !important;
+}
+
+body.student-room-ios-web-immersive {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  background: #000 !important;
+  overscroll-behavior: none;
 }
 
 .topbar-main {

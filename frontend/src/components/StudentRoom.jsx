@@ -98,6 +98,15 @@ function isNativeMobileApp() {
   }
 }
 
+function isIOSWebMobile() {
+  if (typeof navigator === 'undefined' || isNativeMobileApp()) return false;
+  const userAgent = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const touchPoints = Number(navigator.maxTouchPoints || 0);
+  return /iPhone|iPad|iPod/i.test(userAgent)
+    || (/Mac/i.test(platform) && touchPoints > 1);
+}
+
 async function enterImmersiveMobilePresentation() {
   if (typeof document !== 'undefined') {
     document.documentElement.classList.add('student-room-fullscreen-active');
@@ -566,6 +575,11 @@ function StudentRoomControls({
 function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
   const isDisabled = policy.chatDisabled;
   const shouldShowBackdrop = isMobileViewport && (isOpen || isDisabled);
+
+  if (isMobileViewport && !shouldShowBackdrop) {
+    return null;
+  }
+
   const panel = (
     <>
       {isMobileViewport ? (
@@ -841,6 +855,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   const roomShellRef = useRef(null);
   const hasInitializedViewportRef = useRef(false);
   const isImmersive = isFullscreen || isImmersiveFallback;
+  const isIOSMobileWeb = isIOSWebMobile();
 
   useEffect(() => {
     if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return undefined;
@@ -930,11 +945,54 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
 
     const targets = [document.documentElement, document.body].filter(Boolean);
     targets.forEach((target) => target.classList.toggle('student-room-immersive', isImmersive));
+    targets.forEach((target) => target.classList.toggle('student-room-ios-web-immersive', isImmersive && isIOSMobileWeb));
+    roomShellRef.current?.classList.toggle('is-ios-web-immersive', isImmersive && isIOSMobileWeb);
 
     return () => {
       targets.forEach((target) => target.classList.remove('student-room-immersive'));
+      targets.forEach((target) => target.classList.remove('student-room-ios-web-immersive'));
+      roomShellRef.current?.classList.remove('is-ios-web-immersive');
     };
-  }, [isImmersive]);
+  }, [isIOSMobileWeb, isImmersive]);
+
+  useEffect(() => {
+    if (!(isImmersive && isIOSMobileWeb) || typeof window === 'undefined') return undefined;
+
+    const targets = [document.documentElement, document.body, roomShellRef.current].filter(Boolean);
+
+    const syncIOSViewport = () => {
+      const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || 0);
+      const viewportWidth = Math.round(window.visualViewport?.width || window.innerWidth || 0);
+      const viewportOffsetTop = Math.round(window.visualViewport?.offsetTop || 0);
+      const viewportOffsetLeft = Math.round(window.visualViewport?.offsetLeft || 0);
+      targets.forEach((target) => {
+        target.style.setProperty('--student-room-mobile-vh', `${viewportHeight}px`);
+        target.style.setProperty('--student-room-mobile-vw', `${viewportWidth}px`);
+        target.style.setProperty('--student-room-mobile-top', `${viewportOffsetTop}px`);
+        target.style.setProperty('--student-room-mobile-left', `${viewportOffsetLeft}px`);
+      });
+      window.scrollTo(0, 0);
+    };
+
+    syncIOSViewport();
+    window.visualViewport?.addEventListener('resize', syncIOSViewport);
+    window.visualViewport?.addEventListener('scroll', syncIOSViewport);
+    window.addEventListener('orientationchange', syncIOSViewport);
+    window.addEventListener('resize', syncIOSViewport);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', syncIOSViewport);
+      window.visualViewport?.removeEventListener('scroll', syncIOSViewport);
+      window.removeEventListener('orientationchange', syncIOSViewport);
+      window.removeEventListener('resize', syncIOSViewport);
+      targets.forEach((target) => {
+        target.style.removeProperty('--student-room-mobile-vh');
+        target.style.removeProperty('--student-room-mobile-vw');
+        target.style.removeProperty('--student-room-mobile-top');
+        target.style.removeProperty('--student-room-mobile-left');
+      });
+    };
+  }, [isIOSMobileWeb, isImmersive]);
 
   useEffect(() => {
     let active = true;
@@ -972,6 +1030,12 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
     if (!target) return;
 
     try {
+      if (isIOSMobileWeb && isMobileViewport) {
+        setIsImmersiveFallback((current) => !current);
+        setIsFullscreenControlsVisible((current) => !isImmersive || !current);
+        return;
+      }
+
       const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
       if (fullscreenElement === target) {
         if (document.exitFullscreen) {
@@ -1016,8 +1080,10 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
     if (typeof document === 'undefined') return;
     document.documentElement.classList.remove('student-room-immersive');
     document.documentElement.classList.remove('student-room-fullscreen-active');
+    document.documentElement.classList.remove('student-room-ios-web-immersive');
     document.body?.classList.remove('student-room-immersive');
     document.body?.classList.remove('student-room-fullscreen-active');
+    document.body?.classList.remove('student-room-ios-web-immersive');
     exitImmersiveMobilePresentation();
   }, []);
 
