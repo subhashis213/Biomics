@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Chat,
   ControlBar,
   FocusLayout,
   GridLayout,
@@ -142,7 +143,7 @@ function TeacherStageConference() {
         ) : null}
       </div>
 
-      <ControlBar controls={{ chat: false, settings: false }} />
+      <ControlBar controls={{ chat: true, settings: false }} />
     </div>
   );
 }
@@ -882,6 +883,16 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
             </section>
 
             <aside className="livekit-studio-side-column">
+              <section className="card livekit-studio-chat-panel">
+                <div className="section-header compact livekit-chat-headline">
+                  <div>
+                    <p className="eyebrow">Live Chat</p>
+                    <h3>Room messages</h3>
+                    <p className="subtitle">Send updates to students and follow replies in real time while the class is live.</p>
+                  </div>
+                </div>
+                <Chat />
+              </section>
               <TeacherPollConsole onError={setErrorMessage} />
             </aside>
           </div>

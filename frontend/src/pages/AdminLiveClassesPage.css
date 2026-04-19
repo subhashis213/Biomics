@@ -855,12 +855,14 @@
 }
 
 .livekit-admin-page .livekit-studio-status-card *,
+.livekit-admin-page .livekit-studio-chat-panel *,
 .livekit-admin-page .livekit-poll-panel *,
 .livekit-admin-page .livekit-studio-students-panel * {
   color: inherit;
 }
 
 .livekit-admin-page .livekit-studio-status-card h4,
+.livekit-admin-page .livekit-studio-chat-panel h3,
 .livekit-admin-page .livekit-poll-panel h3,
 .livekit-admin-page .livekit-studio-students-panel h3 {
   margin: 2px 0 0;
@@ -869,12 +871,14 @@
 }
 
 .livekit-admin-page .livekit-studio-status-card .eyebrow,
+.livekit-admin-page .livekit-studio-chat-panel .eyebrow,
 .livekit-admin-page .livekit-poll-panel .eyebrow,
 .livekit-admin-page .livekit-studio-students-panel .eyebrow {
   color: #577089 !important;
 }
 
 .livekit-admin-page .livekit-studio-status-card .subtitle,
+.livekit-admin-page .livekit-studio-chat-panel .subtitle,
 .livekit-admin-page .livekit-poll-panel .subtitle,
 .livekit-admin-page .livekit-studio-students-panel .subtitle,
 .livekit-admin-page .livekit-muted-note,
@@ -932,12 +936,117 @@
 }
 
 .livekit-admin-page .livekit-studio-status-grid strong,
+.livekit-admin-page .livekit-studio-chat-panel strong,
 .livekit-admin-page .livekit-poll-summary-card strong,
 .livekit-admin-page .livekit-poll-result-title strong,
 .livekit-admin-page .livekit-poll-result-metrics strong,
 .livekit-admin-page .livekit-studio-student-card strong {
   color: var(--admin-live-ink) !important;
   overflow-wrap: anywhere;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel {
+  display: grid !important;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(191, 219, 254, 0.76);
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(79, 57, 246, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(242, 247, 255, 0.975) 100%);
+  min-height: 320px;
+}
+
+.livekit-admin-page .livekit-chat-headline {
+  display: grid;
+  gap: 10px;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .section-header.compact {
+  display: grid;
+  gap: 10px;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .section-header.compact::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.22), rgba(109, 94, 252, 0.18), rgba(148, 163, 184, 0));
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat {
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1fr) auto;
+  min-height: 0;
+  height: min(420px, 52vh);
+  border-radius: 22px;
+  border: 1px solid rgba(191, 219, 254, 0.76);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(246, 250, 255, 0.98) 100%);
+  overflow: hidden;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(214, 223, 238, 0.84);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--admin-live-ink);
+  font-weight: 800;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-close-button {
+  display: none;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-messages {
+  padding: 14px;
+  gap: 10px;
+  overflow: auto;
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry,
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry * {
+  color: var(--admin-live-ink);
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-entry {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(214, 223, 238, 0.82);
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid rgba(214, 223, 238, 0.84);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-input {
+  min-width: 0;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(177, 190, 217, 0.56);
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--admin-live-ink);
+}
+
+.livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-button {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--admin-live-accent) 0%, var(--admin-live-accent-strong) 100%);
+  border-color: rgba(79, 57, 246, 0.84);
+  color: #fff;
+  font-weight: 700;
 }
 
 .livekit-admin-page .livekit-poll-panel {
@@ -1462,6 +1571,7 @@
 
   .livekit-admin-page .livekit-studio-room-head,
   .livekit-admin-page .livekit-studio-status-card,
+  .livekit-admin-page .livekit-studio-chat-panel,
   .livekit-admin-page .livekit-poll-panel,
   .livekit-admin-page .livekit-studio-students-panel {
     padding: 18px;
@@ -1497,6 +1607,18 @@
   .livekit-admin-page .livekit-poll-option-grid,
   .livekit-admin-page .livekit-poll-results {
     grid-template-columns: 1fr;
+  }
+
+  .livekit-admin-page .livekit-studio-chat-panel .lk-chat {
+    height: min(360px, 48vh);
+  }
+
+  .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form {
+    grid-template-columns: 1fr;
+  }
+
+  .livekit-admin-page .livekit-studio-chat-panel .lk-chat-form-button {
+    width: 100%;
   }
 
   .livekit-admin-page .livekit-studio-toolbar-grid {
