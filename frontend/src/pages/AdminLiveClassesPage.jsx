@@ -335,11 +335,39 @@ export default function AdminLiveClassesPage() {
     });
   }
 
+  async function deleteClassNow(targetClassId) {
+    const normalizedClassId = String(targetClassId || '').trim();
+    if (!normalizedClassId) return;
+
+    const targetClass = workspace.classes.find((item) => item._id === normalizedClassId);
+    const isScheduledClass = targetClass?.status === 'scheduled';
+
+    setIsDeletingClassId(normalizedClassId);
+    try {
+      await deleteLivekitClass(normalizedClassId);
+      setBanner({ type: 'success', text: isScheduledClass ? 'Scheduled live class removed.' : 'Live class cancelled.' });
+      await loadWorkspace();
+      closeDeleteDialog(true);
+      if (classId === normalizedClassId) {
+        navigate('/admin/live-classes');
+      }
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to cancel live class.' });
+    } finally {
+      setIsDeletingClassId('');
+    }
+  }
+
   function handleDeleteClass(targetClassId) {
     const targetClass = workspace.classes.find((item) => item._id === targetClassId);
     if (!targetClass) return;
 
     const isScheduledClass = targetClass?.status === 'scheduled';
+    if (isScheduledClass) {
+      deleteClassNow(targetClassId);
+      return;
+    }
+
     setDeleteDialog({
       open: true,
       classId: targetClassId,
@@ -361,23 +389,7 @@ export default function AdminLiveClassesPage() {
     const targetClassId = String(deleteDialog.classId || '').trim();
     if (!targetClassId) return;
 
-    const targetClass = workspace.classes.find((item) => item._id === targetClassId);
-    const isScheduledClass = targetClass?.status === 'scheduled';
-
-    setIsDeletingClassId(targetClassId);
-    try {
-      await deleteLivekitClass(targetClassId);
-      setBanner({ type: 'success', text: isScheduledClass ? 'Scheduled live class removed.' : 'Live class cancelled.' });
-      await loadWorkspace();
-      closeDeleteDialog(true);
-      if (classId === targetClassId) {
-        navigate('/admin/live-classes');
-      }
-    } catch (error) {
-      setBanner({ type: 'error', text: error.message || 'Failed to cancel live class.' });
-    } finally {
-      setIsDeletingClassId('');
-    }
+    await deleteClassNow(targetClassId);
   }
 
   async function handleCreateBlock(event) {
