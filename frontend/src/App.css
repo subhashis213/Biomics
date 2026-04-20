@@ -188,10 +188,19 @@ html,
 body,
 #root {
   min-height: 100%;
+  width: 100%;
+  max-width: 100%;
+  background-color: var(--bg-base);
 }
 
 html {
   overflow-x: hidden;
+}
+
+#root {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
 }
 
 body {
@@ -209,6 +218,19 @@ body {
 
 html[data-theme='light'] body {
   color-scheme: light;
+}
+
+html[data-theme='dark'],
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  background-color: #0b0e14;
+}
+
+html[data-theme='dark'] body,
+html[data-theme='dark'] #root,
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] #root {
+  background-color: #0b0e14;
 }
 
 button,
@@ -287,6 +309,8 @@ th,
 .app-shell {
   --shell-pad: 24px;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
   padding: var(--shell-pad);
   position: relative;
   z-index: 1;
@@ -1437,6 +1461,9 @@ html[data-theme='light'] .field-hint {
   grid-template-columns: 1fr;
   align-items: start;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
   padding-top: 104px;
 }
 
@@ -1452,6 +1479,8 @@ html[data-theme='light'] .field-hint {
 
 .app-main-content {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .app-nav-dropdown {
