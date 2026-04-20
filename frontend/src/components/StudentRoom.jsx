@@ -66,6 +66,19 @@ function createDefaultRoomPolicy() {
   };
 }
 
+function getPollTimeRemaining(closesAt) {
+  const deadline = Number(closesAt || 0);
+  if (!deadline) return 0;
+  return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+}
+
+function formatPollTimer(seconds) {
+  const safeSeconds = Math.max(0, Number(seconds || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
 function isLocalMicEnabled(room) {
   const publications = Array.from(room?.localParticipant?.trackPublications?.values?.() || []);
   return publications.some((publication) => publication?.source === Track.Source.Microphone && !publication?.isMuted);
@@ -96,15 +109,6 @@ function isNativeMobileApp() {
   } catch (_) {
     return false;
   }
-}
-
-function isIOSWebMobile() {
-  if (typeof navigator === 'undefined' || isNativeMobileApp()) return false;
-  const userAgent = navigator.userAgent || '';
-  const platform = navigator.platform || '';
-  const touchPoints = Number(navigator.maxTouchPoints || 0);
-  return /iPhone|iPad|iPod/i.test(userAgent)
-    || (/Mac/i.test(platform) && touchPoints > 1);
 }
 
 async function enterImmersiveMobilePresentation() {
@@ -180,6 +184,19 @@ async function exitImmersiveMobilePresentation() {
     await StatusBar.setOverlaysWebView({ overlay: false });
   } catch (_) {
     // Ignore unsupported overlay operations.
+  }
+}
+
+async function exitBrowserFullscreen(target) {
+  if (typeof document === 'undefined') return;
+
+  const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
+  if (fullscreenElement && (!target || fullscreenElement === target)) {
+    if (document.exitFullscreen) {
+      await document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
   }
 }
 
@@ -382,15 +399,12 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
 
   return (
     <div className="student-video-conference student-video-conference--custom">
-      {!showImmersiveStage ? (
+      {!isFullscreen ? (
         <div className="student-video-conference-toolbar">
           <div className="student-video-conference-status">
             <span className="student-video-conference-status-pill">Classroom Focus</span>
             <strong>{screenShareTrack ? 'Teacher screen is being shared' : 'Teacher stage is pinned for mobile view'}</strong>
           </div>
-          <button type="button" className="student-room-fullscreen-btn" onClick={onToggleFullscreen}>
-            {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-          </button>
         </div>
       ) : null}
 
@@ -398,7 +412,8 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
         ref={stageRef}
         className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-immersive-stage' : ''}`}
         onPointerDownCapture={isFullscreen ? onStageInteract : undefined}
-        onTouchStartCapture={isFullscreen ? onStageInteract : undefined}
+        onPointerMoveCapture={isFullscreen ? onStageInteract : undefined}
+        onTouchStart={isFullscreen ? onStageInteract : undefined}
       >
         {primaryTrack ? (
           <div className={`student-video-conference-primary${hasScreenShare ? ' is-screen-share' : ''}`}>
@@ -417,9 +432,6 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
                 ) : (
                   <div className="student-screen-share-floating-actions" role="group" aria-label="Screen share controls">
                     <span className="student-screen-share-floating-chip">Pinch to zoom</span>
-                    <button type="button" className="student-screen-share-floating-btn student-screen-share-floating-btn--exit" onClick={onToggleFullscreen}>
-                      Exit
-                    </button>
                   </div>
                 )}
 
@@ -482,9 +494,7 @@ function StudentRoomControls({
   onLeave,
   isChatOpen,
   onToggleChat,
-  onToggleFullscreen,
   isImmersive,
-  isMobileViewport,
   isOverlayVisible
 }) {
   const room = useRoomContext();
@@ -538,12 +548,13 @@ function StudentRoomControls({
     }
   }
 
-  function handleLeaveRoom() {
+  async function handleLeaveRoom() {
+    await exitBrowserFullscreen();
     room?.disconnect();
     onLeave?.();
   }
 
-  const isImmersiveOverlay = isImmersive && isMobileViewport;
+  const isImmersiveOverlay = isImmersive;
 
   return (
     <div
@@ -566,11 +577,6 @@ function StudentRoomControls({
         >
           {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
         </button>
-        {isImmersiveOverlay ? (
-          <button type="button" className="student-room-control-btn" onClick={onToggleFullscreen}>
-            Exit fullscreen
-          </button>
-        ) : null}
         <button type="button" className="student-room-control-btn student-room-control-btn--ghost" onClick={handleLeaveRoom}>
           Leave class
         </button>
@@ -582,33 +588,13 @@ function StudentRoomControls({
 function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
   const isDisabled = policy.chatDisabled;
   const shouldShowBackdrop = isMobileViewport && (isOpen || isDisabled);
-  const [isBackdropInteractive, setIsBackdropInteractive] = useState(false);
-
-  useEffect(() => {
-    if (!shouldShowBackdrop || typeof window === 'undefined') {
-      setIsBackdropInteractive(false);
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setIsBackdropInteractive(true);
-    }, 180);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [shouldShowBackdrop]);
-
-  if (isMobileViewport && !shouldShowBackdrop) {
-    return null;
-  }
-
   const panel = (
     <>
       {isMobileViewport ? (
         <button
           type="button"
-          className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}${isBackdropInteractive ? ' is-interactive' : ''}`}
+          className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}`}
           aria-label="Close chat"
-          disabled={!isBackdropInteractive}
           onClick={onClose}
         />
       ) : null}
@@ -729,7 +715,23 @@ function StudentPollOverlay({ participantIdentity, onError }) {
   const [activePoll, setActivePoll] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [isClosingPoll, setIsClosingPoll] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(0);
   const optionEntries = Object.entries(activePoll?.options || {});
+
+  useEffect(() => {
+    if (!activePoll?.closesAt) {
+      setTimeRemaining(0);
+      return undefined;
+    }
+
+    const syncCountdown = () => {
+      setTimeRemaining(getPollTimeRemaining(activePoll.closesAt));
+    };
+
+    syncCountdown();
+    const timerId = window.setInterval(syncCountdown, 1000);
+    return () => window.clearInterval(timerId);
+  }, [activePoll?.closesAt]);
 
   useEffect(() => {
     if (!room) return undefined;
@@ -764,6 +766,7 @@ function StudentPollOverlay({ participantIdentity, onError }) {
 
   async function handleVote(optionKey) {
     if (!room || !activePoll || selectedAnswer) return;
+    if (activePoll.closesAt && getPollTimeRemaining(activePoll.closesAt) <= 0) return;
     setSelectedAnswer(optionKey);
     try {
       await room.localParticipant.publishData(encoder.encode(JSON.stringify({
@@ -789,6 +792,9 @@ function StudentPollOverlay({ participantIdentity, onError }) {
 
   if (!activePoll) return null;
 
+  const isTimerEnabled = Boolean(activePoll.closesAt);
+  const isPollClosed = isTimerEnabled && timeRemaining <= 0;
+
   return (
     <div className="livekit-student-poll-layer" aria-live="polite">
       <aside
@@ -798,14 +804,17 @@ function StudentPollOverlay({ participantIdentity, onError }) {
         aria-label="Live poll"
       >
         <div className="livekit-student-poll-head">
-          <div>
-            <p className="eyebrow">Live Poll</p>
-            <strong>Choose the matching option</strong>
+          <div className="livekit-student-poll-head-copy">
+            <span className="livekit-student-poll-badge">Live poll</span>
+            <strong>Answer from shared screen</strong>
           </div>
           <div className="livekit-student-poll-head-meta">
-            <span className="livekit-student-poll-badge">Answer once</span>
-            <span className="livekit-student-poll-meta-pill">{optionEntries.length} options</span>
-            <span className="livekit-student-poll-meta-pill">Question on teacher screen</span>
+            {isTimerEnabled ? (
+              <span className={`livekit-student-poll-meta-pill livekit-student-poll-meta-pill--timer${isPollClosed ? ' is-closed' : ''}`}>
+                <span className="livekit-student-poll-meta-pill-label">Timer</span>
+                <span className="livekit-student-poll-meta-pill-value">{isPollClosed ? 'Time up' : formatPollTimer(timeRemaining)}</span>
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="livekit-student-poll-options">
@@ -819,7 +828,7 @@ function StudentPollOverlay({ participantIdentity, onError }) {
                 type="button"
                 className={`livekit-student-poll-option${isSelected ? ' is-selected' : ''}${isCorrect ? ' is-correct' : ''}${isIncorrect ? ' is-incorrect' : ''}`}
                 onClick={() => handleVote(key)}
-                disabled={Boolean(selectedAnswer)}
+                disabled={Boolean(selectedAnswer) || isPollClosed}
                 aria-label={`Option ${key}`}
               >
                 <span className="livekit-student-poll-option-key">{key}</span>
@@ -831,21 +840,20 @@ function StudentPollOverlay({ participantIdentity, onError }) {
         <div className="livekit-student-poll-footer">
           <strong>
             {activePoll.revealed
-              ? `Results are in. You selected option ${selectedAnswer || 'not answered'}.`
-              : selectedAnswer
-                ? `You selected option ${selectedAnswer}.`
-                : 'Tap one option to submit instantly.'}
+              ? `Correct answer: ${activePoll.correctOption}. Your choice: ${selectedAnswer || 'Not answered'}.`
+              : isPollClosed
+                ? `Time up. Your choice: ${selectedAnswer || 'Not answered'}.`
+                : selectedAnswer
+                  ? `Locked: Option ${selectedAnswer}`
+                  : 'Tap A, B, C, or D'}
           </strong>
-          <p className="subtitle">
-            {activePoll.revealed
-              ? 'The teacher has revealed the correct answer for everyone in the room.'
-              : selectedAnswer
-                ? 'Waiting for teacher to reveal answer.'
-                : 'Read the question from the shared PPT or teacher screen, then choose A, B, C, or D.'}
-          </p>
+          {!activePoll.revealed ? <p className="subtitle">Question stays on the teacher screen.</p> : null}
         </div>
-        {selectedAnswer && !activePoll.revealed ? (
+        {selectedAnswer && !activePoll.revealed && !isPollClosed ? (
           <p className="livekit-poll-answer-pending">Waiting for teacher to reveal answer.</p>
+        ) : null}
+        {isPollClosed && !activePoll.revealed ? (
+          <p className="livekit-poll-answer-pending livekit-poll-answer-pending--closed">Poll timer finished. Voting is locked.</p>
         ) : null}
         {activePoll.revealed ? (
           <>
@@ -862,13 +870,13 @@ function StudentPollOverlay({ participantIdentity, onError }) {
   );
 }
 
-export default function StudentRoom({ classSession, onSessionRemoved, onLeave }) {
+export default function StudentRoom({ classSession, onSessionRemoved, onLeave, autoEnterImmersive = false }) {
   const session = getSession();
   const [connectionInfo, setConnectionInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isImmersiveFallback, setIsImmersiveFallback] = useState(false);
+  const [isImmersiveFallback, setIsImmersiveFallback] = useState(() => Boolean(autoEnterImmersive));
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [roomPolicy, setRoomPolicy] = useState(createDefaultRoomPolicy);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -876,8 +884,8 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
   const roomShellRef = useRef(null);
   const hasInitializedViewportRef = useRef(false);
+  const hasAttemptedAutoFullscreenRef = useRef(false);
   const isImmersive = isFullscreen || isImmersiveFallback;
-  const isIOSMobileWeb = isIOSWebMobile();
 
   useEffect(() => {
     if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return undefined;
@@ -944,17 +952,23 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
   }, [roomPolicy.chatDisabled]);
 
   useEffect(() => {
-    if (!(isImmersive && isMobileViewport && isFullscreenControlsVisible)) return undefined;
+    if (!autoEnterImmersive) return;
+    setIsImmersiveFallback(true);
+    setIsFullscreenControlsVisible(true);
+  }, [autoEnterImmersive]);
+
+  useEffect(() => {
+    if (!(isImmersive && isFullscreenControlsVisible) || isChatOpen) return undefined;
 
     const timeoutId = window.setTimeout(() => {
       setIsFullscreenControlsVisible(false);
     }, 2600);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isFullscreenControlsVisible, isImmersive, isMobileViewport]);
+  }, [isChatOpen, isFullscreenControlsVisible, isImmersive]);
 
   useEffect(() => {
-    if (isImmersive && isMobileViewport) {
+    if (isImmersive) {
       setIsFullscreenControlsVisible(true);
       return;
     }
@@ -967,54 +981,11 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
 
     const targets = [document.documentElement, document.body].filter(Boolean);
     targets.forEach((target) => target.classList.toggle('student-room-immersive', isImmersive));
-    targets.forEach((target) => target.classList.toggle('student-room-ios-web-immersive', isImmersive && isIOSMobileWeb));
-    roomShellRef.current?.classList.toggle('is-ios-web-immersive', isImmersive && isIOSMobileWeb);
 
     return () => {
       targets.forEach((target) => target.classList.remove('student-room-immersive'));
-      targets.forEach((target) => target.classList.remove('student-room-ios-web-immersive'));
-      roomShellRef.current?.classList.remove('is-ios-web-immersive');
     };
-  }, [isIOSMobileWeb, isImmersive]);
-
-  useEffect(() => {
-    if (!(isImmersive && isIOSMobileWeb) || typeof window === 'undefined') return undefined;
-
-    const targets = [document.documentElement, document.body, roomShellRef.current].filter(Boolean);
-
-    const syncIOSViewport = () => {
-      const viewportHeight = Math.round(window.visualViewport?.height || window.innerHeight || 0);
-      const viewportWidth = Math.round(window.visualViewport?.width || window.innerWidth || 0);
-      const viewportOffsetTop = Math.round(window.visualViewport?.offsetTop || 0);
-      const viewportOffsetLeft = Math.round(window.visualViewport?.offsetLeft || 0);
-      targets.forEach((target) => {
-        target.style.setProperty('--student-room-mobile-vh', `${viewportHeight}px`);
-        target.style.setProperty('--student-room-mobile-vw', `${viewportWidth}px`);
-        target.style.setProperty('--student-room-mobile-top', `${viewportOffsetTop}px`);
-        target.style.setProperty('--student-room-mobile-left', `${viewportOffsetLeft}px`);
-      });
-      window.scrollTo(0, 0);
-    };
-
-    syncIOSViewport();
-    window.visualViewport?.addEventListener('resize', syncIOSViewport);
-    window.visualViewport?.addEventListener('scroll', syncIOSViewport);
-    window.addEventListener('orientationchange', syncIOSViewport);
-    window.addEventListener('resize', syncIOSViewport);
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', syncIOSViewport);
-      window.visualViewport?.removeEventListener('scroll', syncIOSViewport);
-      window.removeEventListener('orientationchange', syncIOSViewport);
-      window.removeEventListener('resize', syncIOSViewport);
-      targets.forEach((target) => {
-        target.style.removeProperty('--student-room-mobile-vh');
-        target.style.removeProperty('--student-room-mobile-vw');
-        target.style.removeProperty('--student-room-mobile-top');
-        target.style.removeProperty('--student-room-mobile-left');
-      });
-    };
-  }, [isIOSMobileWeb, isImmersive]);
+  }, [isImmersive]);
 
   useEffect(() => {
     let active = true;
@@ -1052,12 +1023,6 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
     if (!target) return;
 
     try {
-      if (isIOSMobileWeb && isMobileViewport) {
-        setIsImmersiveFallback((current) => !current);
-        setIsFullscreenControlsVisible((current) => !isImmersive || !current);
-        return;
-      }
-
       const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || null;
       if (fullscreenElement === target) {
         if (document.exitFullscreen) {
@@ -1093,20 +1058,40 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
     }
   }
 
+  useEffect(() => {
+    if (!autoEnterImmersive || hasAttemptedAutoFullscreenRef.current) return;
+    if (loading || !connectionInfo?.token || !connectionInfo?.livekitUrl) return;
+
+    hasAttemptedAutoFullscreenRef.current = true;
+
+    const target = roomShellRef.current;
+    if (!target) return;
+
+    const requestFullscreen = target.requestFullscreen || target.webkitRequestFullscreen;
+    if (typeof requestFullscreen !== 'function') return;
+
+    Promise.resolve(requestFullscreen.call(target))
+      .then(() => {
+        setIsFullscreenControlsVisible(true);
+      })
+      .catch(() => {
+        // Browsers commonly block non-gesture fullscreen. Keep immersive viewport fallback active.
+      });
+  }, [autoEnterImmersive, connectionInfo?.livekitUrl, connectionInfo?.token, loading]);
+
   function handleStageInteract() {
-    if (!(isImmersive && isMobileViewport)) return;
-    setIsFullscreenControlsVisible(true);
+    if (!isImmersive) return;
+    setIsFullscreenControlsVisible((current) => (current ? current : true));
   }
 
   useEffect(() => () => {
     if (typeof document === 'undefined') return;
     document.documentElement.classList.remove('student-room-immersive');
     document.documentElement.classList.remove('student-room-fullscreen-active');
-    document.documentElement.classList.remove('student-room-ios-web-immersive');
     document.body?.classList.remove('student-room-immersive');
     document.body?.classList.remove('student-room-fullscreen-active');
-    document.body?.classList.remove('student-room-ios-web-immersive');
     exitImmersiveMobilePresentation();
+    exitBrowserFullscreen(roomShellRef.current);
   }, []);
 
   useEffect(() => {
@@ -1188,9 +1173,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave })
           onError={setErrorMessage}
           isChatOpen={isChatOpen}
           isImmersive={isImmersive}
-          isMobileViewport={isMobileViewport}
-          isOverlayVisible={!isImmersive || !isMobileViewport || isFullscreenControlsVisible}
-          onToggleFullscreen={handleToggleFullscreen}
+          isOverlayVisible={!isImmersive || isFullscreenControlsVisible}
           onToggleChat={() => setIsChatOpen((current) => !current)}
           onLeave={() => {
             setConnectionInfo(null);

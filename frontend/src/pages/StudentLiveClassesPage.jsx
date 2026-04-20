@@ -422,6 +422,39 @@ export default function StudentLiveClassesPage() {
   const hourLabels = useMemo(() => buildHourLabels(startHour, endHour), [startHour, endHour]);
   const calendarRowCount = Math.max(1, hourLabels.length - 1);
 
+  if (classId) {
+    return (
+      <main className="livekit-student-direct-room-page livekit-student-page">
+        {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
+        {loading ? <p className="empty-note">Loading live class access...</p> : null}
+
+        {selectedClass && selectedClass.status === 'live' ? (
+          <StudentRoom
+            classSession={selectedClass}
+            autoEnterImmersive
+            onSessionRemoved={(message) => {
+              setBanner({ type: 'error', text: message || 'You were removed from the current live session by the admin.' });
+              navigate('/student/live-classes', { replace: true });
+              loadWorkspace();
+            }}
+            onLeave={() => {
+              navigate('/student/live-classes', { replace: true });
+              loadWorkspace({ showLoading: false });
+            }}
+          />
+        ) : !loading ? (
+          <section className="card livekit-empty-room-card livekit-direct-room-empty-state">
+            <strong>Live class is not available right now</strong>
+            <p>The room will open here automatically when the admin starts this live session.</p>
+            <button type="button" className="secondary-btn" onClick={() => navigate('/student/live-classes', { replace: true })}>
+              Back to live classes
+            </button>
+          </section>
+        ) : null}
+      </main>
+    );
+  }
+
   return (
     <AppShell
       title="Live Classes"

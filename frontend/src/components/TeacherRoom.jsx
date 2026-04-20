@@ -55,6 +55,25 @@ function createEmptyResults() {
   return { A: 0, B: 0, C: 0, D: 0 };
 }
 
+function getPollTimerSeconds(value) {
+  const normalized = Number.parseInt(String(value || '').trim(), 10);
+  if (!Number.isFinite(normalized) || normalized <= 0) return 0;
+  return normalized;
+}
+
+function getPollTimeRemaining(closesAt) {
+  const deadline = Number(closesAt || 0);
+  if (!deadline) return 0;
+  return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+}
+
+function formatPollTimer(seconds) {
+  const safeSeconds = Math.max(0, Number(seconds || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
 function formatParticipantLabel(participantIdentity) {
   const raw = String(participantIdentity || '').trim();
   if (!raw) return 'Anonymous student';
@@ -223,12 +242,29 @@ function TeacherAudienceControlPanel({ onError, policy, onPolicyChange }) {
 function TeacherPollConsole({ onError }) {
   const room = useRoomContext();
   const [draft, setDraft] = useState({
-    correctOption: 'A'
+    correctOption: 'A',
+    timerSeconds: '45'
   });
   const [activePoll, setActivePoll] = useState(null);
+  const [activePollTimeRemaining, setActivePollTimeRemaining] = useState(0);
   const [results, setResults] = useState(createEmptyResults());
   const [voteSnapshots, setVoteSnapshots] = useState([]);
   const votesRef = useRef(new Map());
+
+  useEffect(() => {
+    if (!activePoll?.closesAt) {
+      setActivePollTimeRemaining(0);
+      return undefined;
+    }
+
+    const syncCountdown = () => {
+      setActivePollTimeRemaining(getPollTimeRemaining(activePoll.closesAt));
+    };
+
+    syncCountdown();
+    const timerId = window.setInterval(syncCountdown, 1000);
+    return () => window.clearInterval(timerId);
+  }, [activePoll?.closesAt]);
 
   useEffect(() => {
     if (!room) return undefined;
@@ -237,6 +273,10 @@ function TeacherPollConsole({ onError }) {
       try {
         const message = JSON.parse(decoder.decode(payload));
         if (message?.type === 'poll-answer' && activePoll && message?.pollId === activePoll.id) {
+          if (activePoll.closesAt && getPollTimeRemaining(activePoll.closesAt) <= 0) {
+            return;
+          }
+
           const participantKey = String(message.participantIdentity || '').trim();
           const answer = String(message.answer || '').trim().toUpperCase();
           if (!participantKey || !['A', 'B', 'C', 'D'].includes(answer)) return;
@@ -274,19 +314,24 @@ function TeacherPollConsole({ onError }) {
       C: 'Option C',
       D: 'Option D'
     };
+    const timerSeconds = getPollTimerSeconds(draft.timerSeconds);
+    const closesAt = timerSeconds > 0 ? Date.now() + (timerSeconds * 1000) : null;
 
     const nextPoll = {
       id: `poll-${Date.now().toString(36)}`,
       question: '',
       options,
       correctOption: draft.correctOption,
-      revealed: false
+      revealed: false,
+      timerSeconds,
+      closesAt
     };
 
     votesRef.current = new Map();
     setResults(createEmptyResults());
     setVoteSnapshots([]);
     setActivePoll(nextPoll);
+    setActivePollTimeRemaining(timerSeconds);
     await publishDataMessage({ type: 'poll-create', poll: nextPoll });
   }
 
@@ -335,6 +380,8 @@ function TeacherPollConsole({ onError }) {
   }, [voteSnapshots]);
 
   const maxVotes = Math.max(...resultRows.map((item) => item.count), 1);
+  const isPollTimerEnabled = getPollTimerSeconds(draft.timerSeconds) > 0;
+  const isActivePollClosed = Boolean(activePoll?.closesAt) && activePollTimeRemaining <= 0;
 
   return (
     <section className="card livekit-poll-panel">
@@ -362,6 +409,27 @@ function TeacherPollConsole({ onError }) {
           <strong>{activePoll?.correctOption ? `Option ${activePoll.correctOption}` : `Option ${draft.correctOption}`}</strong>
           <p>{activePoll?.revealed ? 'Revealed to students.' : 'Hidden from students until you reveal it.'}</p>
         </article>
+        <article className="livekit-poll-summary-card accent-slate">
+          <span>Poll Timer</span>
+          <strong>
+            {activePoll
+              ? activePoll.closesAt
+                ? formatPollTimer(activePollTimeRemaining)
+                : 'No timer'
+              : isPollTimerEnabled
+                ? formatPollTimer(getPollTimerSeconds(draft.timerSeconds))
+                : 'No timer'}
+          </strong>
+          <p>
+            {activePoll
+              ? activePoll.closesAt
+                ? isActivePollClosed
+                  ? 'Voting window has closed for students.'
+                  : 'Countdown is running for the live poll.'
+                : 'Students can answer until you clear or reveal the poll.'
+              : 'Set how long the student answer dock stays open.'}
+          </p>
+        </article>
       </div>
 
       <div className="livekit-poll-composer">
@@ -382,6 +450,22 @@ function TeacherPollConsole({ onError }) {
               <option value="B">Option B</option>
               <option value="C">Option C</option>
               <option value="D">Option D</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Poll Timer</span>
+            <select
+              value={draft.timerSeconds}
+              onChange={(event) => setDraft((current) => ({ ...current, timerSeconds: event.target.value }))}
+            >
+              <option value="0">No timer</option>
+              <option value="15">15 seconds</option>
+              <option value="30">30 seconds</option>
+              <option value="45">45 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="90">1 minute 30 seconds</option>
+              <option value="120">2 minutes</option>
             </select>
           </label>
 
