@@ -148,6 +148,16 @@
   margin-top: auto;
 }
 
+.student-learning-live-actions .secondary-btn {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  background: color-mix(in srgb, var(--bg-card-soft) 78%, transparent);
+}
+
+.student-learning-live-actions .primary-btn,
+.student-learning-live-actions .secondary-btn {
+  flex: 1 1 180px;
+}
+
 .student-learning-live-actions .primary-btn,
 .student-learning-live-actions .secondary-btn {
   min-height: 44px;
@@ -201,12 +211,12 @@
 
 @media (max-width: 640px) {
   .student-learning-spotlight-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
 
   .student-performance-spotlight-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
 
@@ -345,12 +355,12 @@
 
 @media (max-width: 480px) {
   .student-learning-spotlight-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
 
   .student-performance-spotlight-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
 
@@ -422,5 +432,14 @@
   .student-learning-spotlight-grid .student-learning-live-actions .secondary-btn {
     min-height: 38px;
     font-size: 0.8rem;
+  }
+
+  .student-learning-live-topline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .student-learning-live-actions {
+    width: 100%;
   }
 }

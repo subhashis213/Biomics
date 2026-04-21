@@ -66,7 +66,15 @@
 .livekit-student-page .student-room-shell .lk-grid-layout-wrapper,
 .livekit-student-page .student-room-shell .lk-focus-layout-wrapper {
   min-height: inherit;
+  height: 100%;
   background: transparent;
+}
+
+.livekit-student-page .student-room-shell .lk-video-conference-inner,
+.livekit-student-page .student-room-shell .lk-focus-layout-wrapper,
+.livekit-student-page .student-room-shell .lk-grid-layout-wrapper {
+  height: 100% !important;
+  min-height: 100% !important;
 }
 
 .livekit-student-page .student-room-shell .student-video-conference {
@@ -2832,6 +2840,54 @@ html[data-theme='dark'] .livekit-student-page,
   display: none !important;
 }
 
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-stage {
+  position: relative;
+}
+
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 6;
+  width: min(34vw, 156px);
+  min-width: 92px;
+  max-width: 156px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 5px;
+  overflow: visible;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(2, 6, 23, 0.68);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.28);
+}
+
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-participant-tile,
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-participant-media,
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-participant-media-video,
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay video {
+  min-height: auto;
+  height: auto;
+  border-radius: 14px;
+}
+
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-participant-metadata {
+  left: 6px;
+  bottom: 6px;
+  min-height: 24px;
+  max-width: calc(100% - 12px);
+  padding: 0 7px;
+}
+
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-participant-name,
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-participant-identity,
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-connection-quality,
+.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay .lk-focus-toggle-button {
+  font-size: 0.66rem;
+}
+
 .livekit-student-page.student-room-chat-portal .student-room-chat-panel-head {
   display: flex;
   align-items: center;
@@ -2872,6 +2928,11 @@ html[data-theme='dark'] .livekit-student-page,
   width: 100%;
   max-width: 100%;
   height: min(52dvh, 400px);
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
   border-radius: 18px;
   border: 1px solid var(--student-chat-border) !important;
   background: var(--student-chat-surface) !important;
@@ -3392,6 +3453,10 @@ html[data-theme='dark'] .livekit-student-page,
   border-radius: 0;
 }
 
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-primary,
 .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-grid-wrapper {
   min-height: 100%;
@@ -3455,6 +3520,11 @@ html[data-theme='dark'] .livekit-student-page,
   min-width: 96px;
   max-width: 148px;
   padding: 4px;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay {
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view.is-immersive,
@@ -3700,6 +3770,11 @@ html[data-theme='light'] .livekit-student-page,
 }
 
 @media (max-width: 480px) {
+  .livekit-student-page .livekit-student-hero,
+  .livekit-student-page .livekit-live-banner-panel {
+    border-radius: 24px;
+  }
+
   .livekit-student-page .livekit-student-hero-spotlight {
     padding: 14px;
     border-radius: 22px;
@@ -3723,6 +3798,13 @@ html[data-theme='light'] .livekit-student-page,
 }
 
 @media (max-width: 420px) {
+  .livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay {
+    width: min(31vw, 118px);
+    min-width: 84px;
+    padding: 4px;
+    border-radius: 14px;
+  }
+
   .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view.is-immersive-overlay {
     left: max(6px, env(safe-area-inset-left));
     right: max(6px, env(safe-area-inset-right));

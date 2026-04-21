@@ -271,7 +271,7 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
 
   const hasScreenShare = Boolean(screenShareTrack);
   const showImmersiveStage = hasScreenShare && isFullscreen;
-  const showFloatingPreview = hasScreenShare && (isFullscreen || isMobileViewport);
+  const showFloatingPreview = Boolean(supportingTracks.length) && (isMobileViewport || showImmersiveStage);
 
   useEffect(() => {
     if (!showFloatingPreview) {
