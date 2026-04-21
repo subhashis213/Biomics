@@ -200,7 +200,7 @@ async function exitBrowserFullscreen(target) {
   }
 }
 
-function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInteract }) {
+function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewport, isMobileLandscape }) {
   const [screenShareZoom, setScreenShareZoom] = useState(1);
   const [floatingPreviewPosition, setFloatingPreviewPosition] = useState({ x: 16, y: 16 });
   const [isDraggingPreview, setIsDraggingPreview] = useState(false);
@@ -410,7 +410,7 @@ function StudentStageConference({ isFullscreen, onToggleFullscreen, onStageInter
 
       <div
         ref={stageRef}
-        className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-immersive-stage' : ''}`}
+        className={`student-video-conference-stage${supportingTracks.length ? '' : ' is-single'}${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-immersive-stage' : ''}${isMobileViewport ? ' is-mobile-view' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`}
         onPointerDownCapture={isFullscreen ? onStageInteract : undefined}
         onPointerMoveCapture={isFullscreen ? onStageInteract : undefined}
         onTouchStart={isFullscreen ? onStageInteract : undefined}
@@ -495,7 +495,9 @@ function StudentRoomControls({
   isChatOpen,
   onToggleChat,
   isImmersive,
-  isOverlayVisible
+  isOverlayVisible,
+  isMobileViewport,
+  isMobileLandscape
 }) {
   const room = useRoomContext();
   const [isMicEnabled, setIsMicEnabled] = useState(false);
@@ -558,7 +560,7 @@ function StudentRoomControls({
 
   return (
     <div
-      className={`student-room-controls${isImmersiveOverlay ? ' is-immersive-overlay' : ''}${isOverlayVisible ? ' is-visible' : ''}`}
+      className={`student-room-controls${isImmersiveOverlay ? ' is-immersive-overlay' : ''}${isOverlayVisible ? ' is-visible' : ''}${isMobileViewport ? ' is-mobile-view' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`}
       aria-label="Student room controls"
     >
       <div className="student-room-controls-status">
@@ -585,7 +587,7 @@ function StudentRoomControls({
   );
 }
 
-function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
+function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport, isMobileLandscape }) {
   const isDisabled = policy.chatDisabled;
   const shouldShowBackdrop = isMobileViewport && (isOpen || isDisabled);
   const panel = (
@@ -599,7 +601,7 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
         />
       ) : null}
       {isDisabled ? (
-        <section className={`student-room-chat-panel is-disabled${isMobileViewport ? ' is-mobile-sheet' : ''}`} aria-live="polite">
+        <section className={`student-room-chat-panel is-disabled${isMobileViewport ? ' is-mobile-drawer' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`} aria-live="polite">
           <div className="student-room-chat-panel-head">
             <div>
               <p className="eyebrow">Class Chat</p>
@@ -614,7 +616,7 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
           <p className="student-room-chat-disabled-copy">The teacher has locked chat for this live class. You can use it again when they reopen it.</p>
         </section>
       ) : (
-        <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}${isMobileViewport ? ' is-mobile-sheet' : ''}`} aria-live="polite">
+        <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}${isMobileViewport ? ' is-mobile-drawer' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`} aria-live="polite">
           <div className="student-room-chat-panel-head">
             <div>
               <p className="eyebrow">Class Chat</p>
@@ -632,7 +634,7 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport }) {
 
   if (isMobileViewport && typeof document !== 'undefined') {
     return createPortal(
-      <div className={`livekit-student-page student-room-chat-portal${isOpen ? ' is-open' : ''}${isDisabled ? ' is-disabled' : ''}`}>
+      <div className={`livekit-student-page student-room-chat-portal${isOpen ? ' is-open' : ''}${isDisabled ? ' is-disabled' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ' is-mobile-portrait'}`}>
         {panel}
       </div>,
       document.body
@@ -882,10 +884,16 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFullscreenControlsVisible, setIsFullscreenControlsVisible] = useState(false);
   const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
+  const [viewportMetrics, setViewportMetrics] = useState(() => ({
+    width: typeof window !== 'undefined' ? Math.round(window.visualViewport?.width || window.innerWidth || 0) : 0,
+    height: typeof window !== 'undefined' ? Math.round(window.visualViewport?.height || window.innerHeight || 0) : 0
+  }));
   const roomShellRef = useRef(null);
   const hasInitializedViewportRef = useRef(false);
   const hasAttemptedAutoFullscreenRef = useRef(false);
   const isImmersive = isFullscreen || isImmersiveFallback;
+  const isMobileLandscape = isMobileViewport && viewportMetrics.width > viewportMetrics.height;
+  const isMobilePortrait = isMobileViewport && !isMobileLandscape;
 
   useEffect(() => {
     if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return undefined;
@@ -947,9 +955,47 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const syncViewportMetrics = () => {
+      const nextWidth = Math.round(window.visualViewport?.width || window.innerWidth || 0);
+      const nextHeight = Math.round(window.visualViewport?.height || window.innerHeight || 0);
+      setViewportMetrics({ width: nextWidth, height: nextHeight });
+
+      const target = roomShellRef.current;
+      if (target) {
+        target.style.setProperty('--student-room-live-vw', `${nextWidth}px`);
+        target.style.setProperty('--student-room-live-vh', `${nextHeight}px`);
+      }
+    };
+
+    syncViewportMetrics();
+    window.visualViewport?.addEventListener('resize', syncViewportMetrics);
+    window.visualViewport?.addEventListener('scroll', syncViewportMetrics);
+    window.addEventListener('resize', syncViewportMetrics);
+    window.addEventListener('orientationchange', syncViewportMetrics);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', syncViewportMetrics);
+      window.visualViewport?.removeEventListener('scroll', syncViewportMetrics);
+      window.removeEventListener('resize', syncViewportMetrics);
+      window.removeEventListener('orientationchange', syncViewportMetrics);
+      roomShellRef.current?.style.removeProperty('--student-room-live-vw');
+      roomShellRef.current?.style.removeProperty('--student-room-live-vh');
+    };
+  }, []);
+
+  useEffect(() => {
     if (!roomPolicy.chatDisabled) return;
     setIsChatOpen(false);
   }, [roomPolicy.chatDisabled]);
+
+  useEffect(() => {
+    if (!isMobileViewport) return;
+    if (isMobileLandscape && isChatOpen) {
+      setIsFullscreenControlsVisible(false);
+    }
+  }, [isChatOpen, isMobileLandscape, isMobileViewport]);
 
   useEffect(() => {
     if (!autoEnterImmersive) return;
@@ -1147,7 +1193,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
   }
 
   return (
-    <section ref={roomShellRef} className={`card livekit-conference-card student-room-shell${isImmersive ? ' is-immersive' : ''}${isChatOpen ? ' has-chat-open' : ''}`}>
+    <section ref={roomShellRef} className={`card livekit-conference-card student-room-shell${isImmersive ? ' is-immersive' : ''}${isChatOpen ? ' has-chat-open' : ''}${isMobileViewport ? ' is-mobile-view' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}${isMobilePortrait ? ' is-mobile-portrait' : ''}`}>
       <LiveKitRoom
         token={connectionInfo.token}
         serverUrl={connectionInfo.livekitUrl}
@@ -1165,7 +1211,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
         }}
       >
         <StudentRoomPolicySync onPolicyChange={setRoomPolicy} />
-        <StudentStageConference isFullscreen={isImmersive} onToggleFullscreen={handleToggleFullscreen} onStageInteract={handleStageInteract} />
+        <StudentStageConference isFullscreen={isImmersive} onStageInteract={handleStageInteract} isMobileViewport={isMobileViewport} isMobileLandscape={isMobileLandscape} />
         <StudentRoomStatusOverlay />
         <RoomAudioRenderer />
         <StudentRoomControls
@@ -1173,6 +1219,8 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
           onError={setErrorMessage}
           isChatOpen={isChatOpen}
           isImmersive={isImmersive}
+          isMobileViewport={isMobileViewport}
+          isMobileLandscape={isMobileLandscape}
           isOverlayVisible={!isImmersive || isFullscreenControlsVisible}
           onToggleChat={() => setIsChatOpen((current) => !current)}
           onLeave={() => {
@@ -1188,6 +1236,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
           isMobileViewport={isMobileViewport}
+          isMobileLandscape={isMobileLandscape}
         />
         <StudentPollOverlay participantIdentity={`student-${session?.username || 'viewer'}-${classSession?._id || 'room'}`} onError={setErrorMessage} />
       </LiveKitRoom>

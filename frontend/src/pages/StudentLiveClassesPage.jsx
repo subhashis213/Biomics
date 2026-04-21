@@ -266,6 +266,11 @@ export default function StudentLiveClassesPage() {
     }
   }
 
+  function scrollToSection(sectionId) {
+    if (typeof document === 'undefined') return;
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   async function loadWorkspace(options = {}) {
     const requestId = loadRequestRef.current + 1;
     loadRequestRef.current = requestId;
@@ -480,11 +485,45 @@ export default function StudentLiveClassesPage() {
 
         {!isLiveFocusMode ? (
           <section id="section-student-live-overview" className="workspace-hero livekit-student-hero">
-            <div>
+            <div className="livekit-student-hero-copy">
               <p className="eyebrow">Course Live Access</p>
-              <h2>Join live classes, see blocked calendar slots, and enter the room only when you choose to join</h2>
-              <p className="subtitle">This area is separate from your regular dashboard so course live sessions feel focused, classroom-ready, and easy to join.</p>
+              <h2>Enter a cleaner mobile classroom, join the live teacher room fast, and track every scheduled class without losing focus.</h2>
+              <p className="subtitle">The live section is now built around quick entry, full-screen class viewing, and a predictable mobile flow for chat, schedules, and live-room access.</p>
+              <div className="livekit-student-hero-actions">
+                {workspace.activeClass ? (
+                  <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(workspace.activeClass._id)}`)}>
+                    Join Live Class
+                  </button>
+                ) : (
+                  <button type="button" className="primary-btn" onClick={() => scrollToSection('section-student-live-calendar')}>
+                    View Schedule
+                  </button>
+                )}
+                <button type="button" className="secondary-btn" onClick={() => scrollToSection('section-student-live-room')}>
+                  Open Live Room
+                </button>
+              </div>
+              <div className="livekit-student-hero-highlights">
+                <span className="livekit-student-hero-highlight">Mobile-first classroom</span>
+                <span className="livekit-student-hero-highlight">Right-side class chat</span>
+                <span className="livekit-student-hero-highlight">Full-screen live focus</span>
+              </div>
             </div>
+            <aside className="livekit-student-hero-spotlight">
+              <span className="livekit-student-hero-spotlight-kicker">Next classroom moment</span>
+              <strong>{workspace.activeClass?.title || nextCalendarEntry?.title || 'No live class scheduled right now'}</strong>
+              <p>
+                {workspace.activeClass
+                  ? `${formatDateTime(workspace.activeClass.startedAt)}${workspace.activeClass.course ? ` • ${workspace.activeClass.course}` : ''}`
+                  : nextCalendarEntry
+                    ? `${formatAgendaDay(nextCalendarEntry.startsAt)} at ${formatTimeRange(nextCalendarEntry.startsAt, nextCalendarEntry.endsAt)}`
+                    : 'Your upcoming class and blocked-slot timeline will appear here as soon as the schedule is available.'}
+              </p>
+              <div className="livekit-student-hero-spotlight-meta">
+                <span className="livekit-student-hero-pill">{hasCourseAccess ? 'Course ready' : 'Course locked'}</span>
+                <span className="livekit-student-hero-pill">{futureCalendarItemCount} upcoming</span>
+              </div>
+            </aside>
             <div className="workspace-hero-stats livekit-hero-stats">
               <StatCard label="Course Access" value={hasCourseAccess ? 'Enabled' : 'Locked'} />
               <StatCard label="Live Now" value={workspace.activeClass ? '1' : '0'} />
@@ -496,6 +535,9 @@ export default function StudentLiveClassesPage() {
         <section id="section-student-live-room" className={`livekit-student-room-section${isLiveFocusMode ? ' focus-mode' : ''}`}>
           {workspace.activeClass ? (
             <section className="card workspace-panel livekit-live-banner-panel">
+              <div className="livekit-live-banner-indicator" aria-hidden="true">
+                <span className="livekit-live-banner-indicator-ring" />
+              </div>
               <div className="livekit-live-banner-copy">
                 <span className="live-badge pulsing">LIVE NOW</span>
                 <div>
@@ -503,16 +545,22 @@ export default function StudentLiveClassesPage() {
                   <p>{workspace.activeClass.description || 'Your teacher is already inside the room.'}</p>
                   <span>{formatDateTime(workspace.activeClass.startedAt)}{workspace.activeClass.course ? ` • ${workspace.activeClass.course}` : ''}</span>
                 </div>
+                <div className="livekit-live-banner-meta">
+                  <span className="livekit-live-banner-pill">Tap once to join</span>
+                  <span className="livekit-live-banner-pill">Optimized for mobile fullscreen</span>
+                </div>
               </div>
-              {isLiveFocusMode ? (
-                <button type="button" className="secondary-btn" onClick={() => navigate('/student/live-classes')}>
-                  Exit Classroom Focus
-                </button>
-              ) : (
-                <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(workspace.activeClass._id)}`)}>
-                  Join Live Class
-                </button>
-              )}
+              <div className="livekit-live-banner-actions">
+                {isLiveFocusMode ? (
+                  <button type="button" className="secondary-btn" onClick={() => navigate('/student/live-classes')}>
+                    Exit Classroom Focus
+                  </button>
+                ) : (
+                  <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(workspace.activeClass._id)}`)}>
+                    Join Live Class
+                  </button>
+                )}
+              </div>
             </section>
           ) : null}
 
