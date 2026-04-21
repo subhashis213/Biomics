@@ -576,16 +576,17 @@ function StudentRoomControls({
         <button type="button" className={`student-room-control-btn${isMicEnabled ? ' is-live' : ''}`} onClick={handleToggleMic} disabled={policy.studentsMuted}>
           {policy.studentsMuted ? 'Muted by teacher' : isMicEnabled ? 'Mute mic' : 'Unmute mic'}
         </button>
-        <button
-          type="button"
-          className={`student-room-control-btn${isChatOpen ? ' is-live' : ''}`}
-          onPointerDown={stopRoomControlEvent}
-          onTouchStart={stopRoomControlEvent}
-          onClick={onToggleChat}
-          disabled={policy.chatDisabled}
-        >
-          {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
-        </button>
+        {!isMobileViewport ? (
+          <button
+            type="button"
+            className={`student-room-control-btn${isChatOpen ? ' is-live' : ''}`}
+            onPointerDown={stopRoomControlEvent}
+            onTouchStart={stopRoomControlEvent}
+            onClick={onToggleChat}
+          >
+            {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
+          </button>
+        ) : null}
         <button type="button" className="student-room-control-btn student-room-control-btn--ghost" onClick={handleLeaveRoom}>
           Leave class
         </button>
@@ -1283,6 +1284,18 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
             onLeave?.();
           }}
         />
+        {isMobileViewport ? (
+          <button
+            type="button"
+            className={`student-room-mobile-chat-toggle${isChatOpen ? ' is-open' : ''}${roomPolicy.chatDisabled ? ' is-disabled' : ''}`}
+            onClick={handleToggleChat}
+            aria-expanded={isChatOpen}
+            aria-label={roomPolicy.chatDisabled ? 'Show chat locked message' : isChatOpen ? 'Hide class chat' : 'Open class chat'}
+          >
+            <span className="student-room-mobile-chat-toggle-icon" aria-hidden="true">💬</span>
+            <span>{roomPolicy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}</span>
+          </button>
+        ) : null}
         <StudentRoomChatPanel
           policy={roomPolicy}
           isOpen={isChatOpen}
