@@ -269,13 +269,17 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
     }
   }, []);
 
+  const hasScreenShare = Boolean(screenShareTrack);
+  const showImmersiveStage = hasScreenShare && isFullscreen;
+  const showFloatingPreview = hasScreenShare && (isFullscreen || isMobileViewport);
+
   useEffect(() => {
-    if (!(screenShareTrack && isFullscreen)) {
+    if (!showFloatingPreview) {
       setFloatingPreviewPosition({ x: 16, y: 16 });
       setIsDraggingPreview(false);
       previewDragRef.current = null;
     }
-  }, [isFullscreen, screenShareTrack]);
+  }, [showFloatingPreview]);
 
   useEffect(() => {
     if (!isDraggingPreview) return undefined;
@@ -315,9 +319,6 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
       window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isDraggingPreview]);
-
-  const hasScreenShare = Boolean(screenShareTrack);
-  const showImmersiveStage = hasScreenShare && isFullscreen;
 
   function clampScreenShareZoom(nextScale) {
     return Math.min(3, Math.max(1, Number(nextScale.toFixed(2))));
@@ -361,7 +362,7 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
   }
 
   function handlePreviewPointerDown(event) {
-    if (!showImmersiveStage || !previewRef.current) return;
+    if (!showFloatingPreview || !previewRef.current) return;
     const previewRect = previewRef.current.getBoundingClientRect();
     previewDragRef.current = {
       offsetX: event.clientX - previewRect.left,
@@ -474,8 +475,8 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
         {primaryTrack && supportingTracks.length ? (
           <div
             ref={previewRef}
-            className={`student-video-conference-support-rail${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showImmersiveStage ? ' is-draggable' : ''}${isDraggingPreview ? ' is-dragging' : ''}`}
-            style={showImmersiveStage ? { '--student-preview-left': `${floatingPreviewPosition.x}px`, '--student-preview-top': `${floatingPreviewPosition.y}px` } : undefined}
+            className={`student-video-conference-support-rail${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showFloatingPreview ? ' is-floating-overlay is-draggable' : ''}${isDraggingPreview ? ' is-dragging' : ''}`}
+            style={showFloatingPreview ? { '--student-preview-left': `${floatingPreviewPosition.x}px`, '--student-preview-top': `${floatingPreviewPosition.y}px` } : undefined}
             onPointerDown={handlePreviewPointerDown}
           >
             <TrackLoop tracks={supportingTracks}>
@@ -501,6 +502,10 @@ function StudentRoomControls({
 }) {
   const room = useRoomContext();
   const [isMicEnabled, setIsMicEnabled] = useState(false);
+
+  function stopRoomControlEvent(event) {
+    event.stopPropagation();
+  }
 
   useEffect(() => {
     if (!room) return undefined;
@@ -574,6 +579,8 @@ function StudentRoomControls({
         <button
           type="button"
           className={`student-room-control-btn${isChatOpen ? ' is-live' : ''}`}
+          onPointerDown={stopRoomControlEvent}
+          onTouchStart={stopRoomControlEvent}
           onClick={onToggleChat}
           disabled={policy.chatDisabled}
         >
@@ -587,10 +594,18 @@ function StudentRoomControls({
   );
 }
 
-function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport, isMobileLandscape }) {
+function StudentRoomChatPanel({ policy, isOpen, onClose, openedAt, isMobileViewport, isMobileLandscape }) {
   const isDisabled = policy.chatDisabled;
   const [isBackdropInteractive, setIsBackdropInteractive] = useState(false);
   const shouldShowBackdrop = isMobileViewport && (isOpen || isDisabled);
+
+  function handleCloseRequest(event) {
+    event?.stopPropagation?.();
+    if (isOpen && Date.now() - Number(openedAt || 0) < 320) {
+      return;
+    }
+    onClose?.();
+  }
 
   useEffect(() => {
     if (!shouldShowBackdrop) {
@@ -600,7 +615,7 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport, isMob
 
     const timeoutId = window.setTimeout(() => {
       setIsBackdropInteractive(true);
-    }, 160);
+    }, 240);
 
     return () => window.clearTimeout(timeoutId);
   }, [shouldShowBackdrop]);
@@ -612,18 +627,18 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport, isMob
           type="button"
           className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}${isBackdropInteractive ? ' is-interactive' : ''}`}
           aria-label="Close chat"
-          onClick={onClose}
+          onClick={handleCloseRequest}
         />
       ) : null}
       {isDisabled ? (
-        <section className={`student-room-chat-panel is-disabled${isMobileViewport ? ' is-mobile-drawer' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`} aria-live="polite">
+        <section className={`student-room-chat-panel is-disabled${isMobileViewport ? ' is-mobile-drawer' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`} aria-live="polite" onClick={(event) => event.stopPropagation()}>
           <div className="student-room-chat-panel-head">
             <div>
               <p className="eyebrow">Class Chat</p>
               <strong>Chat is turned off</strong>
             </div>
             {isMobileViewport ? (
-              <button type="button" className="student-room-chat-close-btn" onClick={onClose}>
+              <button type="button" className="student-room-chat-close-btn" onClick={handleCloseRequest}>
                 Close
               </button>
             ) : null}
@@ -631,13 +646,13 @@ function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport, isMob
           <p className="student-room-chat-disabled-copy">The teacher has locked chat for this live class. You can use it again when they reopen it.</p>
         </section>
       ) : (
-        <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}${isMobileViewport ? ' is-mobile-drawer' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`} aria-live="polite">
+        <section className={`student-room-chat-panel${isOpen ? ' is-open' : ''}${isMobileViewport ? ' is-mobile-drawer' : ''}${isMobileLandscape ? ' is-mobile-landscape' : ''}`} aria-live="polite" onClick={(event) => event.stopPropagation()}>
           <div className="student-room-chat-panel-head">
             <div>
               <p className="eyebrow">Class Chat</p>
               <strong>Messages</strong>
             </div>
-            <button type="button" className="student-room-chat-close-btn" onClick={onClose}>
+            <button type="button" className="student-room-chat-close-btn" onClick={handleCloseRequest}>
               Close
             </button>
           </div>
@@ -897,6 +912,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [roomPolicy, setRoomPolicy] = useState(createDefaultRoomPolicy);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [lastChatOpenedAt, setLastChatOpenedAt] = useState(0);
   const [isFullscreenControlsVisible, setIsFullscreenControlsVisible] = useState(false);
   const [liveKitTheme, setLiveKitTheme] = useState(() => getLiveKitTheme(getDocumentTheme()));
   const [viewportMetrics, setViewportMetrics] = useState(() => ({
@@ -1119,6 +1135,27 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
     }
   }
 
+  function handleOpenChat() {
+    setLastChatOpenedAt(Date.now());
+    setIsChatOpen(true);
+    setIsFullscreenControlsVisible(true);
+  }
+
+  function handleCloseChat() {
+    setIsChatOpen(false);
+    if (isImmersive) {
+      setIsFullscreenControlsVisible(true);
+    }
+  }
+
+  function handleToggleChat() {
+    if (isChatOpen) {
+      handleCloseChat();
+      return;
+    }
+    handleOpenChat();
+  }
+
   useEffect(() => {
     if (!autoEnterImmersive || hasAttemptedAutoFullscreenRef.current) return;
     if (loading || !connectionInfo?.token || !connectionInfo?.livekitUrl) return;
@@ -1237,7 +1274,7 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
           isMobileViewport={isMobileViewport}
           isMobileLandscape={isMobileLandscape}
           isOverlayVisible={!isImmersive || isFullscreenControlsVisible}
-          onToggleChat={() => setIsChatOpen((current) => !current)}
+          onToggleChat={handleToggleChat}
           onLeave={() => {
             setConnectionInfo(null);
             setRoomPolicy(createDefaultRoomPolicy());
@@ -1249,7 +1286,8 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
         <StudentRoomChatPanel
           policy={roomPolicy}
           isOpen={isChatOpen}
-          onClose={() => setIsChatOpen(false)}
+          onClose={handleCloseChat}
+          openedAt={lastChatOpenedAt}
           isMobileViewport={isMobileViewport}
           isMobileLandscape={isMobileLandscape}
         />

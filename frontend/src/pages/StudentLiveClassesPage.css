@@ -414,6 +414,10 @@
   flex-wrap: wrap;
 }
 
+.livekit-student-page .student-room-shell .student-room-controls-status:empty {
+  display: none;
+}
+
 .livekit-student-page .student-room-shell .student-room-control-pill {
   display: inline-flex;
   align-items: center;
@@ -2729,6 +2733,11 @@ html[data-theme='dark'] .livekit-student-page,
   pointer-events: none;
 }
 
+.livekit-student-page.student-room-chat-portal.is-open,
+.livekit-student-page.student-room-chat-portal.is-disabled {
+  pointer-events: auto;
+}
+
 .livekit-student-page.student-room-chat-portal .student-room-chat-backdrop {
   position: fixed;
   inset: 0;
@@ -2786,6 +2795,41 @@ html[data-theme='dark'] .livekit-student-page,
   visibility: visible;
   pointer-events: auto;
   transform: translateX(0);
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay {
+  position: absolute;
+  top: var(--student-preview-top, 10px);
+  left: var(--student-preview-left, 10px);
+  right: auto;
+  z-index: 5;
+  width: min(34vw, 168px);
+  min-width: 108px;
+  max-width: 168px;
+  padding: 6px;
+  overflow: visible;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.62);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.28);
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-tile,
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-media,
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-media-video,
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay video {
+  min-height: auto;
+  height: auto;
+  border-radius: 14px;
+}
+
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-metadata,
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-name,
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-identity,
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-focus-toggle-button,
+.livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-tile::after {
+  display: none !important;
 }
 
 .livekit-student-page.student-room-chat-portal .student-room-chat-panel-head {
@@ -3312,6 +3356,107 @@ html[data-theme='dark'] .livekit-student-page,
   font-size: 0.82rem;
 }
 
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view.is-immersive,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view:fullscreen,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view:-webkit-full-screen {
+  position: fixed;
+  inset: 0;
+  width: var(--student-room-live-vw);
+  height: var(--student-room-live-vh);
+  min-height: var(--student-room-live-vh);
+  max-height: var(--student-room-live-vh);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: #020617 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .lk-room-container,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .lk-layout-wrapper,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .lk-video-conference,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-stage {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-stage,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-primary,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-grid-wrapper {
+  gap: 0;
+  border-radius: 0;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-primary,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-grid-wrapper {
+  min-height: 100%;
+  height: 100%;
+  background: #020617 !important;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-primary.is-screen-share {
+  grid-template-rows: minmax(0, 1fr);
+  padding: 0;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-toolbar,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-screen-share-toolbar,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-screen-share-footnote {
+  display: none;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-screen-share-viewport,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-screen-share-tile,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-screen-share-tile .lk-participant-media-video,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-screen-share-tile video {
+  height: 100%;
+  border-radius: 0;
+  background: #000;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view.is-immersive-overlay {
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  max-width: none;
+  padding: 8px;
+  gap: 8px;
+  border-radius: 18px;
+  background: rgba(2, 6, 23, 0.64) !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  backdrop-filter: blur(18px);
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view .student-room-controls-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view .student-room-control-btn,
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view .student-room-chat-close-btn {
+  min-height: 40px;
+  padding: 0 8px;
+  border-radius: 14px;
+  font-size: 0.76rem;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view .student-room-control-btn--ghost {
+  grid-column: auto;
+}
+
+.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.has-screen-share.is-floating-overlay {
+  width: min(34vw, 148px);
+  min-width: 96px;
+  max-width: 148px;
+  padding: 4px;
+}
+
 .livekit-student-page .student-room-shell.is-mobile-view.is-immersive,
 .livekit-student-page .student-room-shell.is-mobile-view:fullscreen,
 .livekit-student-page .student-room-shell.is-mobile-view:-webkit-full-screen {
@@ -3578,6 +3723,25 @@ html[data-theme='light'] .livekit-student-page,
 }
 
 @media (max-width: 420px) {
+  .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view.is-immersive-overlay {
+    left: max(6px, env(safe-area-inset-left));
+    right: max(6px, env(safe-area-inset-right));
+    bottom: max(6px, env(safe-area-inset-bottom));
+    padding: 6px;
+    border-radius: 14px;
+  }
+
+  .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view .student-room-control-btn {
+    min-height: 36px;
+    font-size: 0.68rem;
+  }
+
+  .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.has-screen-share.is-floating-overlay {
+    width: min(32vw, 122px);
+    min-width: 88px;
+    border-radius: 14px;
+  }
+
   .livekit-student-page .student-room-shell.is-mobile-view {
     padding: 6px;
     border-radius: 18px;
