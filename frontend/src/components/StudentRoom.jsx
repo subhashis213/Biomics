@@ -1157,6 +1157,12 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
     handleOpenChat();
   }
 
+  function handleMobileChatToggle(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    handleToggleChat();
+  }
+
   useEffect(() => {
     if (!autoEnterImmersive || hasAttemptedAutoFullscreenRef.current) return;
     if (loading || !connectionInfo?.token || !connectionInfo?.livekitUrl) return;
@@ -1288,7 +1294,9 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
           <button
             type="button"
             className={`student-room-mobile-chat-toggle${isChatOpen ? ' is-open' : ''}${roomPolicy.chatDisabled ? ' is-disabled' : ''}`}
-            onClick={handleToggleChat}
+            onPointerDown={handleMobileChatToggle}
+            onTouchStart={handleMobileChatToggle}
+            onClick={handleMobileChatToggle}
             aria-expanded={isChatOpen}
             aria-label={roomPolicy.chatDisabled ? 'Show chat locked message' : isChatOpen ? 'Hide class chat' : 'Open class chat'}
           >

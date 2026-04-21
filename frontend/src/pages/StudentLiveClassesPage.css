@@ -2809,6 +2809,25 @@ html[data-theme='dark'] .livekit-student-page,
   transform: translateX(0);
 }
 
+.livekit-student-page.student-room-chat-portal.is-mobile-portrait .student-room-chat-panel {
+  top: auto;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: 0;
+  left: max(10px, env(safe-area-inset-left));
+  width: auto;
+  max-width: none;
+  min-height: min(58dvh, 560px);
+  max-height: min(82dvh, 720px);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -18px 40px rgba(2, 6, 23, 0.34);
+  transform: translateY(calc(100% + 18px));
+}
+
+.livekit-student-page.student-room-chat-portal.is-mobile-portrait .student-room-chat-panel.is-open,
+.livekit-student-page.student-room-chat-portal.is-mobile-portrait .student-room-chat-panel.is-disabled {
+  transform: translateY(0);
+}
+
 .livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay {
   position: absolute;
   top: var(--student-preview-top, 10px);
@@ -2842,10 +2861,6 @@ html[data-theme='dark'] .livekit-student-page,
 .livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-focus-toggle-button,
 .livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-tile::after {
   display: none !important;
-}
-
-.livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-stage {
-  position: relative;
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay {
@@ -3422,7 +3437,7 @@ html[data-theme='dark'] .livekit-student-page,
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view .student-room-mobile-chat-toggle {
-  position: absolute;
+  position: fixed;
   right: max(10px, env(safe-area-inset-right));
   bottom: calc(max(10px, env(safe-area-inset-bottom)) + 72px);
   z-index: 9;
@@ -3440,6 +3455,9 @@ html[data-theme='dark'] .livekit-student-page,
   letter-spacing: 0.01em;
   box-shadow: 0 16px 28px rgba(2, 6, 23, 0.28);
   backdrop-filter: blur(18px);
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view .student-room-mobile-chat-toggle.is-open {
