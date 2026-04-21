@@ -589,13 +589,28 @@ function StudentRoomControls({
 
 function StudentRoomChatPanel({ policy, isOpen, onClose, isMobileViewport, isMobileLandscape }) {
   const isDisabled = policy.chatDisabled;
+  const [isBackdropInteractive, setIsBackdropInteractive] = useState(false);
   const shouldShowBackdrop = isMobileViewport && (isOpen || isDisabled);
+
+  useEffect(() => {
+    if (!shouldShowBackdrop) {
+      setIsBackdropInteractive(false);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsBackdropInteractive(true);
+    }, 160);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [shouldShowBackdrop]);
+
   const panel = (
     <>
       {isMobileViewport ? (
         <button
           type="button"
-          className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}`}
+          className={`student-room-chat-backdrop${shouldShowBackdrop ? ' is-open' : ''}${isBackdropInteractive ? ' is-interactive' : ''}`}
           aria-label="Close chat"
           onClick={onClose}
         />
