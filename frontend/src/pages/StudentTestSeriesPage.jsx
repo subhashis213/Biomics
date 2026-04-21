@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { previewTestSeriesVoucher, requestJson } from '../api';
+import { previewTestSeriesVoucher, requestJson, resolveApiAssetUrl } from '../api';
 import AppShell from '../components/AppShell';
 import TopicTestCatalogBoard from '../components/TopicTestCatalogBoard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
@@ -974,7 +974,16 @@ export default function StudentTestSeriesPage() {
                   <div className="ts-review-q-row">
                     <span className={'ts-review-status-dot ' + (item.isCorrect ? 'dot-correct' : item.selectedIndex === -1 ? 'dot-skip' : 'dot-wrong')} />
                     <span className="ts-review-num">Q{i + 1}</span>
-                    <p className="ts-review-q-text">{item.question}</p>
+                    <div className="ts-review-question-body">
+                      <p className="ts-review-q-text">{item.question}</p>
+                      {item.imageUrl ? (
+                        <img
+                          src={resolveApiAssetUrl(item.imageUrl)}
+                          alt={item.imageName || `Review question ${i + 1}`}
+                          className="ts-question-image"
+                        />
+                      ) : null}
+                    </div>
                   </div>
                   <div className="ts-review-options">
                     {item.options.map((opt, oi) => (
@@ -1054,7 +1063,16 @@ export default function StudentTestSeriesPage() {
                 <span className={'ts-timer-mobile' + (isUrgent ? ' urgent' : '')}>⏱ {mins}:{secs}</span>
               </div>
 
-              <p className="ts-question-text">{q.question}</p>
+              <div className="ts-question-body">
+                <p className="ts-question-text">{q.question}</p>
+                {q.imageUrl ? (
+                  <img
+                    src={resolveApiAssetUrl(q.imageUrl)}
+                    alt={q.imageName || `Question ${currentQ + 1}`}
+                    className="ts-question-image"
+                  />
+                ) : null}
+              </div>
 
               <div className="ts-options-list">
                 {q.options.map((opt, oi) => (

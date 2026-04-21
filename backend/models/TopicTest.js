@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const topicTestQuestionSchema = new mongoose.Schema({
   question: { type: String, required: true, trim: true },
+  imageUrl: { type: String, trim: true, default: '' },
+  imageName: { type: String, trim: true, default: '' },
   options: {
     type: [{ type: String, trim: true }],
     validate: {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { requestJson } from '../api';
+import { requestJson, resolveApiAssetUrl, uploadTestSeriesQuestionImage } from '../api';
 import AppShell from '../components/AppShell';
 import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
@@ -18,8 +18,19 @@ function normalizeText(value) {
   return String(value || '').trim();
 }
 
+function normalizeQuestionDraft(question = {}) {
+  return {
+    question: String(question.question || ''),
+    imageUrl: String(question.imageUrl || ''),
+    imageName: String(question.imageName || ''),
+    options: Array.isArray(question.options) ? [...question.options] : ['', '', '', ''],
+    correctIndex: Number(question.correctIndex ?? 0),
+    explanation: String(question.explanation || '')
+  };
+}
+
 function emptyQuestion() {
-  return { question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' };
+  return normalizeQuestionDraft();
 }
 
 export default function AdminTopicTestBuilderPage() {
@@ -65,6 +76,7 @@ export default function AdminTopicTestBuilderPage() {
   const [clipboardModalOpen, setClipboardModalOpen] = useState(false);
   const [clipboardCount, setClipboardCount] = useState(() => readClipboard()?.questions?.length || 0);
   const [copyToast, setCopyToast] = useState(null);
+  const [uploadingQuestionIndex, setUploadingQuestionIndex] = useState(-1);
 
   function refreshClipboardCount() {
     setClipboardCount(readClipboard()?.questions?.length || 0);
@@ -83,12 +95,7 @@ export default function AdminTopicTestBuilderPage() {
   }
 
   function handlePasteQuestions(pasted, pasteMode) {
-    const normalized = pasted.map((q) => ({
-      question: q.question,
-      options: Array.isArray(q.options) ? [...q.options] : ['', '', '', ''],
-      correctIndex: Number(q.correctIndex ?? 0),
-      explanation: q.explanation || ''
-    }));
+    const normalized = pasted.map((q) => normalizeQuestionDraft(q));
     if (pasteMode === 'replace') {
       setQuestions(normalized);
     } else {
@@ -213,6 +220,12 @@ export default function AdminTopicTestBuilderPage() {
     setQuestions((prev) => prev.map((q, idx) => idx === i ? { ...q, [field]: value } : q));
   }
 
+  function setQuestionImage(i, imageUrl, imageName) {
+    setQuestions((prev) => prev.map((q, idx) => idx === i
+      ? { ...q, imageUrl: String(imageUrl || ''), imageName: String(imageName || '') }
+      : q));
+  }
+
   function updateOption(qi, oi, value) {
     setQuestions((prev) => prev.map((q, idx) => {
       if (idx !== qi) return q;
@@ -228,6 +241,25 @@ export default function AdminTopicTestBuilderPage() {
 
   function removeQuestion(i) {
     setQuestions((prev) => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev);
+  }
+
+  async function handleQuestionImageUpload(questionIndex, file) {
+    if (!file) return;
+    setUploadingQuestionIndex(questionIndex);
+    setMessage(null);
+    try {
+      const response = await uploadTestSeriesQuestionImage(file);
+      setQuestionImage(questionIndex, response?.imageUrl || '', response?.imageName || file.name || '');
+      setMessage({ type: 'success', text: `Question ${questionIndex + 1} image uploaded.` });
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message || 'Failed to upload question image.' });
+    } finally {
+      setUploadingQuestionIndex(-1);
+    }
+  }
+
+  function clearQuestionImage(questionIndex) {
+    setQuestionImage(questionIndex, '', '');
   }
 
   function resetBuilder() {
@@ -250,10 +282,8 @@ export default function AdminTopicTestBuilderPage() {
     setDifficulty(test.difficulty || 'medium');
     setDurationMinutes(test.durationMinutes || 30);
     setQuestions((test.questions || []).map((q) => ({
-      question: q.question,
-      options: [...q.options],
-      correctIndex: Number(q.correctIndex || 0),
-      explanation: q.explanation || ''
+      ...normalizeQuestionDraft(q),
+      options: [...q.options]
     })));
     setMessage(null);
     if (new URLSearchParams(location.search).get('edit') !== test._id) {
@@ -296,6 +326,8 @@ export default function AdminTopicTestBuilderPage() {
           durationMinutes: Number(durationMinutes),
           questions: questions.map((q) => ({
             question: q.question.trim(),
+            imageUrl: String(q.imageUrl || '').trim(),
+            imageName: String(q.imageName || '').trim(),
             options: q.options.map((o) => o.trim()),
             correctIndex: Number(q.correctIndex),
             explanation: String(q.explanation || '').trim()
@@ -376,7 +408,7 @@ export default function AdminTopicTestBuilderPage() {
           <PdfMcqExtractor
             sectionName="Topic Test"
             onApplyQuestions={(extracted) => {
-              setQuestions(extracted);
+              setQuestions(extracted.map((question) => normalizeQuestionDraft(question)));
               setMessage({ type: 'success', text: `Loaded ${extracted.length} extracted question${extracted.length !== 1 ? 's' : ''} into the form.` });
             }}
           />
@@ -474,6 +506,38 @@ export default function AdminTopicTestBuilderPage() {
                         required
                       />
                     </label>
+                    <div className="qe-image-toolbar">
+                      <label className="qe-image-upload-btn">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={saving || uploadingQuestionIndex === qi}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] || null;
+                            event.target.value = '';
+                            handleQuestionImageUpload(qi, file);
+                          }}
+                        />
+                        {uploadingQuestionIndex === qi ? 'Uploading image...' : q.imageUrl ? 'Replace image' : 'Upload question image'}
+                      </label>
+                      {q.imageUrl ? (
+                        <button type="button" className="danger-text-btn" onClick={() => clearQuestionImage(qi)}>
+                          Remove image
+                        </button>
+                      ) : null}
+                    </div>
+                    {q.imageUrl ? (
+                      <div className="qe-image-preview-wrap">
+                        <img
+                          src={resolveApiAssetUrl(q.imageUrl)}
+                          alt={q.imageName || `Question ${qi + 1}`}
+                          className="qe-image-preview"
+                        />
+                        <p className="qe-image-meta">Attached image: {q.imageName || `Question ${qi + 1} image`}</p>
+                      </div>
+                    ) : (
+                      <p className="qe-image-help">Upload an image when the question includes a diagram, graph, or figure.</p>
+                    )}
                     <div className="quiz-options-list">
                       {q.options.map((opt, oi) => (
                         <label key={`ts-opt-${qi}-${oi}`}>

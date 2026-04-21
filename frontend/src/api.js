@@ -85,6 +85,12 @@ export function getApiBase() {
   return API_BASE;
 }
 
+export function resolveApiAssetUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+  return /^https?:\/\//i.test(value) ? value : `${getApiBase()}${value}`;
+}
+
 export function openStudentLivekitWorkspaceStream() {
   const token = getToken();
   if (!token) {
@@ -208,6 +214,15 @@ export async function requestJson(path, options = {}) {
     }
     throw firstError;
   }
+}
+
+export async function uploadTestSeriesQuestionImage(file) {
+  const formData = new FormData();
+  formData.append('image', file);
+  return requestJson('/test-series/question-image', {
+    method: 'POST',
+    body: formData
+  });
 }
 
 export function uploadMaterial(videoId, file, onProgress) {

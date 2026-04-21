@@ -1,6 +1,10 @@
 const crypto = require('crypto');
 const express = require('express');
+const fs = require('fs');
+const multer = require('multer');
+const path = require('path');
 const Razorpay = require('razorpay');
+const { v2: cloudinary } = require('cloudinary');
 const { authenticateToken } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLog');
 const TestSeriesPricing = require('../models/TestSeriesPricing');
@@ -13,6 +17,43 @@ const User = require('../models/User');
 const Voucher = require('../models/Voucher');
 
 const router = express.Router();
+const uploadsDir = path.join(__dirname, '../uploads');
+
+const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+const cloudinaryApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
+const cloudinaryApiSecret = String(process.env.CLOUDINARY_API_SECRET || '').trim();
+const hasCloudinaryConfig = !!(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret);
+
+if (hasCloudinaryConfig) {
+  cloudinary.config({
+    cloud_name: cloudinaryCloudName,
+    api_key: cloudinaryApiKey,
+    api_secret: cloudinaryApiSecret,
+    secure: true
+  });
+}
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const questionImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeBase = path.basename(file.originalname || 'question-image', ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    cb(null, `test-series-question-${Date.now()}-${safeBase}${ext || '.png'}`);
+  }
+});
+
+const questionImageUpload = multer({
+  storage: questionImageStorage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if ((file.mimetype || '').startsWith('image/')) return cb(null, true);
+    return cb(new Error('Only image files are allowed for question images.'));
+  }
+});
 
 const SUPPORTED_COURSES = [
   '11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
@@ -88,9 +129,17 @@ function validateQuestions(questions) {
   return null;
 }
 
+function normalizeQuestionImage(item = {}) {
+  return {
+    imageUrl: String(item.imageUrl || '').trim(),
+    imageName: String(item.imageName || '').trim()
+  };
+}
+
 function sanitizeQuestions(questions = []) {
   return questions.map((item) => ({
     question: String(item.question).trim(),
+    ...normalizeQuestionImage(item),
     options: item.options.map((opt) => String(opt).trim()),
     correctIndex: Number(item.correctIndex),
     explanation: String(item.explanation || '').trim()
@@ -100,6 +149,7 @@ function sanitizeQuestions(questions = []) {
 function sanitizeQuestionsForStudent(questions = []) {
   return questions.map((item) => ({
     question: item.question,
+    ...normalizeQuestionImage(item),
     options: item.options,
     explanation: ''   // hide explanation until submitted
   }));
@@ -109,6 +159,8 @@ function buildTopicTestSignature(testLike = {}) {
   const normalizedQuestions = Array.isArray(testLike.questions)
     ? testLike.questions.map((item) => ({
         question: String(item?.question || '').trim(),
+        imageUrl: String(item?.imageUrl || '').trim(),
+        imageName: String(item?.imageName || '').trim(),
         options: Array.isArray(item?.options) ? item.options.map((opt) => String(opt || '').trim()) : [],
         correctIndex: Number(item?.correctIndex ?? -1),
         explanation: String(item?.explanation || '').trim()
@@ -130,6 +182,31 @@ function calculatePercentage(score, total) {
   return Math.round((Number(score || 0) / safeTotal) * 100);
 }
 
+function safelyRemoveFile(filePath) {
+  if (!filePath) return;
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch (_) {
+    // Non-fatal cleanup error.
+  }
+}
+
+async function uploadQuestionImageToCloudinary(localPath) {
+  if (!hasCloudinaryConfig) return null;
+  if (!localPath) throw new Error('Question image upload path is missing.');
+
+  const uploadResult = await cloudinary.uploader.upload(localPath, {
+    folder: 'biomicshub/test-series-questions',
+    resource_type: 'image',
+    overwrite: true
+  });
+
+  return {
+    url: String(uploadResult?.secure_url || '').trim(),
+    publicId: String(uploadResult?.public_id || '').trim()
+  };
+}
+
 function summarizeAttempts(attempts = []) {
   if (!attempts.length) {
     return {
@@ -149,6 +226,44 @@ function summarizeAttempts(attempts = []) {
     lastAttemptAt: attempts[0]?.submittedAt || null
   };
 }
+
+router.post('/question-image', authenticateToken('admin'), (req, res) => {
+  questionImageUpload.single('image')(req, res, async (uploadError) => {
+    try {
+      if (uploadError instanceof multer.MulterError && uploadError.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Question image must be 8 MB or smaller.' });
+      }
+      if (uploadError) {
+        return res.status(400).json({ error: uploadError.message || 'Failed to upload question image.' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'Question image is required.' });
+      }
+
+      let imageUrl = `/uploads/${encodeURIComponent(req.file.filename)}`;
+      if (hasCloudinaryConfig) {
+        const uploadedImage = await uploadQuestionImageToCloudinary(req.file.path);
+        if (!uploadedImage?.url) {
+          safelyRemoveFile(req.file.path);
+          return res.status(500).json({ error: 'Cloud question image upload failed.' });
+        }
+        imageUrl = uploadedImage.url;
+        safelyRemoveFile(req.file.path);
+      }
+
+      return res.status(201).json({
+        message: 'Question image uploaded.',
+        imageUrl,
+        imageName: String(req.file.originalname || req.file.filename || '').trim()
+      });
+    } catch {
+      if (req.file?.path) {
+        safelyRemoveFile(req.file.path);
+      }
+      return res.status(500).json({ error: 'Failed to upload question image.' });
+    }
+  });
+});
 
 // ─── Admin: Pricing ──────────────────────────────────────────────────────────
 
@@ -523,6 +638,8 @@ router.post('/topic-tests/student/:testId/submit', authenticateToken('user'), as
       if (isCorrect) score += 1;
       return {
         question: q.question,
+        imageUrl: String(q.imageUrl || '').trim(),
+        imageName: String(q.imageName || '').trim(),
         options: q.options,
         selectedIndex,
         correctIndex,
@@ -634,6 +751,8 @@ router.post('/full-mocks/student/:mockId/submit', authenticateToken('user'), asy
       if (isCorrect) score += 1;
       return {
         question: q.question,
+        imageUrl: String(q.imageUrl || '').trim(),
+        imageName: String(q.imageName || '').trim(),
         options: q.options,
         selectedIndex,
         correctIndex,
