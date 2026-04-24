@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { requestJson } from '../api';
+import { requestJson, resolveApiAssetUrl, uploadTestSeriesPricingThumbnailAdmin, fetchCoursesAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
-const COURSE_CATEGORIES = [
-  '11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
-];
+// courses loaded from server
 
 function rupees(paise) {
   return `₹${(Number(paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -21,6 +19,8 @@ export default function AdminTestSeriesHubPage() {
   const [priceForm, setPriceForm] = useState({});
   const [banner, setBanner] = useState(null);
   const [savingCourse, setSavingCourse] = useState('');
+  const [uploadingCourse, setUploadingCourse] = useState('');
+  const [courses, setCourses] = useState([]);
 
   useAutoDismissMessage(banner, setBanner);
 
@@ -46,15 +46,39 @@ export default function AdminTestSeriesHubPage() {
       list.forEach((entry) => {
         form[entry.category] = {
           topicTest: String(Number(entry.topicTestPriceInPaise || 0) / 100),
+          topicTestMrp: String(Number(entry.topicTestMrpInPaise || 0) / 100),
+          topicTestValidityDays: String(Number(entry.topicTestValidityDays || 60)),
           fullMock: String(Number(entry.fullMockPriceInPaise || 0) / 100),
-          active: entry.active !== false
+          fullMockMrp: String(Number(entry.fullMockMrpInPaise || 0) / 100),
+          fullMockValidityDays: String(Number(entry.fullMockValidityDays || 60)),
+          active: entry.active !== false,
+          thumbnailUrl: String(entry.thumbnailUrl || '').trim(),
+          thumbnailName: String(entry.thumbnailName || '').trim()
         };
       });
-      COURSE_CATEGORIES.forEach((cat) => {
-        if (!form[cat]) {
-          form[cat] = { topicTest: '0', fullMock: '0', active: true };
-        }
-      });
+      try {
+        const courseRes = await fetchCoursesAdmin();
+        const courseList = Array.isArray(courseRes?.courses) ? courseRes.courses : [];
+        setCourses(courseList);
+        courseList.forEach((c) => {
+          const cat = c.name || c;
+          if (!form[cat]) {
+            form[cat] = {
+              topicTest: '0',
+              topicTestMrp: '0',
+              topicTestValidityDays: '60',
+              fullMock: '0',
+              fullMockMrp: '0',
+              fullMockValidityDays: '60',
+              active: true,
+              thumbnailUrl: '',
+              thumbnailName: ''
+            };
+          }
+        });
+      } catch {
+        // ignore course fetch error; fall back to existing form
+      }
       setPriceForm(form);
     } catch {
       setBanner({ type: 'error', text: 'Failed to load test series pricing.' });
@@ -77,13 +101,28 @@ export default function AdminTestSeriesHubPage() {
     const form = priceForm[course];
     if (!form) return;
     const topicTestPriceInPaise = Math.max(0, Math.round(Number(form.topicTest || 0) * 100));
+    const topicTestMrpInPaise = Math.max(topicTestPriceInPaise, Math.round(Number(form.topicTestMrp || 0) * 100));
+    const topicTestValidityDays = Math.max(1, Math.floor(Number(form.topicTestValidityDays || 60)));
     const fullMockPriceInPaise = Math.max(0, Math.round(Number(form.fullMock || 0) * 100));
+    const fullMockMrpInPaise = Math.max(fullMockPriceInPaise, Math.round(Number(form.fullMockMrp || 0) * 100));
+    const fullMockValidityDays = Math.max(1, Math.floor(Number(form.fullMockValidityDays || 60)));
 
     setSavingCourse(course);
     try {
       await requestJson('/test-series/pricing', {
         method: 'POST',
-        body: JSON.stringify({ category: course, topicTestPriceInPaise, fullMockPriceInPaise, active: form.active })
+        body: JSON.stringify({
+          category: course,
+          topicTestPriceInPaise,
+          topicTestMrpInPaise,
+          topicTestValidityDays,
+          fullMockPriceInPaise,
+          fullMockMrpInPaise,
+          fullMockValidityDays,
+          thumbnailUrl: String(form.thumbnailUrl || '').trim(),
+          thumbnailName: String(form.thumbnailName || '').trim(),
+          active: form.active
+        })
       });
       setBanner({ type: 'success', text: `${course} pricing saved.` });
       await loadPricing();
@@ -91,6 +130,27 @@ export default function AdminTestSeriesHubPage() {
       setBanner({ type: 'error', text: e.message || 'Failed to save pricing.' });
     } finally {
       setSavingCourse('');
+    }
+  }
+
+  async function handleThumbnailUpload(course, file) {
+    if (!file) return;
+    setUploadingCourse(course);
+    try {
+      const uploadRes = await uploadTestSeriesPricingThumbnailAdmin(file);
+      setPriceForm((prev) => ({
+        ...prev,
+        [course]: {
+          ...prev[course],
+          thumbnailUrl: String(uploadRes?.thumbnailUrl || '').trim(),
+          thumbnailName: String(uploadRes?.thumbnailName || file.name || '').trim()
+        }
+      }));
+      setBanner({ type: 'success', text: `${course} thumbnail uploaded. Save pricing to publish.` });
+    } catch (e) {
+      setBanner({ type: 'error', text: e.message || 'Failed to upload thumbnail.' });
+    } finally {
+      setUploadingCourse('');
     }
   }
 
@@ -206,17 +266,44 @@ export default function AdminTestSeriesHubPage() {
           </div>
 
           <div className="ts-pricing-grid">
-            {COURSE_CATEGORIES.map((course) => {
+            {(courses.length ? courses.map((c) => c.name || c) : Object.keys(priceForm)).map((course) => {
               const form = priceForm[course] || {};
               const isSaving = savingCourse === course;
+              const isUploading = uploadingCourse === course;
+              const thumbnailUrl = resolveApiAssetUrl(form.thumbnailUrl || '');
               return (
                 <article key={course} className="ts-pricing-row card">
                   <div className="ts-pricing-row-head">
                     <strong>{course}</strong>
                   </div>
+                  <div className="ts-pricing-thumb-row">
+                    <div className="ts-pricing-thumb-wrap">
+                      {thumbnailUrl ? (
+                        <img src={thumbnailUrl} alt={`${course} thumbnail`} className="ts-pricing-thumb" />
+                      ) : (
+                        <div className="ts-pricing-thumb ts-pricing-thumb-fallback">{course.slice(0, 2)}</div>
+                      )}
+                    </div>
+                    <label className="secondary-btn ts-upload-btn">
+                      {isUploading ? 'Uploading…' : 'Upload Thumbnail'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploading}
+                        onChange={(e) => {
+                          const selected = e.target.files?.[0];
+                          if (selected) {
+                            handleThumbnailUpload(course, selected);
+                          }
+                          e.target.value = '';
+                        }}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
                   <div className="ts-pricing-inputs">
                     <label>
-                      Topic Test Series (₹)
+                      Topic Test Price (₹)
                       <input
                         type="number"
                         min="0"
@@ -226,13 +313,53 @@ export default function AdminTestSeriesHubPage() {
                       />
                     </label>
                     <label>
-                      Full Mock Series (₹)
+                      Topic Test MRP (₹)
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={form.topicTestMrp || '0'}
+                        onChange={(e) => updatePriceField(course, 'topicTestMrp', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Topic Test Validity (days)
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.topicTestValidityDays || '60'}
+                        onChange={(e) => updatePriceField(course, 'topicTestValidityDays', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Full Mock Price (₹)
                       <input
                         type="number"
                         min="0"
                         step="1"
                         value={form.fullMock || '0'}
                         onChange={(e) => updatePriceField(course, 'fullMock', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Full Mock MRP (₹)
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={form.fullMockMrp || '0'}
+                        onChange={(e) => updatePriceField(course, 'fullMockMrp', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Full Mock Validity (days)
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.fullMockValidityDays || '60'}
+                        onChange={(e) => updatePriceField(course, 'fullMockValidityDays', e.target.value)}
                       />
                     </label>
                   </div>

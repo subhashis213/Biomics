@@ -15,6 +15,7 @@ const FullMockAttempt = require('../models/FullMockAttempt');
 const TestSeriesPayment = require('../models/TestSeriesPayment');
 const User = require('../models/User');
 const Voucher = require('../models/Voucher');
+const Course = require('../models/Course');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -55,16 +56,52 @@ const questionImageUpload = multer({
   }
 });
 
-const SUPPORTED_COURSES = [
-  '11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
+const testSeriesThumbnailStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeBase = path.basename(file.originalname || 'test-series-thumbnail', ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    cb(null, `test-series-thumbnail-${Date.now()}-${safeBase}${ext || '.png'}`);
+  }
+});
+
+const testSeriesThumbnailUpload = multer({
+  storage: testSeriesThumbnailStorage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if ((file.mimetype || '').startsWith('image/')) return cb(null, true);
+    return cb(new Error('Only image files are allowed for test series thumbnails.'));
+  }
+});
+
+const LEGACY_SUPPORTED_COURSES = [
+  '11th', '12th', 'NEET', 'GAT-B', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
 ];
 
 const SERIES_TYPES = ['topic_test', 'full_mock'];
+const DEFAULT_TEST_SERIES_VALIDITY_DAYS = 60;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 function normalizeCourse(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+async function getSupportedCourses() {
+  const docs = await Course.find({}).sort({ name: 1 }).lean();
+  const names = docs
+    .filter((entry) => (
+      entry
+      && entry.archived !== true
+      && entry.active !== false
+      && entry.isDeleted !== true
+      && !entry.deletedAt
+    ))
+    .map((entry) => normalizeCourse(entry?.name))
+    .filter(Boolean);
+
+  if (names.length) return names;
+  return docs.length ? [] : LEGACY_SUPPORTED_COURSES;
 }
 
 function getRazorpayConfig() {
@@ -83,6 +120,51 @@ function buildReceipt(course, seriesType) {
   const c = normalizeCourse(course).replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 10);
   const s = String(seriesType || '').replace(/[^a-z_]/g, '').slice(0, 10);
   return `ts_${c}_${s}_${Date.now()}`.slice(0, 40);
+}
+
+function addDays(baseDate, days) {
+  const next = new Date(baseDate);
+  next.setDate(next.getDate() + Math.max(1, Number(days || DEFAULT_TEST_SERIES_VALIDITY_DAYS)));
+  return next;
+}
+
+function resolvePaidAtDate(paymentDoc = {}) {
+  const paidAt = paymentDoc?.paidAt ? new Date(paymentDoc.paidAt) : null;
+  if (paidAt && !Number.isNaN(paidAt.getTime())) return paidAt;
+  const createdAt = paymentDoc?.createdAt ? new Date(paymentDoc.createdAt) : null;
+  if (createdAt && !Number.isNaN(createdAt.getTime())) return createdAt;
+  return null;
+}
+
+function resolvePaymentExpiryDate(paymentDoc = {}) {
+  const explicit = paymentDoc?.expiresAt ? new Date(paymentDoc.expiresAt) : null;
+  if (explicit && !Number.isNaN(explicit.getTime())) return explicit;
+  const paidAt = resolvePaidAtDate(paymentDoc);
+  if (!paidAt) return null;
+  const fallbackDays = Math.max(1, Number(paymentDoc?.validityDays || DEFAULT_TEST_SERIES_VALIDITY_DAYS));
+  return addDays(paidAt, fallbackDays);
+}
+
+function computeActiveValidityWindow(payments = [], now = new Date()) {
+  let latestActiveUntil = null;
+  let latestExpiredUntil = null;
+
+  payments.forEach((payment) => {
+    const validUntil = resolvePaymentExpiryDate(payment);
+    if (!validUntil) return;
+    if (validUntil.getTime() >= now.getTime()) {
+      if (!latestActiveUntil || validUntil > latestActiveUntil) latestActiveUntil = validUntil;
+      return;
+    }
+    if (!latestExpiredUntil || validUntil > latestExpiredUntil) latestExpiredUntil = validUntil;
+  });
+
+  return {
+    hasActive: Boolean(latestActiveUntil),
+    activeValidUntil: latestActiveUntil ? latestActiveUntil.toISOString() : null,
+    latestExpiredAt: latestExpiredUntil ? latestExpiredUntil.toISOString() : null,
+    hadAnyPurchase: payments.length > 0
+  };
 }
 
 /** Check if user has paid (status=paid) for a specific seriesType in their course. */
@@ -110,10 +192,40 @@ async function resolveStudentAccess(username, course) {
     status: 'paid'
   }).lean();
 
-  const hasTopicTest = payments.some((p) => p.seriesType === 'topic_test');
-  const hasFullMock = payments.some((p) => p.seriesType === 'full_mock' || p.seriesType === 'topic_test');
+  const now = new Date();
+  const topicPayments = payments.filter((p) => p.seriesType === 'topic_test');
+  const fullMockSourcePayments = payments.filter((p) => p.seriesType === 'full_mock' || p.seriesType === 'topic_test');
 
-  return { hasTopicTest, hasFullMock };
+  const topicWindow = computeActiveValidityWindow(topicPayments, now);
+  const fullMockWindow = computeActiveValidityWindow(fullMockSourcePayments, now);
+
+  const hasTopicTest = topicWindow.hasActive;
+  const hasFullMock = fullMockWindow.hasActive;
+
+  return {
+    hasTopicTest,
+    hasFullMock,
+    topicValidUntil: topicWindow.activeValidUntil,
+    fullMockValidUntil: fullMockWindow.activeValidUntil,
+    topicExpired: !hasTopicTest && topicWindow.hadAnyPurchase,
+    fullMockExpired: !hasFullMock && fullMockWindow.hadAnyPurchase,
+    topicLastExpiredAt: topicWindow.latestExpiredAt,
+    fullMockLastExpiredAt: fullMockWindow.latestExpiredAt,
+    anyExpired: (!hasTopicTest && topicWindow.hadAnyPurchase) || (!hasFullMock && fullMockWindow.hadAnyPurchase)
+  };
+}
+
+function normalizeValidityDays(value, fallback = DEFAULT_TEST_SERIES_VALIDITY_DAYS) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.min(3650, Math.floor(parsed)));
+}
+
+function getSeriesValidityDays(pricing, seriesType) {
+  if (seriesType === 'topic_test') {
+    return normalizeValidityDays(pricing?.topicTestValidityDays, DEFAULT_TEST_SERIES_VALIDITY_DAYS);
+  }
+  return normalizeValidityDays(pricing?.fullMockValidityDays, DEFAULT_TEST_SERIES_VALIDITY_DAYS);
 }
 
 function validateQuestions(questions) {
@@ -207,6 +319,31 @@ async function uploadQuestionImageToCloudinary(localPath) {
   };
 }
 
+async function uploadTestSeriesThumbnailToCloudinary(localPath) {
+  if (!hasCloudinaryConfig) return null;
+  if (!localPath) throw new Error('Test series thumbnail upload path is missing.');
+
+  const uploadResult = await cloudinary.uploader.upload(localPath, {
+    folder: 'biomicshub/test-series-thumbnails',
+    resource_type: 'image',
+    overwrite: true
+  });
+
+  return {
+    url: String(uploadResult?.secure_url || '').trim(),
+    publicId: String(uploadResult?.public_id || '').trim()
+  };
+}
+
+function resolveTargetCourse(userCourse, requestedCourse, supportedCourses = []) {
+  const normalizedUserCourse = normalizeCourse(userCourse);
+  const normalizedRequestedCourse = normalizeCourse(requestedCourse);
+  if (normalizedRequestedCourse && supportedCourses.includes(normalizedRequestedCourse)) {
+    return normalizedRequestedCourse;
+  }
+  return normalizedUserCourse;
+}
+
 function summarizeAttempts(attempts = []) {
   if (!attempts.length) {
     return {
@@ -270,13 +407,20 @@ router.post('/question-image', authenticateToken('admin'), (req, res) => {
 // GET /test-series/pricing/admin — list all courses with pricing
 router.get('/pricing/admin', authenticateToken('admin'), async (req, res) => {
   try {
+    const supportedCourses = await getSupportedCourses();
     const docs = await TestSeriesPricing.find().sort({ category: 1 }).lean();
     // Ensure every supported course appears even if no doc yet
     const map = new Map(docs.map((d) => [d.category, d]));
-    const pricing = SUPPORTED_COURSES.map((cat) => map.get(cat) || {
+    const pricing = supportedCourses.map((cat) => map.get(cat) || {
       category: cat,
       topicTestPriceInPaise: 0,
+      topicTestMrpInPaise: 0,
+      topicTestValidityDays: DEFAULT_TEST_SERIES_VALIDITY_DAYS,
       fullMockPriceInPaise: 0,
+      fullMockMrpInPaise: 0,
+      fullMockValidityDays: DEFAULT_TEST_SERIES_VALIDITY_DAYS,
+      thumbnailUrl: '',
+      thumbnailName: '',
       currency: 'INR',
       active: true
     });
@@ -289,18 +433,36 @@ router.get('/pricing/admin', authenticateToken('admin'), async (req, res) => {
 // POST /test-series/pricing — admin upsert pricing for one course
 router.post('/pricing', authenticateToken('admin'), async (req, res) => {
   try {
+    const supportedCourses = await getSupportedCourses();
     const category = normalizeCourse(req.body?.category);
-    if (!SUPPORTED_COURSES.includes(category)) {
+    if (!supportedCourses.includes(category)) {
       return res.status(400).json({ error: 'Invalid course category.' });
     }
     const topicTestPriceInPaise = Math.max(0, Number(req.body?.topicTestPriceInPaise || 0));
+    const topicTestMrpInPaise = Math.max(topicTestPriceInPaise, Number(req.body?.topicTestMrpInPaise || 0));
+    const topicTestValidityDays = normalizeValidityDays(req.body?.topicTestValidityDays, DEFAULT_TEST_SERIES_VALIDITY_DAYS);
     const fullMockPriceInPaise = Math.max(0, Number(req.body?.fullMockPriceInPaise || 0));
+    const fullMockMrpInPaise = Math.max(fullMockPriceInPaise, Number(req.body?.fullMockMrpInPaise || 0));
+    const fullMockValidityDays = normalizeValidityDays(req.body?.fullMockValidityDays, DEFAULT_TEST_SERIES_VALIDITY_DAYS);
+    const thumbnailUrl = String(req.body?.thumbnailUrl || '').trim();
+    const thumbnailName = String(req.body?.thumbnailName || '').trim();
     const active = req.body?.active !== false;
 
     const doc = await TestSeriesPricing.findOneAndUpdate(
       { category },
       {
-        $set: { topicTestPriceInPaise, fullMockPriceInPaise, active, updatedBy: req.user.username }
+        $set: {
+          topicTestPriceInPaise,
+          topicTestMrpInPaise,
+          topicTestValidityDays,
+          fullMockPriceInPaise,
+          fullMockMrpInPaise,
+          fullMockValidityDays,
+          thumbnailUrl,
+          thumbnailName,
+          active,
+          updatedBy: req.user.username
+        }
       },
       { upsert: true, new: true }
     ).lean();
@@ -311,6 +473,44 @@ router.post('/pricing', authenticateToken('admin'), async (req, res) => {
   } catch {
     return res.status(500).json({ error: 'Failed to save test series pricing.' });
   }
+});
+
+router.post('/pricing-thumbnail', authenticateToken('admin'), (req, res) => {
+  testSeriesThumbnailUpload.single('image')(req, res, async (uploadError) => {
+    try {
+      if (uploadError instanceof multer.MulterError && uploadError.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Test series thumbnail must be 8 MB or smaller.' });
+      }
+      if (uploadError) {
+        return res.status(400).json({ error: uploadError.message || 'Failed to upload test series thumbnail.' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'Test series thumbnail is required.' });
+      }
+
+      let thumbnailUrl = `/uploads/${encodeURIComponent(req.file.filename)}`;
+      if (hasCloudinaryConfig) {
+        const uploadedImage = await uploadTestSeriesThumbnailToCloudinary(req.file.path);
+        if (!uploadedImage?.url) {
+          safelyRemoveFile(req.file.path);
+          return res.status(500).json({ error: 'Cloud test series thumbnail upload failed.' });
+        }
+        thumbnailUrl = uploadedImage.url;
+        safelyRemoveFile(req.file.path);
+      }
+
+      return res.status(201).json({
+        message: 'Test series thumbnail uploaded.',
+        thumbnailUrl,
+        thumbnailName: String(req.file.originalname || req.file.filename || '').trim()
+      });
+    } catch {
+      if (req.file?.path) {
+        safelyRemoveFile(req.file.path);
+      }
+      return res.status(500).json({ error: 'Failed to upload test series thumbnail.' });
+    }
+  });
 });
 
 // ─── Admin: Topic Tests ──────────────────────────────────────────────────────
@@ -331,6 +531,7 @@ router.get('/topic-tests/admin', authenticateToken('admin'), async (req, res) =>
 router.post('/topic-tests', authenticateToken('admin'), async (req, res) => {
   try {
     const category = normalizeCourse(req.body?.category);
+    const batch = req.body?.batch ? String(req.body.batch).trim() : '';
     const module = String(req.body?.module || '').trim();
     const topic = String(req.body?.topic || 'General').trim() || 'General';
     const title = String(req.body?.title || '').trim();
@@ -346,6 +547,7 @@ router.post('/topic-tests', authenticateToken('admin'), async (req, res) => {
 
     const payload = {
       category,
+      batch,
       module,
       topic,
       title,
@@ -436,6 +638,7 @@ router.get('/full-mocks/admin', authenticateToken('admin'), async (req, res) => 
 router.post('/full-mocks', authenticateToken('admin'), async (req, res) => {
   try {
     const category = normalizeCourse(req.body?.category);
+    const batch = req.body?.batch ? String(req.body.batch).trim() : '';
     const title = String(req.body?.title || '').trim();
     const description = String(req.body?.description || '').trim();
     const durationMinutes = Number(req.body?.durationMinutes || 90);
@@ -447,6 +650,7 @@ router.post('/full-mocks', authenticateToken('admin'), async (req, res) => {
 
     const payload = {
       category,
+      batch,
       title,
       description,
       durationMinutes: Math.min(300, Math.max(5, durationMinutes)),
@@ -517,7 +721,7 @@ router.get('/full-mocks/syllabus', authenticateToken('user'), async (req, res) =
     const course = normalizeCourse(user.class);
     const { hasFullMock } = await resolveStudentAccess(req.user.username, course);
     const mocks = await FullMockTest.find({ category: course })
-      .sort({ updatedAt: -1 })
+      .sort({ title: 1, updatedAt: -1 })
       .lean();
     const items = mocks.map((m) => ({
       _id: m._id,
@@ -539,20 +743,62 @@ router.get('/pricing/student', authenticateToken('user'), async (req, res) => {
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.query?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
     const pricing = await TestSeriesPricing.findOne({ category: course }).lean();
     const access = await resolveStudentAccess(req.user.username, course);
     return res.json({
       course,
       pricing: {
         topicTestPriceInPaise: pricing?.topicTestPriceInPaise || 0,
+        topicTestMrpInPaise: Math.max(Number(pricing?.topicTestMrpInPaise || 0), Number(pricing?.topicTestPriceInPaise || 0)),
+        topicTestValidityDays: getSeriesValidityDays(pricing, 'topic_test'),
         fullMockPriceInPaise: pricing?.fullMockPriceInPaise || 0,
+        fullMockMrpInPaise: Math.max(Number(pricing?.fullMockMrpInPaise || 0), Number(pricing?.fullMockPriceInPaise || 0)),
+        fullMockValidityDays: getSeriesValidityDays(pricing, 'full_mock'),
         currency: pricing?.currency || 'INR'
       },
       access
     });
   } catch {
     return res.status(500).json({ error: 'Failed to fetch test series access.' });
+  }
+});
+
+router.get('/catalog/student', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
+    const supportedCourses = await getSupportedCourses();
+    const pricingDocs = await TestSeriesPricing.find({ category: { $in: supportedCourses } }).lean();
+    const pricingByCourse = new Map(pricingDocs.map((doc) => [normalizeCourse(doc.category), doc]));
+
+    const courses = await Promise.all(supportedCourses.map(async (courseName) => {
+      const pricing = pricingByCourse.get(courseName) || null;
+      const access = await resolveStudentAccess(req.user.username, courseName);
+      return {
+        courseName,
+        thumbnailUrl: String(pricing?.thumbnailUrl || '').trim(),
+        thumbnailName: String(pricing?.thumbnailName || '').trim(),
+        isEnrolledCourse: normalizeCourse(user?.class) === courseName,
+        pricing: {
+          topicTestPriceInPaise: Math.max(0, Number(pricing?.topicTestPriceInPaise || 0)),
+          topicTestMrpInPaise: Math.max(Number(pricing?.topicTestMrpInPaise || 0), Number(pricing?.topicTestPriceInPaise || 0)),
+          topicTestValidityDays: getSeriesValidityDays(pricing, 'topic_test'),
+          fullMockPriceInPaise: Math.max(0, Number(pricing?.fullMockPriceInPaise || 0)),
+          fullMockMrpInPaise: Math.max(Number(pricing?.fullMockMrpInPaise || 0), Number(pricing?.fullMockPriceInPaise || 0)),
+          fullMockValidityDays: getSeriesValidityDays(pricing, 'full_mock'),
+          currency: String(pricing?.currency || 'INR')
+        },
+        access
+      };
+    }));
+
+    return res.json({ courses });
+  } catch {
+    return res.status(500).json({ error: 'Failed to load test series catalog.' });
   }
 });
 
@@ -563,7 +809,11 @@ router.get('/topic-tests/student', authenticateToken('user'), async (req, res) =
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.query?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
     const { hasTopicTest } = await resolveStudentAccess(req.user.username, course);
     if (!hasTopicTest) return res.status(403).json({ error: 'Topic Test Series not purchased for this course.' });
 
@@ -592,7 +842,11 @@ router.get('/topic-tests/student/:testId', authenticateToken('user'), async (req
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.query?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
     const { hasTopicTest } = await resolveStudentAccess(req.user.username, course);
     if (!hasTopicTest) return res.status(403).json({ error: 'Topic Test Series not purchased.' });
 
@@ -620,7 +874,11 @@ router.post('/topic-tests/student/:testId/submit', authenticateToken('user'), as
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.body?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
     const { hasTopicTest } = await resolveStudentAccess(req.user.username, course);
     if (!hasTopicTest) return res.status(403).json({ error: 'Topic Test Series not purchased.' });
 
@@ -680,12 +938,16 @@ router.get('/full-mocks/student', authenticateToken('user'), async (req, res) =>
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.query?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
     const { hasFullMock } = await resolveStudentAccess(req.user.username, course);
     if (!hasFullMock) return res.status(403).json({ error: 'Full Mock Test Series not purchased for this course.' });
 
     const mocks = await FullMockTest.find({ category: course })
-      .sort({ updatedAt: -1 })
+      .sort({ title: 1, updatedAt: -1 })
       .lean();
 
     const sanitized = mocks.map((m) => ({
@@ -707,7 +969,11 @@ router.get('/full-mocks/student/:mockId', authenticateToken('user'), async (req,
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.query?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
     const { hasFullMock } = await resolveStudentAccess(req.user.username, course);
     if (!hasFullMock) return res.status(403).json({ error: 'Full Mock Test Series not purchased.' });
 
@@ -733,7 +999,11 @@ router.post('/full-mocks/student/:mockId/submit', authenticateToken('user'), asy
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.body?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
     const { hasFullMock } = await resolveStudentAccess(req.user.username, course);
     if (!hasFullMock) return res.status(403).json({ error: 'Full Mock Test Series not purchased.' });
 
@@ -975,13 +1245,18 @@ router.get('/payment/preview', authenticateToken('user'), async (req, res) => {
 
     const pricing = await TestSeriesPricing.findOne({ category: course }).lean();
     const priceKey = seriesType === 'topic_test' ? 'topicTestPriceInPaise' : 'fullMockPriceInPaise';
+    const mrpKey = seriesType === 'topic_test' ? 'topicTestMrpInPaise' : 'fullMockMrpInPaise';
     const amountInPaise = Math.max(0, Number(pricing?.[priceKey] || 0));
+    const mrpAmountInPaise = Math.max(amountInPaise, Number(pricing?.[mrpKey] || 0));
+    const validityDays = getSeriesValidityDays(pricing, seriesType);
 
     return res.json({
       alreadyOwned: false,
       course,
       seriesType,
       amountInPaise,
+      mrpAmountInPaise,
+      validityDays,
       currency: pricing?.currency || 'INR'
     });
   } catch {
@@ -994,7 +1269,11 @@ router.post('/payment/preview-voucher', authenticateToken('user'), async (req, r
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.body?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
 
     const seriesType = String(req.body?.seriesType || '').trim();
     const voucherCode = String(req.body?.voucherCode || '').trim().toUpperCase();
@@ -1008,8 +1287,12 @@ router.post('/payment/preview-voucher', authenticateToken('user'), async (req, r
 
     const pricing = await TestSeriesPricing.findOne({ category: course }).lean();
     const priceKey = seriesType === 'topic_test' ? 'topicTestPriceInPaise' : 'fullMockPriceInPaise';
+    const mrpKey = seriesType === 'topic_test' ? 'topicTestMrpInPaise' : 'fullMockMrpInPaise';
     const originalAmountInPaise = Math.max(0, Number(pricing?.[priceKey] || 0));
-
+    const mrpAmountInPaise = Math.max(originalAmountInPaise, Number(pricing?.[mrpKey] || 0));
+    const validityDays = getSeriesValidityDays(pricing, seriesType);
+    const purchasePaidAt = new Date();
+    const expiresAt = addDays(purchasePaidAt, validityDays);
     const voucher = await Voucher.findOne({ code: voucherCode }).lean();
     if (!voucher || !voucher.active) {
       return res.status(400).json({ error: 'Invalid or inactive voucher code.' });
@@ -1060,8 +1343,10 @@ router.post('/payment/preview-voucher', authenticateToken('user'), async (req, r
     return res.json({
       valid: true,
       originalAmountInPaise,
+      mrpAmountInPaise,
       discountInPaise,
       finalAmountInPaise,
+      validityDays,
       currency: pricing?.currency || 'INR',
       voucherCode: voucher.code,
       description: voucher.description || ''
@@ -1077,7 +1362,11 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
     const { keyId, client: razorpay, hasConfig } = getRazorpayConfig();
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const course = resolveTargetCourse(user.class, req.body?.course, supportedCourses);
+    if (!supportedCourses.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course category.' });
+    }
 
     const seriesType = String(req.body?.seriesType || '').trim();
     const voucherCode = String(req.body?.voucherCode || '').trim().toUpperCase();
@@ -1093,7 +1382,12 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
 
     const pricing = await TestSeriesPricing.findOne({ category: course }).lean();
     const priceKey = seriesType === 'topic_test' ? 'topicTestPriceInPaise' : 'fullMockPriceInPaise';
+    const mrpKey = seriesType === 'topic_test' ? 'topicTestMrpInPaise' : 'fullMockMrpInPaise';
     const originalAmountInPaise = Math.max(0, Number(pricing?.[priceKey] || 0));
+    const mrpAmountInPaise = Math.max(originalAmountInPaise, Number(pricing?.[mrpKey] || 0));
+    const validityDays = getSeriesValidityDays(pricing, seriesType);
+    const purchasePaidAt = new Date();
+    const expiresAt = addDays(purchasePaidAt, validityDays);
 
     // Apply voucher discount if provided
     let discountInPaise = 0;
@@ -1135,12 +1429,14 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
         discountInPaise,
         voucherCode: voucherCode || null,
         currency: pricing?.currency || 'INR',
-        paidAt: new Date()
+        paidAt: purchasePaidAt,
+        validityDays,
+        expiresAt
       });
       if (appliedVoucherId) {
         await Voucher.findByIdAndUpdate(appliedVoucherId, { $inc: { usedCount: 1 } });
       }
-      return res.json({ free: true, alreadyOwned: false });
+      return res.json({ free: true, alreadyOwned: false, validityDays, expiresAt });
     }
 
     if (!hasConfig || !razorpay) {
@@ -1165,6 +1461,8 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
       voucherCode: voucherCode || null,
       appliedVoucherId: appliedVoucherId || null,
       currency: pricing?.currency || 'INR',
+      validityDays,
+      expiresAt,
       razorpayOrderId: razorpayOrder.id
     });
 
@@ -1172,8 +1470,10 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
       razorpayOrder,
       keyId,
       amountInPaise: finalAmountInPaise,
+      mrpAmountInPaise,
       originalAmountInPaise,
       discountInPaise,
+      validityDays,
       currency: pricing?.currency || 'INR',
       seriesType,
       course
@@ -1192,9 +1492,7 @@ router.post('/payment/verify', authenticateToken('user'), async (req, res) => {
     const {
       razorpayOrderId,
       razorpayPaymentId,
-      razorpaySignature,
-      seriesType,
-      course: reqCourse
+      razorpaySignature
     } = req.body || {};
 
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
@@ -1210,10 +1508,6 @@ router.post('/payment/verify', authenticateToken('user'), async (req, res) => {
       return res.status(400).json({ error: 'Payment verification failed. Invalid signature.' });
     }
 
-    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
-    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
-
     const paymentRecord = await TestSeriesPayment.findOneAndUpdate(
       { razorpayOrderId, username: req.user.username },
       {
@@ -1226,6 +1520,20 @@ router.post('/payment/verify', authenticateToken('user'), async (req, res) => {
       },
       { new: false }
     );
+    if (!paymentRecord) {
+      return res.status(404).json({ error: 'Payment order not found.' });
+    }
+
+    const course = normalizeCourse(paymentRecord.course);
+    const purchasedSeriesType = String(paymentRecord.seriesType || '').trim();
+    const paidAt = new Date();
+    const validityDays = normalizeValidityDays(paymentRecord.validityDays, DEFAULT_TEST_SERIES_VALIDITY_DAYS);
+    const expiresAt = addDays(paidAt, validityDays);
+
+    await TestSeriesPayment.updateOne(
+      { _id: paymentRecord._id },
+      { $set: { paidAt, expiresAt, validityDays } }
+    );
 
     // Increment voucher usage count if a voucher was applied
     if (paymentRecord?.appliedVoucherId) {
@@ -1234,8 +1542,7 @@ router.post('/payment/verify', authenticateToken('user'), async (req, res) => {
 
     // Also mark the complementary full_mock if topic_test was purchased,
     // by checking it is not already an independent record.
-    const resolvedType = String(seriesType || reqCourse || '');
-    if (resolvedType === 'topic_test') {
+    if (purchasedSeriesType === 'topic_test') {
       const existingFullMock = await TestSeriesPayment.findOne({
         username: req.user.username,
         course,
@@ -1252,7 +1559,9 @@ router.post('/payment/verify', authenticateToken('user'), async (req, res) => {
           amountInPaise: 0,
           originalAmountInPaise: 0,
           currency: 'INR',
-          paidAt: new Date()
+          paidAt,
+          validityDays,
+          expiresAt
         });
       }
     }

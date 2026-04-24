@@ -5,6 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 const Video = require('../models/Video');
 const Module = require('../models/Module');
+const Course = require('../models/Course');
 const User = require('../models/User');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken } = require('../middleware/auth');
@@ -23,14 +24,14 @@ const {
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-const ALLOWED_CATEGORIES = [
-  '11th',
-  '12th',
-  'NEET',
-  'IIT-JAM',
-  'CSIR-NET Life Science',
-  'GATE'
-];
+async function isAllowedCourseCategory(courseName) {
+  const normalized = normalizeCourseName(courseName);
+  if (!normalized) return false;
+  const count = await Course.countDocuments({ active: true });
+  if (count === 0) return true;
+  const exists = await Course.findOne({ name: normalized, active: true }).select({ _id: 1 }).lean();
+  return Boolean(exists);
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
@@ -126,7 +127,10 @@ async function getUserCourseAccessSnapshot(user) {
 router.get('/', async (req, res) => {
   try {
     const requestedCategory = typeof req.query.category === 'string' ? req.query.category.trim() : '';
-    const filter = requestedCategory ? { category: requestedCategory } : {};
+    const requestedBatch = typeof req.query.batch === 'string' ? req.query.batch.trim() : '';
+    const filter = {};
+    if (requestedCategory) filter.category = requestedCategory;
+    if (requestedBatch) filter.batch = requestedBatch;
     const videos = await Video.find(filter).sort({ uploadedAt: -1 });
     res.json(videos);
   } catch (err) {
@@ -223,19 +227,21 @@ router.post('/:id/progress', authenticateToken('user'), async (req, res) => {
 
 // Upload a new video — admin only
 router.post('/', authenticateToken('admin'), async (req, res) => {
-  const { title, description, url, category, module, topic } = req.body;
+  const { title, description, url, category, batch, module, topic } = req.body;
   if (!title || !url) return res.status(400).json({ error: 'Title and URL required' });
-  if (!category || !ALLOWED_CATEGORIES.includes(category)) {
+  if (!category || !(await isAllowedCourseCategory(category))) {
     return res.status(400).json({ error: 'Valid course category is required' });
   }
   try {
     const normalizedModule = String(module || 'General').trim() || 'General';
     const normalizedTopic = String(topic || 'General').trim() || 'General';
+    const normalizedBatch = String(batch || '').trim();
     const video = new Video({
       title,
       description,
       url,
       category,
+      batch: normalizedBatch,
       module: normalizedModule,
       topic: normalizedTopic
     });
@@ -249,7 +255,13 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       action: 'video.create',
       targetType: 'video',
       targetId: String(video._id),
-      details: { title: video.title, category: video.category, module: video.module, topic: video.topic }
+      details: {
+        title: video.title,
+        category: video.category,
+        batch: video.batch,
+        module: video.module,
+        topic: video.topic
+      }
     });
     res.status(201).json(video);
   } catch (err) {

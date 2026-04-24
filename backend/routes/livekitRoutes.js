@@ -205,7 +205,10 @@ async function userHasCourseContentAccess(user, classDoc) {
   const targetCourse = normalizeCourseName(classDoc?.course);
   if (!targetCourse) return true;
 
-  return hasCourseAccess(user, targetCourse);
+  if (await hasCourseAccess(user, targetCourse)) return true;
+
+  const enrolledCourse = normalizeCourseName(user?.class);
+  return Boolean(enrolledCourse) && enrolledCourse === targetCourse;
 }
 
 function userMatchesClassCourse(user, classDoc) {

@@ -28,8 +28,9 @@ const testSeriesPaymentSchema = new mongoose.Schema({
   razorpayOrderId: { type: String, trim: true, default: '', index: true },
   razorpayPaymentId: { type: String, trim: true, default: '' },
   razorpaySignature: { type: String, trim: true, default: '' },
-  paidAt: { type: Date, default: null }
-  // expiresAt deliberately omitted — test series grants lifetime access
+  paidAt: { type: Date, default: null },
+  validityDays: { type: Number, min: 1, default: 60 },
+  expiresAt: { type: Date, default: null }
 }, { timestamps: true });
 
 module.exports = mongoose.model('TestSeriesPayment', testSeriesPaymentSchema);

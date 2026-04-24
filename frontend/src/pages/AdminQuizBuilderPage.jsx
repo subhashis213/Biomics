@@ -1,22 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { deleteQuiz, fetchAdminQuizzes, requestJson, saveModuleQuiz } from '../api';
+import { deleteQuiz, fetchAdminQuizzes, fetchCourseBatchesAdmin, fetchCoursesAdmin, requestJson, saveModuleQuiz } from '../api';
 import AppShell from '../components/AppShell';
 import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
 import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
-
-const COURSE_CATEGORIES = [
-  '11th',
-  '12th',
-  'NEET',
-  'IIT-JAM',
-  'CSIR-NET Life Science',
-  'GATE'
-];
-const DEFAULT_COURSE = 'CSIR-NET Life Science';
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -24,13 +14,16 @@ function normalizeText(value) {
 
 export default function AdminQuizBuilderPage() {
   const navigate = useNavigate();
-  const [quizCategory, setQuizCategory] = useState(DEFAULT_COURSE);
+  const [courses, setCourses] = useState([]);
+  const [quizCategory, setQuizCategory] = useState('');
   const [quizModule, setQuizModule] = useState('');
   const [quizTopic, setQuizTopic] = useState('General');
   const [quizTitle, setQuizTitle] = useState('');
   const [quizDifficulty, setQuizDifficulty] = useState('medium');
   const [quizRequireExplanation, setQuizRequireExplanation] = useState(false);
   const [quizTimeLimitMinutes, setQuizTimeLimitMinutes] = useState(15);
+  const [quizBatch, setQuizBatch] = useState('');
+  const [batches, setBatches] = useState([]);
   const [quizQuestions, setQuizQuestions] = useState([
     { question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' }
   ]);
@@ -99,6 +92,31 @@ export default function AdminQuizBuilderPage() {
     if (isDeletingQuiz) return;
     setQuizDeleteDialog({ open: false, quiz: null });
   }
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadCourses() {
+      try {
+        const response = await fetchCoursesAdmin();
+        if (!ignore) {
+          const courseList = Array.isArray(response?.courses) ? response.courses : [];
+          setCourses(courseList);
+          // Set default course if not set and courses are loaded
+          if (!quizCategory && courseList.length > 0) {
+            setQuizCategory(courseList[0].name);
+          }
+        }
+      } catch {
+        if (!ignore) setCourses([]);
+      }
+    }
+
+    loadCourses();
+    return () => {
+      ignore = true;
+    };
+  }, [quizCategory]);
 
   useEffect(() => {
     let ignore = false;
@@ -192,6 +210,32 @@ export default function AdminQuizBuilderPage() {
   useEffect(() => {
     loadAdminQuizzes(quizCategory);
   }, [quizCategory]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBatches() {
+      try {
+        const response = await fetchCourseBatchesAdmin(quizCategory);
+        if (cancelled) return;
+        const batchList = Array.isArray(response?.batches) ? response.batches : [];
+        setBatches(batchList);
+        // Reset batch selection if current batch is not in the new list
+        if (quizBatch && !batchList.some(b => b.batchName === quizBatch)) {
+          setQuizBatch('');
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setBatches([]);
+        setQuizBatch('');
+      }
+    }
+
+    loadBatches();
+    return () => {
+      cancelled = true;
+    };
+  }, [quizCategory, quizBatch]);
 
   const modulesByCourseFromVideos = useMemo(() => {
     const result = {};
@@ -340,13 +384,14 @@ export default function AdminQuizBuilderPage() {
 
   function editQuiz(quiz) {
     setEditingQuizId(quiz._id);
-    setQuizCategory(quiz.category || DEFAULT_COURSE);
+    setQuizCategory(quiz.category || (courses.length > 0 ? courses[0].name : ''));
     setQuizModule(quiz.module || '');
     setQuizTopic(quiz.topic || 'General');
     setQuizTitle(quiz.title || '');
     setQuizDifficulty(quiz.difficulty || 'medium');
     setQuizRequireExplanation(Boolean(quiz.requireExplanation));
     setQuizTimeLimitMinutes(quiz.timeLimitMinutes || 15);
+    setQuizBatch(quiz.batch || '');
     setQuizQuestions((quiz.questions || []).map((item) => ({
       question: item.question,
       options: [...item.options],
@@ -407,6 +452,7 @@ export default function AdminQuizBuilderPage() {
       await saveModuleQuiz({
         quizId: editingQuizId || undefined,
         category: quizCategory,
+        batch: quizBatch.trim(),
         module: normalizedModule,
         topic: (quizTopic || 'General').trim() || 'General',
         title: quizTitle.trim(),
@@ -470,8 +516,9 @@ export default function AdminQuizBuilderPage() {
               <label>
                 Course
                 <select value={quizCategory} onChange={(event) => setQuizCategory(event.target.value)}>
-                  {COURSE_CATEGORIES.map((course) => (
-                    <option key={course} value={course}>{course}</option>
+                  <option value="" disabled>{courses.length ? 'Select course' : 'Loading courses...'}</option>
+                  {courses.map((course) => (
+                    <option key={course.name} value={course.name}>{course.displayName || course.name}</option>
                   ))}
                 </select>
               </label>
@@ -490,6 +537,16 @@ export default function AdminQuizBuilderPage() {
                 </select>
               </label>
             </div>
+
+            <label>
+              Batch (optional)
+              <select value={quizBatch} onChange={(event) => setQuizBatch(event.target.value)}>
+                <option value="">All batches</option>
+                {batches.map((batch) => (
+                  <option key={batch.batchName} value={batch.batchName}>{batch.batchName}</option>
+                ))}
+              </select>
+            </label>
 
             <label>
               Topic

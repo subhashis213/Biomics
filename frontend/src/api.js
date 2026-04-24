@@ -371,6 +371,112 @@ export function fetchMyCoursePaymentInfo() {
   return requestJson('/payments/my-course');
 }
 
+export function fetchStudentCourseCatalog() {
+  return requestJson('/payments/catalog');
+}
+
+export function fetchCoursesAdmin() {
+  return requestJson('/courses/admin');
+}
+
+export function fetchMigrationData() {
+  return requestJson('/courses/admin/migration-data');
+}
+
+export function fetchCoursesStudent() {
+  return requestJson('/courses/student');
+}
+
+export function createCourseAdmin(payload) {
+  return requestJson('/courses/admin', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteCourseAdmin(courseName) {
+  return requestJson(`/courses/admin/${encodeURIComponent(courseName)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function addCourseBatchAdmin(courseName, batchName) {
+  return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/batches`, {
+    method: 'POST',
+    body: JSON.stringify({ name: batchName })
+  });
+}
+
+export function removeCourseBatchAdmin(courseName, batchName) {
+  return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/batches/${encodeURIComponent(batchName)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function renameCourseAdmin(courseName, nextName) {
+  return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/rename`, {
+    method: 'PUT',
+    body: JSON.stringify({ name: nextName })
+  });
+}
+
+export function renameCourseBatchAdmin(courseName, batchName, nextName) {
+  return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/batches/${encodeURIComponent(batchName)}/rename`, {
+    method: 'PUT',
+    body: JSON.stringify({ name: nextName })
+  });
+}
+
+export function migrateContentToBatchAdmin(courseName, targetBatch, options = {}) {
+  return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/migrate-content`, {
+    method: 'POST',
+    body: JSON.stringify({
+      targetBatch,
+      mode: options.mode || 'move',
+      module: options.module || '',
+      topic: options.topic || '',
+      fromBatch: options.fromBatch || '',
+      sourceCourse: options.sourceCourse || ''
+    })
+  });
+}
+
+export async function fetchStudentCourseVideoProgress() {
+  const [allVideos, myCoursePayload] = await Promise.all([
+    requestJson('/videos'),
+    requestJson('/videos/my-course')
+  ]);
+
+  const completedSet = new Set((myCoursePayload?.completedVideos || []).map((id) => String(id || '')));
+  const progressByCourse = {};
+
+  (Array.isArray(allVideos) ? allVideos : []).forEach((video) => {
+    const courseName = String(video?.category || '').trim();
+    if (!courseName) return;
+
+    if (!progressByCourse[courseName]) {
+      progressByCourse[courseName] = {
+        totalVideos: 0,
+        completedVideos: 0,
+        completionPercent: 0
+      };
+    }
+
+    progressByCourse[courseName].totalVideos += 1;
+    if (completedSet.has(String(video?._id || ''))) {
+      progressByCourse[courseName].completedVideos += 1;
+    }
+  });
+
+  Object.values(progressByCourse).forEach((entry) => {
+    entry.completionPercent = entry.totalVideos > 0
+      ? Math.max(0, Math.min(100, Math.round((entry.completedVideos / entry.totalVideos) * 100)))
+      : 0;
+  });
+
+  return { progressByCourse };
+}
+
 export function createCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES', course = '') {
   return requestJson('/payments/create-order', {
     method: 'POST',
@@ -396,8 +502,32 @@ export function fetchCoursePricingAdmin() {
   return requestJson('/payments/admin/pricing');
 }
 
+export function fetchCourseBatchesStudent(course) {
+  return requestJson(`/payments/catalog/${encodeURIComponent(course)}/batches`);
+}
+
+export function fetchCourseBatchesAdmin(course) {
+  return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}/batches`);
+}
+
+export function uploadCoursePricingThumbnailAdmin(file) {
+  const formData = new FormData();
+  formData.append('image', file);
+  return requestJson('/payments/admin/pricing-thumbnail', {
+    method: 'POST',
+    body: formData
+  });
+}
+
 export function saveCoursePricingAdmin(course, payload) {
   return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function saveBatchPricingAdmin(course, batchName, payload) {
+  return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}/batches/${encodeURIComponent(batchName)}`, {
     method: 'PUT',
     body: JSON.stringify(payload)
   });
@@ -764,6 +894,15 @@ export function fetchTestSeriesPricingAdmin() {
   return requestJson('/test-series/pricing/admin');
 }
 
+export function uploadTestSeriesPricingThumbnailAdmin(file) {
+  const formData = new FormData();
+  formData.append('image', file);
+  return requestJson('/test-series/pricing-thumbnail', {
+    method: 'POST',
+    body: formData
+  });
+}
+
 export function saveTestSeriesPricingAdmin(payload) {
   return requestJson('/test-series/pricing', {
     method: 'POST',
@@ -805,21 +944,25 @@ export function fetchTestSeriesStudentAccess() {
   return requestJson('/test-series/pricing/student');
 }
 
+export function fetchTestSeriesCatalogStudent() {
+  return requestJson('/test-series/catalog/student');
+}
+
 export function fetchTestSeriesPerformanceStudent() {
   return requestJson('/test-series/performance/student');
 }
 
-export function createTestSeriesOrder(seriesType, voucherCode) {
+export function createTestSeriesOrder(seriesType, voucherCode, course = '') {
   return requestJson('/test-series/payment/create-order', {
     method: 'POST',
-    body: JSON.stringify({ seriesType, ...(voucherCode ? { voucherCode } : {}) })
+    body: JSON.stringify({ seriesType, course, ...(voucherCode ? { voucherCode } : {}) })
   });
 }
 
-export function previewTestSeriesVoucher(seriesType, voucherCode) {
+export function previewTestSeriesVoucher(seriesType, voucherCode, course = '') {
   return requestJson('/test-series/payment/preview-voucher', {
     method: 'POST',
-    body: JSON.stringify({ seriesType, voucherCode })
+    body: JSON.stringify({ seriesType, voucherCode, course })
   });
 }
 

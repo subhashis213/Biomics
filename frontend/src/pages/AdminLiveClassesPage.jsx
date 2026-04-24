@@ -641,7 +641,7 @@ export default function AdminLiveClassesPage() {
                 <span>Course access</span>
                 <select value={classForm.course} onChange={(event) => setClassForm((current) => ({ ...current, course: event.target.value }))}>
                   <option value="">All courses</option>
-                  {COURSE_CATEGORIES.map((courseName) => (
+                  {(workspace.availableCourses || []).map((courseName) => (
                     <option key={courseName} value={courseName}>{courseName}</option>
                   ))}
                 </select>

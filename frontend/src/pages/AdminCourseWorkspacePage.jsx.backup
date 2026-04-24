@@ -6,8 +6,6 @@ import {
   deleteCourseAdmin,
   fetchCoursesAdmin,
   migrateContentToBatchAdmin,
-  renameCourseAdmin,
-  renameCourseBatchAdmin,
   removeCourseBatchAdmin,
   requestJson,
   uploadMaterial
@@ -102,11 +100,6 @@ export default function AdminCourseWorkspacePage() {
   const [selectedCourse, setSelectedCourse] = useState('');
   const [newCourseName, setNewCourseName] = useState('');
   const [newBatchName, setNewBatchName] = useState('');
-  const [renameCourseValue, setRenameCourseValue] = useState('');
-  const [renamingCourse, setRenamingCourse] = useState(false);
-  const [renamingBatchName, setRenamingBatchName] = useState('');
-  const [renameBatchValue, setRenameBatchValue] = useState('');
-  const [renamingBatch, setRenamingBatch] = useState(false);
   const [selectedBatchByCourse, setSelectedBatchByCourse] = useState({});
   const [savingBatch, setSavingBatch] = useState(false);
   const [deletePrompt, setDeletePrompt] = useState(null);
@@ -301,39 +294,6 @@ export default function AdminCourseWorkspacePage() {
     setDeletePrompt({ type: 'course', target: selectedCourse });
   }
 
-  async function handleRenameCourse() {
-    const nextName = String(renameCourseValue || '').trim();
-    if (!selectedCourse || !nextName) return;
-    if (normalizeKey(nextName) === normalizeKey(selectedCourse)) {
-      setModalMessage({ type: 'error', text: 'Please enter a different course name.' });
-      return;
-    }
-    setRenamingCourse(true);
-    try {
-      const response = await renameCourseAdmin(selectedCourse, nextName);
-      const nextCourses = Array.isArray(response?.courses) ? response.courses : [];
-      setCourseCatalog(nextCourses);
-      const renamed = nextCourses.find((entry) => normalizeKey(entry?.name) === normalizeKey(nextName));
-      const resolvedName = renamed?.name || nextName;
-      setSelectedCourse(resolvedName);
-      setSelectedBatchByCourse((current) => {
-        const next = { ...current };
-        const oldKey = selectedCourse;
-        if (Object.prototype.hasOwnProperty.call(next, oldKey)) {
-          next[resolvedName] = next[oldKey];
-          delete next[oldKey];
-        }
-        return next;
-      });
-      setRenameCourseValue('');
-      setModalMessage({ type: 'success', text: `Course renamed to "${resolvedName}". Updated across workspace content.` });
-    } catch (error) {
-      setModalMessage({ type: 'error', text: error.message || 'Failed to rename course.' });
-    } finally {
-      setRenamingCourse(false);
-    }
-  }
-
   async function confirmDeletePrompt() {
     if (!deletePrompt) return;
     setDeletingEntity(true);
@@ -410,34 +370,6 @@ export default function AdminCourseWorkspacePage() {
       setModalMessage({ type: 'error', text: error.message || 'Failed to remove batch.' });
     } finally {
       setSavingBatch(false);
-    }
-  }
-
-  async function handleRenameBatch(oldBatchName) {
-    const nextBatchName = String(renameBatchValue || '').trim();
-    if (!selectedCourse || !oldBatchName || !nextBatchName) return;
-    if (normalizeKey(oldBatchName) === normalizeKey(nextBatchName)) {
-      setModalMessage({ type: 'error', text: 'Please enter a different batch name.' });
-      return;
-    }
-    setRenamingBatch(true);
-    try {
-      const response = await renameCourseBatchAdmin(selectedCourse, oldBatchName, nextBatchName);
-      const nextCourses = Array.isArray(response?.courses) ? response.courses : [];
-      const nextCourse = nextCourses.find((entry) => normalizeKey(entry?.name) === normalizeKey(selectedCourse));
-      const nextBatch = (nextCourse?.batches || []).find((entry) => normalizeKey(entry?.name) === normalizeKey(nextBatchName));
-      setCourseCatalog(nextCourses);
-      setSelectedBatchByCourse((current) => ({
-        ...current,
-        [selectedCourse]: nextBatch?.name || nextBatchName
-      }));
-      setRenamingBatchName('');
-      setRenameBatchValue('');
-      setModalMessage({ type: 'success', text: `Batch renamed to "${nextBatch?.name || nextBatchName}". Updated across content sections.` });
-    } catch (error) {
-      setModalMessage({ type: 'error', text: error.message || 'Failed to rename batch.' });
-    } finally {
-      setRenamingBatch(false);
     }
   }
 
@@ -717,14 +649,9 @@ export default function AdminCourseWorkspacePage() {
       navTitle="Builder"
       navItems={navItems}
       actions={(
-        <div className="workspace-shell-actions">
-          <button type="button" className="secondary-btn" onClick={() => navigate('/admin/course-workspace')}>
-            Back to Workspace
-          </button>
-          <button type="button" className="secondary-btn" onClick={() => navigate('/admin')}>
-            Dashboard
-          </button>
-        </div>
+        <button type="button" className="secondary-btn" onClick={() => navigate('/admin/course-workspace')}>
+          Back To Workspace
+        </button>
       )}
     >
       <section id="builder-workspace" className="card admin-course-workspace" style={courseModalStyle}>
@@ -739,170 +666,146 @@ export default function AdminCourseWorkspacePage() {
         </header>
 
         {(workspaceMode === 'full' || workspaceMode === 'setup') && (
-        <section className="card course-setup-panel">
-          <div className="section-header compact">
+        <section className="card" style={{ marginBottom: '14px', padding: '14px' }}>
+          <div className="section-header compact" style={{ marginBottom: '10px' }}>
             <div>
               <p className="eyebrow">Course Setup</p>
-              <h3>Create, rename, and delete courses + batches</h3>
+              <h3>Manage courses and batches</h3>
             </div>
           </div>
 
-          <div className="course-setup-grid">
-            <article className="course-setup-card">
-              <h4>Courses</h4>
-              <div className="course-setup-row">
-                <select
-                  value={selectedCourse}
-                  onChange={(event) => {
-                    setSelectedCourse(event.target.value);
-                    setSelectedModule(null);
-                    setSelectedTopic(null);
-                    setModalStep('module');
-                  }}
-                >
-                  {!courseCatalog.length ? <option value="">No course available</option> : null}
-                  {courseCatalog.map((entry) => (
-                    <option key={entry.name} value={entry.name}>{entry.displayName || entry.name}</option>
-                  ))}
-                </select>
-              </div>
+          <div className="material-upload-row" style={{ gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+            <select
+              value={selectedCourse}
+              onChange={(event) => {
+                setSelectedCourse(event.target.value);
+                setSelectedModule(null);
+                setSelectedTopic(null);
+                setModalStep('module');
+              }}
+              style={{ minWidth: '220px' }}
+            >
+              {!courseCatalog.length ? <option value="">No course available</option> : null}
+              {courseCatalog.map((entry) => (
+                <option key={entry.name} value={entry.name}>{entry.displayName || entry.name}</option>
+              ))}
+            </select>
 
-              <div className="course-setup-row">
-                <input
-                  type="text"
-                  placeholder="Create new course (e.g. CSIR NET)"
-                  value={newCourseName}
-                  onChange={(event) => setNewCourseName(event.target.value)}
-                />
-                <button type="button" className="primary-btn" onClick={handleCreateCourse} disabled={!newCourseName.trim()}>
-                  Add Course
-                </button>
-              </div>
-
-              <div className="course-setup-row">
-                <input
-                  type="text"
-                  placeholder="Rename selected course"
-                  value={renameCourseValue}
-                  onChange={(event) => setRenameCourseValue(event.target.value)}
-                  disabled={!selectedCourse || renamingCourse}
-                />
-                <button type="button" className="secondary-btn" onClick={handleRenameCourse} disabled={!selectedCourse || !renameCourseValue.trim() || renamingCourse}>
-                  {renamingCourse ? 'Renaming...' : 'Rename Course'}
-                </button>
-                <button type="button" className="danger-btn" onClick={handleDeleteSelectedCourse} disabled={!selectedCourse || deletingEntity}>
-                  Delete Course
-                </button>
-              </div>
-
-              <div className="course-chip-list">
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginLeft: 8 }}>
                 {courseCatalog.length ? courseCatalog.map((entry) => (
-                  <button
-                    key={`course-chip-${entry.name}`}
-                    type="button"
-                    className={`course-chip${normalizeKey(selectedCourse) === normalizeKey(entry.name) ? ' active' : ''}`}
+                  <div
+                    key={`pill-${entry.name}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      border: selectedCourse === entry.name ? '1px solid var(--course-modal-accent)' : '1px solid var(--border-color, #e5e7eb)',
+                      background: selectedCourse === entry.name ? 'rgba(59,130,246,0.06)' : 'transparent',
+                      cursor: 'pointer'
+                    }}
                     onClick={() => { setSelectedCourse(entry.name); setSelectedModule(null); setSelectedTopic(null); setModalStep('module'); }}
                     title={entry.displayName || entry.name}
                   >
-                    {entry.displayName || entry.name}
-                  </button>
-                )) : <p className="empty-note">No courses yet.</p>}
-              </div>
-            </article>
-
-            <article className="course-setup-card">
-              <h4>Batches {selectedCourse ? `for ${selectedCourse}` : ''}</h4>
-              <div className="course-setup-row">
-                <select
-                  value={selectedBatch}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setSelectedBatchByCourse((current) => ({ ...current, [selectedCourse]: value }));
-                  }}
-                  disabled={!selectedCourse || !availableBatches.length}
-                >
-                  {!availableBatches.length ? <option value="">No batch</option> : null}
-                  {availableBatches.map((batchName) => (
-                    <option key={batchName} value={batchName}>{batchName}</option>
-                  ))}
-                </select>
+                    <span style={{ fontSize: '0.95rem' }}>{entry.displayName || entry.name}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDeletePrompt({ type: 'course', target: entry.name }); }}
+                      title={`Remove ${entry.displayName || entry.name}`}
+                      className="icon-btn"
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, padding: 4, borderRadius: 6, border: 'none', background: 'transparent' }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M8 6v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )) : <p className="empty-note" style={{ margin: 0 }}>No courses yet.</p>}
               </div>
 
-              <form
-                className="course-setup-row"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  handleAddBatch();
-                }}
-              >
-                <input
-                  type="text"
-                  placeholder="Create batch (e.g. Batch 2027)"
-                  value={newBatchName}
-                  onChange={(event) => setNewBatchName(event.target.value)}
-                  disabled={!selectedCourse}
-                />
-                <button type="button" className="primary-btn" onClick={handleAddBatch} disabled={!selectedCourse || !newBatchName.trim() || savingBatch}>
-                  {savingBatch ? 'Saving...' : 'Add Batch'}
-                </button>
-              </form>
+            <input
+              type="text"
+              placeholder="Add new course"
+              value={newCourseName}
+              onChange={(event) => setNewCourseName(event.target.value)}
+              style={{ minWidth: '220px' }}
+            />
+            <button type="button" className="primary-btn" onClick={handleCreateCourse} disabled={!newCourseName.trim()}>
+              Add Course
+            </button>
+            <button type="button" className="secondary-btn" onClick={handleDeleteSelectedCourse} disabled={!selectedCourse}>
+              Remove Course
+            </button>
+          </div>
 
-              <div className="course-setup-row">
-                <input
-                  type="text"
-                  placeholder="Rename selected batch"
-                  value={renamingBatchName ? renameBatchValue : ''}
-                  onChange={(event) => setRenameBatchValue(event.target.value)}
-                  disabled={!selectedCourse || !selectedBatch || renamingBatch}
-                  onFocus={() => {
-                    if (!renamingBatchName && selectedBatch) {
-                      setRenamingBatchName(selectedBatch);
-                      setRenameBatchValue(selectedBatch);
-                    }
-                  }}
-                />
+          <form
+            className="material-upload-row"
+            style={{ gap: '10px', flexWrap: 'wrap' }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleAddBatch();
+            }}
+          >
+            <select
+              value={selectedBatch}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedBatchByCourse((current) => ({ ...current, [selectedCourse]: value }));
+              }}
+              style={{ minWidth: '220px' }}
+              disabled={!selectedCourse || !availableBatches.length}
+            >
+              {!availableBatches.length ? <option value="">No batch</option> : null}
+              {availableBatches.map((batchName) => (
+                <option key={batchName} value={batchName}>{batchName}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Add batch (e.g. Batch 2027)"
+              value={newBatchName}
+              onChange={(event) => setNewBatchName(event.target.value)}
+              style={{ minWidth: '220px' }}
+              disabled={!selectedCourse}
+            />
+            <button type="button" className="primary-btn" onClick={handleAddBatch} disabled={!selectedCourse || !newBatchName.trim()}>
+              {savingBatch ? 'Saving...' : 'Add Batch'}
+            </button>
+            <button type="button" className="secondary-btn" onClick={() => setDeletePrompt({ type: 'batch', target: selectedBatch })} disabled={!selectedCourse || !selectedBatch || savingBatch}>
+              Remove Batch
+            </button>
+          </form>
+
+          {selectedCourse ? (
+            <div className="material-upload-row" style={{ gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+              {availableBatches.length ? availableBatches.map((batchName) => (
                 <button
+                  key={batchName}
                   type="button"
                   className="secondary-btn"
-                  onClick={() => {
-                    const target = renamingBatchName || selectedBatch;
-                    if (!target) return;
-                    handleRenameBatch(target);
+                  onClick={() => setDeletePrompt({ type: 'batch', target: batchName })}
+                  disabled={savingBatch}
+                  style={{
+                    minHeight: '30px',
+                    padding: '4px 10px',
+                    borderRadius: '999px',
+                    borderColor: normalizeKey(batchName) === normalizeKey(selectedBatch) ? 'var(--course-modal-accent)' : undefined
                   }}
-                  disabled={!selectedCourse || !selectedBatch || !renameBatchValue.trim() || renamingBatch}
+                  title={`Remove ${batchName}`}
                 >
-                  {renamingBatch ? 'Renaming...' : 'Rename Batch'}
+                  {batchName} ×
                 </button>
-                <button type="button" className="danger-btn" onClick={() => setDeletePrompt({ type: 'batch', target: selectedBatch })} disabled={!selectedCourse || !selectedBatch || savingBatch}>
-                  Delete Batch
-                </button>
-              </div>
-
-              {selectedCourse ? (
-                <div className="course-chip-list">
-                  {availableBatches.length ? availableBatches.map((batchName) => (
-                    <button
-                      key={`batch-chip-${batchName}`}
-                      type="button"
-                      className={`course-chip${normalizeKey(batchName) === normalizeKey(selectedBatch) ? ' active' : ''}`}
-                      onClick={() => {
-                        setSelectedBatchByCourse((current) => ({ ...current, [selectedCourse]: batchName }));
-                        setRenamingBatchName(batchName);
-                        setRenameBatchValue(batchName);
-                      }}
-                      title={batchName}
-                    >
-                      {batchName}
-                    </button>
-                  )) : <p className="empty-note">No batch added yet for this course.</p>}
-                </div>
-              ) : <p className="empty-note">Select a course to manage batches.</p>}
-            </article>
-          </div>
+              )) : <p className="empty-note" style={{ margin: 0 }}>No batch added yet for this course.</p>}
+            </div>
+          ) : null}
         </section>
-        )}
 
-        {(workspaceMode === 'full' || workspaceMode === 'module-topic') && selectedCourse && availableBatches.length > 0 ? (
+        {(workspaceMode === 'full' || workspaceMode === 'module-topic') && selectedCourse && availableBatches.length > 0 && (
           <section className="material-upload-section" style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
             <h3 style={{ marginBottom: '15px' }}>Content Migration</h3>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary, #6b7280)', marginBottom: '15px' }}>
@@ -917,52 +820,7 @@ export default function AdminCourseWorkspacePage() {
               Open Content Migration Workspace
             </button>
           </section>
-        ) : null}
-
-        {(workspaceMode === 'full' || workspaceMode === 'module-topic') ? (
-          <section className="course-context-bar">
-            <div className="course-context-row">
-              <label className="course-context-field">
-                <span>Course</span>
-                <select
-                  value={selectedCourse}
-                  onChange={(event) => {
-                    setSelectedCourse(event.target.value);
-                    setSelectedModule(null);
-                    setSelectedTopic(null);
-                    setModalStep('module');
-                  }}
-                >
-                  {!courseCatalog.length ? <option value="">No course available</option> : null}
-                  {courseCatalog.map((entry) => (
-                    <option key={`module-topic-course-${entry.name}`} value={entry.name}>
-                      {entry.displayName || entry.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="course-context-field">
-                <span>Batch</span>
-                <select
-                  value={selectedBatch}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setSelectedBatchByCourse((current) => ({ ...current, [selectedCourse]: value }));
-                  }}
-                  disabled={!selectedCourse || !availableBatches.length}
-                >
-                  {!availableBatches.length ? <option value="">No batch</option> : null}
-                  {availableBatches.map((batchName) => (
-                    <option key={`module-topic-batch-${batchName}`} value={batchName}>
-                      {batchName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </section>
-        ) : null}
+        )}
 
         {!selectedCourse ? (
           <p className="empty-note">Add a course first, then create modules and topics.</p>

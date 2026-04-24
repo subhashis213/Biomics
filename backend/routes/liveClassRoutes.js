@@ -48,7 +48,10 @@ async function canUserAccessClass(user, liveClass) {
   const targetCourse = normalizeCourseName(liveClass?.course);
   if (!targetCourse) return true;
 
-  return hasCourseAccess(user, targetCourse);
+  if (await hasCourseAccess(user, targetCourse)) return true;
+
+  const enrolledCourse = normalizeCourseName(user?.class);
+  return Boolean(enrolledCourse) && enrolledCourse === targetCourse;
 }
 
 async function loadCurrentUser(username) {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 export default function ModuleManager({
   course,
   modules = [],
+  batches = [],
   selectedModule,
   onModuleSelect,
   onModuleCreate,
@@ -13,6 +14,7 @@ export default function ModuleManager({
   onClearMessage
 }) {
   const [newModuleName, setNewModuleName] = useState('');
+  const [newModuleBatch, setNewModuleBatch] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(modules.length === 0);
   const [createError, setCreateError] = useState(null);
   const [confirmDeleteModule, setConfirmDeleteModule] = useState(null);
@@ -29,8 +31,9 @@ export default function ModuleManager({
       setCreateError('Module already exists'); return;
     }
     try {
-      await onModuleCreate(newModuleName.trim());
+      if (onModuleCreate) await onModuleCreate(newModuleName.trim(), newModuleBatch || '');
       setNewModuleName('');
+      setNewModuleBatch('');
       setShowCreateForm(false);
       setCreateError(null);
     } catch {
@@ -223,6 +226,15 @@ export default function ModuleManager({
                   disabled={isProcessing}
                 />
               </div>
+                {batches && batches.length ? (
+                  <div className="form-group">
+                    <label>Batch (optional)</label>
+                    <select value={newModuleBatch} onChange={(e) => setNewModuleBatch(e.target.value)}>
+                      <option value="">(No batch)</option>
+                      {batches.map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                ) : null}
               {createError && <p className="form-error">{createError}</p>}
               <div className="form-actions">
                 <button

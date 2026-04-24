@@ -4,11 +4,14 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminContentLibraryPage from './pages/AdminContentLibraryPage';
 import AdminCourseWorkspacePage from './pages/AdminCourseWorkspacePage';
+import AdminCourseWorkspaceLandingPage from './pages/AdminCourseWorkspaceLandingPage';
+import AdminContentMigrationPage from './pages/AdminContentMigrationPage';
 import AdminAnnouncementsWorkspacePage from './pages/AdminAnnouncementsWorkspacePage';
 import AdminAuditLogPage from './pages/AdminAuditLogPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminMockExamPage from './pages/AdminMockExamPage';
 import AdminPricingWorkspacePage from './pages/AdminPricingWorkspacePage';
+import AdminBatchPricingPage from './pages/AdminBatchPricingPage';
 import AdminQuizBuilderPage from './pages/AdminQuizBuilderPage';
 import AdminLearnerInsightsPage from './pages/AdminLearnerInsightsPage';
 import AdminLiveClassesPage from './pages/AdminLiveClassesPage';
@@ -34,8 +37,14 @@ const StudentMockExamPage = lazy(() => import('./pages/StudentMockExamPage'));
 const StudentModuleQuizPage = lazy(() => import('./pages/StudentModuleQuizPage'));
 const StudentQuizPage = lazy(() => import('./pages/StudentQuizPage'));
 const StudentTestSeriesPage = lazy(() => import('./pages/StudentTestSeriesPage'));
+const StudentTestSeriesPurchasePage = lazy(() => import('./pages/StudentTestSeriesPurchasePage'));
 const StudentTopicTestCatalogPage = lazy(() => import('./pages/StudentTopicTestCatalogPage'));
+const StudentTopicSeriesModulesPage = lazy(() => import('./pages/StudentTopicSeriesModulesPage'));
+const StudentTopicSeriesModuleTopicsPage = lazy(() => import('./pages/StudentTopicSeriesModuleTopicsPage'));
 const StudentCourseModulesPage = lazy(() => import('./pages/StudentCourseModulesPage'));
+const StudentCourseCatalogPage = lazy(() => import('./pages/StudentCourseCatalogPage'));
+const StudentMyCoursesPage = lazy(() => import('./pages/StudentMyCoursesPage'));
+const StudentCourseBatchesPage = lazy(() => import('./pages/StudentCourseBatchesPage'));
 const StudentInsightsPage = lazy(() => import('./pages/StudentInsightsPage'));
 const StudentQuizPerformancePage = lazy(() => import('./pages/StudentQuizPerformancePage'));
 const StudentTestSeriesPerformancePage = lazy(() => import('./pages/StudentTestSeriesPerformancePage'));
@@ -70,10 +79,42 @@ export default function App() {
         )}
       />
       <Route
+        path="/admin/course-workspace"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminCourseWorkspaceLandingPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/course-workspace/setup"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminCourseWorkspacePage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/course-workspace/module-topic"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminCourseWorkspacePage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/admin/course-workspace/:courseName"
         element={(
           <ProtectedRoute role="admin">
             <AdminCourseWorkspacePage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/content-migration"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminContentMigrationPage />
           </ProtectedRoute>
         )}
       />
@@ -130,6 +171,14 @@ export default function App() {
         element={(
           <ProtectedRoute role="admin">
             <AdminPricingWorkspacePage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/batch-pricing"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminBatchPricingPage />
           </ProtectedRoute>
         )}
       />
@@ -282,11 +331,41 @@ export default function App() {
         )}
       />
       <Route
+        path="/student/courses"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading course catalog...</div>}>
+              <StudentCourseCatalogPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/my-courses"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading my courses...</div>}>
+              <StudentMyCoursesPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/student/course/:courseName/modules"
         element={(
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading course modules...</div>}>
               <StudentCourseModulesPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/course/:courseName/batches"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading course batches...</div>}>
+              <StudentCourseBatchesPage />
             </Suspense>
           </ProtectedRoute>
         )}
@@ -342,11 +421,41 @@ export default function App() {
         )}
       />
       <Route
+        path="/student/test-series/purchase"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading purchase page...</div>}>
+              <StudentTestSeriesPurchasePage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
         path="/student/test-series/topic-tests/catalog"
         element={(
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading topic test organizer...</div>}>
               <StudentTopicTestCatalogPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/test-series/topic-tests/modules"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading module-wise topic tests...</div>}>
+              <StudentTopicSeriesModulesPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/test-series/topic-tests/module/:moduleName"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading module topics...</div>}>
+              <StudentTopicSeriesModuleTopicsPage />
             </Suspense>
           </ProtectedRoute>
         )}

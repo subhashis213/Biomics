@@ -19,6 +19,7 @@ const topicTestQuestionSchema = new mongoose.Schema({
 // Module/Topic-wise test — part of Test Series (not the monthly scheduled exam).
 const topicTestSchema = new mongoose.Schema({
   category: { type: String, required: true, trim: true },
+  batch: { type: String, trim: true, default: '' },
   module: { type: String, required: true, trim: true },
   topic: { type: String, required: true, trim: true, default: 'General' },
   title: { type: String, required: true, trim: true },

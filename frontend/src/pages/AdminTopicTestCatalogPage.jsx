@@ -1,28 +1,41 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { requestJson } from '../api';
+import { fetchCoursesAdmin, requestJson } from '../api';
 import AppShell from '../components/AppShell';
 import TopicTestCatalogBoard from '../components/TopicTestCatalogBoard';
 
-const COURSE_CATEGORIES = [
-  '11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
-];
-const DEFAULT_COURSE = 'CSIR-NET Life Science';
+// course list loaded from server
 
 export default function AdminTopicTestCatalogPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [category, setCategory] = useState(DEFAULT_COURSE);
+  const [courses, setCourses] = useState([]);
+  const [category, setCategory] = useState('');
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const categoryFromQuery = params.get('category');
-    if (categoryFromQuery && COURSE_CATEGORIES.includes(categoryFromQuery)) {
-      setCategory(categoryFromQuery);
+    let ignore = false;
+    async function loadCourses() {
+      try {
+        const res = await fetchCoursesAdmin();
+        if (ignore) return;
+        const courseList = Array.isArray(res?.courses) ? res.courses : [];
+        setCourses(courseList);
+        const params = new URLSearchParams(location.search);
+        const categoryFromQuery = params.get('category');
+        if (categoryFromQuery && courseList.some((c) => c.name === categoryFromQuery)) {
+          setCategory(categoryFromQuery);
+        } else if (!category && courseList.length) {
+          setCategory(courseList[0].name);
+        }
+      } catch {
+        if (!ignore) setCourses([]);
+      }
     }
+    loadCourses();
+    return () => { ignore = true; };
   }, [location.search]);
 
   useEffect(() => {
@@ -83,8 +96,9 @@ export default function AdminTopicTestCatalogPage() {
             <label>
               Course
               <select value={category} onChange={(event) => setCategory(event.target.value)}>
-                {COURSE_CATEGORIES.map((course) => (
-                  <option key={course} value={course}>{course}</option>
+                {courses.length === 0 ? <option value="">Loading courses...</option> : null}
+                {courses.map((c) => (
+                  <option key={c.name} value={c.name}>{c.displayName || c.name}</option>
                 ))}
               </select>
             </label>

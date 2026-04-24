@@ -11,6 +11,7 @@
     "dev:status": "zsh ./scripts/dev-status.sh",
     "build": "npm --prefix frontend run build",
     "start": "npm --prefix backend run start",
+    "migrate:content-batch": "npm --prefix backend run migrate:content-batch --",
     "check:routes": "node -e \"require('./backend/routes/videoRoutes'); console.log('video-routes-ok')\"",
     "check:mongo": "node -e \"require('./backend/node_modules/dotenv').config({ path: './backend/.env' }); const mongoose = require('./backend/node_modules/mongoose'); const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/biomicshub'; mongoose.connect(uri).then(async () => { console.log('mongo-ok'); await mongoose.disconnect(); }).catch((err) => { console.error(err.message || err); process.exit(1); });\"",
     "check:port": "lsof -nP -iTCP:5002 -sTCP:LISTEN",

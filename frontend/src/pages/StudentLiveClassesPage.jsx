@@ -12,6 +12,11 @@ const CALENDAR_HOUR_ROW_HEIGHT = 64;
 const MIN_CALENDAR_EVENT_HEIGHT = 24;
 const MOBILE_CALENDAR_BREAKPOINT = 768;
 const WORKSPACE_REFRESH_INTERVAL_MS = 15000;
+const DEFAULT_LIVE_CLASS_COURSE_FILTER = 'CSIR-NET Life Science';
+
+function normalizeCourseName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
 
 function formatDateKey(value) {
   if (!value) return '';
@@ -251,6 +256,7 @@ export default function StudentLiveClassesPage() {
   const [workspace, setWorkspace] = useState({ access: null, activeClass: null, upcomingClasses: [], calendar: [] });
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState(null);
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState(DEFAULT_LIVE_CLASS_COURSE_FILTER);
   const [selectedDateKey, setSelectedDateKey] = useState('');
   const [isMiniCalendarCollapsed, setIsMiniCalendarCollapsed] = useState(false);
   const loadRequestRef = useRef(0);
@@ -370,17 +376,51 @@ export default function StudentLiveClassesPage() {
   const access = workspace.access || {};
   const hasCourseAccess = Boolean(access.hasCourseAccess);
   const isLiveFocusMode = Boolean(classId && selectedClass?.status === 'live');
-  const calendarEntries = Array.isArray(workspace.calendar) ? workspace.calendar : [];
+  const rawCalendarEntries = Array.isArray(workspace.calendar) ? workspace.calendar : [];
+  const normalizedSelectedCourseFilter = normalizeCourseName(selectedCourseFilter).toLowerCase();
+  const showAllCourses = normalizedSelectedCourseFilter === 'all';
+  const filteredActiveClass = useMemo(() => {
+    const active = workspace.activeClass;
+    if (!active) return null;
+    if (showAllCourses) return active;
+    return normalizeCourseName(active.course).toLowerCase() === normalizedSelectedCourseFilter ? active : null;
+  }, [workspace.activeClass, showAllCourses, normalizedSelectedCourseFilter]);
+  const filteredUpcomingClasses = useMemo(() => {
+    if (showAllCourses) return Array.isArray(workspace.upcomingClasses) ? workspace.upcomingClasses : [];
+    return (Array.isArray(workspace.upcomingClasses) ? workspace.upcomingClasses : []).filter(
+      (entry) => normalizeCourseName(entry?.course).toLowerCase() === normalizedSelectedCourseFilter
+    );
+  }, [workspace.upcomingClasses, showAllCourses, normalizedSelectedCourseFilter]);
+  const calendarEntries = useMemo(() => {
+    if (showAllCourses) return rawCalendarEntries;
+    return rawCalendarEntries.filter(
+      (entry) => normalizeCourseName(entry?.course).toLowerCase() === normalizedSelectedCourseFilter
+    );
+  }, [rawCalendarEntries, showAllCourses, normalizedSelectedCourseFilter]);
+  const courseFilterOptions = useMemo(() => {
+    const courses = new Set([DEFAULT_LIVE_CLASS_COURSE_FILTER]);
+    rawCalendarEntries.forEach((entry) => {
+      const courseName = normalizeCourseName(entry?.course);
+      if (courseName) courses.add(courseName);
+    });
+    const activeCourse = normalizeCourseName(workspace.activeClass?.course);
+    if (activeCourse) courses.add(activeCourse);
+    (Array.isArray(workspace.upcomingClasses) ? workspace.upcomingClasses : []).forEach((entry) => {
+      const courseName = normalizeCourseName(entry?.course);
+      if (courseName) courses.add(courseName);
+    });
+    return ['all', ...Array.from(courses).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))];
+  }, [rawCalendarEntries, workspace.activeClass, workspace.upcomingClasses]);
 
   useEffect(() => {
     if (selectedDateKey) return;
     const nextRelevantDate = calendarEntries[0]?.startsAt
-      || workspace.activeClass?.startedAt
-      || workspace.upcomingClasses?.[0]?.scheduledAt
+      || filteredActiveClass?.startedAt
+      || filteredUpcomingClasses?.[0]?.scheduledAt
       || new Date();
     const nextKey = formatDateKey(nextRelevantDate);
     if (nextKey) setSelectedDateKey(nextKey);
-  }, [calendarEntries, selectedDateKey, workspace.activeClass?.startedAt, workspace.upcomingClasses]);
+  }, [calendarEntries, selectedDateKey, filteredActiveClass?.startedAt, filteredUpcomingClasses]);
 
   const selectedDate = useMemo(() => parseDateKey(selectedDateKey || formatDateKey(new Date())), [selectedDateKey]);
   const eventCountByDate = useMemo(() => {
@@ -490,8 +530,8 @@ export default function StudentLiveClassesPage() {
               <h2>Enter a cleaner mobile classroom, join the live teacher room fast, and track every scheduled class without losing focus.</h2>
               <p className="subtitle">The live section is now built around quick entry, full-screen class viewing, and a predictable mobile flow for chat, schedules, and live-room access.</p>
               <div className="livekit-student-hero-actions">
-                {workspace.activeClass ? (
-                  <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(workspace.activeClass._id)}`)}>
+                {filteredActiveClass ? (
+                  <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(filteredActiveClass._id)}`)}>
                     Join Live Class
                   </button>
                 ) : (
@@ -511,13 +551,13 @@ export default function StudentLiveClassesPage() {
             </div>
             <aside className="livekit-student-hero-spotlight">
               <span className="livekit-student-hero-spotlight-kicker">Next classroom moment</span>
-              <strong>{workspace.activeClass?.title || nextCalendarEntry?.title || 'No live class scheduled right now'}</strong>
+              <strong>{filteredActiveClass?.title || nextCalendarEntry?.title || 'No live class scheduled for selected course'}</strong>
               <p>
-                {workspace.activeClass
-                  ? `${formatDateTime(workspace.activeClass.startedAt)}${workspace.activeClass.course ? ` • ${workspace.activeClass.course}` : ''}`
+                {filteredActiveClass
+                  ? `${formatDateTime(filteredActiveClass.startedAt)}${filteredActiveClass.course ? ` • ${filteredActiveClass.course}` : ''}`
                   : nextCalendarEntry
                     ? `${formatAgendaDay(nextCalendarEntry.startsAt)} at ${formatTimeRange(nextCalendarEntry.startsAt, nextCalendarEntry.endsAt)}`
-                    : 'Your upcoming class and blocked-slot timeline will appear here as soon as the schedule is available.'}
+                    : 'No blocked slots or classes for the selected course yet.'}
               </p>
               <div className="livekit-student-hero-spotlight-meta">
                 <span className="livekit-student-hero-pill">{hasCourseAccess ? 'Course ready' : 'Course locked'}</span>
@@ -526,14 +566,14 @@ export default function StudentLiveClassesPage() {
             </aside>
             <div className="workspace-hero-stats livekit-hero-stats">
               <StatCard label="Course Access" value={hasCourseAccess ? 'Enabled' : 'Locked'} />
-              <StatCard label="Live Now" value={workspace.activeClass ? '1' : '0'} />
+              <StatCard label="Live Now" value={filteredActiveClass ? '1' : '0'} />
               <StatCard label="Upcoming" value={futureCalendarItemCount} />
             </div>
           </section>
         ) : null}
 
         <section id="section-student-live-room" className={`livekit-student-room-section${isLiveFocusMode ? ' focus-mode' : ''}`}>
-          {workspace.activeClass ? (
+          {filteredActiveClass ? (
             <section className="card workspace-panel livekit-live-banner-panel">
               <div className="livekit-live-banner-indicator" aria-hidden="true">
                 <span className="livekit-live-banner-indicator-ring" />
@@ -541,9 +581,9 @@ export default function StudentLiveClassesPage() {
               <div className="livekit-live-banner-copy">
                 <span className="live-badge pulsing">LIVE NOW</span>
                 <div>
-                  <strong>{workspace.activeClass.title}</strong>
-                  <p>{workspace.activeClass.description || 'Your teacher is already inside the room.'}</p>
-                  <span>{formatDateTime(workspace.activeClass.startedAt)}{workspace.activeClass.course ? ` • ${workspace.activeClass.course}` : ''}</span>
+                  <strong>{filteredActiveClass.title}</strong>
+                  <p>{filteredActiveClass.description || 'Your teacher is already inside the room.'}</p>
+                  <span>{formatDateTime(filteredActiveClass.startedAt)}{filteredActiveClass.course ? ` • ${filteredActiveClass.course}` : ''}</span>
                 </div>
                 <div className="livekit-live-banner-meta">
                   <span className="livekit-live-banner-pill">Tap once to join</span>
@@ -556,7 +596,7 @@ export default function StudentLiveClassesPage() {
                     Exit Classroom Focus
                   </button>
                 ) : (
-                  <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(workspace.activeClass._id)}`)}>
+                  <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(filteredActiveClass._id)}`)}>
                     Join Live Class
                   </button>
                 )}
@@ -577,10 +617,10 @@ export default function StudentLiveClassesPage() {
                   loadWorkspace({ showLoading: false });
                 }}
               />
-          ) : !workspace.activeClass ? (
+          ) : !filteredActiveClass ? (
             <section className="card livekit-empty-room-card">
               <strong>No active live class yet</strong>
-              <p>When the admin starts your course live class, the join option will appear here.</p>
+              <p>When the admin starts a live class for this selected course, the join option will appear here.</p>
             </section>
           ) : null}
         </section>
@@ -607,10 +647,27 @@ export default function StudentLiveClassesPage() {
                       </p>
                     </div>
                     <div className="livekit-student-calendar-spotlight-meta">
+                      <div className="livekit-student-course-filter">
+                        <span>Course</span>
+                        <select
+                          className="livekit-student-course-filter-field"
+                          value={selectedCourseFilter}
+                          onChange={(event) => {
+                            setSelectedCourseFilter(event.target.value);
+                            setSelectedDateKey('');
+                          }}
+                        >
+                          {courseFilterOptions.map((courseOption) => (
+                            <option key={courseOption} value={courseOption}>
+                              {courseOption === 'all' ? 'All Courses' : courseOption}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <button type="button" className="secondary-btn" onClick={() => setSelectedDateKey(formatDateKey(new Date()))}>
                         Today
                       </button>
-                      <span className="livekit-student-calendar-summary-pill">{workspace.calendar.length} agenda item{workspace.calendar.length === 1 ? '' : 's'}</span>
+                      <span className="livekit-student-calendar-summary-pill">{calendarEntries.length} agenda item{calendarEntries.length === 1 ? '' : 's'}</span>
                       <span className={`livekit-student-calendar-summary-pill ${hasCourseAccess ? 'is-premium' : ''}`}>{hasCourseAccess ? 'Course ready' : 'Course locked'}</span>
                       {nextCalendarEntry?.kind === 'live-class' && nextCalendarEntry.liveClassId ? (
                         <button type="button" className="primary-btn" onClick={() => navigate(`/student/live-classes/${encodeURIComponent(nextCalendarEntry.liveClassId)}`)}>

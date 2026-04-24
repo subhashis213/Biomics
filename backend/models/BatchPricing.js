@@ -1,10 +1,8 @@
 const mongoose = require('mongoose');
 
-// ModulePricing stores Pro/Elite prices per module per course.
-// moduleName === 'ALL_MODULES' is the course-wide bundle entry.
-const modulePricingSchema = new mongoose.Schema({
+const batchPricingSchema = new mongoose.Schema({
   category: { type: String, required: true, trim: true },
-  moduleName: { type: String, required: true, trim: true, default: 'ALL_MODULES' },
+  batchName: { type: String, required: true, trim: true },
   proPriceInPaise: { type: Number, required: true, min: 0, default: 0 },
   elitePriceInPaise: { type: Number, required: true, min: 0, default: 0 },
   proMrpInPaise: { type: Number, min: 0, default: 0 },
@@ -18,6 +16,6 @@ const modulePricingSchema = new mongoose.Schema({
   updatedBy: { type: String, trim: true, default: '' }
 }, { timestamps: true });
 
-modulePricingSchema.index({ category: 1, moduleName: 1 }, { unique: true });
+batchPricingSchema.index({ category: 1, batchName: 1 }, { unique: true });
 
-module.exports = mongoose.model('ModulePricing', modulePricingSchema);
+module.exports = mongoose.model('BatchPricing', batchPricingSchema);

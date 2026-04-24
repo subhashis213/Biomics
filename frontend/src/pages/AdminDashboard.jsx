@@ -115,6 +115,7 @@ export default function AdminDashboard() {
   const [students, setStudents] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [videoForm, setVideoForm] = useState({ title: '', description: '', url: '' });
+  const [adminCourseCatalog, setAdminCourseCatalog] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [courseModalOpen, setCourseModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState('module'); // 'module' or 'upload'
@@ -307,14 +308,15 @@ export default function AdminDashboard() {
   async function refreshData() {
     setLoading(true);
     try {
-      const [videoResult, studentResult, feedbackResult, moduleResult] = await Promise.allSettled([
+      const [videoResult, studentResult, feedbackResult, moduleResult, courseCatalogResult] = await Promise.allSettled([
         requestJson('/videos'),
         requestJson('/auth/users'),
         requestJson('/feedback'),
-        requestJson('/modules')
+        requestJson('/modules'),
+        requestJson('/courses/admin')
       ]);
 
-      const authError = [videoResult, studentResult, feedbackResult, moduleResult]
+      const authError = [videoResult, studentResult, feedbackResult, moduleResult, courseCatalogResult]
         .filter((result) => result.status === 'rejected')
         .map((result) => result.reason?.message || '')
         .find((message) => /authentication|forbidden/i.test(message));
@@ -344,6 +346,13 @@ export default function AdminDashboard() {
         })));
       }
 
+      if (courseCatalogResult.status === 'fulfilled') {
+        const courses = Array.isArray(courseCatalogResult.value?.courses)
+          ? courseCatalogResult.value.courses
+          : [];
+        setAdminCourseCatalog(courses);
+      }
+
       const modulesByCourse = {};
       if (moduleResult.status === 'fulfilled') {
         (moduleResult.value?.modules || []).forEach((entry) => {
@@ -363,7 +372,7 @@ export default function AdminDashboard() {
         return next;
       });
 
-      const failures = [videoResult, studentResult, feedbackResult, moduleResult]
+      const failures = [videoResult, studentResult, feedbackResult, moduleResult, courseCatalogResult]
         .filter((result) => result.status === 'rejected')
         .map((result) => result.reason?.message || 'Request failed');
 
@@ -2304,6 +2313,13 @@ export default function AdminDashboard() {
   const topicBucketKey = getTopicBucketKey(selectedCourse, selectedModule);
   const currentModuleTopics = moduleTopicsByKey[topicBucketKey] || [];
   const selectedCourseTheme = COURSE_MODAL_THEME[selectedCourse] || COURSE_MODAL_THEME['11th'];
+  const catalogCourseNames = adminCourseCatalog
+    .map((entry) => String(entry?.name || '').trim())
+    .filter(Boolean);
+  const courseManagerCourses = (catalogCourseNames.length
+    ? Array.from(new Set(catalogCourseNames))
+    : COURSE_CATEGORIES
+  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const courseModalStyle = {
     '--course-modal-accent': selectedCourseTheme.accent,
     '--course-modal-accent-alt': selectedCourseTheme.accentAlt,
@@ -2456,12 +2472,17 @@ export default function AdminDashboard() {
             <div className="section-header" style={{ marginTop: 0 }}>
               <div>
                 <h2>Course categories</h2>
-                <p className="subtitle">Tap a course to add lectures &amp; notes.</p>
+                <p className="subtitle">Open course setup workspace to add/remove courses and batches, or tap a course below to add lectures.</p>
               </div>
-              <StatCard label="Total Courses" value={COURSE_CATEGORIES.length} />
+              <StatCard label="Total Courses" value={courseManagerCourses.length} />
+            </div>
+            <div className="workspace-link-actions" style={{ marginBottom: '12px' }}>
+              <button type="button" className="primary-btn" onClick={() => navigate('/admin/course-workspace')}>
+                Open Course Setup Workspace
+              </button>
             </div>
             <div className="course-grid">
-              {COURSE_CATEGORIES.map((course) => {
+              {courseManagerCourses.map((course) => {
                 const meta = COURSE_META[course] || { icon: '\ud83d\udcda', color: '#6b7280' };
                 const lectureCount = videos.filter((v) => (v.category || 'General') === course).length;
                 const moduleCount = getModulesForCourse(course).length;
@@ -2524,7 +2545,7 @@ export default function AdminDashboard() {
                 <span className="workspace-quick-chip">Search and filters</span>
               </div>
               <div className="content-library-launch-metrics">
-                <StatCard label="Courses With Content" value={COURSE_CATEGORIES.filter((course) => videos.some((v) => (v.category || 'General') === course)).length} />
+                <StatCard label="Courses With Content" value={courseManagerCourses.filter((course) => videos.some((v) => (v.category || 'General') === course)).length} />
                 <StatCard label="Modules" value={Array.from(new Set(videos.map((video) => String(video.module || 'General')))).length} />
               </div>
               <div className="workspace-link-actions">

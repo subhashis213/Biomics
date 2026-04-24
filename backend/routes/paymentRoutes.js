@@ -1,17 +1,24 @@
 const crypto = require('crypto');
 const express = require('express');
+const fs = require('fs');
+const multer = require('multer');
+const path = require('path');
 const Razorpay = require('razorpay');
+const { v2: cloudinary } = require('cloudinary');
 const { authenticateToken } = require('../middleware/auth');
 const ModulePricing = require('../models/ModulePricing');
+const BatchPricing = require('../models/BatchPricing');
 const Voucher = require('../models/Voucher');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const Module = require('../models/Module');
+const Course = require('../models/Course');
 const { logAdminAction } = require('../utils/auditLog');
 const {
   ALL_MODULES,
   getActiveCourseMembership,
   getActiveModuleMembership,
+  hasCourseAccess,
   normalizeCourseName,
   normalizeModuleName,
   getCoursePricingDocs,
@@ -22,11 +29,49 @@ const {
 } = require('../utils/courseAccess');
 
 const router = express.Router();
+const uploadsDir = path.join(__dirname, '../uploads');
 
-const SUPPORTED_COURSES = [
+const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+const cloudinaryApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
+const cloudinaryApiSecret = String(process.env.CLOUDINARY_API_SECRET || '').trim();
+const hasCloudinaryConfig = !!(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret);
+
+if (hasCloudinaryConfig) {
+  cloudinary.config({
+    cloud_name: cloudinaryCloudName,
+    api_key: cloudinaryApiKey,
+    api_secret: cloudinaryApiSecret,
+    secure: true
+  });
+}
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const courseThumbnailStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeBase = path.basename(file.originalname || 'course-thumbnail', ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    cb(null, `course-thumbnail-${Date.now()}-${safeBase}${ext || '.png'}`);
+  }
+});
+
+const courseThumbnailUpload = multer({
+  storage: courseThumbnailStorage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if ((file.mimetype || '').startsWith('image/')) return cb(null, true);
+    return cb(new Error('Only image files are allowed for course thumbnails.'));
+  }
+});
+
+const LEGACY_SUPPORTED_COURSES = [
   '11th',
   '12th',
   'NEET',
+  'GAT-B',
   'IIT-JAM',
   'CSIR-NET Life Science',
   'GATE'
@@ -47,8 +92,33 @@ function getRazorpayConfig() {
   };
 }
 
-function isSupportedCourse(course) {
-  return SUPPORTED_COURSES.includes(normalizeCourseName(course));
+async function getSupportedCourses() {
+  const docs = await Course.find({}).sort({ name: 1 }).lean();
+  const names = docs
+    .filter((entry) => (
+      entry
+      && entry.archived !== true
+      && entry.active !== false
+      && entry.isDeleted !== true
+      && !entry.deletedAt
+    ))
+    .map((entry) => normalizeCourseName(entry?.name))
+    .filter(Boolean);
+  if (names.length) return names;
+  return docs.length ? [] : LEGACY_SUPPORTED_COURSES;
+}
+
+async function findCourseDocByName(courseName) {
+  const normalized = normalizeCourseName(courseName);
+  if (!normalized) return null;
+  const docs = await Course.find({}).lean();
+  const target = String(normalized || '').toLowerCase();
+  return docs.find((entry) => String(normalizeCourseName(entry?.name) || '').toLowerCase() === target) || null;
+}
+
+async function isSupportedCourse(course) {
+  const supportedCourses = await getSupportedCourses();
+  return supportedCourses.includes(normalizeCourseName(course));
 }
 
 function buildPlanPricing(pricing) {
@@ -62,6 +132,50 @@ function buildPlanPricing(pricing) {
 
 function hasPaidPlans(pricing) {
   return Boolean(pricing && buildPlanPricing(pricing).some((plan) => plan.amountInPaise > 0));
+}
+
+function safelyRemoveFile(filePath) {
+  if (!filePath) return;
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch {
+    // Non-fatal cleanup error.
+  }
+}
+
+async function uploadCourseThumbnailToCloudinary(localPath) {
+  if (!hasCloudinaryConfig) return null;
+  if (!localPath) throw new Error('Course thumbnail upload path is missing.');
+
+  const uploadResult = await cloudinary.uploader.upload(localPath, {
+    folder: 'biomicshub/course-thumbnails',
+    resource_type: 'image',
+    overwrite: true
+  });
+
+  return {
+    url: String(uploadResult?.secure_url || '').trim(),
+    publicId: String(uploadResult?.public_id || '').trim()
+  };
+}
+
+function buildCatalogPlanSummary(pricing, plan) {
+  const saleAmountInPaise = Math.max(0, Number(getPlanPriceInPaise(pricing, plan.type) || 0));
+  const mrpKey = plan.type === 'elite' ? 'eliteMrpInPaise' : 'proMrpInPaise';
+  const configuredMrp = Math.max(0, Number(pricing?.[mrpKey] || 0));
+  const mrpAmountInPaise = Math.max(saleAmountInPaise, configuredMrp);
+  const discountPercent = mrpAmountInPaise > saleAmountInPaise && mrpAmountInPaise > 0
+    ? Math.round(((mrpAmountInPaise - saleAmountInPaise) / mrpAmountInPaise) * 100)
+    : 0;
+
+  return {
+    type: plan.type,
+    label: plan.label,
+    durationMonths: plan.durationMonths,
+    saleAmountInPaise,
+    mrpAmountInPaise,
+    discountPercent
+  };
 }
 
 function addMonths(date, months) {
@@ -221,6 +335,100 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
   }
 });
 
+router.get('/catalog', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }).lean();
+    const supportedCourses = await getSupportedCourses();
+    const courseDocs = await Course.find({ name: { $in: supportedCourses } }).lean();
+    const courseDocByName = new Map(
+      courseDocs.map((entry) => [normalizeCourseName(entry?.name), entry])
+    );
+    const [bundlePricingDocs, modules] = await Promise.all([
+      ModulePricing.find({ moduleName: ALL_MODULES, category: { $in: supportedCourses } }).lean(),
+      Module.find({ category: { $in: supportedCourses } }).select({ category: 1 }).lean()
+    ]);
+
+    const bundlePricingMap = new Map(
+      bundlePricingDocs.map((entry) => [normalizeCourseName(entry.category), entry])
+    );
+    const moduleCountMap = modules.reduce((acc, entry) => {
+      const category = normalizeCourseName(entry?.category || '');
+      if (!category) return acc;
+      acc.set(category, Number(acc.get(category) || 0) + 1);
+      return acc;
+    }, new Map());
+
+    const courses = await Promise.all(supportedCourses.map(async (courseName) => {
+      const pricing = bundlePricingMap.get(courseName) || null;
+      const courseDoc = courseDocByName.get(courseName) || null;
+      const purchasesForCourse = Array.isArray(user?.purchasedCourses)
+        ? user.purchasedCourses.filter((entry) => normalizeCourseName(entry?.course) === courseName)
+        : [];
+      const activeMembership = user ? getActiveCourseMembership(user, courseName) : null;
+      const plans = Object.values(MEMBERSHIP_PLANS)
+        .map((plan) => buildCatalogPlanSummary(pricing, plan))
+        .filter((plan) => plan.saleAmountInPaise > 0 || plan.mrpAmountInPaise > 0);
+      const featuredPlan = plans.find((plan) => plan.saleAmountInPaise > 0) || plans[0] || null;
+
+      return {
+        courseName,
+        displayName: String(courseDoc?.displayName || courseName).trim(),
+        description: String(courseDoc?.description || '').trim(),
+        icon: String(courseDoc?.icon || '').trim(),
+        batches: Array.isArray(courseDoc?.batches)
+          ? courseDoc.batches
+            .filter((batch) => batch?.active !== false)
+            .map((batch) => ({ name: normalizeCourseName(batch?.name), active: batch?.active !== false }))
+            .filter((batch) => Boolean(batch.name))
+          : [],
+        moduleCount: Number(moduleCountMap.get(courseName) || 0),
+        thumbnailUrl: String(pricing?.thumbnailUrl || '').trim(),
+        thumbnailName: String(pricing?.thumbnailName || '').trim(),
+        isEnrolledCourse: normalizeCourseName(user?.class) === courseName,
+        unlocked: user ? await hasCourseAccess(user, courseName) : false,
+        hadPurchase: purchasesForCourse.length > 0,
+        expiredMembership: purchasesForCourse.length > 0 && !activeMembership,
+        plans,
+        featuredPlan
+      };
+    }));
+
+    return res.json({ courses });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load course catalog.' });
+  }
+});
+
+router.get('/catalog/:course/batches', authenticateToken('user'), async (req, res) => {
+  try {
+    const courseName = normalizeCourseName(decodeURIComponent(req.params.course || ''));
+    if (!(await isSupportedCourse(courseName))) return res.status(400).json({ error: 'Unsupported course category.' });
+
+    const courseDoc = await Course.findOne({ name: courseName }).lean();
+    const pricingDocs = await BatchPricing.find({ category: courseName }).lean();
+    const pricingMap = new Map(pricingDocs.map((p) => [String(p.batchName || '').trim(), p]));
+
+    const batches = (Array.isArray(courseDoc?.batches) ? courseDoc.batches.filter((b) => b?.active !== false).map((b) => String(b.name || '').trim()).filter(Boolean) : []);
+
+    return res.json({
+      courseName,
+      batches: batches.map((name) => {
+        const pricing = pricingMap.get(name) || {};
+        return {
+          batchName: name,
+          proPriceInPaise: Number(pricing.proPriceInPaise || 0),
+          elitePriceInPaise: Number(pricing.elitePriceInPaise || 0),
+          proMrpInPaise: Number(pricing.proMrpInPaise || 0),
+          eliteMrpInPaise: Number(pricing.eliteMrpInPaise || 0),
+          active: pricing ? pricing.active !== false : true
+        };
+      })
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch batch catalog.' });
+  }
+});
+
 router.post('/preview-order', authenticateToken('user'), async (req, res) => {
   try {
     const { user, course } = await ensureUserAndCourse(req.user.username);
@@ -228,7 +436,7 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
 
     const requestedCourse = normalizeCourseName(req.body?.course || '');
     const targetCourse = requestedCourse || course;
-    if (!isSupportedCourse(targetCourse)) {
+    if (!(await isSupportedCourse(targetCourse))) {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
@@ -313,7 +521,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
 
     const requestedCourse = normalizeCourseName(req.body?.course || '');
     const targetCourse = requestedCourse || course;
-    if (!isSupportedCourse(targetCourse)) {
+    if (!(await isSupportedCourse(targetCourse))) {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
@@ -327,10 +535,57 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
     const originalAmountInPaise = getPlanPriceInPaise(pricing, selectedPlan.type);
 
     if (!pricing || originalAmountInPaise <= 0) {
+      const now = new Date();
+      const expiresAt = addMonths(now, selectedPlan.durationMonths);
+      const payment = await Payment.create({
+        username: req.user.username,
+        course: targetCourse,
+        moduleName: targetModuleName,
+        planType: selectedPlan.type,
+        durationMonths: selectedPlan.durationMonths,
+        status: 'paid',
+        amountInPaise: 0,
+        originalAmountInPaise: 0,
+        discountInPaise: 0,
+        currency: String(pricing?.currency || 'INR'),
+        voucherCode: '',
+        voucherSnapshot: {
+          discountType: '',
+          discountValue: 0
+        },
+        paidAt: now,
+        expiresAt
+      });
+
+      await User.updateOne(
+        { username: req.user.username },
+        { $pull: { purchasedCourses: { course: targetCourse, moduleName: targetModuleName } } }
+      );
+      await User.updateOne(
+        { username: req.user.username },
+        {
+          $push: {
+            purchasedCourses: {
+              course: targetCourse,
+              moduleName: targetModuleName,
+              planType: selectedPlan.type,
+              unlockedAt: now,
+              expiresAt,
+              paymentId: String(payment._id)
+            }
+          }
+        }
+      );
+
       return res.json({
         unlocked: true,
         purchaseRequired: false,
-        message: 'This course is currently free.'
+        message: `${targetModuleName === ALL_MODULES ? targetCourse : targetModuleName} unlocked successfully.`,
+        activeMembership: {
+          moduleName: targetModuleName,
+          planType: selectedPlan.type,
+          expiresAt
+        }
       });
     }
 
@@ -591,16 +846,17 @@ router.post('/verify', authenticateToken('user'), async (req, res) => {
 
 router.get('/admin/pricing', authenticateToken('admin'), async (req, res) => {
   try {
+    const supportedCourses = await getSupportedCourses();
     const pricingDocs = await ModulePricing.find({}).sort({ category: 1, moduleName: 1 }).lean();
     // Group docs by course for easy consumption by admin UI
     const pricingByCourse = {};
-    SUPPORTED_COURSES.forEach((cat) => { pricingByCourse[cat] = []; });
+    supportedCourses.forEach((cat) => { pricingByCourse[cat] = []; });
     pricingDocs.forEach((doc) => {
       const cat = normalizeCourseName(doc.category);
       if (!pricingByCourse[cat]) pricingByCourse[cat] = [];
       pricingByCourse[cat].push(doc);
     });
-    return res.json({ supportedCourses: SUPPORTED_COURSES, pricingByCourse, pricing: pricingDocs });
+    return res.json({ supportedCourses, pricingByCourse, pricing: pricingDocs });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch pricing.' });
   }
@@ -611,14 +867,26 @@ router.put('/admin/pricing/:course', authenticateToken('admin'), async (req, res
     const category = normalizeCourseName(req.params.course);
     const proPriceInPaise = Math.floor(Number(req.body?.proPriceInPaise || 0));
     const elitePriceInPaise = Math.floor(Number(req.body?.elitePriceInPaise || 0));
+    const proMrpInPaise = Math.floor(Number(req.body?.proMrpInPaise || 0));
+    const eliteMrpInPaise = Math.floor(Number(req.body?.eliteMrpInPaise || 0));
+    const proTenureMonths = Math.floor(Number(req.body?.proTenureMonths || 1));
+    const eliteTenureMonths = Math.floor(Number(req.body?.eliteTenureMonths || 3));
+    const thumbnailUrl = String(req.body?.thumbnailUrl || '').trim();
+    const thumbnailName = String(req.body?.thumbnailName || '').trim();
     const currency = String(req.body?.currency || 'INR').trim().toUpperCase();
     const active = req.body?.active !== false;
 
-    if (!isSupportedCourse(category)) {
+    if (!(await isSupportedCourse(category))) {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
     if (!Number.isFinite(proPriceInPaise) || proPriceInPaise < 0 || !Number.isFinite(elitePriceInPaise) || elitePriceInPaise < 0) {
       return res.status(400).json({ error: 'Plan prices must be non-negative numbers.' });
+    }
+    if (!Number.isFinite(proMrpInPaise) || proMrpInPaise < 0 || !Number.isFinite(eliteMrpInPaise) || eliteMrpInPaise < 0) {
+      return res.status(400).json({ error: 'MRP values must be non-negative numbers.' });
+    }
+    if (!Number.isFinite(proTenureMonths) || proTenureMonths < 1 || !Number.isFinite(eliteTenureMonths) || eliteTenureMonths < 1) {
+      return res.status(400).json({ error: 'Tenure must be at least 1 month.' });
     }
 
     const pricing = await ModulePricing.findOneAndUpdate(
@@ -629,6 +897,12 @@ router.put('/admin/pricing/:course', authenticateToken('admin'), async (req, res
           moduleName: ALL_MODULES,
           proPriceInPaise,
           elitePriceInPaise,
+          proMrpInPaise,
+          eliteMrpInPaise,
+          proTenureMonths,
+          eliteTenureMonths,
+          thumbnailUrl,
+          thumbnailName,
           currency,
           active,
           updatedBy: req.user.username
@@ -643,10 +917,48 @@ router.put('/admin/pricing/:course', authenticateToken('admin'), async (req, res
   }
 });
 
+router.post('/admin/pricing-thumbnail', authenticateToken('admin'), (req, res) => {
+  courseThumbnailUpload.single('image')(req, res, async (uploadError) => {
+    try {
+      if (uploadError instanceof multer.MulterError && uploadError.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Course thumbnail must be 8 MB or smaller.' });
+      }
+      if (uploadError) {
+        return res.status(400).json({ error: uploadError.message || 'Failed to upload course thumbnail.' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'Course thumbnail is required.' });
+      }
+
+      let thumbnailUrl = `/uploads/${encodeURIComponent(req.file.filename)}`;
+      if (hasCloudinaryConfig) {
+        const uploadedImage = await uploadCourseThumbnailToCloudinary(req.file.path);
+        if (!uploadedImage?.url) {
+          safelyRemoveFile(req.file.path);
+          return res.status(500).json({ error: 'Cloud course thumbnail upload failed.' });
+        }
+        thumbnailUrl = uploadedImage.url;
+        safelyRemoveFile(req.file.path);
+      }
+
+      return res.status(201).json({
+        message: 'Course thumbnail uploaded.',
+        thumbnailUrl,
+        thumbnailName: String(req.file.originalname || req.file.filename || '').trim()
+      });
+    } catch {
+      if (req.file?.path) {
+        safelyRemoveFile(req.file.path);
+      }
+      return res.status(500).json({ error: 'Failed to upload course thumbnail.' });
+    }
+  });
+});
+
 router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (req, res) => {
   try {
     const category = normalizeCourseName(decodeURIComponent(req.params.course));
-    if (!isSupportedCourse(category)) {
+    if (!(await isSupportedCourse(category))) {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
@@ -691,14 +1003,19 @@ router.put('/admin/pricing/:course/:module', authenticateToken('admin'), async (
     const moduleName = normalizeModuleName(decodeURIComponent(req.params.module));
     const proPriceInPaise = Math.floor(Number(req.body?.proPriceInPaise || 0));
     const elitePriceInPaise = Math.floor(Number(req.body?.elitePriceInPaise || 0));
+    const proTenureMonths = Math.floor(Number(req.body?.proTenureMonths || 1));
+    const eliteTenureMonths = Math.floor(Number(req.body?.eliteTenureMonths || 3));
     const currency = String(req.body?.currency || 'INR').trim().toUpperCase();
     const active = req.body?.active !== false;
 
-    if (!isSupportedCourse(category)) {
+    if (!(await isSupportedCourse(category))) {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
     if (!Number.isFinite(proPriceInPaise) || proPriceInPaise < 0 || !Number.isFinite(elitePriceInPaise) || elitePriceInPaise < 0) {
       return res.status(400).json({ error: 'Plan prices must be non-negative numbers.' });
+    }
+    if (!Number.isFinite(proTenureMonths) || proTenureMonths < 1 || !Number.isFinite(eliteTenureMonths) || eliteTenureMonths < 1) {
+      return res.status(400).json({ error: 'Tenure must be at least 1 month.' });
     }
 
     const pricing = await ModulePricing.findOneAndUpdate(
@@ -709,6 +1026,8 @@ router.put('/admin/pricing/:course/:module', authenticateToken('admin'), async (
           moduleName,
           proPriceInPaise,
           elitePriceInPaise,
+          proTenureMonths,
+          eliteTenureMonths,
           currency,
           active,
           updatedBy: req.user.username
@@ -720,6 +1039,92 @@ router.put('/admin/pricing/:course/:module', authenticateToken('admin'), async (
     return res.json({ pricing });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to save module pricing.' });
+  }
+});
+
+// Admin: batch-level pricing editor
+router.get('/admin/pricing/:course/batches', authenticateToken('admin'), async (req, res) => {
+  try {
+    const category = normalizeCourseName(decodeURIComponent(req.params.course));
+    if (!(await isSupportedCourse(category))) {
+      return res.status(400).json({ error: 'Unsupported course category.' });
+    }
+
+    const courseDoc = await findCourseDocByName(category);
+    const batches = Array.isArray(courseDoc?.batches) ? courseDoc.batches.filter((b) => b?.active !== false).map((b) => String(b.name || '').trim()).filter(Boolean) : [];
+    const pricingDocs = await BatchPricing.find({ category }).lean();
+    const pricingMap = new Map(pricingDocs.map((p) => [String(p.batchName || '').trim(), p]));
+
+    return res.json({ category, batches: batches.map((name) => {
+      const pricing = pricingMap.get(name) || {};
+      return {
+        batchName: name,
+        proPriceInPaise: Number(pricing.proPriceInPaise || 0),
+        elitePriceInPaise: Number(pricing.elitePriceInPaise || 0),
+        proMrpInPaise: Number(pricing.proMrpInPaise || 0),
+        eliteMrpInPaise: Number(pricing.eliteMrpInPaise || 0),
+        proTenureMonths: Number(pricing.proTenureMonths || 1),
+        eliteTenureMonths: Number(pricing.eliteTenureMonths || 3),
+        thumbnailUrl: String(pricing.thumbnailUrl || '').trim(),
+        thumbnailName: String(pricing.thumbnailName || '').trim(),
+        active: pricing ? pricing.active !== false : true
+      };
+    }) });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch batch pricing.' });
+  }
+});
+
+router.put('/admin/pricing/:course/batches/:batch', authenticateToken('admin'), async (req, res) => {
+  try {
+    const category = normalizeCourseName(decodeURIComponent(req.params.course));
+    const batchName = String(decodeURIComponent(req.params.batch || '')).trim();
+    if (!(await isSupportedCourse(category))) {
+      return res.status(400).json({ error: 'Unsupported course category.' });
+    }
+    if (!batchName) return res.status(400).json({ error: 'Batch name required.' });
+
+    const proPriceInPaise = Math.floor(Number(req.body?.proPriceInPaise || 0));
+    const elitePriceInPaise = Math.floor(Number(req.body?.elitePriceInPaise || 0));
+    const proMrpInPaise = Math.floor(Number(req.body?.proMrpInPaise || 0));
+    const eliteMrpInPaise = Math.floor(Number(req.body?.eliteMrpInPaise || 0));
+    const proTenureMonths = Math.floor(Number(req.body?.proTenureMonths || 1));
+    const eliteTenureMonths = Math.floor(Number(req.body?.eliteTenureMonths || 3));
+    const currency = String(req.body?.currency || 'INR').trim().toUpperCase();
+    const active = req.body?.active !== false;
+
+    if (!Number.isFinite(proPriceInPaise) || proPriceInPaise < 0 || !Number.isFinite(elitePriceInPaise) || elitePriceInPaise < 0) {
+      return res.status(400).json({ error: 'Plan prices must be non-negative numbers.' });
+    }
+    if (!Number.isFinite(proTenureMonths) || proTenureMonths < 1 || !Number.isFinite(eliteTenureMonths) || eliteTenureMonths < 1) {
+      return res.status(400).json({ error: 'Tenure must be at least 1 month.' });
+    }
+
+    const pricing = await BatchPricing.findOneAndUpdate(
+      { category, batchName },
+      {
+        $set: {
+          category,
+          batchName,
+          proPriceInPaise,
+          elitePriceInPaise,
+          proMrpInPaise,
+          eliteMrpInPaise,
+          proTenureMonths,
+          eliteTenureMonths,
+          thumbnailUrl: String(req.body?.thumbnailUrl || '').trim(),
+          thumbnailName: String(req.body?.thumbnailName || '').trim(),
+          currency,
+          active,
+          updatedBy: req.user.username
+        }
+      },
+      { upsert: true, new: true }
+    ).lean();
+
+    return res.json({ pricing });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to save batch pricing.' });
   }
 });
 
@@ -792,7 +1197,8 @@ router.post('/admin/vouchers', authenticateToken('admin'), async (req, res) => {
       ? req.body.applicableCourses.map((entry) => normalizeCourseName(entry)).filter(Boolean)
       : [];
 
-    if (applicableCourses.some((course) => !isSupportedCourse(course))) {
+    const supportedCourses = await getSupportedCourses();
+    if (applicableCourses.some((course) => !supportedCourses.includes(normalizeCourseName(course)))) {
       return res.status(400).json({ error: 'One or more applicableCourses are unsupported.' });
     }
 
@@ -841,7 +1247,8 @@ router.patch('/admin/vouchers/:id', authenticateToken('admin'), async (req, res)
       const applicableCourses = Array.isArray(req.body.applicableCourses)
         ? req.body.applicableCourses.map((entry) => normalizeCourseName(entry)).filter(Boolean)
         : [];
-      if (applicableCourses.some((course) => !isSupportedCourse(course))) {
+      const supportedCourses = await getSupportedCourses();
+      if (applicableCourses.some((course) => !supportedCourses.includes(normalizeCourseName(course)))) {
         return res.status(400).json({ error: 'One or more applicableCourses are unsupported.' });
       }
       updates.applicableCourses = applicableCourses;

@@ -1294,8 +1294,6 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
           <button
             type="button"
             className={`student-room-mobile-chat-toggle${isChatOpen ? ' is-open' : ''}${roomPolicy.chatDisabled ? ' is-disabled' : ''}`}
-            onPointerDown={handleMobileChatToggle}
-            onTouchStart={handleMobileChatToggle}
             onClick={handleMobileChatToggle}
             aria-expanded={isChatOpen}
             aria-label={roomPolicy.chatDisabled ? 'Show chat locked message' : isChatOpen ? 'Hide class chat' : 'Open class chat'}

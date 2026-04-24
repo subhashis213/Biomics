@@ -451,6 +451,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     if (validationError) return res.status(400).json({ error: validationError });
 
     const category = String(req.body.category).trim();
+    const batch = req.body.batch ? String(req.body.batch).trim() : '';
     const moduleName = String(req.body.module).trim();
     const topicName = String(req.body.topic || 'General').trim() || 'General';
     const title = String(req.body.title).trim();
@@ -472,6 +473,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
         {
           $set: {
             category,
+            batch,
             module: moduleName,
             topic: topicName,
             title,
@@ -489,6 +491,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     } else {
       quiz = await Quiz.create({
         category,
+        batch,
         module: moduleName,
         topic: topicName,
         title,

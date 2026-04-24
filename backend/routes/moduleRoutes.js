@@ -110,12 +110,13 @@ router.get('/', authenticateToken('admin'), async (req, res) => {
 router.post('/', authenticateToken('admin'), async (req, res) => {
   const category = normalizeValue(req.body.category || '');
   const name = normalizeValue(req.body.name || '');
+  const batch = normalizeValue(req.body.batch || '');
   if (!category || !name) {
     return res.status(400).json({ error: 'category and name are required' });
   }
 
   try {
-    const existingModule = await Module.findOne({ category, name }).lean();
+    const existingModule = await Module.findOne({ category, name, batch }).lean();
     if (existingModule) {
       return res.json({ module: existingModule, alreadyExists: true });
     }
@@ -123,6 +124,7 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     const createdModule = await Module.create({
       category,
       name,
+      batch,
       createdBy: req.user?.username || ''
     });
 

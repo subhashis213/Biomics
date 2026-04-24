@@ -7,21 +7,14 @@ import {
   saveMockExamAdmin,
   toggleMockExamNoticeAdmin
 } from '../api';
+import { fetchCoursesAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
 import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
 
-const COURSE_CATEGORIES = [
-  '11th',
-  '12th',
-  'NEET',
-  'IIT-JAM',
-  'CSIR-NET Life Science',
-  'GATE'
-];
-const DEFAULT_COURSE = 'CSIR-NET Life Science';
+// courses are loaded dynamically from server
 
 function formatMonthLabel(monthValue) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(monthValue || ''))) return monthValue || 'Unknown Month';
@@ -32,7 +25,8 @@ function formatMonthLabel(monthValue) {
 
 export default function AdminMockExamPage() {
   const navigate = useNavigate();
-  const [mockExamCategory, setMockExamCategory] = useState(DEFAULT_COURSE);
+  const [mockExamCategory, setMockExamCategory] = useState('');
+  const [courses, setCourses] = useState([]);
   const [mockExamTitle, setMockExamTitle] = useState('');
   const [mockExamDescription, setMockExamDescription] = useState('');
   const [mockExamDate, setMockExamDate] = useState('');
@@ -101,6 +95,22 @@ export default function AdminMockExamPage() {
   const [mockExamPerformanceMonthFilter, setMockExamPerformanceMonthFilter] = useState('all');
   const [mockExamPerformanceLoading, setMockExamPerformanceLoading] = useState(false);
   const [mockExamPerformanceError, setMockExamPerformanceError] = useState('');
+
+  useEffect(() => {
+    let ignore = false;
+    (async function loadCourses() {
+      try {
+        const res = await fetchCoursesAdmin();
+        if (ignore) return;
+        const list = Array.isArray(res?.courses) ? res.courses : [];
+        setCourses(list);
+        if (!mockExamCategory && list.length) setMockExamCategory(list[0].name || list[0]);
+      } catch {
+        if (!ignore) setCourses([]);
+      }
+    })();
+    return () => { ignore = true; };
+  }, []);
 
   function resetBuilder() {
     setEditingMockExamId('');
@@ -307,8 +317,9 @@ export default function AdminMockExamPage() {
             <label>
               Course
               <select value={mockExamCategory} onChange={(event) => setMockExamCategory(event.target.value)}>
-                {COURSE_CATEGORIES.map((course) => (
-                  <option key={course} value={course}>{course}</option>
+                {courses.length === 0 ? <option value="">Loading courses...</option> : null}
+                {courses.map((c) => (
+                  <option key={c.name || c} value={c.name || c}>{c.displayName || c.name || c}</option>
                 ))}
               </select>
             </label>

@@ -5,6 +5,7 @@ const videoSchema = new mongoose.Schema({
   description: { type: String },
   url: { type: String, required: true },
   category: { type: String, default: 'General' },
+  batch: { type: String, default: '' },
   module: { type: String, default: 'General' },
   topic: { type: String, default: 'General' },
   uploadedAt: { type: Date, default: Date.now },

@@ -1,26 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { requestJson, uploadMaterial } from '../api';
+import { requestJson, uploadMaterial, fetchCoursesAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import VideoCard from '../components/VideoCard';
 import { MAX_MATERIAL_MB } from '../constants';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
-const COURSE_CATEGORIES = [
-  '11th',
-  '12th',
-  'NEET',
-  'IIT-JAM',
-  'CSIR-NET Life Science',
-  'GATE'
-];
-
 function getInitialCourse(search) {
   const params = new URLSearchParams(search || '');
   const raw = String(params.get('course') || '').trim();
-  return COURSE_CATEGORIES.includes(raw) ? raw : 'All';
+  return raw || 'All';
 }
 
 function normalizeLibraryLabel(value, fallback) {
@@ -46,6 +37,7 @@ export default function AdminContentLibraryPage() {
   const [errorText, setErrorText] = useState('');
   const [banner, setBanner] = useState(null);
   const [activeCourse, setActiveCourse] = useState(() => getInitialCourse(location.search));
+  const [courses, setCourses] = useState([]);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [moduleInput, setModuleInput] = useState('');
@@ -121,6 +113,26 @@ export default function AdminContentLibraryPage() {
 
   useEffect(() => {
     setActiveCourse(getInitialCourse(location.search));
+  }, [location.search]);
+
+  useEffect(() => {
+    let ignore = false;
+    (async function loadCourses() {
+      try {
+        const res = await fetchCoursesAdmin();
+        if (ignore) return;
+        const courseList = Array.isArray(res?.courses) ? res.courses : [];
+        setCourses(courseList);
+        const params = new URLSearchParams(location.search);
+        const raw = String(params.get('course') || '').trim();
+        if (raw && courseList.some((c) => (c.name || c) === raw)) {
+          setActiveCourse(raw);
+        }
+      } catch {
+        if (!ignore) setCourses([]);
+      }
+    })();
+    return () => { ignore = true; };
   }, [location.search]);
 
   function applySearch() {
@@ -333,8 +345,8 @@ export default function AdminContentLibraryPage() {
               Course
               <select value={activeCourse} onChange={(event) => handleCourseChange(event.target.value)}>
                 <option value="All">All courses</option>
-                {COURSE_CATEGORIES.map((course) => (
-                  <option key={`course-${course}`} value={course}>{course}</option>
+                {(courses || []).map((c) => (
+                  <option key={`course-${c.name || c}`} value={c.name || c}>{c.displayName || c.name || c}</option>
                 ))}
               </select>
             </label>

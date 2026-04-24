@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { requestJson, resolveApiAssetUrl, uploadTestSeriesQuestionImage } from '../api';
+import { fetchCourseBatchesAdmin, fetchCoursesAdmin, requestJson, resolveApiAssetUrl, uploadTestSeriesQuestionImage } from '../api';
 import AppShell from '../components/AppShell';
 import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
 import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
-
-const COURSE_CATEGORIES = [
-  '11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
-];
-const DEFAULT_COURSE = 'CSIR-NET Life Science';
 
 function normalizeQuestionDraft(question = {}) {
   return {
@@ -32,10 +27,13 @@ export default function AdminFullMockTestBuilderPage() {
   const navigate = useNavigate();
 
   // form
-  const [category, setCategory] = useState(DEFAULT_COURSE);
+  const [courses, setCourses] = useState([]);
+  const [category, setCategory] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(90);
+  const [batch, setBatch] = useState('');
+  const [batches, setBatches] = useState([]);
   const [questions, setQuestions] = useState([emptyQuestion()]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -110,7 +108,46 @@ export default function AdminFullMockTestBuilderPage() {
     }
   }
 
-  useEffect(() => { loadMocks(); }, [category]);
+  useEffect(() => { 
+    loadMocks();
+    // Load batches for the current category
+    let cancelled = false;
+    async function loadBatches() {
+      try {
+        const response = await fetchCourseBatchesAdmin(category);
+        if (cancelled) return;
+        const batchList = Array.isArray(response?.batches) ? response.batches : [];
+        setBatches(batchList);
+        // Reset batch selection if current batch is not in the new list
+        if (batch && !batchList.some(b => b.batchName === batch)) {
+          setBatch('');
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setBatches([]);
+        setBatch('');
+      }
+    }
+    loadBatches();
+    return () => { cancelled = true; };
+  }, [category, batch]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadCourses() {
+      try {
+        const response = await fetchCoursesAdmin();
+        if (ignore) return;
+        const courseList = Array.isArray(response?.courses) ? response.courses : [];
+        setCourses(courseList);
+        if (!category && courseList.length > 0) setCategory(courseList[0].name);
+      } catch {
+        if (!ignore) setCourses([]);
+      }
+    }
+    loadCourses();
+    return () => { ignore = true; };
+  }, [category]);
 
   function updateQuestion(i, field, value) {
     setQuestions((prev) => prev.map((q, idx) => idx === i ? { ...q, [field]: value } : q));
@@ -163,6 +200,7 @@ export default function AdminFullMockTestBuilderPage() {
     setTitle('');
     setDescription('');
     setDurationMinutes(90);
+    setBatch('');
     setQuestions([emptyQuestion()]);
   }
 
@@ -172,6 +210,7 @@ export default function AdminFullMockTestBuilderPage() {
     setTitle(mock.title || '');
     setDescription(mock.description || '');
     setDurationMinutes(mock.durationMinutes || 90);
+    setBatch(mock.batch || '');
     setQuestions((mock.questions || []).map((q) => ({
       ...normalizeQuestionDraft(q),
       options: [...q.options]
@@ -204,6 +243,7 @@ export default function AdminFullMockTestBuilderPage() {
         body: JSON.stringify({
           mockId: editingId || undefined,
           category,
+          batch: batch.trim(),
           title: title.trim(),
           description: description.trim(),
           durationMinutes: Number(durationMinutes),
@@ -298,7 +338,18 @@ export default function AdminFullMockTestBuilderPage() {
               <label>
                 Course
                 <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                  {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  <option value="" disabled>{courses.length ? 'Select course' : 'Loading courses...'}</option>
+                  {courses.map((c) => <option key={c.name} value={c.name}>{c.displayName || c.name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Batch (optional)
+                <select value={batch} onChange={(e) => setBatch(e.target.value)}>
+                  <option value="">All batches</option>
+                  {batches.map((b) => (
+                    <option key={b.batchName} value={b.batchName}>{b.batchName}</option>
+                  ))}
                 </select>
               </label>
 

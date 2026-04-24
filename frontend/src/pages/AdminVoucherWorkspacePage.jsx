@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { createVoucherAdmin, deleteVoucherAdmin, fetchVouchersAdmin, updateVoucherAdmin } from '../api';
+import { createVoucherAdmin, deleteVoucherAdmin, fetchVouchersAdmin, updateVoucherAdmin, fetchCoursesAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
-const COURSE_CATEGORIES = [
-  '11th',
-  '12th',
-  'NEET',
-  'IIT-JAM',
-  'CSIR-NET Life Science',
-  'GATE'
-];
+// courses are loaded from server
 
 export default function AdminVoucherWorkspacePage() {
   const navigate = useNavigate();
@@ -21,6 +14,7 @@ export default function AdminVoucherWorkspacePage() {
   const [isSavingVoucher, setIsSavingVoucher] = useState(false);
   const [isDeletingVoucher, setIsDeletingVoucher] = useState(false);
   const [banner, setBanner] = useState(null);
+  const [courses, setCourses] = useState([]);
   const [voucherDeleteDialog, setVoucherDeleteDialog] = useState({ open: false, voucherId: '', code: '' });
   const [voucherForm, setVoucherForm] = useState({
     code: '',
@@ -77,6 +71,17 @@ export default function AdminVoucherWorkspacePage() {
 
   useEffect(() => {
     loadVouchers();
+    let ignore = false;
+    (async function loadCourses() {
+      try {
+        const res = await fetchCoursesAdmin();
+        if (ignore) return;
+        setCourses(Array.isArray(res?.courses) ? res.courses : []);
+      } catch {
+        if (!ignore) setCourses([]);
+      }
+    })();
+    return () => { ignore = true; };
   }, []);
 
   async function handleCreateVoucher(event) {
@@ -266,7 +271,9 @@ export default function AdminVoucherWorkspacePage() {
 
             <div className="quiz-builder-header-checkbox">
               <span>Applicable courses</span>
-              {COURSE_CATEGORIES.map((courseName) => {
+              {(courses || []).map((c) => {
+                const courseName = c.name || c;
+                const label = c.displayName || courseName;
                 const selected = voucherForm.applicableCourses.includes(courseName);
                 return (
                   <label key={`voucher-course-${courseName}`} className="quiz-inline-checkbox">
@@ -283,7 +290,7 @@ export default function AdminVoucherWorkspacePage() {
                         }));
                       }}
                     />
-                    <span>{courseName}</span>
+                    <span>{label}</span>
                   </label>
                 );
               })}

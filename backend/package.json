@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "seed:admin": "node createAdmin.js",
     "reset:user-password": "node resetUserPassword.js",
-    "migrate:avatars": "node migrateAvatarsToCloudinary.js"
+    "migrate:avatars": "node migrateAvatarsToCloudinary.js",
+    "migrate:content-batch": "node assignContentBatch.js"
   },
   "dependencies": {
     "aws-sdk": "^2.1693.0",

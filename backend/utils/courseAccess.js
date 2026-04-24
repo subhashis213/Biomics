@@ -1,4 +1,5 @@
 const ModulePricing = require('../models/ModulePricing');
+const BatchPricing = require('../models/BatchPricing');
 
 const MEMBERSHIP_PLANS = {
   pro: { type: 'pro', label: 'Pro', durationMonths: 1 },
@@ -89,6 +90,14 @@ async function getModulePricingDoc(course, moduleName) {
   const normalized = normalizeCourseName(course);
   const normalizedMod = normalizeModuleName(moduleName);
   if (!normalized) return null;
+
+  // First try batch-level pricing (if moduleName happens to be a batch name)
+  try {
+    const batchDoc = await BatchPricing.findOne({ category: normalized, batchName: normalizedMod, active: true }).lean();
+    if (batchDoc) return batchDoc;
+  } catch (e) {
+    // ignore
+  }
 
   const direct = await ModulePricing.findOne({
     category: normalized,

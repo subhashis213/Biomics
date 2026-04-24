@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { requestJson, resolveApiAssetUrl, uploadTestSeriesQuestionImage } from '../api';
+import { fetchCourseBatchesAdmin, fetchCoursesAdmin, requestJson, resolveApiAssetUrl, uploadTestSeriesQuestionImage } from '../api';
 import AppShell from '../components/AppShell';
 import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
@@ -9,10 +9,7 @@ import StatCard from '../components/StatCard';
 import TopicTestCatalogBoard from '../components/TopicTestCatalogBoard';
 import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
 
-const COURSE_CATEGORIES = [
-  '11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'
-];
-const DEFAULT_COURSE = 'CSIR-NET Life Science';
+// courses are loaded from server via fetchCoursesAdmin
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -48,12 +45,15 @@ export default function AdminTopicTestBuilderPage() {
   }
 
   // builder form
-  const [category, setCategory] = useState(DEFAULT_COURSE);
+  const [courses, setCourses] = useState([]);
+  const [category, setCategory] = useState('');
   const [module, setModule] = useState('');
   const [topic, setTopic] = useState('General');
   const [title, setTitle] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
   const [durationMinutes, setDurationMinutes] = useState(30);
+  const [batch, setBatch] = useState('');
+  const [batches, setBatches] = useState([]);
   const [questions, setQuestions] = useState([emptyQuestion()]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -162,14 +162,52 @@ export default function AdminTopicTestBuilderPage() {
     }
   }
 
-  useEffect(() => { loadTests(); }, [category]);
+  useEffect(() => { 
+    loadTests();
+    // Load batches for the current category
+    let cancelled = false;
+    async function loadBatches() {
+      try {
+        const response = await fetchCourseBatchesAdmin(category);
+        if (cancelled) return;
+        const batchList = Array.isArray(response?.batches) ? response.batches : [];
+        setBatches(batchList);
+        // Reset batch selection if current batch is not in the new list
+        if (batch && !batchList.some(b => b.batchName === batch)) {
+          setBatch('');
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setBatches([]);
+        setBatch('');
+      }
+    }
+    loadBatches();
+    return () => { cancelled = true; };
+  }, [category, batch]);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const categoryFromQuery = params.get('category');
-    if (categoryFromQuery && COURSE_CATEGORIES.includes(categoryFromQuery) && categoryFromQuery !== category) {
-      setCategory(categoryFromQuery);
+    let ignore = false;
+
+    async function loadCourses() {
+      try {
+        const response = await fetchCoursesAdmin();
+        if (ignore) return;
+        const courseList = Array.isArray(response?.courses) ? response.courses : [];
+        setCourses(courseList);
+        if (!category && courseList.length > 0) setCategory(courseList[0].name);
+        const params = new URLSearchParams(location.search);
+        const categoryFromQuery = params.get('category');
+        if (categoryFromQuery && courseList.some(c => c.name === categoryFromQuery) && categoryFromQuery !== category) {
+          setCategory(categoryFromQuery);
+        }
+      } catch {
+        if (!ignore) setCourses([]);
+      }
     }
+
+    loadCourses();
+    return () => { ignore = true; };
   }, [location.search, category]);
 
   useEffect(() => {
@@ -275,12 +313,13 @@ export default function AdminTopicTestBuilderPage() {
 
   function editTest(test) {
     setEditingId(test._id);
-    setCategory(test.category || DEFAULT_COURSE);
+    setCategory(test.category || (courses[0]?.name || ''));
     setModule(test.module || '');
     setTopic(test.topic || 'General');
     setTitle(test.title || '');
     setDifficulty(test.difficulty || 'medium');
     setDurationMinutes(test.durationMinutes || 30);
+    setBatch(test.batch || '');
     setQuestions((test.questions || []).map((q) => ({
       ...normalizeQuestionDraft(q),
       options: [...q.options]
@@ -288,7 +327,7 @@ export default function AdminTopicTestBuilderPage() {
     setMessage(null);
     if (new URLSearchParams(location.search).get('edit') !== test._id) {
       const params = new URLSearchParams(location.search);
-      params.set('category', test.category || DEFAULT_COURSE);
+      params.set('category', test.category || (courses[0]?.name || ''));
       params.set('edit', test._id);
       navigate(`/admin/test-series/topic-tests?${params.toString()}`, { replace: true });
     }
@@ -319,6 +358,7 @@ export default function AdminTopicTestBuilderPage() {
         body: JSON.stringify({
           testId: editingId || undefined,
           category,
+          batch: batch.trim(),
           module: normalizeText(module),
           topic: (normalizeText(topic) || 'General'),
           title: normalizeText(title),
@@ -420,7 +460,8 @@ export default function AdminTopicTestBuilderPage() {
                 <label>
                   Course
                   <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                    {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    <option value="" disabled>{courses.length ? 'Select course' : 'Loading courses...'}</option>
+                    {courses.map((c) => <option key={c.name} value={c.name}>{c.displayName || c.name}</option>)}
                   </select>
                 </label>
                 <label>
@@ -431,6 +472,16 @@ export default function AdminTopicTestBuilderPage() {
                   </select>
                 </label>
               </div>
+
+              <label>
+                Batch (optional)
+                <select value={batch} onChange={(e) => setBatch(e.target.value)}>
+                  <option value="">All batches</option>
+                  {batches.map((b) => (
+                    <option key={b.batchName} value={b.batchName}>{b.batchName}</option>
+                  ))}
+                </select>
+              </label>
 
               <label>
                 Topic

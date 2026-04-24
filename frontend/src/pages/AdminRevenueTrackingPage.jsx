@@ -1,18 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchPaymentHistoryAdmin } from '../api';
+import { fetchPaymentHistoryAdmin, fetchCoursesAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
-const COURSE_CATEGORIES = [
-  '11th',
-  '12th',
-  'NEET',
-  'IIT-JAM',
-  'CSIR-NET Life Science',
-  'GATE'
-];
+// course list is loaded from server via fetchCoursesAdmin
 
 export default function AdminRevenueTrackingPage() {
   const navigate = useNavigate();
@@ -20,6 +13,7 @@ export default function AdminRevenueTrackingPage() {
   const [paymentHistoryPagination, setPaymentHistoryPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [paymentHistoryFilter, setPaymentHistoryFilter] = useState({ course: '', status: '', username: '' });
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
+  const [courses, setCourses] = useState([]);
   const [refreshPulse, setRefreshPulse] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -57,6 +51,17 @@ export default function AdminRevenueTrackingPage() {
 
   useEffect(() => {
     loadPaymentHistory(1, paymentHistoryFilter);
+    let ignore = false;
+    (async function loadCourses() {
+      try {
+        const res = await fetchCoursesAdmin();
+        if (ignore) return;
+        setCourses(Array.isArray(res?.courses) ? res.courses : []);
+      } catch {
+        if (!ignore) setCourses([]);
+      }
+    })();
+    return () => { ignore = true; };
   }, []);
 
   useEffect(() => {
@@ -132,7 +137,7 @@ export default function AdminRevenueTrackingPage() {
               onChange={(event) => setPaymentHistoryFilter((f) => ({ ...f, course: event.target.value }))}
             >
               <option value="">All Courses</option>
-              {COURSE_CATEGORIES.map((course) => <option key={course} value={course}>{course}</option>)}
+              {courses.map((c) => <option key={c.name || c} value={c.name || c}>{c.displayName || c.name || c}</option>)}
             </select>
             <select
               className="analytics-filter-select"

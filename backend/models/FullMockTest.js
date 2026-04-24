@@ -30,6 +30,7 @@ const fullMockTestSchema = new mongoose.Schema({
     },
     required: true
   },
+  batch: { type: String, trim: true, default: '' },
   updatedBy: { type: String, trim: true, default: '' },
   updatedAt: { type: Date, default: Date.now }
 });

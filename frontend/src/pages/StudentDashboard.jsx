@@ -45,6 +45,8 @@ export default function StudentDashboard() {
   const [selectedModule, setSelectedModule] = useState(null);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
   const [pickerCourse, setPickerCourse] = useState('');
+  const [courseBundlePreviewByCourse, setCourseBundlePreviewByCourse] = useState({});
+  const [courseBundleCheckoutKey, setCourseBundleCheckoutKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('latest');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
@@ -93,6 +95,7 @@ export default function StudentDashboard() {
   const [mockExams, setMockExams] = useState([]);
   const [mockExamNotices, setMockExamNotices] = useState([]);
   const [mockExamLoading, setMockExamLoading] = useState(false);
+  const [courseDirectory, setCourseDirectory] = useState([]);
   const [examLeaderboard, setExamLeaderboard] = useState([]);
   const [examLeaderboardMonths, setExamLeaderboardMonths] = useState([]);
   const [examLeaderboardMonthFilter, setExamLeaderboardMonthFilter] = useState('all');
@@ -104,6 +107,13 @@ export default function StudentDashboard() {
   const cartIconButtonRef = useRef(null);
   const cartPulseTimerRef = useRef(null);
   const cartVoucherRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (location?.state?.openCart) {
+      setCartOpen(true);
+      navigate('/student', { replace: true, state: null });
+    }
+  }, [location?.state, navigate]);
 
   // Sync test-series cart across tabs / pages via storage event
   useEffect(() => {
@@ -123,6 +133,28 @@ export default function StudentDashboard() {
     }
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    requestJson('/courses/student')
+      .then((response) => {
+        if (cancelled) return;
+        const courses = Array.isArray(response?.courses) ? response.courses : [];
+        setCourseDirectory(courses.map((entry) => ({
+          courseName: normalizeCourseName(entry?.name || entry?.courseName || ''),
+          displayName: String(entry?.displayName || entry?.name || entry?.courseName || '').trim(),
+          icon: String(entry?.icon || '').trim() || '📚',
+          eyebrow: 'Course Track',
+          blurb: String(entry?.description || '').trim() || 'Structured modules, tests, and premium learning access.'
+        })).filter((entry) => entry.courseName));
+      })
+      .catch(() => {
+        if (!cancelled) setCourseDirectory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const allModulesUnlocked = Boolean(access?.allModulesUnlocked || access?.unlocked);
@@ -433,8 +465,11 @@ export default function StudentDashboard() {
     if (normalized === '11th') return 'school11';
     if (normalized === '12th') return 'school12';
     if (normalized === 'neet') return 'neet';
+    if (normalized === 'gat-b') return 'gatb';
     if (normalized === 'iit-jam') return 'jam';
+    if (normalized === 'csir net lifescience') return 'csir';
     if (normalized === 'csir-net life science') return 'csir';
+    if (normalized === 'gate exam') return 'gate';
     if (normalized === 'gate') return 'gate';
     return 'default';
   }
@@ -1121,6 +1156,67 @@ export default function StudentDashboard() {
   const availableCourses = Array.from(availableCourseMap.values())
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
+  const marketplaceCourseDirectory = courseDirectory.length
+    ? courseDirectory
+    : availableCourses.map((courseName) => ({
+      courseName,
+      displayName: courseName,
+      icon: '📚',
+      eyebrow: 'Course Track',
+      blurb: 'Structured modules, tests, and premium learning access.'
+    }));
+
+  const marketplaceCourses = marketplaceCourseDirectory.map((courseMeta) => {
+    const canonicalCourse = normalizeCourseName(courseMeta.courseName);
+    const canonicalKey = canonicalCourse.toLowerCase();
+    const moduleNameSet = new Set(
+      Object.values(moduleMetaByKey)
+        .filter((meta) => normalizeCourseName(meta?.category || '').toLowerCase() === canonicalKey)
+        .map((meta) => normalizeModuleName(meta?.module || '').toLowerCase())
+        .filter(Boolean)
+    );
+    const courseVideos = videos.filter((video) => normalizeCourseName(video.category || '').toLowerCase() === canonicalKey);
+    const courseQuizCount = quizzes.filter((quiz) => normalizeCourseName(quiz.category || '').toLowerCase() === canonicalKey).length;
+    const courseCompleted = courseVideos.filter((video) => completedIds.has(normalizeId(video._id))).length;
+    const courseProgress = courseVideos.length ? Math.round((courseCompleted / courseVideos.length) * 100) : 0;
+    const pricing = courseBundlePreviewByCourse[canonicalCourse] || null;
+
+    return {
+      ...courseMeta,
+      canonicalCourse,
+      canonicalKey,
+      moduleCount: moduleNameSet.size,
+      lectureCount: courseVideos.length,
+      quizCount: courseQuizCount,
+      progress: courseProgress,
+      isEnrolledCourse: canonicalKey === normalizeCourseName(course || '').toLowerCase(),
+      pricing
+    };
+  });
+  const selectedMarketplaceCourse = marketplaceCourses.find((courseEntry) => courseEntry.canonicalCourse === pickerCourse) || null;
+  const purchasedCourseKeySet = useMemo(() => {
+    const purchasedKeys = new Set();
+
+    Object.entries(courseBundlePreviewByCourse || {}).forEach(([courseName, entry]) => {
+      if (!entry?.unlocked) return;
+      const key = normalizeCourseName(courseName).toLowerCase();
+      if (key) purchasedKeys.add(key);
+    });
+
+    if (hasAnyUnlockedModule) {
+      const enrolledKey = normalizeCourseName(course || '').toLowerCase();
+      if (enrolledKey) purchasedKeys.add(enrolledKey);
+    }
+
+    return purchasedKeys;
+  }, [courseBundlePreviewByCourse, hasAnyUnlockedModule, course]);
+
+  function hasPurchasedCourseAccess(courseName) {
+    const normalizedKey = normalizeCourseName(courseName || '').toLowerCase();
+    if (!normalizedKey) return false;
+    return purchasedCourseKeySet.has(normalizedKey);
+  }
+
   const modules = Object.keys(moduleMetaByKey)
     .filter((moduleKey) => {
       if (!activeCourseFilter) return true;
@@ -1158,6 +1254,75 @@ export default function StudentDashboard() {
     ? resolveModuleKey(selectedModuleCourse, selectedModuleName)
     : '';
   const selectedModuleVideos = selectedModule ? (videosByModule[selectedModuleKey] || []) : [];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMarketplacePricing() {
+      try {
+        const courseEntries = await Promise.all(
+          marketplaceCourseDirectory.map(async (courseMeta) => {
+            const canonicalCourse = normalizeCourseName(courseMeta.courseName);
+            const planResponses = await Promise.all(
+              ['pro', 'elite'].map(async (planType) => {
+                try {
+                  const response = await previewCourseOrder(planType, '', ALL_MODULES, canonicalCourse);
+                  const pricing = response?.pricing || null;
+                  return {
+                    type: planType,
+                    unlocked: Boolean(response?.unlocked),
+                    purchaseRequired: Boolean(response?.purchaseRequired),
+                    pricing: pricing
+                      ? {
+                          planType: String(pricing.planType || planType),
+                          durationMonths: Number(pricing.durationMonths || 0),
+                          originalAmountInPaise: Number(pricing.originalAmountInPaise || 0),
+                          discountInPaise: Number(pricing.discountInPaise || 0),
+                          finalAmountInPaise: Number(pricing.finalAmountInPaise || 0)
+                        }
+                      : null
+                  };
+                } catch {
+                  return {
+                    type: planType,
+                    unlocked: false,
+                    purchaseRequired: false,
+                    pricing: null
+                  };
+                }
+              })
+            );
+
+            const paidPlans = planResponses
+              .filter((entry) => Number(entry?.pricing?.originalAmountInPaise || 0) > 0)
+              .sort((left, right) => Number(left.pricing.finalAmountInPaise || 0) - Number(right.pricing.finalAmountInPaise || 0));
+
+            return [
+              canonicalCourse,
+              {
+                unlocked: planResponses.some((entry) => entry.unlocked),
+                plans: planResponses,
+                featuredPlan: paidPlans[0] || planResponses.find((entry) => entry.pricing) || null
+              }
+            ];
+          })
+        );
+
+        if (!cancelled) {
+          setCourseBundlePreviewByCourse(Object.fromEntries(courseEntries));
+        }
+      } catch {
+        if (!cancelled) {
+          setCourseBundlePreviewByCourse({});
+        }
+      }
+    }
+
+    loadMarketplacePricing();
+    return () => {
+      cancelled = true;
+    };
+  }, [course, marketplaceCourseDirectory]);
 
   const displayedVideos = selectedModuleVideos
     .filter((video) => {
@@ -1627,6 +1792,65 @@ export default function StudentDashboard() {
     }
   }
 
+  async function handleMarketplaceCourseCheckout(targetCourse, planType = 'pro') {
+    const normalizedTargetCourse = normalizeCourseName(targetCourse || '');
+    if (!normalizedTargetCourse || courseBundleCheckoutKey) return;
+
+    setCourseBundleCheckoutKey(normalizedTargetCourse);
+    setBanner(null);
+
+    try {
+      const result = await startMembershipCheckout({
+        targetCourse: normalizedTargetCourse,
+        targetModuleName: ALL_MODULES,
+        planType,
+        voucher: '',
+        reloadOnSuccess: false,
+        showSuccessBanner: true,
+        showCancelBanner: true
+      });
+
+      if (['paid', 'already-unlocked', 'free'].includes(result?.status)) {
+        setPickerCourse(normalizedTargetCourse);
+        const refreshEntries = await Promise.all(
+          ['pro', 'elite'].map(async (nextPlanType) => {
+            try {
+              const response = await previewCourseOrder(nextPlanType, '', ALL_MODULES, normalizedTargetCourse);
+              return {
+                type: nextPlanType,
+                unlocked: Boolean(response?.unlocked),
+                purchaseRequired: Boolean(response?.purchaseRequired),
+                pricing: response?.pricing
+                  ? {
+                      planType: String(response.pricing.planType || nextPlanType),
+                      durationMonths: Number(response.pricing.durationMonths || 0),
+                      originalAmountInPaise: Number(response.pricing.originalAmountInPaise || 0),
+                      discountInPaise: Number(response.pricing.discountInPaise || 0),
+                      finalAmountInPaise: Number(response.pricing.finalAmountInPaise || 0)
+                    }
+                  : null
+              };
+            } catch {
+              return { type: nextPlanType, unlocked: false, purchaseRequired: false, pricing: null };
+            }
+          })
+        );
+        setCourseBundlePreviewByCourse((current) => ({
+          ...current,
+          [normalizedTargetCourse]: {
+            unlocked: refreshEntries.some((entry) => entry.unlocked),
+            plans: refreshEntries,
+            featuredPlan: refreshEntries.find((entry) => Number(entry?.pricing?.originalAmountInPaise || 0) > 0) || refreshEntries.find((entry) => entry.pricing) || null
+          }
+        }));
+      }
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to start course unlock.' });
+    } finally {
+      setCourseBundleCheckoutKey('');
+    }
+  }
+
   async function handlePayForLockedLiveClass() {
     if (isUnlockingCourse || !preferredLiveClassPlan) return;
 
@@ -1777,6 +2001,7 @@ export default function StudentDashboard() {
     if (selectedModule) return [...baseItems, { id: 'section-connect', label: 'Connect', icon: '🔗' }];
     return [
       ...baseItems,
+      { id: 'route-student-my-courses', label: 'My Courses', icon: '🎓' },
       {
         id: 'section-community-chat',
         label: (
@@ -1812,6 +2037,11 @@ export default function StudentDashboard() {
       return;
     }
 
+    if (id === 'route-student-my-courses') {
+      navigate('/student/my-courses');
+      return;
+    }
+
     if (id === 'route-student-test-series-performance') {
       navigate('/student/test-series-performance');
       return;
@@ -1826,7 +2056,9 @@ export default function StudentDashboard() {
   }
 
   function renderLearningLiveCard() {
-    if (liveClass) {
+    // Keep locked-course alerts silent, but preserve the dashboard 2-card layout.
+    const visibleLiveClass = liveClass && hasPurchasedCourseAccess(liveClass.course) ? liveClass : null;
+    if (visibleLiveClass) {
       return (
         <section className="card student-learning-live-card student-learning-live-card--live">
           <div className="student-learning-live-header">
@@ -1835,12 +2067,12 @@ export default function StudentDashboard() {
               <span className="student-learning-live-kicker">Classroom Active</span>
             </div>
             <div className="student-learning-live-copy-block">
-              <strong className="student-learning-live-title">{liveClass.title}</strong>
+              <strong className="student-learning-live-title">{visibleLiveClass.title}</strong>
               <p className="student-learning-live-copy">Teacher is already inside the classroom. Join now or open the full live class section.</p>
             </div>
             <div className="student-learning-live-meta">
-              <span className="student-learning-live-pill">Started {new Date(liveClass.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              {liveClass.course ? <span className="student-learning-live-pill">{liveClass.course}</span> : null}
+              <span className="student-learning-live-pill">Started {new Date(visibleLiveClass.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              {visibleLiveClass.course ? <span className="student-learning-live-pill">{visibleLiveClass.course}</span> : null}
             </div>
           </div>
           <div className="student-learning-live-actions">
@@ -1855,50 +2087,8 @@ export default function StudentDashboard() {
       );
     }
 
-    if (lockedLiveClass) {
-      return (
-        <section className="card student-learning-live-card student-learning-live-card--locked">
-          <div className="student-learning-live-header">
-            <div className="student-learning-live-topline">
-              <span className="live-badge offline">LOCKED</span>
-              <span className="student-learning-live-kicker">Course Access Needed</span>
-            </div>
-            <div className="student-learning-live-copy-block">
-              <strong className="student-learning-live-title">{lockedLiveClass.title}</strong>
-              <p className="student-learning-live-copy">
-                {preferredLiveClassPlan
-                  ? `A live class is running for ${lockedLiveClass.course || 'this course'}. Pay ${formatPriceInPaise(preferredLiveClassPlan.amountInPaise)} for ${preferredLiveClassPlan.label} access to enter the room.`
-                  : `A live class is running for ${lockedLiveClass.course || 'this course'}. Unlock the course content to enter the room.`}
-              </p>
-            </div>
-            <div className="student-learning-live-meta">
-              {lockedLiveClass.course ? <span className="student-learning-live-pill">{lockedLiveClass.course}</span> : null}
-              <span className="student-learning-live-pill">Live room locked</span>
-              {preferredLiveClassPlan ? <span className="student-learning-live-pill">{preferredLiveClassPlan.label} {formatPriceInPaise(preferredLiveClassPlan.amountInPaise)}</span> : null}
-            </div>
-          </div>
-          <div className="student-learning-live-actions">
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={preferredLiveClassPlan ? handlePayForLockedLiveClass : openCourseUnlockPanel}
-              disabled={isUnlockingCourse}
-            >
-              {isUnlockingCourse
-                ? 'Processing...'
-                : preferredLiveClassPlan
-                  ? `Pay ${formatPriceInPaise(preferredLiveClassPlan.amountInPaise)}`
-                  : 'Unlock Course Content'}
-            </button>
-            <button type="button" className="secondary-btn" onClick={openCourseUnlockPanel}>
-              See All Plans
-            </button>
-          </div>
-        </section>
-      );
-    }
-
-    if (upcomingClass) {
+    const visibleUpcomingClass = upcomingClass && hasPurchasedCourseAccess(upcomingClass.course) ? upcomingClass : null;
+    if (visibleUpcomingClass) {
       return (
         <section className="card student-learning-live-card student-learning-live-card--upcoming">
           <div className="student-learning-live-header">
@@ -1907,12 +2097,12 @@ export default function StudentDashboard() {
               <span className="student-learning-live-kicker">Next Live Session</span>
             </div>
             <div className="student-learning-live-copy-block">
-              <strong className="student-learning-live-title">{upcomingClass.title}</strong>
+              <strong className="student-learning-live-title">{visibleUpcomingClass.title}</strong>
               <p className="student-learning-live-copy">Your next live class is scheduled soon. Open the live section to view details and calendar timing.</p>
             </div>
             <div className="student-learning-live-meta">
               <span className="student-learning-live-pill">{upcomingCountdown || 'Starting soon'}</span>
-              <span className="student-learning-live-pill">{new Date(upcomingClass.scheduledAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              <span className="student-learning-live-pill">{new Date(visibleUpcomingClass.scheduledAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</span>
             </div>
           </div>
           <div className="student-learning-live-actions">
@@ -1933,11 +2123,11 @@ export default function StudentDashboard() {
           </div>
           <div className="student-learning-live-copy-block">
             <strong className="student-learning-live-title">Live Class Section</strong>
-            <p className="student-learning-live-copy">See blocked calendar slots, upcoming classes, and enter the live classroom from one focused section.</p>
+            <p className="student-learning-live-copy">Track live classes and blocked slots from one section. Course-level visibility stays filtered by your access.</p>
           </div>
           <div className="student-learning-live-meta">
             <span className="student-learning-live-pill">Calendar ready</span>
-            <span className="student-learning-live-pill">Join when live</span>
+            <span className="student-learning-live-pill">Course-wise filters</span>
           </div>
         </div>
         <div className="student-learning-live-actions">
@@ -2139,7 +2329,7 @@ export default function StudentDashboard() {
                       <article key={item.key} className="student-cart-drawer-item">
                         <div>
                           <div className="student-cart-item-headline">
-                            <strong>{item.moduleName}</strong>
+                            <strong>{item.moduleName === ALL_MODULES ? 'All Modules Bundle' : item.moduleName}</strong>
                             <span className={`student-cart-course-chip tone-${getCourseTone(item.moduleCourse)}`}>{item.moduleCourse}</span>
                           </div>
                           <p>Course purchase</p>
@@ -2266,66 +2456,8 @@ export default function StudentDashboard() {
           )}
         </div>
         {selectedModule && <StatCard label="Module" value={selectedModuleName} />}
-        {!selectedModule && <StatCard label="Courses" value={availableCourses.length} />}
+        {!selectedModule && <StatCard label="Courses" value={marketplaceCourses.length} />}
       </section>
-
-      {!selectedModule && bundlePlanOptions.some((plan) => plan.amountInPaise > 0) && !allModulesUnlocked ? (
-        <section id="section-course-bundle-unlock" className="card course-lock-panel membership-lock-panel">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">All Modules Bundle</p>
-              <h2>Unlock every module in {course || 'this course'}</h2>
-            </div>
-            <StatCard label="Unlock" value="All Modules" />
-          </div>
-          <p className="empty-note">Buy the full-course bundle to access every module at once. Or open a locked module card below to buy only that module.</p>
-
-          <div className="membership-plan-grid">
-            {bundlePlanOptions.map((plan) => {
-              const isSelected = selectedPlan === plan.type;
-              const isElite = plan.type === 'elite';
-              return (
-                <button
-                  key={plan.type}
-                  type="button"
-                  className={`membership-plan-card${isSelected ? ' selected' : ''}${isElite ? ' elite' : ' pro'}`}
-                  onClick={() => {
-                    setSelectedPlan(plan.type);
-                    setSelectedAccessTarget(ALL_MODULES);
-                  }}
-                >
-                  <div className="membership-plan-head">
-                    <span className="membership-plan-kicker">{isElite ? 'Premium Tier' : 'Starter Tier'}</span>
-                    <span className="membership-plan-badge">{plan.label}</span>
-                    {isElite ? <span className="membership-plan-elite-flag">Most Popular</span> : null}
-                  </div>
-                  <div className="membership-plan-price">{formatPriceInPaise(plan.amountInPaise)}</div>
-                  <p className="membership-plan-duration">{plan.durationMonths} {plan.durationMonths === 1 ? 'month' : 'months'} access</p>
-                  <ul className="membership-plan-points">
-                    <li>All lectures in {course}</li>
-                    <li>Study materials and downloads</li>
-                    <li>Quizzes and progress tracking</li>
-                    <li>{isElite ? 'Longer validity and premium status' : 'Full access for monthly prep'}</li>
-                  </ul>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="material-upload-row membership-actions-row">
-            <input
-              type="text"
-              placeholder="Voucher code (optional)"
-              value={voucherCode}
-              onChange={(event) => setVoucherCode(event.target.value.toUpperCase())}
-              maxLength={20}
-            />
-            <button type="button" className="primary-btn" onClick={handleUnlockCourse} disabled={isUnlockingCourse || !selectedPlan}>
-              {isUnlockingCourse ? 'Processing...' : `Unlock All Modules with ${selectedPlan === 'elite' ? 'Elite' : 'Pro'}`}
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       {isLoading ? (
         <div className="video-grid">
@@ -2342,92 +2474,39 @@ export default function StudentDashboard() {
         </div>
       ) : !selectedModule ? (
         (() => {
-          const activeCourse = pickerCourse || availableCourses[0] || '';
-          const activeCourseKey = normalizeCourseName(activeCourse).toLowerCase();
-          const activeModuleNameSet = new Set(
-            Object.values(moduleMetaByKey)
-              .filter((meta) => normalizeCourseName(meta?.category || '').toLowerCase() === activeCourseKey)
-              .map((meta) => normalizeModuleName(meta?.module || '').toLowerCase())
-              .filter(Boolean)
-          );
-          const activeModuleCount = activeModuleNameSet.size;
-          const activeVideos = videos.filter(
-            (v) => normalizeCourseName(v.category || '').toLowerCase() === activeCourseKey
-          );
-          const activeQuizCount = quizzes.filter(
-            (q) => normalizeCourseName(q.category || '').toLowerCase() === activeCourseKey
-          ).length;
-          const activeCompleted = activeVideos.filter((v) =>
-            completedIds.has(normalizeId(v._id))
-          ).length;
-          const activeProgress = activeVideos.length
-            ? Math.round((activeCompleted / activeVideos.length) * 100)
-            : 0;
-
           return (
             <div className="student-learning-spotlight-grid">
               <div className="course-chooser-wrap">
                 <div className="course-chooser-card">
                   <div className="course-chooser-top">
-                    <span className="course-chooser-icon" aria-hidden="true">🎓</span>
+                    <span className="course-chooser-icon" aria-hidden="true">🔐</span>
                     <div className="course-chooser-intro">
                       <h3 className="course-chooser-title">Select a Course</h3>
-                      <p className="course-chooser-subtitle">Pick one below, then tap Go to explore its modules</p>
+                      <p className="course-chooser-subtitle">Start from a compact premium card. Open it to browse all available courses and choose your track.</p>
                     </div>
                   </div>
 
-                  {availableCourses.length ? (
+                  {marketplaceCourses.length ? (
                     <>
-                      <div className="course-chooser-pills" role="group" aria-label="Available courses">
-                        {availableCourses.map((cName) => (
-                          <button
-                            key={cName}
-                            type="button"
-                            className={`course-chooser-pill${normalizeCourseName(cName).toLowerCase() === activeCourseKey ? ' active' : ''}`}
-                            onClick={() => setPickerCourse(cName)}
-                          >
-                            {cName}
-                          </button>
-                        ))}
-                      </div>
-
-                      {activeCourse ? (
-                        <div className="course-chooser-details">
-                          <div className="course-chooser-stats-row">
-                            <span className="course-chooser-stat">
-                              <strong>{activeModuleCount}</strong> module{activeModuleCount === 1 ? '' : 's'}
-                            </span>
-                            <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
-                            <span className="course-chooser-stat">
-                              <strong>{activeVideos.length}</strong> lecture{activeVideos.length === 1 ? '' : 's'}
-                            </span>
-                            {activeQuizCount > 0 && (
-                              <>
-                                <span className="course-chooser-stat-sep" aria-hidden="true">·</span>
-                                <span className="course-chooser-stat">
-                                  <strong>{activeQuizCount}</strong> quiz{activeQuizCount === 1 ? '' : 'zes'}
-                                </span>
-                              </>
-                            )}
-                          </div>
-
-                          <div className="course-chooser-progress-row">
-                            <span className="course-chooser-progress-label">Progress</span>
-                            <div className="course-chooser-progress-track" role="progressbar" aria-valuenow={activeProgress} aria-valuemin={0} aria-valuemax={100}>
-                              <div className="course-chooser-progress-fill" style={{ width: `${activeProgress}%` }} />
-                            </div>
-                            <span className="course-chooser-progress-pct">{activeProgress}%</span>
-                          </div>
-
-                          <button
-                            type="button"
-                            className="course-chooser-go-btn"
-                            onClick={() => navigate(`/student/course/${encodeURIComponent(activeCourse)}/modules`)}
-                          >
-                            Go <span aria-hidden="true">→</span>
-                          </button>
+                      <button
+                        type="button"
+                        className="course-marketplace-launcher"
+                        onClick={() => navigate('/student/courses')}
+                      >
+                        <div className="course-marketplace-launcher-copy">
+                          <span className="course-marketplace-launcher-kicker">Premium Course Entry</span>
+                          <strong>{selectedMarketplaceCourse ? selectedMarketplaceCourse.displayName : 'Open Course Catalog'}</strong>
+                          <span>
+                            {selectedMarketplaceCourse
+                              ? `${selectedMarketplaceCourse.moduleCount} modules ready to explore`
+                              : `${marketplaceCourses.length} curated exam tracks available`}
+                          </span>
                         </div>
-                      ) : null}
+                        <div className="course-marketplace-launcher-side">
+                          <span className="course-marketplace-launcher-badge">Select Course</span>
+                          <span className="course-marketplace-launcher-arrow" aria-hidden="true">→</span>
+                        </div>
+                      </button>
                     </>
                   ) : (
                     <div className="course-chooser-details">
