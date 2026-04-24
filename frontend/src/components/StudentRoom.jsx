@@ -304,7 +304,21 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
       setFloatingPreviewPosition(nextPosition);
     }
 
+    function handleTouchMove(event) {
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      const nextPosition = clampPreviewPosition(touch.clientX, touch.clientY);
+      if (!nextPosition) return;
+      setFloatingPreviewPosition(nextPosition);
+      event.preventDefault();
+    }
+
     function handlePointerUp() {
+      setIsDraggingPreview(false);
+      previewDragRef.current = null;
+    }
+
+    function handleTouchEnd() {
       setIsDraggingPreview(false);
       previewDragRef.current = null;
     }
@@ -312,11 +326,17 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', handleTouchEnd);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [isDraggingPreview]);
 
@@ -363,10 +383,24 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
 
   function handlePreviewPointerDown(event) {
     if (!showFloatingPreview || !previewRef.current) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
     const previewRect = previewRef.current.getBoundingClientRect();
     previewDragRef.current = {
       offsetX: event.clientX - previewRect.left,
       offsetY: event.clientY - previewRect.top
+    };
+    setIsDraggingPreview(true);
+    event.preventDefault();
+  }
+
+  function handlePreviewTouchStart(event) {
+    if (!showFloatingPreview || !previewRef.current) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    const previewRect = previewRef.current.getBoundingClientRect();
+    previewDragRef.current = {
+      offsetX: touch.clientX - previewRect.left,
+      offsetY: touch.clientY - previewRect.top
     };
     setIsDraggingPreview(true);
     event.preventDefault();
@@ -478,6 +512,7 @@ function StudentStageConference({ isFullscreen, onStageInteract, isMobileViewpor
             className={`student-video-conference-support-rail${hasScreenShare ? ' has-screen-share' : ''}${isFullscreen ? ' is-fullscreen' : ''}${showFloatingPreview ? ' is-floating-overlay is-draggable' : ''}${isDraggingPreview ? ' is-dragging' : ''}`}
             style={showFloatingPreview ? { '--student-preview-left': `${floatingPreviewPosition.x}px`, '--student-preview-top': `${floatingPreviewPosition.y}px` } : undefined}
             onPointerDown={handlePreviewPointerDown}
+            onTouchStart={handlePreviewTouchStart}
           >
             <TrackLoop tracks={supportingTracks}>
               <ParticipantTile />
@@ -576,17 +611,15 @@ function StudentRoomControls({
         <button type="button" className={`student-room-control-btn${isMicEnabled ? ' is-live' : ''}`} onClick={handleToggleMic} disabled={policy.studentsMuted}>
           {policy.studentsMuted ? 'Muted by teacher' : isMicEnabled ? 'Mute mic' : 'Unmute mic'}
         </button>
-        {!isMobileViewport ? (
-          <button
-            type="button"
-            className={`student-room-control-btn${isChatOpen ? ' is-live' : ''}`}
-            onPointerDown={stopRoomControlEvent}
-            onTouchStart={stopRoomControlEvent}
-            onClick={onToggleChat}
-          >
-            {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className={`student-room-control-btn${isChatOpen ? ' is-live' : ''}`}
+          onPointerDown={stopRoomControlEvent}
+          onTouchStart={stopRoomControlEvent}
+          onClick={onToggleChat}
+        >
+          {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
+        </button>
         <button type="button" className="student-room-control-btn student-room-control-btn--ghost" onClick={handleLeaveRoom}>
           Leave class
         </button>
@@ -1157,12 +1190,6 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
     handleOpenChat();
   }
 
-  function handleMobileChatToggle(event) {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-    handleToggleChat();
-  }
-
   useEffect(() => {
     if (!autoEnterImmersive || hasAttemptedAutoFullscreenRef.current) return;
     if (loading || !connectionInfo?.token || !connectionInfo?.livekitUrl) return;
@@ -1290,18 +1317,6 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
             onLeave?.();
           }}
         />
-        {isMobileViewport ? (
-          <button
-            type="button"
-            className={`student-room-mobile-chat-toggle${isChatOpen ? ' is-open' : ''}${roomPolicy.chatDisabled ? ' is-disabled' : ''}`}
-            onClick={handleMobileChatToggle}
-            aria-expanded={isChatOpen}
-            aria-label={roomPolicy.chatDisabled ? 'Show chat locked message' : isChatOpen ? 'Hide class chat' : 'Open class chat'}
-          >
-            <span className="student-room-mobile-chat-toggle-icon" aria-hidden="true">💬</span>
-            <span>{roomPolicy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}</span>
-          </button>
-        ) : null}
         <StudentRoomChatPanel
           policy={roomPolicy}
           isOpen={isChatOpen}

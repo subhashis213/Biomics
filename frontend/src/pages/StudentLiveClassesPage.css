@@ -2906,6 +2906,7 @@ html[data-theme='dark'] .livekit-student-page,
   background: rgba(2, 6, 23, 0.62);
   backdrop-filter: blur(12px);
   box-shadow: 0 14px 28px rgba(2, 6, 23, 0.28);
+  touch-action: none;
 }
 
 .livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-tile,
@@ -2915,6 +2916,7 @@ html[data-theme='dark'] .livekit-student-page,
   min-height: auto;
   height: auto;
   border-radius: 14px;
+  touch-action: none;
 }
 
 .livekit-student-page .student-room-shell .student-video-conference-support-rail.has-screen-share.is-floating-overlay .lk-participant-metadata,
@@ -3489,7 +3491,8 @@ html[data-theme='dark'] .livekit-student-page,
 
 .livekit-student-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view .student-room-controls-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view .student-room-controls.is-mobile-view .student-room-control-btn {
@@ -3499,47 +3502,7 @@ html[data-theme='dark'] .livekit-student-page,
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view .student-room-mobile-chat-toggle {
-  position: fixed;
-  right: max(10px, env(safe-area-inset-right));
-  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 72px);
-  z-index: 9;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 46px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(96, 165, 250, 0.28);
-  background: rgba(15, 23, 42, 0.88);
-  color: #f8fafc;
-  font-size: 0.84rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  box-shadow: 0 16px 28px rgba(2, 6, 23, 0.28);
-  backdrop-filter: blur(18px);
-  pointer-events: auto;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.livekit-student-page .student-room-shell.is-mobile-view .student-room-mobile-chat-toggle.is-open {
-  border-color: rgba(56, 189, 248, 0.34);
-  background: rgba(3, 105, 161, 0.9);
-}
-
-.livekit-student-page .student-room-shell.is-mobile-view .student-room-mobile-chat-toggle.is-disabled {
-  border-color: rgba(248, 113, 113, 0.2);
-}
-
-.livekit-student-page .student-room-shell.is-mobile-view .student-room-mobile-chat-toggle-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  font-size: 0.88rem;
+  display: none !important;
 }
 
 .livekit-student-direct-room-page .student-room-shell.is-mobile-view,
@@ -3650,11 +3613,6 @@ html[data-theme='dark'] .livekit-student-page,
 .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay {
   top: max(8px, env(safe-area-inset-top));
   left: max(8px, env(safe-area-inset-left));
-}
-
-.livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-room-mobile-chat-toggle {
-  right: max(8px, env(safe-area-inset-right));
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 70px);
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view.is-immersive,
@@ -3775,11 +3733,7 @@ html[data-theme='dark'] .livekit-student-page,
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view.is-mobile-portrait .student-room-controls.is-mobile-view .student-room-controls-actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.livekit-student-page .student-room-shell.is-mobile-view.is-mobile-portrait .student-room-controls.is-mobile-view .student-room-control-btn--ghost {
-  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .livekit-student-page.student-room-chat-portal .student-room-chat-panel {
