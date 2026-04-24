@@ -2929,8 +2929,8 @@ html[data-theme='dark'] .livekit-student-page,
 
 .livekit-student-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay {
   position: absolute;
-  top: max(10px, env(safe-area-inset-top));
-  left: max(10px, env(safe-area-inset-left));
+  top: var(--student-preview-top, max(10px, env(safe-area-inset-top)));
+  left: var(--student-preview-left, max(10px, env(safe-area-inset-left)));
   z-index: 6;
   width: min(34vw, 156px);
   min-width: 92px;
@@ -3611,8 +3611,8 @@ html[data-theme='dark'] .livekit-student-page,
 }
 
 .livekit-student-direct-room-page .student-room-shell.is-mobile-view .student-video-conference-support-rail.is-floating-overlay {
-  top: max(8px, env(safe-area-inset-top));
-  left: max(8px, env(safe-area-inset-left));
+  top: var(--student-preview-top, max(8px, env(safe-area-inset-top)));
+  left: var(--student-preview-left, max(8px, env(safe-area-inset-left)));
 }
 
 .livekit-student-page .student-room-shell.is-mobile-view.is-immersive,

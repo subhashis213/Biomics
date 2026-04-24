@@ -538,10 +538,6 @@ function StudentRoomControls({
   const room = useRoomContext();
   const [isMicEnabled, setIsMicEnabled] = useState(false);
 
-  function stopRoomControlEvent(event) {
-    event.stopPropagation();
-  }
-
   useEffect(() => {
     if (!room) return undefined;
 
@@ -614,8 +610,6 @@ function StudentRoomControls({
         <button
           type="button"
           className={`student-room-control-btn${isChatOpen ? ' is-live' : ''}`}
-          onPointerDown={stopRoomControlEvent}
-          onTouchStart={stopRoomControlEvent}
           onClick={onToggleChat}
         >
           {policy.chatDisabled ? 'Chat locked' : isChatOpen ? 'Hide chat' : 'Open chat'}
@@ -1049,6 +1043,38 @@ export default function StudentRoom({ classSession, onSessionRemoved, onLeave, a
       roomShellRef.current?.style.removeProperty('--student-room-live-vh');
     };
   }, []);
+
+  useEffect(() => {
+    if (!isMobileViewport) return undefined;
+    const shell = roomShellRef.current;
+    if (!shell) return undefined;
+
+    function allowInternalScreenSharePinch(target) {
+      if (!(target instanceof Element)) return false;
+      return Boolean(target.closest('.student-screen-share-viewport, .student-screen-share-canvas, .student-screen-share-tile'));
+    }
+
+    function handleShellTouchMove(event) {
+      if ((event.touches?.length || 0) < 2) return;
+      if (allowInternalScreenSharePinch(event.target)) return;
+      event.preventDefault();
+    }
+
+    function blockGestureZoom(event) {
+      if (allowInternalScreenSharePinch(event.target)) return;
+      event.preventDefault();
+    }
+
+    shell.addEventListener('touchmove', handleShellTouchMove, { passive: false });
+    shell.addEventListener('gesturestart', blockGestureZoom);
+    shell.addEventListener('gesturechange', blockGestureZoom);
+
+    return () => {
+      shell.removeEventListener('touchmove', handleShellTouchMove);
+      shell.removeEventListener('gesturestart', blockGestureZoom);
+      shell.removeEventListener('gesturechange', blockGestureZoom);
+    };
+  }, [isMobileViewport]);
 
   useEffect(() => {
     if (!roomPolicy.chatDisabled) return;
