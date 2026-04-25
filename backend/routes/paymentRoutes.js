@@ -406,20 +406,22 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
 
     const courseDoc = await Course.findOne({ name: courseName }).lean();
     const pricingDocs = await BatchPricing.find({ category: courseName }).lean();
-    const pricingMap = new Map(pricingDocs.map((p) => [String(p.batchName || '').trim(), p]));
+    const pricingMap = new Map(pricingDocs.map((p) => [String(p.batchName || '').trim().toLowerCase(), p]));
 
     const batches = (Array.isArray(courseDoc?.batches) ? courseDoc.batches.filter((b) => b?.active !== false).map((b) => String(b.name || '').trim()).filter(Boolean) : []);
 
     return res.json({
       courseName,
       batches: batches.map((name) => {
-        const pricing = pricingMap.get(name) || {};
+        const pricing = pricingMap.get(String(name || '').trim().toLowerCase()) || {};
         return {
           batchName: name,
           proPriceInPaise: Number(pricing.proPriceInPaise || 0),
           elitePriceInPaise: Number(pricing.elitePriceInPaise || 0),
           proMrpInPaise: Number(pricing.proMrpInPaise || 0),
           eliteMrpInPaise: Number(pricing.eliteMrpInPaise || 0),
+          thumbnailUrl: String(pricing.thumbnailUrl || '').trim(),
+          thumbnailName: String(pricing.thumbnailName || '').trim(),
           active: pricing ? pricing.active !== false : true
         };
       })
@@ -1132,6 +1134,45 @@ router.get('/admin/vouchers', authenticateToken('admin'), async (req, res) => {
   try {
     const vouchers = await Voucher.find({}).sort({ createdAt: -1 }).lean();
     return res.json({ vouchers });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch vouchers.' });
+  }
+});
+
+// Student: list active vouchers applicable for a course
+router.get('/vouchers/student', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+
+    const requestedCourse = normalizeCourseName(req.query?.course || '');
+    const targetCourse = requestedCourse || normalizeCourseName(user.class);
+    if (!(await isSupportedCourse(targetCourse))) {
+      return res.status(400).json({ error: 'Unsupported course category.' });
+    }
+
+    const now = Date.now();
+    const vouchers = await Voucher.find({ active: true }).sort({ createdAt: -1 }).lean();
+    const visibleVouchers = vouchers
+      .filter((voucher) => {
+        const notExpired = !voucher.validUntil || new Date(voucher.validUntil).getTime() >= now;
+        const started = !voucher.validFrom || new Date(voucher.validFrom).getTime() <= now;
+        const underLimit = !Number.isFinite(voucher.usageLimit) || voucher.usageLimit <= 0 || voucher.usedCount < voucher.usageLimit;
+        const courseAllowed = !Array.isArray(voucher.applicableCourses)
+          || voucher.applicableCourses.length === 0
+          || voucher.applicableCourses.some((entry) => normalizeCourseName(entry) === targetCourse);
+        return notExpired && started && underLimit && courseAllowed;
+      })
+      .map((voucher) => ({
+        code: String(voucher.code || '').trim().toUpperCase(),
+        description: String(voucher.description || '').trim(),
+        discountType: voucher.discountType,
+        discountValue: Number(voucher.discountValue || 0),
+        maxDiscountInPaise: Number(voucher.maxDiscountInPaise || 0),
+        validUntil: voucher.validUntil || null
+      }));
+
+    return res.json({ course: targetCourse, vouchers: visibleVouchers });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch vouchers.' });
   }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   fetchMockExamPerformanceAdmin,
   fetchMockExamsAdmin,
+  deleteMockExamAdmin,
   releaseMockExamResultAdmin,
   saveMockExamAdmin,
   toggleMockExamNoticeAdmin
@@ -278,6 +279,19 @@ export default function AdminMockExamPage() {
     }
   }
 
+  async function handleDeleteMockExam(exam) {
+    const examTitle = String(exam?.title || 'this exam');
+    const confirmed = window.confirm(`Delete "${examTitle}"?\n\nThis will also remove all student attempts for this exam.`);
+    if (!confirmed) return;
+    try {
+      await deleteMockExamAdmin(exam._id);
+      await loadMockExamList(mockExamCategory);
+      setMockExamMessage({ type: 'success', text: 'Mock exam deleted successfully.' });
+    } catch (error) {
+      setMockExamMessage({ type: 'error', text: error.message || 'Failed to delete mock exam.' });
+    }
+  }
+
   return (
     <>
     <AppShell
@@ -521,6 +535,13 @@ export default function AdminMockExamPage() {
                       onClick={() => handleToggleMockResultRelease(exam)}
                     >
                       {exam.resultReleased ? 'Hide Result' : 'Release Result'}
+                    </button>
+                    <button
+                      type="button"
+                      className="danger-btn"
+                      onClick={() => handleDeleteMockExam(exam)}
+                    >
+                      Delete Exam
                     </button>
                   </div>
                 </article>

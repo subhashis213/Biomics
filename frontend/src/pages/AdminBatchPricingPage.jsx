@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchCoursesAdmin,
   fetchCourseBatchesAdmin,
@@ -9,6 +9,7 @@ import {
 import AppShell from '../components/AppShell';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 import { getSession } from '../session';
+import { resolveApiAssetUrl } from '../api';
 
 function rupeesToPaise(val) {
   return Math.round((Number(val || 0) || 0) * 100);
@@ -20,6 +21,7 @@ function paiseToRupees(paise) {
 
 export default function AdminBatchPricingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [coursesData, setCoursesData] = useState([]);
   const [expandedCourse, setExpandedCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,7 @@ export default function AdminBatchPricingPage() {
     eliteTenure: 3
   });
   const [savingBatch, setSavingBatch] = useState(null);
+  const [uploadingBatchThumb, setUploadingBatchThumb] = useState(null);
 
   useAutoDismissMessage(banner, setBanner);
   const adminSession = getSession();
@@ -43,6 +46,29 @@ export default function AdminBatchPricingPage() {
   useEffect(() => {
     loadAllData();
   }, []);
+
+  useEffect(() => {
+    if (!coursesData.length) return;
+    const params = new URLSearchParams(location.search);
+    const selectedCourse = String(params.get('course') || '').trim();
+    const selectedBatch = String(params.get('batch') || '').trim();
+    if (!selectedCourse) return;
+
+    const matchedCourse = coursesData.find(
+      (course) => String(course.courseName || '').trim().toLowerCase() === selectedCourse.toLowerCase()
+    );
+    if (!matchedCourse) return;
+
+    setExpandedCourse(matchedCourse.courseName);
+
+    if (!selectedBatch) return;
+    const matchedBatch = (matchedCourse.batches || []).find(
+      (batch) => String(batch.batchName || '').trim().toLowerCase() === selectedBatch.toLowerCase()
+    );
+    if (matchedBatch) {
+      startEditBatch(matchedCourse, matchedBatch);
+    }
+  }, [coursesData, location.search]);
 
   async function loadAllData() {
     setLoading(true);
@@ -117,7 +143,9 @@ export default function AdminBatchPricingPage() {
       proMrp: paiseToRupees(batch.proMrpInPaise),
       eliteMrp: paiseToRupees(batch.eliteMrpInPaise),
       proTenure: batch.proTenureMonths || 1,
-      eliteTenure: batch.eliteTenureMonths || 3
+      eliteTenure: batch.eliteTenureMonths || 3,
+      thumbnailUrl: String(batch.thumbnailUrl || '').trim(),
+      thumbnailName: String(batch.thumbnailName || '').trim()
     });
   }
 
@@ -129,8 +157,29 @@ export default function AdminBatchPricingPage() {
       proMrp: '0',
       eliteMrp: '0',
       proTenure: 1,
-      eliteTenure: 3
+      eliteTenure: 3,
+      thumbnailUrl: '',
+      thumbnailName: ''
     });
+  }
+
+  async function handleBatchThumbnailUpload(file) {
+    if (!file || !editingBatch) return;
+    const key = `${editingBatch.course}-${editingBatch.batch}`;
+    setUploadingBatchThumb(key);
+    try {
+      const response = await uploadCoursePricingThumbnailAdmin(file);
+      setEditForm((current) => ({
+        ...current,
+        thumbnailUrl: String(response?.thumbnailUrl || '').trim(),
+        thumbnailName: String(response?.thumbnailName || file.name || '').trim()
+      }));
+      setBanner({ type: 'success', text: 'Batch thumbnail uploaded. Click Save to publish pricing + thumbnail.' });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to upload batch thumbnail.' });
+    } finally {
+      setUploadingBatchThumb(null);
+    }
   }
 
   async function saveBatchPrice(course, batch) {
@@ -148,6 +197,8 @@ export default function AdminBatchPricingPage() {
         eliteMrpInPaise: rupeesToPaise(editForm.eliteMrp),
         proTenureMonths: editForm.proTenure || 1,
         eliteTenureMonths: editForm.eliteTenure || 3,
+        thumbnailUrl: String(editForm.thumbnailUrl || '').trim(),
+        thumbnailName: String(editForm.thumbnailName || '').trim(),
         currency: 'INR',
         active: true
       });
@@ -219,6 +270,7 @@ export default function AdminBatchPricingPage() {
                           <th style={{ textAlign: 'right', padding: '12px', fontWeight: '600' }}>Elite Price (₹)</th>
                           <th style={{ textAlign: 'right', padding: '12px', fontWeight: '600' }}>Elite Tenure</th>
                           <th style={{ textAlign: 'right', padding: '12px', fontWeight: '600' }}>Elite MRP (₹)</th>
+                          <th style={{ textAlign: 'left', padding: '12px', fontWeight: '600' }}>Batch Thumbnail</th>
                           <th style={{ textAlign: 'center', padding: '12px', fontWeight: '600' }}>Action</th>
                         </tr>
                       </thead>
@@ -314,6 +366,46 @@ export default function AdminBatchPricingPage() {
                                   />
                                 ) : (
                                   paiseToRupees(batch.eliteMrpInPaise)
+                                )}
+                              </td>
+                              <td style={{ padding: '12px', minWidth: 240 }}>
+                                {isEditing ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                    <label className="secondary-btn pricing-thumbnail-upload-btn" style={{ minWidth: 130, textAlign: 'center' }}>
+                                      {uploadingBatchThumb === `${course.courseName}-${batch.batchName}` ? 'Uploading...' : 'Upload Thumbnail'}
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        hidden
+                                        disabled={uploadingBatchThumb === `${course.courseName}-${batch.batchName}`}
+                                        onChange={(event) => {
+                                          const file = event.target.files?.[0];
+                                          handleBatchThumbnailUpload(file);
+                                          event.target.value = '';
+                                        }}
+                                      />
+                                    </label>
+                                    <span className="pricing-thumbnail-name" style={{ maxWidth: 160 }}>
+                                      {editForm.thumbnailName || 'No thumbnail'}
+                                    </span>
+                                    {editForm.thumbnailUrl ? (
+                                      <img
+                                        src={resolveApiAssetUrl(editForm.thumbnailUrl)}
+                                        alt={`${batch.batchName} thumbnail`}
+                                        className="batch-pricing-thumb-preview"
+                                      />
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  batch.thumbnailUrl ? (
+                                    <img
+                                      src={resolveApiAssetUrl(batch.thumbnailUrl)}
+                                      alt={`${batch.batchName} thumbnail`}
+                                      className="batch-pricing-thumb-preview"
+                                    />
+                                  ) : (
+                                    <span className="subtitle">No thumbnail</span>
+                                  )
                                 )}
                               </td>
                               <td style={{ textAlign: 'center', padding: '12px' }}>

@@ -87,6 +87,39 @@ function parseMonthFilter(value) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : null;
 }
 
+function normalizeCourseName(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildCourseRegex(value) {
+  return new RegExp(`^${escapeRegex(normalizeCourseName(value))}$`, 'i');
+}
+
+async function resolveAccessibleCourses(userDoc) {
+  const candidateCourses = new Set();
+  const enrolledCourse = normalizeCourseName(userDoc?.class);
+  if (enrolledCourse) candidateCourses.add(enrolledCourse);
+
+  if (Array.isArray(userDoc?.purchasedCourses)) {
+    userDoc.purchasedCourses.forEach((entry) => {
+      const course = normalizeCourseName(entry?.course);
+      if (course) candidateCourses.add(course);
+    });
+  }
+
+  const accessibleCourses = [];
+  for (const courseName of candidateCourses) {
+    // eslint-disable-next-line no-await-in-loop
+    const canAccess = await hasCourseAccess(userDoc, courseName);
+    if (canAccess) accessibleCourses.push(courseName);
+  }
+  return accessibleCourses;
+}
+
 // Admin: create or update monthly mock exam
 router.post('/', authenticateToken('admin'), async (req, res) => {
   try {
@@ -243,16 +276,30 @@ router.patch('/:id/notice', authenticateToken('admin'), async (req, res) => {
   }
 });
 
+// Admin: delete exam and all student attempts for that exam
+router.delete('/:id', authenticateToken('admin'), async (req, res) => {
+  try {
+    const exam = await MockExam.findByIdAndDelete(req.params.id).lean();
+    if (!exam) return res.status(404).json({ error: 'Mock exam not found.' });
+
+    await MockExamAttempt.deleteMany({ examId: exam._id });
+    return res.json({ message: 'Mock exam deleted successfully.', examId: String(exam._id) });
+  } catch {
+    return res.status(500).json({ error: 'Failed to delete mock exam.' });
+  }
+});
+
 // Student: list exams for their course + status
 router.get('/my-course', authenticateToken('user'), async (req, res) => {
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
 
-    const canAccess = await hasCourseAccess(user, user.class);
-    if (!canAccess) return res.json({ exams: [], notices: [] });
+    const accessibleCourses = await resolveAccessibleCourses(user);
+    if (!accessibleCourses.length) return res.json({ exams: [], notices: [] });
 
-    const exams = await MockExam.find({ category: user.class }).sort({ examDate: -1 }).lean();
+    const courseFilters = accessibleCourses.map((courseName) => ({ category: buildCourseRegex(courseName) }));
+    const exams = await MockExam.find(courseFilters.length ? { $or: courseFilters } : {}).sort({ examDate: -1 }).lean();
     const examIds = exams.map((exam) => exam._id);
 
     const attempts = await MockExamAttempt.find(
@@ -268,12 +315,34 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
       const attempt = attemptMap.get(String(exam._id)) || null;
       const isUpcoming = new Date(exam.examDate).getTime() > now;
       const resultReady = Boolean(exam.resultReleased && attempt);
+      const noticeEnabled = exam.noticeEnabled !== false;
 
-      if (isUpcoming && exam.noticeEnabled !== false) {
-        notices.push({ type: 'upcoming', examId: exam._id, title: exam.title, examDate: exam.examDate });
+      if (isUpcoming && noticeEnabled) {
+        notices.push({
+          type: 'upcoming',
+          examId: exam._id,
+          title: exam.title,
+          examDate: exam.examDate,
+          course: exam.category
+        });
       }
-      if (resultReady && exam.noticeEnabled !== false) {
-        notices.push({ type: 'resultReleased', examId: exam._id, title: exam.title, examDate: exam.examDate });
+      if (resultReady && noticeEnabled) {
+        notices.push({
+          type: 'resultReleased',
+          examId: exam._id,
+          title: exam.title,
+          examDate: exam.examDate,
+          course: exam.category
+        });
+      }
+      if (!isUpcoming && !resultReady && noticeEnabled) {
+        notices.push({
+          type: 'noticeEnabled',
+          examId: exam._id,
+          title: exam.title,
+          examDate: exam.examDate,
+          course: exam.category
+        });
       }
 
       return {
@@ -287,7 +356,7 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
         questionCount: Array.isArray(exam.questions) ? exam.questions.length : 0,
         attempted: Boolean(attempt),
         windowClosed: Boolean(!attempt && exam.examWindowEndAt && new Date(exam.examWindowEndAt).getTime() < now),
-        noticeEnabled: exam.noticeEnabled !== false,
+        noticeEnabled,
         attemptSummary: attempt
           ? {
               score: attempt.score,
@@ -313,11 +382,11 @@ router.get('/my-course/:id', authenticateToken('user'), async (req, res) => {
     if (!exam) return res.status(404).json({ error: 'Mock exam not found.' });
 
     const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
-    if (!user?.class || user.class !== exam.category) {
+    if (!user?.class) {
       return res.status(403).json({ error: 'You are not authorized for this exam.' });
     }
 
-    const canAccess = await hasCourseAccess(user, user.class);
+    const canAccess = await hasCourseAccess(user, exam.category);
     if (!canAccess) return res.status(403).json({ error: 'Please unlock your course to access exams.' });
 
     const examStartsAt = new Date(exam.examDate).getTime();
@@ -362,10 +431,14 @@ router.get('/leaderboard', authenticateToken('user'), async (req, res) => {
       return res.status(400).json({ error: 'Invalid month filter. Use YYYY-MM format.' });
     }
 
-    const canAccess = await hasCourseAccess(user, user.class);
-    if (!canAccess) return res.json({ leaderboard: [], months: [] });
+    const accessibleCourses = await resolveAccessibleCourses(user);
+    if (!accessibleCourses.length) return res.json({ leaderboard: [], months: [] });
 
-    const exams = await MockExam.find({ category: user.class }, { _id: 1, title: 1, examDate: 1 }).lean();
+    const courseFilters = accessibleCourses.map((courseName) => ({ category: buildCourseRegex(courseName) }));
+    const exams = await MockExam.find(
+      courseFilters.length ? { $or: courseFilters } : {},
+      { _id: 1, title: 1, examDate: 1, category: 1 }
+    ).lean();
     const months = Array.from(new Set(exams
       .map((exam) => getMonthValue(exam.examDate))
       .filter(Boolean)))
@@ -379,8 +452,8 @@ router.get('/leaderboard', authenticateToken('user'), async (req, res) => {
 
     const examTitleById = new Map(filteredExams.map((exam) => [String(exam._id), exam.title]));
     const attempts = await MockExamAttempt.find(
-      { category: user.class, examId: { $in: examIds } },
-      { username: 1, examId: 1, score: 1, total: 1, submittedAt: 1 }
+      { examId: { $in: examIds } },
+      { username: 1, examId: 1, score: 1, total: 1, submittedAt: 1, category: 1 }
     )
       .sort({ submittedAt: -1 })
       .lean();
@@ -467,11 +540,11 @@ router.post('/:id/submit', authenticateToken('user'), async (req, res) => {
     if (!exam) return res.status(404).json({ error: 'Mock exam not found.' });
 
     const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
-    if (!user?.class || user.class !== exam.category) {
+    if (!user?.class) {
       return res.status(403).json({ error: 'You are not authorized for this exam.' });
     }
 
-    const canAccess = await hasCourseAccess(user, user.class);
+    const canAccess = await hasCourseAccess(user, exam.category);
     if (!canAccess) return res.status(403).json({ error: 'Please unlock your course to submit exams.' });
 
     const examStartsAt = new Date(exam.examDate).getTime();

@@ -2700,6 +2700,41 @@ body.student-room-fullscreen-active {
   gap: 8px;
 }
 
+.student-cart-item-actions .primary-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, #4f46e5 44%, var(--line));
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 56%, #2563eb 100%);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.32);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.student-cart-item-actions .primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: saturate(1.06);
+  box-shadow: 0 12px 22px rgba(79, 70, 229, 0.4);
+}
+
+.student-cart-item-actions .primary-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.student-cart-item-actions .primary-btn:disabled {
+  opacity: 0.65;
+  box-shadow: none;
+}
+
+.student-cart-item-actions .secondary-btn {
+  min-height: 36px;
+  border-radius: 999px;
+  padding: 0 12px;
+}
+
 .student-cart-item-actions .link-btn {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
@@ -2817,6 +2852,7 @@ body.student-room-fullscreen-active {
   }
 
   .student-cart-item-actions .link-btn,
+  .student-cart-item-actions .primary-btn,
   .student-cart-item-actions .secondary-btn {
     width: 100%;
   }
@@ -14311,6 +14347,67 @@ html[data-theme='light'] .student-dashboard-view .stat-card {
   justify-content: center;
   color: #fff;
   background: linear-gradient(135deg, #f97316, #fb923c);
+  border: none;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.student-batch-coupon:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.05);
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.28);
+}
+
+.student-batch-coupon.is-open {
+  background: linear-gradient(135deg, #ea580c, #f97316);
+}
+
+.student-batch-coupon-panel {
+  display: grid;
+  gap: 6px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  transition: max-height 280ms ease, opacity 220ms ease, transform 220ms ease;
+}
+
+.student-batch-coupon-panel.is-open {
+  max-height: 220px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.student-batch-coupon-chip {
+  border: 1px dashed color-mix(in srgb, #f59e0b 48%, var(--line));
+  background: color-mix(in srgb, #f59e0b 10%, var(--bg-card));
+  border-radius: 10px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.student-batch-coupon-chip strong {
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  color: var(--text-strong);
+}
+
+.student-batch-coupon-chip span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: color-mix(in srgb, #b45309 72%, var(--text-main));
+}
+
+.student-batch-coupon-empty {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  background: color-mix(in srgb, var(--bg-card-soft) 86%, transparent);
 }
 
 .student-batch-card-copy {
@@ -14339,13 +14436,20 @@ html[data-theme='light'] .student-dashboard-view .stat-card {
 .student-batch-lock-pill.locked {
   background: color-mix(in srgb, #dc2626 18%, transparent);
   border: 1px solid color-mix(in srgb, #dc2626 44%, transparent);
-  color: #fecaca;
+  color: #000;
 }
 
 .student-batch-lock-pill.free {
   background: color-mix(in srgb, #16a34a 18%, transparent);
   border: 1px solid color-mix(in srgb, #16a34a 44%, transparent);
-  color: #bbf7d0;
+  color: #000;
+}
+
+html[data-theme='dark'] .student-batch-lock-pill.locked,
+:root[data-theme='dark'] .student-batch-lock-pill.locked,
+html[data-theme='dark'] .student-batch-lock-pill.free,
+:root[data-theme='dark'] .student-batch-lock-pill.free {
+  color: #fff;
 }
 
 .student-course-catalog-thumb,

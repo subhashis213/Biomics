@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
-import { fetchCourseBatchesStudent, fetchStudentCourseCatalog, resolveApiAssetUrl } from '../api';
+import { fetchCourseBatchesStudent, fetchStudentCourseCatalog, fetchStudentCourseVouchers, resolveApiAssetUrl } from '../api';
 import { useSessionStore } from '../stores/sessionStore';
 
 function formatPriceInPaise(amountInPaise) {
@@ -21,8 +21,10 @@ export default function StudentCourseBatchesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [banner, setBanner] = useState(null);
   const [selectedPlanByBatch, setSelectedPlanByBatch] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
   const [coursePreview, setCoursePreview] = useState(null);
+  const [availableVouchers, setAvailableVouchers] = useState([]);
+  const [openCouponBatch, setOpenCouponBatch] = useState('');
+  const [cartKeys, setCartKeys] = useState(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +41,20 @@ export default function StudentCourseBatchesPage() {
       }
     }
     load();
+    return () => { cancelled = true; };
+  }, [courseName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadVouchers() {
+      try {
+        const response = await fetchStudentCourseVouchers(decodeURIComponent(courseName || ''));
+        if (!cancelled) setAvailableVouchers(Array.isArray(response?.vouchers) ? response.vouchers : []);
+      } catch {
+        if (!cancelled) setAvailableVouchers([]);
+      }
+    }
+    loadVouchers();
     return () => { cancelled = true; };
   }, [courseName]);
 
@@ -71,15 +87,29 @@ export default function StudentCourseBatchesPage() {
     return `biomics:student-cart:${String(session?.username || '').toLowerCase()}`;
   }
 
-  const normalizedSearch = String(searchTerm || '').trim().toLowerCase();
-  const visibleBatches = batches.filter((batch) => {
-    if (!normalizedSearch) return true;
-    return String(batch.batchName || '').toLowerCase().includes(normalizedSearch);
-  });
+  function refreshCartKeys() {
+    try {
+      const raw = localStorage.getItem(getCartKey());
+      const current = raw ? JSON.parse(raw) : [];
+      const keys = Array.isArray(current) ? current.map((item) => String(item?.key || '').trim()).filter(Boolean) : [];
+      setCartKeys(new Set(keys));
+    } catch {
+      setCartKeys(new Set());
+    }
+  }
+
+  useEffect(() => {
+    refreshCartKeys();
+    function handleStorageSync() {
+      refreshCartKeys();
+    }
+    window.addEventListener('storage', handleStorageSync);
+    return () => window.removeEventListener('storage', handleStorageSync);
+  }, [session?.username]);
+
+  const visibleBatches = batches;
 
   const decodedCourseName = decodeURIComponent(courseName || '');
-  const heroThumbnail = resolveApiAssetUrl(coursePreview?.thumbnailUrl || '');
-
   function handleAddBatchToCart(batch) {
     const planType = selectedPlanByBatch[batch.batchName] || 'pro';
     const storageKey = getCartKey();
@@ -107,6 +137,7 @@ export default function StudentCourseBatchesPage() {
         }
       ];
       localStorage.setItem(storageKey, JSON.stringify(next));
+      setCartKeys(new Set(next.map((item) => String(item?.key || '').trim()).filter(Boolean)));
       setBanner({ type: 'success', text: `${batch.batchName} added to cart.` });
     } catch (e) {
       setBanner({ type: 'error', text: 'Failed to update cart.' });
@@ -128,40 +159,15 @@ export default function StudentCourseBatchesPage() {
     >
       <main className="student-batch-page">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
-        <section className="card student-batch-hero">
-          <div className="student-batch-hero-media">
-            {heroThumbnail ? (
-              <img src={heroThumbnail} alt={decodedCourseName} />
-            ) : (
-              <div className="student-batch-hero-fallback">🎯</div>
-            )}
-          </div>
-          <div className="student-batch-hero-copy">
-            <p className="eyebrow">Course Batches</p>
-            <h3>{decodedCourseName}</h3>
-            <p>Select a batch below. Paid batches show lock icon and offer pricing similar to premium marketplaces.</p>
-            <label className="student-course-catalog-search" htmlFor="student-batch-search">
-              <span aria-hidden="true">🔎</span>
-              <input
-                id="student-batch-search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search batches"
-              />
-            </label>
-          </div>
-        </section>
-
         <section className="card student-batch-list-wrap">
           <div className="section-header compact">
             <div>
-              <p className="eyebrow">Batches</p>
-              <h3>{decodedCourseName} ({visibleBatches.length})</h3>
+              <h3>{decodedCourseName}</h3>
             </div>
           </div>
 
           {isLoading ? <p className="empty-note">Loading batches...</p> : null}
-          {!isLoading && !visibleBatches.length ? <p className="empty-note">No batches found for this search.</p> : null}
+          {!isLoading && !visibleBatches.length ? <p className="empty-note">No batches available for this course.</p> : null}
 
           <div className="student-batch-list">
             {visibleBatches.map((batch) => {
@@ -173,16 +179,43 @@ export default function StudentCourseBatchesPage() {
                 ? Math.round(((mrpPrice - salePrice) / mrpPrice) * 100)
                 : 0;
               const isLocked = salePrice > 0;
+              const cartEntryKey = `${courseName}::${batch.batchName}`;
+              const isInCart = cartKeys.has(cartEntryKey);
 
               return (
                 <article key={batch.batchName} className="student-batch-card">
                   <div className="student-batch-card-media">
-                    {heroThumbnail ? <img src={heroThumbnail} alt={batch.batchName} /> : <div className="student-batch-card-media-fallback">📘</div>}
-                    <div className="student-batch-coupon">COUPONS</div>
+                    {batch.thumbnailUrl ? (
+                      <img src={resolveApiAssetUrl(batch.thumbnailUrl)} alt={batch.batchName} />
+                    ) : (
+                      <div className="student-batch-card-media-fallback">📘</div>
+                    )}
+                    <button
+                      type="button"
+                      className={`student-batch-coupon ${openCouponBatch === batch.batchName ? 'is-open' : ''}`}
+                      onClick={() => setOpenCouponBatch((current) => (current === batch.batchName ? '' : batch.batchName))}
+                    >
+                      {openCouponBatch === batch.batchName ? 'HIDE COUPONS' : 'COUPONS'}
+                    </button>
+                    <div className={`student-batch-coupon-panel ${openCouponBatch === batch.batchName ? 'is-open' : ''}`}>
+                      {availableVouchers.length ? (
+                        availableVouchers.slice(0, 4).map((voucher) => (
+                          <div key={voucher.code} className="student-batch-coupon-chip">
+                            <strong>{voucher.code}</strong>
+                            <span>
+                              {voucher.discountType === 'percent'
+                                ? `${Math.round(voucher.discountValue)}% OFF`
+                                : `₹${Math.round(voucher.discountValue / 100)} OFF`}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="student-batch-coupon-empty">No active coupons for this course right now.</p>
+                      )}
+                    </div>
                   </div>
                   <div className="student-batch-card-copy">
                     <div className="student-course-catalog-tags">
-                      <span>NEW</span>
                       <span>LIVE CLASS</span>
                       <span>FREE CONTENT</span>
                     </div>
@@ -212,7 +245,19 @@ export default function StudentCourseBatchesPage() {
                       </div>
                     </div>
                     <div className="student-course-catalog-cta-row">
-                      <button type="button" className="secondary-btn" onClick={() => handleAddBatchToCart(batch)}>🛒 Add to Cart</button>
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => {
+                          if (isInCart) {
+                            navigate('/student', { state: { openCart: true } });
+                            return;
+                          }
+                          handleAddBatchToCart(batch);
+                        }}
+                      >
+                        {isInCart ? 'Go to Cart' : '🛒 Add to Cart'}
+                      </button>
                       <button
                         type="button"
                         className="primary-btn"

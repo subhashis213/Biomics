@@ -506,6 +506,11 @@ export function fetchCourseBatchesStudent(course) {
   return requestJson(`/payments/catalog/${encodeURIComponent(course)}/batches`);
 }
 
+export function fetchStudentCourseVouchers(course = '') {
+  const query = course ? `?course=${encodeURIComponent(course)}` : '';
+  return requestJson(`/payments/vouchers/student${query}`);
+}
+
 export function fetchCourseBatchesAdmin(course) {
   return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}/batches`);
 }
@@ -777,6 +782,12 @@ export function toggleMockExamNoticeAdmin(examId, noticeEnabled) {
   return requestJson(`/mock-exams/${encodeURIComponent(examId)}/notice`, {
     method: 'PATCH',
     body: JSON.stringify({ noticeEnabled })
+  });
+}
+
+export function deleteMockExamAdmin(examId) {
+  return requestJson(`/mock-exams/${encodeURIComponent(examId)}`, {
+    method: 'DELETE'
   });
 }
 

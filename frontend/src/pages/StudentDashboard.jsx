@@ -1217,6 +1217,8 @@ export default function StudentDashboard() {
     return purchasedCourseKeySet.has(normalizedKey);
   }
 
+  const visibleMockExamNotices = mockExamNotices;
+
   const modules = Object.keys(moduleMetaByKey)
     .filter((moduleKey) => {
       if (!activeCourseFilter) return true;
@@ -2378,16 +2380,18 @@ export default function StudentDashboard() {
           document.body
         ) : null}
 
-        {!selectedModule && mockExamNotices.length ? (
+        {!selectedModule && visibleMockExamNotices.length ? (
           <aside className="monthly-exam-notice card" role="status" aria-live="polite">
             <div>
               <p className="eyebrow">Monthly Mock Exam Notice</p>
               <h3>
-                {mockExamNotices[0].type === 'resultReleased'
+                {visibleMockExamNotices[0].type === 'resultReleased'
                   ? 'Result released. Go to Exam section to view details.'
-                  : `Upcoming exam on ${new Date(mockExamNotices[0].examDate).toLocaleDateString()}.`}
+                  : visibleMockExamNotices[0].type === 'noticeEnabled'
+                    ? 'New monthly mock exam has been announced for your course.'
+                    : `Upcoming exam on ${new Date(visibleMockExamNotices[0].examDate).toLocaleDateString()}.`}
               </h3>
-              <p>{mockExamNotices[0].title}</p>
+              <p>{visibleMockExamNotices[0].title}</p>
             </div>
             <div className="quiz-thankyou-actions">
               <button type="button" className="primary-btn" onClick={() => {
@@ -2396,7 +2400,15 @@ export default function StudentDashboard() {
               }}>
                 Go To Exam Section
               </button>
-              <button type="button" className="secondary-btn" onClick={() => setMockExamNotices((current) => current.slice(1))}>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => {
+                  const currentNotice = visibleMockExamNotices[0];
+                  if (!currentNotice) return;
+                  setMockExamNotices((current) => current.filter((item) => String(item?.examId || '') !== String(currentNotice.examId || '')));
+                }}
+              >
                 Dismiss
               </button>
             </div>

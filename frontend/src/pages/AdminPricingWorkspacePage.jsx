@@ -590,26 +590,15 @@ export default function AdminPricingWorkspacePage() {
                       className="primary-btn module-price-toggle-btn pricing-set-batch-btn"
                       disabled={!isAdminAuthenticated}
                       title={!isAdminAuthenticated ? 'Admin not authenticated — please login' : ''}
-                      onClick={async () => {
+                      onClick={() => {
                         if (!isAdminAuthenticated) {
                           setBanner({ type: 'error', text: 'Admin authentication required. Please login and retry.' });
                           return;
                         }
-                        // Ensure we reload and reliably toggle the batch editor
-                        if (expandedBatchCourse === courseName) {
-                          setExpandedBatchCourse(null);
-                          return;
-                        }
-                        setExpandedBatchCourse(null);
-                        try {
-                          await loadBatchPricing(courseName);
-                        } catch (err) {
-                          // error handled in loader
-                        }
-                        setExpandedBatchCourse(courseName);
+                        navigate(`/admin/batch-pricing?course=${encodeURIComponent(courseName)}`);
                       }}
                     >
-                      {expandedBatchCourse === courseName ? 'Close Batch Prices' : '🎯 Set Batch Prices'}
+                      Open Batch Editor
                     </button>
                   </div>
 

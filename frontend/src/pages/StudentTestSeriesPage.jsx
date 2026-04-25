@@ -172,6 +172,7 @@ function TsCartButton({ session, openOnLoad = false }) {
       });
       if (orderRes?.alreadyOwned || orderRes?.free) {
         remove(item);
+        window.dispatchEvent(new Event('ts-access-refresh'));
         return;
       }
       const ready = await loadRazorpayCheckoutScript();
@@ -219,6 +220,16 @@ function TsCartButton({ session, openOnLoad = false }) {
       alert(e.message || 'Payment failed.');
     } finally {
       setCheckoutKey('');
+    }
+  }
+
+  async function checkoutAll() {
+    if (checkoutKey || !items.length) return;
+    // Razorpay checkout supports one order at a time.
+    // Process cart items sequentially to avoid conflicting modals/orders.
+    for (const item of items) {
+      // eslint-disable-next-line no-await-in-loop
+      await checkout(item);
     }
   }
 
@@ -276,6 +287,14 @@ function TsCartButton({ session, openOnLoad = false }) {
                         </span>
                       </div>
                       <div className="student-cart-item-actions">
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          disabled={Boolean(checkoutKey)}
+                          onClick={() => checkout(item)}
+                        >
+                          {checkoutKey === getTsCartItemKey(item) ? 'Processing…' : 'Pay now'}
+                        </button>
                         <button type="button" className="secondary-btn" onClick={() => remove(item)}>
                           Remove
                         </button>
@@ -296,9 +315,9 @@ function TsCartButton({ session, openOnLoad = false }) {
                   type="button"
                   className="primary-btn"
                   disabled={Boolean(checkoutKey)}
-                  onClick={() => items.forEach((item) => checkout(item))}
+                  onClick={checkoutAll}
                 >
-                  {checkoutKey ? 'Processing…' : `Pay Now (${items.length})`}
+                  {checkoutKey ? 'Processing…' : items.length > 1 ? `Pay All (${items.length})` : 'Pay Now'}
                 </button>
               )}
             </footer>
