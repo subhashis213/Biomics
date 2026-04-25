@@ -4,18 +4,13 @@ import { getApiBase, requestJson } from '../api';
 import { emptyRegisterForm } from '../constants';
 import { getSession } from '../session';
 import { useSessionStore } from '../stores/sessionStore';
-import { useThemeStore } from '../stores/themeStore';
-import promoBanner from '../assets/biomics-hero-banner.jpeg';
 
 export default function AuthPage() {
-  const INTRO_DURATION_MS = 2300;
   const REGISTER_FLIP_BACK_MS = 3000;
+  const GOOGLE_CLIENT_ID = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
   const navigate = useNavigate();
   const existingSession = getSession();
   const { login } = useSessionStore();
-  const { theme, toggleTheme } = useThemeStore();
-  const isLightTheme = theme === 'light';
-  const [loginRole, setLoginRole] = useState('user');
   const [loginMethod, setLoginMethod] = useState('password');
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [otpForm, setOtpForm] = useState({ email: '', otp: '' });
@@ -39,12 +34,34 @@ export default function AuthPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [toast, setToast] = useState(null);
-  const [introVisible, setIntroVisible] = useState(true);
+  const [isAdminUsername, setIsAdminUsername] = useState(false);
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+  const [googleLoadError, setGoogleLoadError] = useState('');
+  const [isGoogleSdkReady, setIsGoogleSdkReady] = useState(false);
+  const [googleSlideProgress, setGoogleSlideProgress] = useState(0);
+  const [isGoogleSliding, setIsGoogleSliding] = useState(false);
+  const [googleSlideSuccess, setGoogleSlideSuccess] = useState(false);
+  const [googleProfileDraft, setGoogleProfileDraft] = useState({
+    open: false,
+    completionToken: '',
+    email: '',
+    name: '',
+    picture: '',
+    phone: '',
+    birthDate: '',
+    missingFields: []
+  });
+  const [isSubmittingGoogleProfile, setIsSubmittingGoogleProfile] = useState(false);
   // serverReady: false while health ping is in-flight (Render cold start)
   const isLocalhost = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
   const [serverReady, setServerReady] = useState(isLocalhost);
   const registerFlipTimerRef = useRef(null);
   const forgotSuccessTimerRef = useRef(null);
+  const googleButtonRef = useRef(null);
+  const googleSlideTrackRef = useRef(null);
+  const googleSlideRafRef = useRef(0);
+  const googleSlideClientXRef = useRef(null);
+  const googleSuccessTimerRef = useRef(0);
 
   useEffect(() => {
     if (!existingSession) return;
@@ -66,13 +83,6 @@ export default function AuthPage() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setIntroVisible(false);
-    }, INTRO_DURATION_MS);
-    return () => window.clearTimeout(timer);
-  }, [INTRO_DURATION_MS]);
-
-  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => {
       setToast(null);
@@ -87,6 +97,9 @@ export default function AuthPage() {
       }
       if (forgotSuccessTimerRef.current) {
         window.clearTimeout(forgotSuccessTimerRef.current);
+      }
+      if (googleSuccessTimerRef.current) {
+        window.clearTimeout(googleSuccessTimerRef.current);
       }
     };
   }, []);
@@ -111,12 +124,6 @@ export default function AuthPage() {
   }, [forgotOpen, forgotSuccessModal]);
 
   useEffect(() => {
-    if (loginRole === 'admin') {
-      setLoginMethod('password');
-    }
-  }, [loginRole]);
-
-  useEffect(() => {
     if (otpCooldown <= 0) return undefined;
     const timer = window.setInterval(() => {
       setOtpCooldown((seconds) => (seconds > 0 ? seconds - 1 : 0));
@@ -124,12 +131,49 @@ export default function AuthPage() {
     return () => window.clearInterval(timer);
   }, [otpCooldown]);
 
-  const isOtpMode = loginRole === 'user' && loginMethod === 'otp';
+  useEffect(() => {
+    const username = String(loginForm.username || '').trim();
+    if (username.length < 3) {
+      setIsAdminUsername(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timerId = window.setTimeout(async () => {
+      try {
+        const response = await requestJson('/auth/check-admin-username', {
+          method: 'POST',
+          body: JSON.stringify({ username })
+        });
+        if (!cancelled) {
+          const isAdmin = Boolean(response?.exists);
+          setIsAdminUsername(isAdmin);
+          if (isAdmin) {
+            setLoginMethod('password');
+            setOtpSent(false);
+            setOtpCooldown(0);
+          }
+        }
+      } catch {
+        if (!cancelled) setIsAdminUsername(false);
+      }
+    }, 280);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [loginForm.username]);
+
+  const isOtpMode = loginMethod === 'otp';
   const isValidEmailForOtp = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(otpForm.email.trim());
   const canLogin = isOtpMode
     ? isValidEmailForOtp && /^\d{6}$/.test(otpForm.otp.trim())
     : loginForm.username.trim().length >= 3 && loginForm.password.length >= 6;
   const canSendOtp = isValidEmailForOtp && otpCooldown === 0;
+  const canSubmitGoogleProfile =
+    /^\d{10}$/.test(String(googleProfileDraft.phone || '').trim()) &&
+    Boolean(String(googleProfileDraft.birthDate || '').trim());
   const regEmailHint =
     registerForm.email.length > 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(registerForm.email.trim())
       ? 'Enter a valid email address.'
@@ -220,21 +264,37 @@ export default function AuthPage() {
     setIsSubmittingLogin(true);
     setLoginMessage(null);
     try {
-      const endpoint = loginRole === 'admin'
-        ? '/auth/admin-login'
-        : (isOtpMode ? '/auth/verify-email-otp' : '/auth/login');
-      const body = loginRole === 'admin' || !isOtpMode
-        ? loginForm
-        : { email: otpForm.email.trim(), otp: otpForm.otp.trim() };
-      const response = await requestJson(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      const identity = loginRole === 'admin' ? response.admin : response.user;
+      let response;
+      let role = 'user';
+      if (isOtpMode) {
+        response = await requestJson('/auth/verify-email-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email: otpForm.email.trim(), otp: otpForm.otp.trim() }),
+        });
+      } else {
+        try {
+          response = await requestJson('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify(loginForm),
+          });
+        } catch (studentError) {
+          // Seamless admin detection: if student login fails, try admin endpoint using same credentials.
+          try {
+            response = await requestJson('/auth/admin-login', {
+              method: 'POST',
+              body: JSON.stringify(loginForm),
+            });
+            role = 'admin';
+          } catch {
+            throw studentError;
+          }
+        }
+      }
+      const identity = role === 'admin' ? response?.admin : response?.user;
       const session = {
-        role: loginRole === 'admin' ? 'admin' : 'user',
+        role,
         username: identity?.username || (isOtpMode ? otpForm.email.trim() : loginForm.username.trim()),
-        token: response.token,
+        token: response?.token,
       };
       login(session);
       navigate(session.role === 'admin' ? '/admin' : '/student', { replace: true });
@@ -242,6 +302,168 @@ export default function AuthPage() {
       setLoginMessage({ type: 'error', text: error.message });
     } finally {
       setIsSubmittingLogin(false);
+    }
+  }
+
+  async function handleGoogleCredential(credentialToken) {
+    if (!credentialToken) return;
+    setIsGoogleSigningIn(true);
+    setLoginMessage(null);
+    try {
+      const response = await requestJson('/auth/google-login', {
+        method: 'POST',
+        body: JSON.stringify({ idToken: credentialToken })
+      });
+      if (response?.requiresProfileCompletion) {
+        setGoogleProfileDraft({
+          open: true,
+          completionToken: String(response?.completionToken || '').trim(),
+          email: String(response?.profile?.email || '').trim(),
+          name: String(response?.profile?.name || '').trim(),
+          picture: String(response?.profile?.picture || '').trim(),
+          phone: String(response?.profile?.phone || '').trim(),
+          birthDate: String(response?.profile?.birthDate || '').trim(),
+          missingFields: Array.isArray(response?.missingFields) ? response.missingFields : []
+        });
+        setLoginMessage({ type: 'info', text: 'Please complete your profile to continue.' });
+        return;
+      }
+
+      const identity = response?.user || {};
+      const session = {
+        role: 'user',
+        username: identity?.username || String(response?.user?.email || 'google-user').trim(),
+        token: response?.token
+      };
+      login(session);
+      navigate('/student', { replace: true });
+    } catch (error) {
+      const text = String(error?.message || '').toUpperCase();
+      if (text.includes('NETWORK_ERROR')) {
+        const hint = error?.lastUrl ? ` (${error.lastUrl})` : '';
+        setLoginMessage({ type: 'error', text: `Network error while contacting server${hint}. Restart backend and try again.` });
+      } else {
+        setLoginMessage({ type: 'error', text: error.message || 'Google sign-in failed' });
+      }
+    } finally {
+      setIsGoogleSigningIn(false);
+    }
+  }
+
+  function updateSlideProgressFromClientX(clientX) {
+    const track = googleSlideTrackRef.current;
+    if (!track) return 0;
+    const rect = track.getBoundingClientRect();
+    const thumbSize = 44;
+    const usableWidth = Math.max(1, rect.width - thumbSize);
+    const next = Math.min(1, Math.max(0, (clientX - rect.left - thumbSize / 2) / usableWidth));
+    setGoogleSlideProgress(next);
+    return next;
+  }
+
+  function queueSlideProgressFromClientX(clientX) {
+    googleSlideClientXRef.current = clientX;
+    if (googleSlideRafRef.current) return;
+    googleSlideRafRef.current = window.requestAnimationFrame(() => {
+      googleSlideRafRef.current = 0;
+      if (googleSlideClientXRef.current == null) return;
+      updateSlideProgressFromClientX(googleSlideClientXRef.current);
+    });
+  }
+
+  function triggerGoogleFromSlide() {
+    const host = googleButtonRef.current;
+    if (!host) return false;
+    const candidate = host.querySelector('[role="button"], button, div[tabindex]');
+    if (!candidate || typeof candidate.click !== 'function') return false;
+    candidate.click();
+    return true;
+  }
+
+  function handleGoogleSliderPointerDown(event) {
+    if (isGoogleSigningIn) return;
+    setIsGoogleSliding(true);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // pointer capture may fail on some browsers/devices
+    }
+    queueSlideProgressFromClientX(event.clientX);
+  }
+
+  function handleGoogleSliderPointerMove(event) {
+    if (!isGoogleSliding) return;
+    queueSlideProgressFromClientX(event.clientX);
+  }
+
+  function handleGoogleSliderPointerUp(event) {
+    if (!isGoogleSliding) return;
+    try {
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // safe no-op
+    }
+    const progress = updateSlideProgressFromClientX(event.clientX);
+    setIsGoogleSliding(false);
+    if (progress >= 0.92) {
+      setGoogleSlideProgress(1);
+      if (!isGoogleSdkReady) {
+        setGoogleLoadError('Preparing Google sign-in. Please try sliding again in a moment.');
+      } else {
+        const opened = triggerGoogleFromSlide();
+        if (opened) {
+          setGoogleLoadError('');
+          setGoogleSlideSuccess(true);
+          if (googleSuccessTimerRef.current) {
+            window.clearTimeout(googleSuccessTimerRef.current);
+          }
+          googleSuccessTimerRef.current = window.setTimeout(() => {
+            setGoogleSlideSuccess(false);
+            googleSuccessTimerRef.current = 0;
+          }, 1200);
+        } else {
+          setGoogleLoadError('Google sign-in not ready yet. Please slide once more.');
+        }
+      }
+    } else {
+      setGoogleLoadError('');
+      setGoogleSlideSuccess(false);
+    }
+    window.setTimeout(() => setGoogleSlideProgress(0), 180);
+  }
+
+  async function handleGoogleProfileSubmit(event) {
+    event?.preventDefault?.();
+    if (!canSubmitGoogleProfile || isSubmittingGoogleProfile) return;
+    setIsSubmittingGoogleProfile(true);
+    setLoginMessage(null);
+    try {
+      const response = await requestJson('/auth/google-complete-profile', {
+        method: 'POST',
+        body: JSON.stringify({
+          completionToken: googleProfileDraft.completionToken,
+          phone: String(googleProfileDraft.phone || '').trim(),
+          birthDate: googleProfileDraft.birthDate
+        })
+      });
+      const identity = response?.user || {};
+      login({
+        role: 'user',
+        username: identity?.username || 'student',
+        token: response?.token
+      });
+      navigate('/student', { replace: true });
+      window.setTimeout(() => {
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/student')) {
+          window.location.assign('/student');
+        }
+      }, 120);
+    } catch (error) {
+      setLoginMessage({ type: 'error', text: error.message || 'Failed to complete profile' });
+    } finally {
+      setIsSubmittingGoogleProfile(false);
     }
   }
 
@@ -364,22 +586,102 @@ export default function AuthPage() {
     }
   }
 
+  useEffect(() => {
+    if (GOOGLE_CLIENT_ID) return;
+    setLoginMessage((current) => current || { type: 'info', text: 'Google sign-in is not configured yet. Add VITE_GOOGLE_CLIENT_ID to enable it.' });
+  }, [GOOGLE_CLIENT_ID]);
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || registerOpen || isAdminUsername) return undefined;
+    if (typeof window === 'undefined') return undefined;
+    setIsGoogleSdkReady(false);
+
+    let cancelled = false;
+    const scriptId = 'google-identity-services';
+    let initRetryTimer = 0;
+    let retryCount = 0;
+
+    const initializeGoogleSdk = () => {
+      if (cancelled) return;
+      if (!window.google?.accounts?.id || !googleButtonRef.current) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        ux_mode: 'popup',
+        auto_select: false,
+        callback: (response) => {
+          const token = String(response?.credential || '').trim();
+          if (token) handleGoogleCredential(token);
+        }
+      });
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'filled_black',
+        size: 'large',
+        shape: 'pill',
+        text: 'signin_with',
+        width: 340
+      });
+      setIsGoogleSdkReady(true);
+      setGoogleLoadError('');
+    };
+
+    const tryInitializeWithRetry = () => {
+      if (cancelled) return;
+      if (window.google?.accounts?.id) {
+        initializeGoogleSdk();
+        return;
+      }
+      if (retryCount >= 30) {
+        setGoogleLoadError('Google sign-in is taking too long to load. Refresh and try again.');
+        return;
+      }
+      retryCount += 1;
+      initRetryTimer = window.setTimeout(tryInitializeWithRetry, 150);
+    };
+
+    const existingScript = document.getElementById(scriptId);
+    if (existingScript) {
+      if (window.google?.accounts?.id) {
+        initializeGoogleSdk();
+      } else {
+        existingScript.addEventListener('load', tryInitializeWithRetry);
+        tryInitializeWithRetry();
+      }
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener('load', tryInitializeWithRetry);
+        if (initRetryTimer) window.clearTimeout(initRetryTimer);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = tryInitializeWithRetry;
+    script.onerror = () => {
+      if (!cancelled) {
+        setGoogleLoadError('Unable to load Google sign-in right now.');
+      }
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+      if (initRetryTimer) window.clearTimeout(initRetryTimer);
+    };
+  }, [GOOGLE_CLIENT_ID, registerOpen, isAdminUsername]);
+
+  useEffect(() => () => {
+    if (googleSlideRafRef.current) {
+      window.cancelAnimationFrame(googleSlideRafRef.current);
+      googleSlideRafRef.current = 0;
+    }
+  }, []);
+
   return (
     <div className="auth-page-shell">
-      {introVisible ? (
-        <section className="auth-intro-screen" aria-label="Biomics Hub intro animation" role="status" aria-live="polite">
-          <p className="auth-intro-kicker">Welcome to</p>
-          <h1 className="auth-intro-title">
-            <span className="auth-intro-title-word">Biomics</span>
-            <span className="auth-intro-title-word">Hub</span>
-          </h1>
-          <p className="auth-intro-subtitle">Smart biology learning platform</p>
-          <div className="auth-intro-loader" aria-hidden="true">
-            <span className="auth-intro-loader-bar" />
-          </div>
-        </section>
-      ) : null}
-
       {toast ? (
         <aside className={`auth-toast ${toast.type}`} role="status" aria-live="polite">
           <span>{toast.text}</span>
@@ -389,77 +691,24 @@ export default function AuthPage() {
         </aside>
       ) : null}
 
-      {/* ── Hero panel ─────────────────────────────────── */}
-      <section className="hero-panel">
-        <h1>Biomics Hub</h1>
-        <p className="subtitle large auth-hero-tagline">
-          Enroll now for life science entrance preparation with complete chapter-wise learning.
-        </p>
-        <div className="auth-hero-media-card">
-          <img
-            src={promoBanner}
-            alt="Biomics Hub life science entrance preparation"
-            className="auth-hero-image"
-            loading="eager"
-          />
-          <p className="auth-hero-media-badge">Trusted by life science aspirants across India</p>
-        </div>
-      </section>
-
       {/* ── Auth panel ─────────────────────────────────── */}
       <section className="auth-card-panel">
-        <div className="auth-toolbar">
-          <button
-            type="button"
-            className="theme-switch"
-            onClick={toggleTheme}
-            aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
-            aria-pressed={isLightTheme}
-            title={isLightTheme ? 'Light theme active' : 'Dark theme active'}
-          >
-            <span className="theme-switch-track" aria-hidden="true">
-              <span className="theme-switch-thumb" />
-            </span>
-            <span>{isLightTheme ? 'Light' : 'Dark'}</span>
-          </button>
-        </div>
-
         <div className={`auth-flip-wrap ${registerOpen ? 'is-register' : ''}`}>
           <section className="auth-flip-face auth-flip-face-front" aria-hidden={registerOpen}>
             <form className="card auth-face-card" onSubmit={handleLogin}>
               <h2>Sign in</h2>
-
-              <label>
-                Role
-                <select
-                  value={loginRole}
-                  onChange={(e) => {
-                    const role = e.target.value;
-                    setLoginRole(role);
+              <div className="auth-login-methods" role="group" aria-label="Sign in method">
+                <button
+                  type="button"
+                  className={`auth-login-method-btn ${loginMethod === 'password' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setLoginMethod('password');
                     setLoginMessage(null);
-                    if (role === 'admin') {
-                      setOtpSent(false);
-                      setOtpCooldown(0);
-                    }
                   }}
                 >
-                  <option value="user">Student</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </label>
-
-              {loginRole === 'user' ? (
-                <div className="auth-login-methods" role="group" aria-label="Student sign in method">
-                  <button
-                    type="button"
-                    className={`auth-login-method-btn ${loginMethod === 'password' ? 'is-active' : ''}`}
-                    onClick={() => {
-                      setLoginMethod('password');
-                      setLoginMessage(null);
-                    }}
-                  >
-                    Username + Password
-                  </button>
+                  Username + Password
+                </button>
+                {!isAdminUsername ? (
                   <button
                     type="button"
                     className={`auth-login-method-btn ${loginMethod === 'otp' ? 'is-active' : ''}`}
@@ -470,6 +719,58 @@ export default function AuthPage() {
                   >
                     Gmail + OTP
                   </button>
+                ) : null}
+              </div>
+              {isAdminUsername ? <small className="field-hint">Admin account detected. Sign in using username and password.</small> : null}
+              {!isAdminUsername ? (
+                <div className="auth-social-block">
+                  <p className="auth-social-label">or continue with</p>
+                  <div className="auth-social-provider-chip" aria-hidden="true">
+                    <span className="auth-social-provider-icon">
+                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.8 0-.7-.1-1.2-.2-1.9H12z" />
+                        <path fill="#34A853" d="M3.2 7.3l3.2 2.3C7.2 8 9.4 6.5 12 6.5c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 8 2 4.6 4.2 3.2 7.3z" />
+                        <path fill="#FBBC05" d="M12 22c2.6 0 4.8-.9 6.4-2.4l-3-2.5c-.8.5-1.9.9-3.4.9-2.5 0-4.7-1.7-5.5-4l-3.3 2.5C4.6 19.8 8 22 12 22z" />
+                        <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.2-.2-1.9H12v3.9h5.5c-.3 1.4-1.2 2.5-2.2 3.3l3 2.5c1.8-1.7 3.3-4.3 3.3-7.8z" />
+                      </svg>
+                    </span>
+                    <span>Google Sign-In</span>
+                  </div>
+                  <div className={`auth-google-slide-wrap${isGoogleSigningIn ? ' is-loading' : ''}${isGoogleSliding ? ' is-dragging' : ''}${googleSlideSuccess ? ' is-success' : ''}`}>
+                    <div className="auth-google-slide-label">Slide to continue with Google</div>
+                    <div
+                      ref={googleSlideTrackRef}
+                      className="auth-google-slide-track"
+                      onPointerDown={handleGoogleSliderPointerDown}
+                      onPointerMove={handleGoogleSliderPointerMove}
+                      onPointerUp={handleGoogleSliderPointerUp}
+                      onPointerCancel={() => {
+                        setIsGoogleSliding(false);
+                        setGoogleSlideProgress(0);
+                      }}
+                    >
+                      <div className="auth-google-slide-fill" style={{ '--slide-progress': googleSlideProgress }} />
+                      <div
+                        className="auth-google-slide-thumb"
+                        style={{ '--slide-progress': googleSlideProgress }}
+                        role="button"
+                        aria-label="Slide to sign in with Google"
+                      >
+                        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                          <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.8 0-.7-.1-1.2-.2-1.9H12z" />
+                          <path fill="#34A853" d="M3.2 7.3l3.2 2.3C7.2 8 9.4 6.5 12 6.5c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 8 2 4.6 4.2 3.2 7.3z" />
+                          <path fill="#FBBC05" d="M12 22c2.6 0 4.8-.9 6.4-2.4l-3-2.5c-.8.5-1.9.9-3.4.9-2.5 0-4.7-1.7-5.5-4l-3.3 2.5C4.6 19.8 8 22 12 22z" />
+                          <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.2-.2-1.9H12v3.9h5.5c-.3 1.4-1.2 2.5-2.2 3.3l3 2.5c1.8-1.7 3.3-4.3 3.3-7.8z" />
+                        </svg>
+                      </div>
+                      <div className="auth-google-slide-text">Slide to Sign in with Google</div>
+                    </div>
+                  </div>
+                  <div className="auth-google-hidden-host" aria-hidden="true">
+                    <div ref={googleButtonRef} className="auth-google-button-host" />
+                  </div>
+                  {googleLoadError ? <small className="field-hint">⚠ {googleLoadError}</small> : null}
+                  {isGoogleSigningIn ? <small className="field-hint">Signing in with Google…</small> : null}
                 </div>
               ) : null}
 
@@ -578,7 +879,7 @@ export default function AuthPage() {
                 >
                   {isSubmittingLogin ? 'Signing in…' : (isOtpMode ? 'Verify OTP & Login' : 'Login')}
                 </button>
-                {!isOtpMode && loginRole === 'user' ? (
+                {!isOtpMode ? (
                   <button
                     type="button"
                     className="secondary-btn"
@@ -594,6 +895,41 @@ export default function AuthPage() {
                   <p className={`inline-message ${loginMessage.type}`}>{loginMessage.text}</p>
                 )}
               </div>
+
+              {googleProfileDraft.open ? (
+                <section className="auth-google-profile-card" aria-label="Complete profile">
+                  <h3>Complete your profile</h3>
+                  <p className="subtitle">Google did not provide all required details. Please add them once.</p>
+                  <div className="auth-google-profile-form">
+                    <label>
+                      Email
+                      <input type="email" value={googleProfileDraft.email} disabled />
+                    </label>
+                    <label>
+                      Mobile Number
+                      <input
+                        type="text"
+                        placeholder="10-digit mobile number"
+                        value={googleProfileDraft.phone}
+                        onChange={(e) => setGoogleProfileDraft((current) => ({ ...current, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                      />
+                    </label>
+                    <label>
+                      Date of Birth
+                      <input
+                        type="date"
+                        value={googleProfileDraft.birthDate}
+                        onChange={(e) => setGoogleProfileDraft((current) => ({ ...current, birthDate: e.target.value }))}
+                      />
+                    </label>
+                    <div className="form-actions">
+                      <button type="button" className="primary-btn" onClick={handleGoogleProfileSubmit} disabled={!canSubmitGoogleProfile || isSubmittingGoogleProfile}>
+                        {isSubmittingGoogleProfile ? 'Saving…' : 'Save & Continue'}
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
 
             </form>
 

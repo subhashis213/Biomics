@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const DigestFetch = require('digest-fetch');
+const { OAuth2Client } = require('google-auth-library');
 const { v2: cloudinary } = require('cloudinary');
 const { z } = require('zod');
 const mongoose = require('mongoose');
@@ -35,7 +36,10 @@ const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
 const RECOVERY_RETENTION_DAYS = 15;
 const RECOVERY_RETENTION_MS = RECOVERY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const ACTIVITY_SESSION_MAX_GAP_MS = Math.max(15, Number(process.env.ACTIVITY_SESSION_MAX_GAP_SECONDS || 90)) * 1000;
+const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+const GOOGLE_PROFILE_COMPLETION_EXPIRES_IN = '15m';
 const uploadsDir = path.join(__dirname, '../uploads');
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
 const cloudinaryApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
@@ -110,6 +114,66 @@ function buildUserTokenPayload(user) {
     username: String(user?.username || '').trim(),
     role: 'user'
   };
+}
+
+function ensureGoogleConfig() {
+  if (!GOOGLE_CLIENT_ID || !googleClient) {
+    const err = new Error('Google sign-in is not configured.');
+    err.statusCode = 503;
+    throw err;
+  }
+}
+
+async function verifyGoogleIdToken(idToken) {
+  ensureGoogleConfig();
+  const ticket = await googleClient.verifyIdToken({
+    idToken: String(idToken || '').trim(),
+    audience: GOOGLE_CLIENT_ID
+  });
+  return ticket?.getPayload() || null;
+}
+
+function normalizeSimpleUsername(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '')
+    .slice(0, 40);
+}
+
+async function ensureUniqueUsername(baseValue) {
+  const base = normalizeSimpleUsername(baseValue) || `user${Date.now().toString(36)}`;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = attempt === 0 ? base : `${base}${String(attempt + 1)}`;
+    const [existingUser, existingAdmin] = await Promise.all([
+      User.findOne({ username: new RegExp(`^${escapeRegex(candidate)}$`, 'i') }, { _id: 1 }).lean(),
+      Admin.findOne({ username: new RegExp(`^${escapeRegex(candidate)}$`, 'i') }, { _id: 1 }).lean()
+    ]);
+    if (!existingUser && !existingAdmin) return candidate;
+  }
+  return `user${Date.now().toString(36)}`;
+}
+
+function createRandomPassword() {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
+function signGoogleCompletionToken(payload) {
+  return jwt.sign(
+    { ...payload, role: 'user', purpose: 'google_profile_completion' },
+    JWT_SECRET,
+    { expiresIn: GOOGLE_PROFILE_COMPLETION_EXPIRES_IN }
+  );
+}
+
+function verifyGoogleCompletionToken(token) {
+  const payload = jwt.verify(String(token || '').trim(), JWT_SECRET);
+  if (String(payload?.purpose || '') !== 'google_profile_completion') {
+    const err = new Error('Invalid completion token.');
+    err.statusCode = 400;
+    throw err;
+  }
+  return payload;
 }
 
 function buildAuthenticatedUserQuery(payload) {
@@ -576,6 +640,48 @@ async function uploadAvatarToCloudinary(localPath) {
   };
 }
 
+function sanitizeCloudinaryIdPart(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+async function syncGoogleAvatarToCloudinary(user, picture, googleSub) {
+  const normalizedPicture = String(picture || '').trim();
+  if (!hasCloudinaryConfig || !user || !normalizedPicture) return false;
+
+  const stableId = sanitizeCloudinaryIdPart(googleSub) || sanitizeCloudinaryIdPart(user?._id) || `google-${Date.now()}`;
+  const previousPublicId = String(user?.avatar?.publicId || '').trim();
+
+  const uploadResult = await cloudinary.uploader.upload(normalizedPicture, {
+    folder: 'biomicshub/avatars/google',
+    public_id: stableId,
+    resource_type: 'image',
+    overwrite: true,
+    invalidate: true
+  });
+
+  const nextPublicId = String(uploadResult?.public_id || '').trim();
+  const nextUrl = String(uploadResult?.secure_url || '').trim();
+  if (!nextPublicId || !nextUrl) return false;
+
+  user.avatar = {
+    ...(user.avatar || {}),
+    url: nextUrl,
+    publicId: nextPublicId,
+    filename: '',
+    originalName: 'google-profile.jpg'
+  };
+
+  if (previousPublicId && previousPublicId !== nextPublicId) {
+    await deleteAvatarFromCloudinary(previousPublicId);
+  }
+  return true;
+}
+
 async function deleteAvatarFromCloudinary(publicId) {
   const normalizedPublicId = String(publicId || '').trim();
   if (!hasCloudinaryConfig || !normalizedPublicId) return;
@@ -675,6 +781,16 @@ const verifyEmailOtpSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits')
 });
 
+const googleLoginSchema = z.object({
+  idToken: z.string().min(10, 'Google ID token is required')
+});
+
+const googleCompleteSchema = z.object({
+  completionToken: z.string().min(20, 'Completion token is required'),
+  phone: z.string().regex(/^\d{10}$/, 'Phone number must be exactly 10 digits'),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Birth date is required')
+});
+
 async function sendOtpEmailViaResend(email, otp) {
   const apiKey = String(process.env.RESEND_API_KEY || '').trim();
   if (!apiKey) {
@@ -755,6 +871,21 @@ router.post('/check-username', async (req, res) => {
     const normalizedUsername = String(username).trim();
     const user = await User.findOne({ username: new RegExp(`^${escapeRegex(normalizedUsername)}$`, 'i') }).lean();
     res.json({ exists: !!user });
+  } catch (err) {
+    res.status(500).json({ error: 'Check failed' });
+  }
+});
+
+// Check if username belongs to an admin account
+router.post('/check-admin-username', async (req, res) => {
+  const { username } = req.body;
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  try {
+    const normalizedUsername = String(username).trim();
+    const admin = await Admin.findOne({ username: new RegExp(`^${escapeRegex(normalizedUsername)}$`, 'i') }).lean();
+    res.json({ exists: !!admin });
   } catch (err) {
     res.status(500).json({ error: 'Check failed' });
   }
@@ -1993,6 +2124,226 @@ router.post('/verify-email-otp', validate(verifyEmailOtpSchema), async (req, res
     });
   } catch (err) {
     return res.status(500).json({ error: 'OTP verification failed' });
+  }
+});
+
+// Google Login (step 1)
+router.post('/google-login', validate(googleLoginSchema), async (req, res) => {
+  try {
+    const googlePayload = await verifyGoogleIdToken(req.body.idToken);
+    const googleSub = String(googlePayload?.sub || '').trim();
+    const email = String(googlePayload?.email || '').trim().toLowerCase();
+    const emailVerified = Boolean(googlePayload?.email_verified);
+    const name = String(googlePayload?.name || '').trim();
+    const picture = String(googlePayload?.picture || '').trim();
+
+    if (!googleSub) {
+      return res.status(400).json({ error: 'Invalid Google account token.' });
+    }
+
+    let user = await User.findOne({ 'googleAuth.sub': googleSub });
+    if (!user && email) {
+      user = await User.findOne({ email: new RegExp(`^${escapeRegex(email)}$`, 'i') });
+    }
+
+    if (user) {
+      const previousGooglePicture = String(user.googleAuth?.picture || '').trim();
+      user.googleAuth = {
+        sub: googleSub,
+        email: email || String(user.googleAuth?.email || '').trim(),
+        picture: picture || String(user.googleAuth?.picture || '').trim(),
+        linkedAt: user.googleAuth?.linkedAt || new Date()
+      };
+      if (!user.email && email) user.email = email;
+      if (!user.avatar?.url && picture) {
+        user.avatar = { ...(user.avatar || {}), url: picture };
+      }
+      if (picture && (picture !== previousGooglePicture || !String(user.avatar?.publicId || '').trim())) {
+        try {
+          await syncGoogleAvatarToCloudinary(user, picture, googleSub);
+        } catch (_) {
+          // Non-fatal: keep Google URL as fallback avatar.
+        }
+      }
+      await user.save();
+
+      const hasPhone = /^\d{10}$/.test(String(user.phone || '').trim());
+      const hasBirthDate = Boolean(normalizeBirthDate(user.security?.birthDate));
+
+      if (!hasPhone || !hasBirthDate) {
+        const completionToken = signGoogleCompletionToken({
+          googleSub,
+          email,
+          name,
+          picture,
+          userId: String(user._id || '')
+        });
+        return res.json({
+          requiresProfileCompletion: true,
+          completionToken,
+          profile: {
+            email,
+            name,
+            phone: String(user.phone || '').trim(),
+            birthDate: normalizeBirthDate(user.security?.birthDate)
+          },
+          missingFields: [
+            !hasPhone ? 'phone' : null,
+            !hasBirthDate ? 'birthDate' : null
+          ].filter(Boolean)
+        });
+      }
+
+      const token = jwt.sign(buildUserTokenPayload(user), JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+      return res.json({
+        message: 'Google login successful',
+        token,
+        user: {
+          username: user.username,
+          phone: user.phone,
+          class: user.class,
+          city: user.city,
+          email: user.email
+        }
+      });
+    }
+
+    const completionToken = signGoogleCompletionToken({
+      googleSub,
+      email,
+      name,
+      picture,
+      userId: ''
+    });
+
+    return res.json({
+      requiresProfileCompletion: true,
+      completionToken,
+      profile: {
+        email,
+        name,
+        phone: '',
+        birthDate: ''
+      },
+      missingFields: ['phone', 'birthDate'],
+      emailVerified
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message || 'Google login failed' });
+  }
+});
+
+// Google Login (step 2) — collect required profile fields
+router.post('/google-complete-profile', validate(googleCompleteSchema), async (req, res) => {
+  try {
+    const payload = verifyGoogleCompletionToken(req.body.completionToken);
+    const googleSub = String(payload?.googleSub || '').trim();
+    const email = String(payload?.email || '').trim().toLowerCase();
+    const name = String(payload?.name || '').trim();
+    const picture = String(payload?.picture || '').trim();
+    const phone = normalizePhone(req.body.phone);
+    const birthDate = normalizeBirthDate(req.body.birthDate);
+
+    if (!googleSub || !phone || !birthDate) {
+      return res.status(400).json({ error: 'Missing required profile details.' });
+    }
+
+    let user = null;
+    const tokenUserId = String(payload?.userId || '').trim();
+    if (mongoose.Types.ObjectId.isValid(tokenUserId)) {
+      user = await User.findById(tokenUserId);
+    }
+    if (!user) {
+      user = await User.findOne({ 'googleAuth.sub': googleSub });
+    }
+    if (!user && email) {
+      user = await User.findOne({ email: new RegExp(`^${escapeRegex(email)}$`, 'i') });
+    }
+
+    const phoneOwner = await User.findOne({ phone: new RegExp(`^${escapeRegex(phone)}$`, 'i') });
+    if (phoneOwner && String(phoneOwner._id) !== String(user?._id || '')) {
+      return res.status(409).json({ error: 'Phone number is already linked to another account.' });
+    }
+
+    if (!user) {
+      const suggestedUsername = await ensureUniqueUsername(
+        email ? email.split('@')[0] : (name || `user${Date.now().toString(36)}`)
+      );
+      user = await User.create({
+        phone,
+        username: suggestedUsername,
+        email,
+        class: 'General',
+        city: 'NA',
+        security: {
+          question: 'What is your birth date?',
+          birthDate: new Date(birthDate)
+        },
+        avatar: {
+          url: picture || '',
+          publicId: '',
+          filename: '',
+          originalName: ''
+        },
+        googleAuth: {
+          sub: googleSub,
+          email,
+          picture,
+          linkedAt: new Date()
+        },
+        password: createRandomPassword()
+      });
+      if (picture) {
+        try {
+          await syncGoogleAvatarToCloudinary(user, picture, googleSub);
+          await user.save();
+        } catch (_) {
+          // Non-fatal: keep Google URL as fallback avatar.
+        }
+      }
+    } else {
+      user.phone = phone;
+      if (!String(user.city || '').trim()) user.city = 'NA';
+      if (!user.class) user.class = 'General';
+      user.security = {
+        ...(user.security || {}),
+        question: 'What is your birth date?',
+        birthDate: new Date(birthDate)
+      };
+      if (!user.email && email) user.email = email;
+      if (!user.avatar?.url && picture) {
+        user.avatar = { ...(user.avatar || {}), url: picture };
+      }
+      if (picture && !String(user.avatar?.publicId || '').trim()) {
+        try {
+          await syncGoogleAvatarToCloudinary(user, picture, googleSub);
+        } catch (_) {
+          // Non-fatal: keep Google URL as fallback avatar.
+        }
+      }
+      user.googleAuth = {
+        sub: googleSub,
+        email: email || String(user.googleAuth?.email || '').trim(),
+        picture: picture || String(user.googleAuth?.picture || '').trim(),
+        linkedAt: user.googleAuth?.linkedAt || new Date()
+      };
+      await user.save();
+    }
+
+    const token = jwt.sign(buildUserTokenPayload(user), JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    return res.json({
+      message: 'Google profile completed successfully',
+      token,
+      user: {
+        username: user.username,
+        phone: user.phone,
+        class: user.class,
+        city: user.city,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message || 'Failed to complete Google profile.' });
   }
 });
 

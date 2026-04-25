@@ -13,6 +13,7 @@ const liveClassSchema = new mongoose.Schema({
   scheduledEndAt: { type: Date, default: null },
   status: { type: String, enum: ['scheduled', 'live', 'ended', 'cancelled'], default: 'live' },
   course: { type: String, trim: true, default: '' },
+  batch: { type: String, trim: true, default: 'General' },
   maxParticipants: { type: Number, default: 101 },
   premiumOnly: { type: Boolean, default: true },
   allowedUsernames: [{ type: String, trim: true }],

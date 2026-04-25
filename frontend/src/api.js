@@ -375,6 +375,34 @@ export function fetchStudentCourseCatalog() {
   return requestJson('/payments/catalog');
 }
 
+export function fetchStudentVoicesPublic() {
+  return requestJson('/landing/student-voices');
+}
+
+export function fetchStudentVoicesAdmin() {
+  return requestJson('/landing/student-voices/admin');
+}
+
+export function createStudentVoiceAdmin(payload) {
+  return requestJson('/landing/student-voices/admin', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateStudentVoiceAdmin(voiceId, payload) {
+  return requestJson(`/landing/student-voices/admin/${encodeURIComponent(voiceId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteStudentVoiceAdmin(voiceId) {
+  return requestJson(`/landing/student-voices/admin/${encodeURIComponent(voiceId)}`, {
+    method: 'DELETE'
+  });
+}
+
 export function fetchCoursesAdmin() {
   return requestJson('/courses/admin');
 }

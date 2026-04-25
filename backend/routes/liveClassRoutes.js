@@ -3,7 +3,17 @@ const LiveClass = require('../models/LiveClass');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLog');
-const { getActiveCourseMembership, hasCourseAccess, normalizeCourseName } = require('../utils/courseAccess');
+const { ALL_MODULES, getActiveCourseMembership, getActiveModuleMembership, hasCourseAccess, normalizeCourseName } = require('../utils/courseAccess');
+const GENERAL_BATCH = 'General';
+
+function normalizeBatchName(value) {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return GENERAL_BATCH;
+  const key = normalized.toLowerCase();
+  if (key === 'general' || key === 'all' || key === 'all batches') return GENERAL_BATCH;
+  return normalized;
+}
+
 
 const router = express.Router();
 
@@ -46,12 +56,22 @@ async function canUserAccessClass(user, liveClass) {
   if (username && allowedUsernames.includes(username)) return true;
 
   const targetCourse = normalizeCourseName(liveClass?.course);
+  const targetBatch = normalizeBatchName(liveClass?.batch);
   if (!targetCourse) return true;
 
-  if (await hasCourseAccess(user, targetCourse)) return true;
+  if (!await hasCourseAccess(user, targetCourse)) {
+    const enrolledCourse = normalizeCourseName(user?.class);
+    if (!(Boolean(enrolledCourse) && enrolledCourse === targetCourse)) {
+      return false;
+    }
+  }
 
-  const enrolledCourse = normalizeCourseName(user?.class);
-  return Boolean(enrolledCourse) && enrolledCourse === targetCourse;
+  if (targetBatch === GENERAL_BATCH) return true;
+
+  if (getActiveModuleMembership(user, targetCourse, targetBatch)) return true;
+  if (getActiveModuleMembership(user, targetCourse, ALL_MODULES)) return true;
+
+  return false;
 }
 
 async function loadCurrentUser(username) {
@@ -68,6 +88,7 @@ function serializeStatusClass(liveClass, options = {}) {
     title: String(liveClass.title || '').trim(),
     description: String(liveClass.description || '').trim(),
     course: String(liveClass.course || '').trim(),
+    batch: normalizeBatchName(liveClass.batch),
     meetUrl: String(liveClass.meetUrl || '').trim(),
     startedAt: liveClass.startedAt || null,
     scheduledAt: liveClass.scheduledAt || null,

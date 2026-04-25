@@ -17,6 +17,12 @@ const userSchema = new mongoose.Schema({
 		filename: { type: String, default: '' },
 		originalName: { type: String, default: '' }
 	},
+	googleAuth: {
+		sub: { type: String, trim: true, default: '' },
+		email: { type: String, trim: true, default: '' },
+		picture: { type: String, trim: true, default: '' },
+		linkedAt: { type: Date, default: null }
+	},
 	password: { type: String, required: true },
 	favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Video' }],
 	completedVideos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Video' }],

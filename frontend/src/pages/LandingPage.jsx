@@ -5,6 +5,8 @@ import logoImg from '../assets/biomics-logo.jpeg';
 import posterTestSeries from '../assets/poster-test-series.jpeg';
 import posterLifeScience from '../assets/poster-life-science.jpeg';
 import posterBatch from '../assets/poster-batch.jpeg';
+import { fetchStudentVoicesPublic } from '../api';
+import { useThemeStore } from '../stores/themeStore';
 
 const LANDING_STATS = [
   { target: 500, label: 'Video Lectures', suffix: '+' },
@@ -34,6 +36,37 @@ const POSTERS = [
   },
 ];
 
+const FALLBACK_STUDENT_VOICES = [
+  { _id: 'voice-1', name: 'Priya Singh', role: 'CSIR NET Aspirant', rating: 5, message: 'The mock tests and analytics made my preparation structured and confident.' },
+  { _id: 'voice-2', name: 'Rohit Patel', role: 'Life Science Student', rating: 5, message: 'Live classes are super interactive, and doubts get solved very quickly.' },
+  { _id: 'voice-3', name: 'Anjali Sharma', role: 'Biotech Learner', rating: 4, message: 'Topic-wise practice and revision flow helped me improve every week.' },
+  { _id: 'voice-4', name: 'Devansh Verma', role: 'NET Candidate', rating: 5, message: 'I love the course structure. It keeps me focused and consistent daily.' },
+  { _id: 'voice-5', name: 'Sneha Nair', role: 'Final Year Student', rating: 5, message: 'Community support and teacher guidance gave me real exam confidence.' }
+];
+
+const FEATURE_CARDS = [
+  {
+    icon: '🎥',
+    title: 'Daily Live Class',
+    desc: 'Attend structured daily live classes with mentor-led concept clarity and real-time doubt solving.',
+    color: '#6366f1',
+  },
+  {
+    icon: '📝',
+    title: 'Practice Live Class',
+    desc: 'Join problem-practice live sessions focused on exam patterns, speed, and accuracy under pressure.',
+    color: '#f97316',
+  },
+  {
+    icon: '🌍',
+    title: 'Learn Anytime Anywhere',
+    desc: 'Access premium recordings, smart revision modules, and performance insights from any device.',
+    color: '#10b981',
+  },
+];
+
+const BIOMICS_MISSION_COPY = `At Biomics Hub Biology, we deliver an exceptional learning experience through comprehensive video tutorials that cover every aspect of Biology. Our content supports core science studies and competitive pathways including IIT JAM, CSIR NET, GAT-B, TIFR, CUET, DBT, ICMR, ICAR, and GATE. Our curriculum starts from strong fundamentals and progressively advances to in-depth concepts for every stage of preparation.`;
+
 function SocialIcon({ kind }) {
   if (kind === 'instagram') {
     return (
@@ -62,6 +95,10 @@ function SocialIcon({ kind }) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useThemeStore();
+  const isLightTheme = theme === 'light';
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
 
   // Redirect already-authenticated users to their dashboard
   const session = getSession();
@@ -76,10 +113,14 @@ export default function LandingPage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isPaused, setIsPaused]       = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [studentVoices, setStudentVoices] = useState(FALLBACK_STUDENT_VOICES);
+  const [hoveredBrandLetter, setHoveredBrandLetter] = useState(null);
+  const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
   const [statNumbers, setStatNumbers] = useState(
     () => LANDING_STATS.map((item) => Math.max(0, item.target - 100))
   );
   const autoRef = useRef(null);
+  const featureTrackRef = useRef(null);
   const SLIDE_INTERVAL = 3200;
 
   const goTo = useCallback((idx) => {
@@ -102,6 +143,88 @@ export default function LandingPage() {
     }, SLIDE_INTERVAL);
     return () => clearInterval(autoRef.current);
   }, [isPaused]);
+
+  useEffect(() => {
+    function handleOutsideClick(event) {
+      if (!profileMenuRef.current) return;
+      if (!profileMenuRef.current.contains(event.target)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('touchstart', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [profileMenuOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchStudentVoicesPublic()
+      .then((response) => {
+        if (cancelled) return;
+        const apiVoices = Array.isArray(response?.voices) ? response.voices : [];
+        setStudentVoices(apiVoices.length ? apiVoices : FALLBACK_STUDENT_VOICES);
+      })
+      .catch(() => {
+        if (!cancelled) setStudentVoices(FALLBACK_STUDENT_VOICES);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const track = featureTrackRef.current;
+    if (!track) return;
+
+    function handleScroll() {
+      const cards = Array.from(track.querySelectorAll('.lp-feature-card'));
+      if (!cards.length) return;
+      const midpoint = track.scrollLeft + (track.clientWidth / 2);
+      let nearestIndex = 0;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      cards.forEach((card, index) => {
+        const center = card.offsetLeft + (card.clientWidth / 2);
+        const distance = Math.abs(center - midpoint);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      });
+      setActiveFeatureIndex(nearestIndex);
+    }
+
+    track.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => track.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollFeatureTo = useCallback((index) => {
+    const track = featureTrackRef.current;
+    if (!track) return;
+    const safeIndex = Math.max(0, Math.min(FEATURE_CARDS.length - 1, index));
+    const cards = Array.from(track.querySelectorAll('.lp-feature-card'));
+    const card = cards[safeIndex];
+    if (!card) return;
+    track.scrollTo({
+      left: card.offsetLeft - Math.max(0, (track.clientWidth - card.clientWidth) / 2),
+      behavior: 'smooth',
+    });
+  }, []);
+
+  const handleFeatureKeyNav = useCallback((event) => {
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      scrollFeatureTo(activeFeatureIndex + 1);
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      scrollFeatureTo(activeFeatureIndex - 1);
+    }
+  }, [activeFeatureIndex, scrollFeatureTo]);
 
   useEffect(() => {
     const minY = 120;
@@ -238,19 +361,57 @@ export default function LandingPage() {
             <a href="#how-it-works" className="lp-nav-link">How it Works</a>
             <a href="#community" className="lp-nav-link">Community</a>
           </div>
-          <div className="lp-nav-cta">
-            <button type="button" className="lp-btn-ghost" onClick={() => navigate('/auth')}>Log In</button>
-            <button type="button" className="lp-btn-primary" onClick={() => navigate('/auth')}>Get Started</button>
+          <div className="lp-nav-cta" ref={profileMenuRef}>
+            <button
+              type="button"
+              className="lp-nav-profile-trigger"
+              onClick={() => setProfileMenuOpen((current) => !current)}
+              aria-haspopup="menu"
+              aria-expanded={profileMenuOpen}
+              aria-label="Open profile menu"
+            >
+              <span className="lp-nav-profile-avatar">G</span>
+              <span className="lp-nav-profile-trigger-text">Profile</span>
+            </button>
+            <div className={`lp-nav-profile-menu${profileMenuOpen ? ' is-open' : ''}`} role="menu">
+              <div className="lp-nav-profile-card">
+                <div className="lp-nav-profile-id">
+                  <span className="lp-nav-profile-avatar">G</span>
+                  <div>
+                    <strong>Guest Profile</strong>
+                    <small>Welcome to Biomics Hub</small>
+                  </div>
+                </div>
+                <div className="lp-nav-profile-actions">
+                  <button type="button" className="lp-btn-ghost lp-nav-auth-btn" onClick={() => navigate('/auth')}>Sign In</button>
+                  <button type="button" className="lp-btn-primary lp-nav-auth-btn" onClick={() => navigate('/auth')}>Sign Up</button>
+                  <button
+                    type="button"
+                    className="lp-nav-theme-switch"
+                    onClick={toggleTheme}
+                    aria-label={`Switch to ${isLightTheme ? 'dark' : 'light'} theme`}
+                    title={isLightTheme ? 'Light mode active' : 'Dark mode active'}
+                  >
+                    <span className="lp-header-sun" aria-hidden="true">
+                      {isLightTheme ? '☀️' : '🌙'}
+                    </span>
+                    <span>{isLightTheme ? 'Light' : 'Dark'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* ── HERO ───────────────────────────────── */}
       <section className="lp-hero">
+        <div className="lp-hero-orb lp-hero-orb-a" aria-hidden="true" />
+        <div className="lp-hero-orb lp-hero-orb-b" aria-hidden="true" />
+        <div className="lp-hero-orb lp-hero-orb-c" aria-hidden="true" />
         <div className="lp-hero-glow-a" aria-hidden="true" />
         <div className="lp-hero-glow-b" aria-hidden="true" />
         <div className="lp-hero-inner">
-          <p className="lp-eyebrow">The Biology Learning Platform</p>
           <h1 className="lp-hero-headline">
             Master Biology.<br />
             <span className="lp-hero-gradient">Ace Your Exams.</span>
@@ -266,6 +427,24 @@ export default function LandingPage() {
             </button>
             <a href="#features" className="lp-btn-ghost lp-btn-lg">See What's Inside</a>
           </div>
+        </div>
+
+        <div className="lp-hero-playful-stack" aria-hidden="true">
+          <article className="lp-floater-card lp-floater-card-live lp-corner-live-card">
+            <p>LIVE NOW</p>
+            <strong>Cell Biology</strong>
+            <span>1,234 watching</span>
+          </article>
+          <article className="lp-floater-card lp-floater-card-quiz lp-corner-quiz-card">
+            <p>TOPIC FOCUS</p>
+            <strong>Genetics</strong>
+            <span>8 chapters • 256 questions</span>
+          </article>
+          <article className="lp-floater-card lp-floater-card-mock lp-corner-mock-card">
+            <p>MOCK GOAL</p>
+            <strong>87% +</strong>
+            <span>Clear exam score line</span>
+          </article>
         </div>
       </section>
 
@@ -287,7 +466,7 @@ export default function LandingPage() {
           <div className="lp-section-header lp-reveal">
             <p className="lp-eyebrow">Our Courses</p>
             <h2 className="lp-section-title">What we offer</h2>
-            <p className="lp-section-sub">Comprehensive biology programmes for every stage of your preparation.</p>
+            <p className="lp-section-sub">{BIOMICS_MISSION_COPY}</p>
           </div>
 
           <div
@@ -390,54 +569,60 @@ export default function LandingPage() {
         <div className="lp-section-inner">
           <div className="lp-section-header lp-reveal">
             <p className="lp-eyebrow">Everything You Need</p>
-            <h2 className="lp-section-title">Built for serious biology students</h2>
+            <h2 className="lp-section-title">Built for serious students</h2>
             <p className="lp-section-sub">Every tool crafted to make learning efficient, measurable and enjoyable.</p>
           </div>
 
-          <div className="lp-features-grid">
-            {[
-              {
-                icon: '📹',
-                title: 'Video Lectures',
-                desc: 'Chapter-wise HD videos taught by expert biology educators. Pause, rewind, and learn at your own pace.',
-                color: '#6366f1',
-              },
-              {
-                icon: '📝',
-                title: 'Smart Quizzes',
-                desc: 'Topic-wise quizzes with instant feedback and detailed explanations to reinforce every concept.',
-                color: '#8b5cf6',
-              },
-              {
-                icon: '🎯',
-                title: 'Mock Test Series',
-                desc: 'Full-length and topic-based mock exams modelled on real exam patterns with detailed analytics.',
-                color: '#06b6d4',
-              },
-              {
-                icon: '🔴',
-                title: 'Live Classes',
-                desc: 'Join scheduled live sessions with your teachers for doubt-clearing and interactive learning.',
-                color: '#f43f5e',
-              },
-              {
-                icon: '📊',
-                title: 'Progress Insights',
-                desc: 'Track your quiz streaks, scores over time, and see exactly where you need to focus more.',
-                color: '#10b981',
-              },
-              {
-                icon: '💬',
-                title: 'Community',
-                desc: 'Stay connected on Telegram, YouTube and Instagram with daily updates, tips and peer support.',
-                color: '#f59e0b',
-              },
-            ].map((f) => (
-              <div key={f.title} className="lp-feature-card lp-reveal" style={{ '--lp-feat-color': f.color }}>
+          <div className="lp-features-carousel lp-reveal">
+            <button
+              type="button"
+              className="lp-feature-nav lp-feature-nav-prev"
+              aria-label="Previous feature card"
+              disabled={activeFeatureIndex <= 0}
+              onClick={() => scrollFeatureTo(Math.max(0, activeFeatureIndex - 1))}
+            >
+              ←
+            </button>
+            <div
+              className="lp-features-grid"
+              ref={featureTrackRef}
+              role="region"
+              aria-label="Built for serious students cards"
+              tabIndex={0}
+              onKeyDown={handleFeatureKeyNav}
+            >
+              {FEATURE_CARDS.map((f, index) => (
+              <div
+                key={f.title}
+                className={`lp-feature-card lp-reveal${activeFeatureIndex === index ? ' is-active' : ''}`}
+                style={{ '--lp-feat-color': f.color }}
+              >
                 <span className="lp-feature-icon">{f.icon}</span>
+                <span className="lp-feature-chip">Premium</span>
                 <h3 className="lp-feature-title">{f.title}</h3>
                 <p className="lp-feature-desc">{f.desc}</p>
               </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="lp-feature-nav lp-feature-nav-next"
+              aria-label="Next feature card"
+              disabled={activeFeatureIndex >= FEATURE_CARDS.length - 1}
+              onClick={() => scrollFeatureTo(Math.min(FEATURE_CARDS.length - 1, activeFeatureIndex + 1))}
+            >
+              →
+            </button>
+          </div>
+          <div className="lp-feature-dots lp-reveal" aria-label="Feature card position">
+            {FEATURE_CARDS.map((card, index) => (
+              <button
+                key={card.title}
+                type="button"
+                className={`lp-feature-dot${activeFeatureIndex === index ? ' is-active' : ''}`}
+                onClick={() => scrollFeatureTo(index)}
+                aria-label={`Go to ${card.title}`}
+              />
             ))}
           </div>
         </div>
@@ -478,33 +663,77 @@ export default function LandingPage() {
             <h2 className="lp-section-title">What learners say</h2>
           </div>
 
-          <div className="lp-testimonials">
-            {[
-              {
-                quote: 'The mock tests are incredibly close to the real exam pattern. My score improved by 20 marks after just 3 weeks of practice.',
-                name: 'Priya S.',
-                tag: 'NEET Aspirant, Class 12',
-              },
-              {
-                quote: 'I love how organised everything is. Video lectures, then quiz, then mock test — the flow makes sense and keeps me focused.',
-                name: 'Aryan M.',
-                tag: 'Biology Student',
-              },
-              {
-                quote: 'The live classes and Telegram community make me feel like I\'m in a real classroom. The teachers are amazing and always available.',
-                name: 'Neha K.',
-                tag: 'Biomics Hub Student',
-              },
-            ].map((t) => (
-              <div key={t.name} className="lp-testimonial-card lp-reveal">
-                <div className="lp-testimonial-stars" aria-label="5 stars">★★★★★</div>
-                <p className="lp-testimonial-quote">"{t.quote}"</p>
-                <div className="lp-testimonial-author">
-                  <span className="lp-testimonial-name">{t.name}</span>
-                  <span className="lp-testimonial-tag">{t.tag}</span>
-                </div>
-              </div>
-            ))}
+          <div className="lp-voices-marquee-wrap lp-reveal">
+            <div className="lp-voices-marquee-track">
+              {[...studentVoices, ...studentVoices].map((voice, idx) => (
+                <article key={`${voice._id || voice.name}-${idx}`} className="lp-voice-card">
+                  <div className="lp-voice-top">
+                    <div className="lp-voice-avatar">{String(voice?.name || 'S').trim().charAt(0).toUpperCase()}</div>
+                    <div>
+                      <strong className="lp-voice-name">{voice.name}</strong>
+                      <span className="lp-voice-role">{voice.role || 'Student'}</span>
+                    </div>
+                  </div>
+                  <div className="lp-testimonial-stars" aria-label={`${voice.rating || 5} stars`}>
+                    {'★'.repeat(Math.max(1, Math.min(5, Number(voice.rating || 5))))}
+                  </div>
+                  <p className="lp-testimonial-quote">"{voice.message}"</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="lp-voices-marquee-wrap lp-voices-marquee-wrap-reverse lp-reveal">
+            <div className="lp-voices-marquee-track lp-voices-marquee-track-reverse">
+              {[...studentVoices.slice().reverse(), ...studentVoices.slice().reverse()].map((voice, idx) => (
+                <article key={`rev-${voice._id || voice.name}-${idx}`} className="lp-voice-card">
+                  <div className="lp-voice-top">
+                    <div className="lp-voice-avatar">{String(voice?.name || 'S').trim().charAt(0).toUpperCase()}</div>
+                    <div>
+                      <strong className="lp-voice-name">{voice.name}</strong>
+                      <span className="lp-voice-role">{voice.role || 'Student'}</span>
+                    </div>
+                  </div>
+                  <div className="lp-testimonial-stars" aria-label={`${voice.rating || 5} stars`}>
+                    {'★'.repeat(Math.max(1, Math.min(5, Number(voice.rating || 5))))}
+                  </div>
+                  <p className="lp-testimonial-quote">"{voice.message}"</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── BRAND GLOW ─────────────────────────── */}
+      <section className="lp-section lp-brand-glow-section">
+        <div className="lp-section-inner">
+          <div className="lp-brand-glow-board lp-reveal" role="img" aria-label="Interactive BIOMICS HUB glowing letters">
+            <div className="lp-brand-glow-word">
+              {'BIOMICS HUB'.split('').map((char, index) => {
+                const isSpace = char === ' ';
+                const isHovered = hoveredBrandLetter === index;
+                return (
+                  <span
+                    key={`brand-letter-${index}`}
+                    className={`lp-brand-glow-letter${isHovered ? ' is-hovered' : ''}${isSpace ? ' is-space' : ''}`}
+                    onMouseEnter={() => {
+                      if (isSpace) return;
+                      setHoveredBrandLetter(index);
+                    }}
+                    onMouseLeave={() => setHoveredBrandLetter(null)}
+                    onFocus={() => {
+                      if (isSpace) return;
+                      setHoveredBrandLetter(index);
+                    }}
+                    onBlur={() => setHoveredBrandLetter(null)}
+                    tabIndex={isSpace ? -1 : 0}
+                  >
+                    {isSpace ? '\u00A0' : char}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -547,7 +776,7 @@ export default function LandingPage() {
         <div className="lp-cta-glow" aria-hidden="true" />
         <div className="lp-cta-inner">
           <h2 className="lp-cta-title">Ready to start your biology journey?</h2>
-          <p className="lp-cta-sub">Join hundreds of students already learning on Biomics Hub.</p>
+          <p className="lp-cta-sub">Structured from basics to advanced mastery for students and aspirants preparing for top life science exams.</p>
           <button type="button" className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/auth')}>
             Create Free Account
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" /></svg>
@@ -558,20 +787,43 @@ export default function LandingPage() {
       {/* ── FOOTER ──────────────────────────────── */}
       <footer className="lp-footer">
         <div className="lp-footer-inner">
-          <div className="lp-footer-brand">
-            <img src={logoImg} alt="Biomics Hub" className="lp-footer-logo" />
-            <div>
-              <p className="lp-footer-name">Biomics Hub</p>
-              <p className="lp-footer-tagline">Empowering students with quality biology education.</p>
+          <div className="lp-footer-brand-col">
+            <div className="lp-footer-brand">
+              <img src={logoImg} alt="Biomics Hub" className="lp-footer-logo" />
+              <div>
+                <p className="lp-footer-name">Biomics Hub</p>
+                <p className="lp-footer-tagline">Premium biology learning for ambitious students.</p>
+              </div>
+            </div>
+            <p className="lp-footer-about">{BIOMICS_MISSION_COPY}</p>
+          </div>
+
+          <div className="lp-footer-col">
+            <p className="lp-footer-col-title">Company</p>
+            <nav className="lp-footer-nav" aria-label="Footer navigation">
+              <a href="#courses" className="lp-footer-link">Courses</a>
+              <a href="#features" className="lp-footer-link">Features</a>
+              <a href="#how-it-works" className="lp-footer-link">How it Works</a>
+              <a href="#community" className="lp-footer-link">Community</a>
+              <button type="button" className="lp-footer-link" onClick={() => navigate('/auth')}>Log In</button>
+            </nav>
+          </div>
+
+          <div className="lp-footer-col">
+            <p className="lp-footer-col-title">Contact</p>
+            <div className="lp-footer-contact-list">
+              <p className="lp-footer-contact-item">📍 Bhubaneswar, Khandagiri, Lane R7, Odisha, PIN 751030</p>
+              <a href="mailto:biomicshub@gmail.com" className="lp-footer-contact-item lp-footer-contact-link">✉ biomicshub@gmail.com</a>
+              <p className="lp-footer-contact-item">🕒 Open: Mon - Sat, 9:00 AM - 9:00 PM</p>
             </div>
           </div>
-          <nav className="lp-footer-nav" aria-label="Footer navigation">
-            <a href="#features" className="lp-footer-link">Features</a>
-            <a href="#how-it-works" className="lp-footer-link">How it Works</a>
-            <a href="#community" className="lp-footer-link">Community</a>
-            <button type="button" className="lp-footer-link" onClick={() => navigate('/auth')}>Log In</button>
-          </nav>
+        </div>
+        <div className="lp-footer-bottom">
           <p className="lp-footer-copy">© {new Date().getFullYear()} Biomics Hub. All rights reserved.</p>
+          <div className="lp-footer-legal">
+            <button type="button" className="lp-footer-legal-btn">Privacy Policy</button>
+            <button type="button" className="lp-footer-legal-btn">Terms of Service</button>
+          </div>
         </div>
       </footer>
 

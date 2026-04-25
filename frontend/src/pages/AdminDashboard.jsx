@@ -2295,6 +2295,7 @@ export default function AdminDashboard() {
     { id: 'section-quiz-builder', label: 'Quiz Builder', icon: '📝' },
     { id: 'section-monthly-mock-exam', label: 'Monthly Exam', icon: '📅' },
     { id: 'section-test-series', label: 'Test Series', icon: '🧪' },
+    { id: 'section-student-voices', label: 'Student Voices', icon: '🗣️' },
     { id: 'section-announcements', label: 'Announcements', icon: '📢' },
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
@@ -2606,6 +2607,21 @@ export default function AdminDashboard() {
         <div className="workspace-link-actions">
           <button type="button" className="primary-btn" onClick={() => navigate('/admin/test-series')}>
             Open Test Series Workspace
+          </button>
+        </div>
+      </section>
+
+      <section id="section-student-voices" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card">
+        <div className="section-header compact quiz-builder-heading-row">
+          <div>
+            <p className="eyebrow">Landing Content</p>
+            <h2>Student voices marquee workspace</h2>
+            <p className="subtitle">Add and manage student testimonial cards that run in reverse marquee on the landing page.</p>
+          </div>
+        </div>
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" onClick={() => navigate('/admin/student-voices')}>
+            Open Student Voices Workspace
           </button>
         </div>
       </section>

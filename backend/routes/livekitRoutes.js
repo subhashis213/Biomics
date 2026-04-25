@@ -5,11 +5,12 @@ const { z } = require('zod');
 const { AccessToken, RoomServiceClient, TrackSource } = require('livekit-server-sdk');
 const LiveClass = require('../models/LiveClass');
 const LiveClassCalendarBlock = require('../models/LiveClassCalendarBlock');
+const Course = require('../models/Course');
 const User = require('../models/User');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { logAdminAction } = require('../utils/auditLog');
-const { getActiveCourseMembership, hasCourseAccess, normalizeCourseName } = require('../utils/courseAccess');
+const { ALL_MODULES, getActiveCourseMembership, getActiveModuleMembership, hasCourseAccess, normalizeCourseName } = require('../utils/courseAccess');
 const classServerRoutes = require('./classServerRoutes');
 
 const router = express.Router();
@@ -29,6 +30,7 @@ const createLiveClassSchema = z.object({
   description: z.string().max(400).optional().default(''),
   roomName: z.string().max(120).optional(),
   course: z.string().max(120).optional().default(''),
+  batch: z.string().max(120).optional().default('General'),
   scheduledAt: z.string().datetime().nullable().optional(),
   scheduledEndAt: z.string().datetime().nullable().optional(),
   premiumOnly: z.boolean().optional().default(true),
@@ -37,6 +39,16 @@ const createLiveClassSchema = z.object({
 });
 
 const updateLiveClassSchema = createLiveClassSchema.partial();
+const GENERAL_BATCH = 'General';
+
+function normalizeBatchName(value) {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return GENERAL_BATCH;
+  const key = normalized.toLowerCase();
+  if (key === 'general' || key === 'all' || key === 'all batches') return GENERAL_BATCH;
+  return normalized;
+}
+
 
 const updatePremiumAccessSchema = z.object({
   premiumEnabled: z.boolean(),
@@ -238,7 +250,18 @@ async function canUserAccessClass(user, classDoc, role = 'user') {
   const allowedUsernames = normalizeUsernameList(classDoc?.allowedUsernames || []);
   if (username && allowedUsernames.includes(username)) return true;
 
-  return userHasCourseContentAccess(user, classDoc);
+  const hasCourseLevelAccess = await userHasCourseContentAccess(user, classDoc);
+  if (!hasCourseLevelAccess) return false;
+
+  const targetCourse = normalizeCourseName(classDoc?.course);
+  const targetBatch = normalizeBatchName(classDoc?.batch);
+  if (!targetCourse || targetBatch === GENERAL_BATCH) return true;
+
+  const batchMembership = getActiveModuleMembership(user, targetCourse, targetBatch);
+  if (batchMembership) return true;
+
+  // Explicit ALL_MODULES bundle always grants access to every batch under the course.
+  return Boolean(getActiveModuleMembership(user, targetCourse, ALL_MODULES));
 }
 
 function isUserRemovedFromClass(user, classDoc) {
@@ -278,6 +301,7 @@ function serializeLiveClass(classDoc, user, role = 'user', accessState = {}) {
     isActive: Boolean(classDoc?.isActive),
     isScheduled: Boolean(classDoc?.isScheduled),
     course: String(classDoc?.course || '').trim(),
+    batch: normalizeBatchName(classDoc?.batch),
     premiumOnly: Boolean(classDoc?.premiumOnly),
     maxParticipants: Number(classDoc?.maxParticipants || MAX_ALLOWED_PARTICIPANTS),
     allowedUsernames,
@@ -363,6 +387,7 @@ function buildCalendarEntries(user, classes = [], accessibleCourseNames = []) {
     kind: 'live-class',
     liveClassId: String(classDoc?._id || ''),
     course: String(classDoc?.course || '').trim(),
+      batch: normalizeBatchName(classDoc?.batch),
     premiumOnly: Boolean(classDoc?.premiumOnly),
     status: String(classDoc?.status || '').trim() || 'scheduled'
   }));
@@ -500,7 +525,7 @@ router.get('/service-state', authenticateToken('admin'), async (req, res) => {
 
 router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
   try {
-    const [classes, students, calendarBlocks] = await Promise.all([
+    const [classes, students, calendarBlocks, courseDocs] = await Promise.all([
       LiveClass.find().sort({ scheduledAt: 1, startedAt: -1, createdAt: -1 }).limit(40).lean(),
       User.find({}, {
         username: 1,
@@ -512,7 +537,8 @@ router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
         liveClassCalendarBlocks: 1,
         _id: 0
       }).sort({ username: 1 }).lean(),
-      LiveClassCalendarBlock.find().sort({ startsAt: 1, createdAt: -1 }).lean()
+      LiveClassCalendarBlock.find().sort({ startsAt: 1, createdAt: -1 }).lean(),
+      Course.find({ active: true, archived: { $ne: true } }, { name: 1, displayName: 1, batches: 1 }).sort({ name: 1 }).lean()
     ]);
 
     const mergedCalendarBlocks = dedupeCalendarBlocks([
@@ -520,16 +546,66 @@ router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
       ...collectLegacyCalendarBlocks(students)
     ]);
 
-    const availableCourses = Array.from(new Set(
-      students.flatMap((student) => (Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []))
-        .map((entry) => String(entry?.course || '').trim())
-        .filter(Boolean)
-    )).sort((left, right) => left.localeCompare(right));
+    const availableCoursesSet = new Set();
+    courseDocs.forEach((courseDoc) => {
+      const name = String(courseDoc?.name || courseDoc?.displayName || '').trim();
+      if (name) availableCoursesSet.add(name);
+    });
+    students.forEach((student) => {
+      const enrolledCourse = String(student?.class || '').trim();
+      if (enrolledCourse) availableCoursesSet.add(enrolledCourse);
+      (Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []).forEach((entry) => {
+        const courseName = String(entry?.course || '').trim();
+        if (courseName) availableCoursesSet.add(courseName);
+      });
+    });
+    classes.forEach((classDoc) => {
+      const courseName = String(classDoc?.course || '').trim();
+      if (courseName) availableCoursesSet.add(courseName);
+    });
+
+    const availableBatchesByCourse = {};
+    availableCoursesSet.forEach((courseName) => {
+      const set = new Set([GENERAL_BATCH]);
+
+      const matchingCourseDoc = courseDocs.find((courseDoc) => normalizeCourseName(courseDoc?.name || courseDoc?.displayName) === normalizeCourseName(courseName));
+      (Array.isArray(matchingCourseDoc?.batches) ? matchingCourseDoc.batches : []).forEach((batch) => {
+        if (batch?.active === false) return;
+        const batchName = normalizeBatchName(batch?.name);
+        if (batchName && batchName !== GENERAL_BATCH) set.add(batchName);
+      });
+
+      classes
+        .filter((classDoc) => normalizeCourseName(classDoc?.course) === normalizeCourseName(courseName))
+        .forEach((classDoc) => {
+          const batchName = normalizeBatchName(classDoc?.batch);
+          if (batchName && batchName !== GENERAL_BATCH) set.add(batchName);
+        });
+
+      students.forEach((student) => {
+        (Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []).forEach((entry) => {
+          if (normalizeCourseName(entry?.course) !== normalizeCourseName(courseName)) return;
+          const moduleName = String(entry?.moduleName || '').trim();
+          if (!moduleName || moduleName === ALL_MODULES) return;
+          const batchName = normalizeBatchName(moduleName);
+          if (batchName && batchName !== GENERAL_BATCH) set.add(batchName);
+        });
+      });
+
+      availableBatchesByCourse[courseName] = Array.from(set).sort((left, right) => {
+        if (left === GENERAL_BATCH) return -1;
+        if (right === GENERAL_BATCH) return 1;
+        return left.localeCompare(right);
+      });
+    });
+
+    const availableCourses = Array.from(availableCoursesSet).sort((left, right) => left.localeCompare(right));
 
     return res.json({
       classes: classes.map((item) => serializeLiveClass(item, null, 'admin')),
       calendarBlocks: mergedCalendarBlocks.map((entry) => serializeCalendarBlock(entry)),
       availableCourses,
+      availableBatchesByCourse,
       students: students.map((student) => ({
         username: student.username,
         email: student.email || '',
@@ -637,6 +713,7 @@ router.post('/classes', authenticateToken('admin'), validate(createLiveClassSche
       description: String(req.body.description || '').trim(),
       roomName: buildRoomName(title, req.body.roomName),
       course: String(req.body.course || '').trim(),
+      batch: normalizeBatchName(req.body.batch),
       scheduledAt,
       scheduledEndAt,
       isScheduled: Boolean(scheduledAt),
@@ -674,6 +751,7 @@ router.patch('/classes/:classId', authenticateToken('admin'), validate(updateLiv
     if (req.body.description !== undefined) liveClass.description = String(req.body.description || '').trim();
     if (req.body.roomName !== undefined) liveClass.roomName = buildRoomName(liveClass.title, req.body.roomName);
     if (req.body.course !== undefined) liveClass.course = String(req.body.course || '').trim();
+    if (req.body.batch !== undefined) liveClass.batch = normalizeBatchName(req.body.batch);
     if (req.body.scheduledAt !== undefined) {
       liveClass.scheduledAt = req.body.scheduledAt ? new Date(req.body.scheduledAt) : null;
       liveClass.isScheduled = Boolean(liveClass.scheduledAt);

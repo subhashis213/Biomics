@@ -66,6 +66,7 @@ export default function StudentDashboard() {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarImageFailed, setAvatarImageFailed] = useState(false);
   const [liveClass, setLiveClass] = useState(null); // { active, title, meetUrl, startedAt }
   const [lockedLiveClass, setLockedLiveClass] = useState(null);
   const [upcomingClass, setUpcomingClass] = useState(null); // { _id, title, scheduledAt, meetUrl }
@@ -1993,7 +1994,18 @@ export default function StudentDashboard() {
   const profileAvatarUrl = rawProfileAvatarUrl
     ? (/^https?:\/\//i.test(rawProfileAvatarUrl) ? rawProfileAvatarUrl : `${getApiBase()}${rawProfileAvatarUrl}`)
     : '';
-  const profileInitial = (profile?.username || session?.username || 'S').trim().charAt(0).toUpperCase();
+  useEffect(() => {
+    setAvatarImageFailed(false);
+  }, [profileAvatarUrl]);
+  const profileInitial = (() => {
+    const rawName = String(profile?.username || session?.username || 'Student').trim();
+    if (!rawName) return 'S';
+    const chunks = rawName.split(/[\s._-]+/).filter(Boolean);
+    if (chunks.length >= 2) {
+      return `${chunks[0].charAt(0)}${chunks[1].charAt(0)}`.toUpperCase();
+    }
+    return rawName.charAt(0).toUpperCase();
+  })();
   const studentNavItems = useMemo(() => {
     const baseItems = [
       { id: 'section-overview', label: 'Overview', icon: '🏠' },
@@ -2173,8 +2185,13 @@ export default function StudentDashboard() {
               aria-label="Open profile settings"
               title="Profile settings"
             >
-              {profileAvatarUrl ? (
-                <img src={profileAvatarUrl} alt="Student profile" className="profile-icon-image" />
+              {profileAvatarUrl && !avatarImageFailed ? (
+                <img
+                  src={profileAvatarUrl}
+                  alt="Student profile"
+                  className="profile-icon-image"
+                  onError={() => setAvatarImageFailed(true)}
+                />
               ) : (
                 <span className="profile-icon-fallback">{profileInitial}</span>
               )}
@@ -3185,8 +3202,13 @@ export default function StudentDashboard() {
               <div className="profile-modal-body">
                 <aside className="profile-summary-card">
                   <div className="profile-avatar-large">
-                    {profileAvatarUrl ? (
-                      <img src={profileAvatarUrl} alt="Student profile" className="profile-avatar-large-image" />
+                    {profileAvatarUrl && !avatarImageFailed ? (
+                      <img
+                        src={profileAvatarUrl}
+                        alt="Student profile"
+                        className="profile-avatar-large-image"
+                        onError={() => setAvatarImageFailed(true)}
+                      />
                     ) : (
                       <span>{profileInitial}</span>
                     )}

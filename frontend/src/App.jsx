@@ -24,6 +24,7 @@ import AdminTestSeriesHubPage from './pages/AdminTestSeriesHubPage';
 import AdminTopicTestBuilderPage from './pages/AdminTopicTestBuilderPage';
 import AdminTopicTestCatalogPage from './pages/AdminTopicTestCatalogPage';
 import AdminFullMockTestBuilderPage from './pages/AdminFullMockTestBuilderPage';
+import AdminStudentVoicesPage from './pages/AdminStudentVoicesPage';
 import SessionActivityTracker from './components/SessionActivityTracker';
 import AuthPage from './pages/AuthPage';
 
@@ -245,6 +246,14 @@ export default function App() {
         element={(
           <ProtectedRoute role="admin">
             <AdminStorageMonitorPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/student-voices"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminStudentVoicesPage />
           </ProtectedRoute>
         )}
       />

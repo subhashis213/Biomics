@@ -17,5 +17,8 @@
     "check:port": "lsof -nP -iTCP:5002 -sTCP:LISTEN",
     "check:api": "curl -i http://localhost:5002/videos",
     "check:health": "npm run check:routes && npm run check:mongo && npm run check:port && npm run check:api"
+  },
+  "dependencies": {
+    "google-auth-library": "^10.6.2"
   }
 }

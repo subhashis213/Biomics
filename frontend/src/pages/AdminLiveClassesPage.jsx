@@ -121,7 +121,7 @@ export default function AdminLiveClassesPage() {
   const navigate = useNavigate();
   const { classId = '' } = useParams();
   const isStudioRoute = location.pathname.endsWith('/studio');
-  const [workspace, setWorkspace] = useState({ classes: [], students: [], calendarBlocks: [], availableCourses: [] });
+  const [workspace, setWorkspace] = useState({ classes: [], students: [], calendarBlocks: [], availableCourses: [], availableBatchesByCourse: {} });
   const [serverStatus, setServerStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState(null);
@@ -129,6 +129,7 @@ export default function AdminLiveClassesPage() {
     title: '',
     description: '',
     course: '',
+    batch: 'General',
     scheduledAt: '',
     scheduledEndAt: ''
   });
@@ -175,7 +176,10 @@ export default function AdminLiveClassesPage() {
         classes: Array.isArray(workspaceResponse?.classes) ? workspaceResponse.classes : [],
         students: Array.isArray(workspaceResponse?.students) ? workspaceResponse.students : [],
         calendarBlocks: Array.isArray(workspaceResponse?.calendarBlocks) ? workspaceResponse.calendarBlocks : [],
-        availableCourses: Array.isArray(workspaceResponse?.availableCourses) ? workspaceResponse.availableCourses : []
+        availableCourses: Array.isArray(workspaceResponse?.availableCourses) ? workspaceResponse.availableCourses : [],
+        availableBatchesByCourse: workspaceResponse?.availableBatchesByCourse && typeof workspaceResponse.availableBatchesByCourse === 'object'
+          ? workspaceResponse.availableBatchesByCourse
+          : {}
       });
       setServerStatus(serverResponse?.server || null);
     } catch (error) {
@@ -183,6 +187,12 @@ export default function AdminLiveClassesPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleRefreshWorkspace() {
+    setBanner(null);
+    await loadWorkspace();
+    setBanner({ type: 'success', text: 'Workspace refreshed successfully.' });
   }
 
   useEffect(() => {
@@ -271,6 +281,32 @@ export default function AdminLiveClassesPage() {
     [workspace.availableCourses]
   );
 
+  const classBatchOptions = useMemo(() => {
+    const selectedCourse = String(classForm.course || '').trim();
+    if (!selectedCourse) return ['General'];
+    const fromWorkspace = Array.isArray(workspace.availableBatchesByCourse?.[selectedCourse])
+      ? workspace.availableBatchesByCourse[selectedCourse]
+      : [];
+    const merged = Array.from(new Set(['General', ...fromWorkspace.filter(Boolean)]));
+    return merged.sort((left, right) => {
+      if (left === 'General') return -1;
+      if (right === 'General') return 1;
+      return left.localeCompare(right, undefined, { sensitivity: 'base' });
+    });
+  }, [classForm.course, workspace.availableBatchesByCourse]);
+
+  useEffect(() => {
+    if (!classForm.course) {
+      if (classForm.batch !== 'General') {
+        setClassForm((current) => ({ ...current, batch: 'General' }));
+      }
+      return;
+    }
+    if (!classBatchOptions.includes(classForm.batch)) {
+      setClassForm((current) => ({ ...current, batch: 'General' }));
+    }
+  }, [classBatchOptions, classForm.batch, classForm.course]);
+
   const groupedCalendarBlocks = useMemo(
     () => groupAgendaEntries(workspace.calendarBlocks || []),
     [workspace.calendarBlocks]
@@ -285,13 +321,14 @@ export default function AdminLiveClassesPage() {
         title: classForm.title.trim() || 'Course Live Class',
         description: classForm.description.trim(),
         course: classForm.course,
+        batch: classForm.batch || 'General',
         scheduledAt: toLocalInputIsoString(classForm.scheduledAt),
         scheduledEndAt: toLocalInputIsoString(classForm.scheduledEndAt),
         allowedUsernames: [],
         maxParticipants: 101
       });
 
-      setClassForm({ title: '', description: '', course: '', scheduledAt: '', scheduledEndAt: '' });
+      setClassForm({ title: '', description: '', course: '', batch: 'General', scheduledAt: '', scheduledEndAt: '' });
       setBanner({ type: 'success', text: `Live class “${response?.liveClass?.title || 'session'}” created.` });
       await loadWorkspace();
     } catch (error) {
@@ -489,6 +526,7 @@ export default function AdminLiveClassesPage() {
       title: String(block.title || '').trim(),
       description: String(block.description || '').trim(),
       course: String(block.course || '').trim(),
+      batch: 'General',
       scheduledAt: toDateTimeLocalInput(block.startsAt),
       scheduledEndAt: toDateTimeLocalInput(block.endsAt),
       allowedUsernames: ''
@@ -525,7 +563,7 @@ export default function AdminLiveClassesPage() {
         actions={(
           <div className="registered-learners-topbar-actions">
             <button type="button" className="secondary-btn" onClick={() => navigate('/admin/live-classes')}>← Back to Workspace</button>
-            <button type="button" className="secondary-btn" onClick={loadWorkspace}>Refresh</button>
+            <button type="button" className="secondary-btn" onClick={handleRefreshWorkspace}>Refresh</button>
           </div>
         )}
       >
@@ -543,6 +581,7 @@ export default function AdminLiveClassesPage() {
               <StatCard label="Room" value={selectedClass?.roomName || 'Not assigned'} />
               <StatCard label="Class Status" value={selectedClass?.status || 'Not ready'} />
               <StatCard label="Course Access" value={selectedClass?.course || 'All Courses'} />
+              <StatCard label="Batch Access" value={selectedClass?.batch || 'General'} />
               <StatCard label="Server" value={serverStatus?.state || 'unknown'} />
             </div>
           </section>
@@ -578,7 +617,7 @@ export default function AdminLiveClassesPage() {
       actions={(
         <div className="registered-learners-topbar-actions">
           <button type="button" className="secondary-btn" onClick={() => navigate('/admin')}>← Back to Dashboard</button>
-          <button type="button" className="secondary-btn" onClick={loadWorkspace}>Refresh</button>
+          <button type="button" className="secondary-btn" onClick={handleRefreshWorkspace}>Refresh</button>
         </div>
       )}
     >
@@ -643,6 +682,20 @@ export default function AdminLiveClassesPage() {
                   <option value="">All courses</option>
                   {(workspace.availableCourses || []).map((courseName) => (
                     <option key={courseName} value={courseName}>{courseName}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Batch access</span>
+                <select
+                  value={classForm.batch}
+                  onChange={(event) => setClassForm((current) => ({ ...current, batch: event.target.value || 'General' }))}
+                  disabled={!classForm.course}
+                >
+                  {classBatchOptions.map((batchName) => (
+                    <option key={batchName} value={batchName}>
+                      {batchName === 'General' ? 'General (All students in this course)' : batchName}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -713,6 +766,7 @@ export default function AdminLiveClassesPage() {
                         <span className="livekit-session-meta-pill">{formatDateTime(item.scheduledAt || item.startedAt)}</span>
                         <span className="livekit-session-meta-pill">{item.roomName}</span>
                         <span className="livekit-session-meta-pill">{item.course || 'All courses'}</span>
+                        <span className="livekit-session-meta-pill">{item.batch || 'General'}</span>
                       </div>
                     </div>
                     <div className="livekit-session-actions">
