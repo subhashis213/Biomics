@@ -2659,7 +2659,6 @@ export default function StudentDashboard() {
               <h2>Talk with admins and learners in real time</h2>
               <p className="subtitle">Ask doubts, share tips, and stay connected with the whole Biomics community.</p>
             </div>
-            <StatCard label="Status" value="Live" />
           </div>
           <div className="workspace-link-actions">
             <button type="button" className="primary-btn" onClick={() => navigate('/student/community-chat')}>

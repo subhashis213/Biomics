@@ -63,6 +63,8 @@ export default function StudentInsightsPage() {
   } = useCourseData();
 
   const [rangeFilter, setRangeFilter] = useState('30d');
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [batchFilter, setBatchFilter] = useState('all');
   const [topicFilter, setTopicFilter] = useState('all');
   const [performanceRangeFilter, setPerformanceRangeFilter] = useState('30d');
   const [performanceTopicFilter, setPerformanceTopicFilter] = useState('all');
@@ -100,34 +102,102 @@ export default function StudentInsightsPage() {
   const topicOptions = useMemo(() => {
     const topics = new Set();
     quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      const batchName = normalizeText(quiz?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const t = normalizeText(quiz?.topic || 'General');
       if (t) topics.add(t);
     });
     quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const t = normalizeText(attempt?.topic || 'General');
       if (t) topics.add(t);
     });
     return Array.from(topics).sort((a, b) => a.localeCompare(b));
+  }, [batchFilter, courseFilter, quizzes, quizAttempts]);
+
+  const courseOptions = useMemo(() => {
+    const courses = new Set();
+    quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      if (courseName) courses.add(courseName);
+    });
+    quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      if (courseName) courses.add(courseName);
+    });
+    return Array.from(courses).sort((a, b) => a.localeCompare(b));
   }, [quizzes, quizAttempts]);
+
+  const batchOptions = useMemo(() => {
+    const batches = new Set();
+    quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      const batchName = normalizeText(quiz?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchName) batches.add(batchName);
+    });
+    quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchName) batches.add(batchName);
+    });
+    return Array.from(batches).sort((a, b) => a.localeCompare(b));
+  }, [courseFilter, quizzes, quizAttempts]);
 
   const moduleOptions = useMemo(() => {
     const modules = new Set();
     quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      const batchName = normalizeText(quiz?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const m = normalizeText(quiz?.module || 'General');
       if (m) modules.add(m);
     });
     quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const m = normalizeText(attempt?.module || 'General');
       if (m) modules.add(m);
     });
     return Array.from(modules).sort((a, b) => a.localeCompare(b));
-  }, [quizzes, quizAttempts]);
+  }, [batchFilter, courseFilter, quizzes, quizAttempts]);
+
+  useEffect(() => {
+    if (courseFilter !== 'all' && !courseOptions.includes(courseFilter)) {
+      setCourseFilter('all');
+    }
+  }, [courseFilter, courseOptions]);
+
+  useEffect(() => {
+    if (batchFilter !== 'all' && !batchOptions.includes(batchFilter)) {
+      setBatchFilter('all');
+    }
+  }, [batchFilter, batchOptions]);
 
   useEffect(() => {
     if (topicFilter === 'all') return;
     if (topicOptions.includes(topicFilter)) return;
     setTopicFilter('all');
   }, [topicFilter, topicOptions]);
+
+  const scopedQuizAttempts = useMemo(() => (
+    quizAttempts.filter((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return false;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return false;
+      return true;
+    })
+  ), [batchFilter, courseFilter, quizAttempts]);
 
   useEffect(() => {
     if (performanceTopicFilter !== 'all' && !topicOptions.includes(performanceTopicFilter)) {
@@ -154,7 +224,7 @@ export default function StudentInsightsPage() {
     if (rangeFilter === '30d') cutoff = getPastDate(30);
     if (rangeFilter === '90d') cutoff = getPastDate(90);
 
-    return quizAttempts.filter((attempt) => {
+    return scopedQuizAttempts.filter((attempt) => {
       const topic = normalizeText(attempt?.topic || 'General');
       if (topicFilter !== 'all' && topic !== topicFilter) return false;
 
@@ -163,7 +233,7 @@ export default function StudentInsightsPage() {
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= cutoff && submittedAt <= now;
     });
-  }, [quizAttempts, rangeFilter, topicFilter]);
+  }, [scopedQuizAttempts, rangeFilter, topicFilter]);
 
   const previousWindowAttempts = useMemo(() => {
     const rangeDays = getRangeDays(rangeFilter);
@@ -174,21 +244,21 @@ export default function StudentInsightsPage() {
     const previousStart = new Date(currentStart);
     previousStart.setDate(previousStart.getDate() - rangeDays);
 
-    return quizAttempts.filter((attempt) => {
+    return scopedQuizAttempts.filter((attempt) => {
       const topic = normalizeText(attempt?.topic || 'General');
       if (topicFilter !== 'all' && topic !== topicFilter) return false;
       const submittedAt = new Date(attempt?.submittedAt || 0);
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= previousStart && submittedAt < currentStart && submittedAt <= now;
     });
-  }, [quizAttempts, rangeFilter, topicFilter]);
+  }, [scopedQuizAttempts, rangeFilter, topicFilter]);
 
   const performanceAttempts = useMemo(() => {
     const now = new Date();
     const rangeDays = getRangeDays(performanceRangeFilter);
     const cutoff = rangeDays ? getPastDate(rangeDays) : null;
 
-    return quizAttempts.filter((attempt) => {
+    return scopedQuizAttempts.filter((attempt) => {
       const topic = normalizeText(attempt?.topic || 'General');
       const moduleName = normalizeText(attempt?.module || 'General');
       if (performanceTopicFilter !== 'all' && topic !== performanceTopicFilter) return false;
@@ -198,14 +268,14 @@ export default function StudentInsightsPage() {
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= cutoff && submittedAt <= now;
     });
-  }, [quizAttempts, performanceRangeFilter, performanceTopicFilter, performanceModuleFilter]);
+  }, [performanceModuleFilter, performanceRangeFilter, performanceTopicFilter, scopedQuizAttempts]);
 
   const weakTopicAttempts = useMemo(() => {
     const now = new Date();
     const rangeDays = getRangeDays(weakRangeFilter);
     const cutoff = rangeDays ? getPastDate(rangeDays) : null;
 
-    return quizAttempts.filter((attempt) => {
+    return scopedQuizAttempts.filter((attempt) => {
       const moduleName = normalizeText(attempt?.module || 'General');
       if (weakModuleFilter !== 'all' && moduleName !== weakModuleFilter) return false;
       if (!cutoff) return true;
@@ -213,14 +283,14 @@ export default function StudentInsightsPage() {
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= cutoff && submittedAt <= now;
     });
-  }, [quizAttempts, weakRangeFilter, weakModuleFilter]);
+  }, [scopedQuizAttempts, weakModuleFilter, weakRangeFilter]);
 
   const heatmapAttempts = useMemo(() => {
     const now = new Date();
     const rangeDays = getRangeDays(heatmapRangeFilter);
     const cutoff = rangeDays ? getPastDate(rangeDays) : null;
 
-    return quizAttempts.filter((attempt) => {
+    return scopedQuizAttempts.filter((attempt) => {
       const topic = normalizeText(attempt?.topic || 'General');
       if (heatmapTopicFilter !== 'all' && topic !== heatmapTopicFilter) return false;
       if (!cutoff) return true;
@@ -228,7 +298,7 @@ export default function StudentInsightsPage() {
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= cutoff && submittedAt <= now;
     });
-  }, [quizAttempts, heatmapRangeFilter, heatmapTopicFilter]);
+  }, [heatmapRangeFilter, heatmapTopicFilter, scopedQuizAttempts]);
 
   const attemptMetrics = useMemo(() => {
     const totalAttempts = filteredAttempts.length;
@@ -313,7 +383,7 @@ export default function StudentInsightsPage() {
 
   const streakDays = useMemo(() => {
     const daySet = new Set(
-      quizAttempts
+      scopedQuizAttempts
         .map((attempt) => asDateKey(attempt?.submittedAt))
         .filter(Boolean)
     );
@@ -332,7 +402,7 @@ export default function StudentInsightsPage() {
     }
 
     return streak;
-  }, [quizAttempts]);
+  }, [scopedQuizAttempts]);
 
   const readinessScore = useMemo(() => {
     const consistencyScore = Math.min(100, streakDays * 12);
@@ -610,6 +680,24 @@ export default function StudentInsightsPage() {
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
                 <option value="all">All time</option>
+              </select>
+            </label>
+            <label>
+              Course
+              <select value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}>
+                <option value="all">All Courses</option>
+                {courseOptions.map((courseName) => (
+                  <option key={`ins-course-${courseName}`} value={courseName}>{courseName}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Batch
+              <select value={batchFilter} onChange={(event) => setBatchFilter(event.target.value)}>
+                <option value="all">All Batches</option>
+                {batchOptions.map((batchName) => (
+                  <option key={`ins-batch-${batchName}`} value={batchName}>{batchName}</option>
+                ))}
               </select>
             </label>
             <label>

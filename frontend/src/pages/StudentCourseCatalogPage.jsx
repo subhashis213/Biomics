@@ -119,12 +119,6 @@ export default function StudentCourseCatalogPage() {
       onNavItemClick={handleNav}
       actions={(
         <div className="student-course-catalog-actions">
-          <button type="button" className="secondary-btn" onClick={() => navigate('/student/my-courses')}>
-            My Courses
-          </button>
-          <button type="button" className="secondary-btn" onClick={() => navigate('/student', { state: { openCart: true } })}>
-            🛒 Cart{cartCount ? ` (${cartCount})` : ''}
-          </button>
           <button type="button" className="secondary-btn" onClick={() => navigate('/student')}>
             ← Back
           </button>

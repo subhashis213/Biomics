@@ -153,7 +153,6 @@ export default function StudentCourseBatchesPage() {
       actions={(
         <div className="student-course-catalog-actions">
           <button type="button" className="secondary-btn" onClick={() => navigate('/student/courses')}>← Back</button>
-          <button type="button" className="secondary-btn" onClick={() => navigate('/student', { state: { openCart: true } })}>🛒 Cart</button>
         </div>
       )}
     >

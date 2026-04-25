@@ -1060,17 +1060,71 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
     const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
 
-    const course = normalizeCourse(user.class);
-    const access = await resolveStudentAccess(req.user.username, course);
+    const supportedCourses = await getSupportedCourses();
+    const requestedCourse = normalizeCourse(req.query?.course);
+    const selectedCourse = (requestedCourse && requestedCourse !== 'all')
+      ? resolveTargetCourse(user.class, requestedCourse, supportedCourses)
+      : 'all';
 
-    const [topicAttempts, fullMockAttempts] = await Promise.all([
-      access.hasTopicTest
-        ? TopicTestAttempt.find({ username: req.user.username, category: course }).sort({ submittedAt: -1 }).lean()
+    const accessByCourseEntries = await Promise.all(
+      supportedCourses.map(async (courseName) => {
+        const accessForCourse = await resolveStudentAccess(req.user.username, courseName);
+        return [courseName, accessForCourse];
+      })
+    );
+    const accessByCourse = Object.fromEntries(accessByCourseEntries);
+
+    const topicCourses = supportedCourses.filter((courseName) => Boolean(accessByCourse?.[courseName]?.hasTopicTest));
+    const fullMockCourses = supportedCourses.filter((courseName) => Boolean(accessByCourse?.[courseName]?.hasFullMock));
+
+    const topicCourseFilter = selectedCourse === 'all'
+      ? topicCourses
+      : (topicCourses.includes(selectedCourse) ? [selectedCourse] : []);
+    const fullMockCourseFilter = selectedCourse === 'all'
+      ? fullMockCourses
+      : (fullMockCourses.includes(selectedCourse) ? [selectedCourse] : []);
+
+    const [topicAttemptsRaw, fullMockAttemptsRaw] = await Promise.all([
+      topicCourseFilter.length
+        ? TopicTestAttempt.find({ username: req.user.username, category: { $in: topicCourseFilter } }).sort({ submittedAt: -1 }).lean()
         : Promise.resolve([]),
-      access.hasFullMock
-        ? FullMockAttempt.find({ username: req.user.username, category: course }).sort({ submittedAt: -1 }).lean()
+      fullMockCourseFilter.length
+        ? FullMockAttempt.find({ username: req.user.username, category: { $in: fullMockCourseFilter } }).sort({ submittedAt: -1 }).lean()
         : Promise.resolve([])
     ]);
+
+    const topicTestIds = Array.from(new Set(topicAttemptsRaw.map((attempt) => String(attempt?.testId || '').trim()).filter(Boolean)));
+    const fullMockIds = Array.from(new Set(fullMockAttemptsRaw.map((attempt) => String(attempt?.mockId || '').trim()).filter(Boolean)));
+
+    const [topicTests, fullMocks] = await Promise.all([
+      topicTestIds.length ? TopicTest.find({ _id: { $in: topicTestIds } }, { _id: 1, batch: 1, category: 1 }).lean() : Promise.resolve([]),
+      fullMockIds.length ? FullMockTest.find({ _id: { $in: fullMockIds } }, { _id: 1, batch: 1, category: 1 }).lean() : Promise.resolve([])
+    ]);
+
+    const topicMetaById = new Map(topicTests.map((item) => [String(item._id), item]));
+    const fullMockMetaById = new Map(fullMocks.map((item) => [String(item._id), item]));
+
+    const topicAttempts = topicAttemptsRaw.map((attempt) => {
+      const meta = topicMetaById.get(String(attempt?.testId || '')) || {};
+      const courseName = normalizeCourse(attempt?.category || meta?.category || user.class);
+      return {
+        ...attempt,
+        category: courseName,
+        course: courseName,
+        batch: String(meta?.batch || '').trim()
+      };
+    });
+
+    const fullMockAttempts = fullMockAttemptsRaw.map((attempt) => {
+      const meta = fullMockMetaById.get(String(attempt?.mockId || '')) || {};
+      const courseName = normalizeCourse(attempt?.category || meta?.category || user.class);
+      return {
+        ...attempt,
+        category: courseName,
+        course: courseName,
+        batch: String(meta?.batch || '').trim()
+      };
+    });
 
     const modulePerformanceMap = new Map();
     const topicKeys = new Set();
@@ -1184,9 +1238,19 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
         return left.title.localeCompare(right.title);
       });
 
+    const selectedAccess = selectedCourse === 'all'
+      ? {
+          hasTopicTest: topicCourseFilter.length > 0,
+          hasFullMock: fullMockCourseFilter.length > 0
+        }
+      : (accessByCourse[selectedCourse] || { hasTopicTest: false, hasFullMock: false });
+
     return res.json({
-      course,
-      access,
+      course: normalizeCourse(user.class),
+      selectedCourse,
+      availableCourses: supportedCourses,
+      accessByCourse,
+      access: selectedAccess,
       summary: {
         topicTests: {
           ...summarizeAttempts(topicAttempts),
@@ -1200,6 +1264,9 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
       recentTopicAttempts: topicAttempts.slice(0, 8).map((attempt) => ({
         _id: attempt._id,
         title: attempt.title,
+        course: attempt.course,
+        category: attempt.category,
+        batch: attempt.batch || '',
         module: attempt.module,
         topic: attempt.topic,
         score: attempt.score,
@@ -1210,6 +1277,9 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
       recentFullMockAttempts: fullMockAttempts.slice(0, 8).map((attempt) => ({
         _id: attempt._id,
         title: attempt.title,
+        course: attempt.course,
+        category: attempt.category,
+        batch: attempt.batch || '',
         score: attempt.score,
         total: attempt.total,
         percentage: calculatePercentage(attempt.score, attempt.total),

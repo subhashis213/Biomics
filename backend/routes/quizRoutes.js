@@ -647,7 +647,7 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
 
     const quizzes = await Quiz.find(
       { category: user.class },
-      { category: 1, module: 1, topic: 1, title: 1, difficulty: 1, requireExplanation: 1, timeLimitMinutes: 1, updatedAt: 1, questions: 1 }
+      { category: 1, batch: 1, module: 1, topic: 1, title: 1, difficulty: 1, requireExplanation: 1, timeLimitMinutes: 1, updatedAt: 1, questions: 1 }
     )
       .sort({ module: 1 })
       .lean();
@@ -663,6 +663,8 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
       quizzes: accessibleQuizzes.map((quiz) => ({
         _id: quiz._id,
         category: quiz.category,
+        course: quiz.category,
+        batch: String(quiz.batch || '').trim(),
         module: quiz.module,
         topic: quiz.topic || 'General',
         title: quiz.title,
@@ -831,7 +833,28 @@ router.get('/my-attempts/recent', authenticateToken('user'), async (req, res) =>
       const canAccessModule = await hasModuleAccess(user, attempt.category || user.class, attempt.module || 'General');
       if (canAccessModule) filteredAttempts.push(attempt);
     }
-    return res.json({ attempts: filteredAttempts });
+    const quizIds = Array.from(new Set(
+      filteredAttempts
+        .map((attempt) => String(attempt?.quizId || '').trim())
+        .filter(Boolean)
+    ));
+    const quizzes = quizIds.length
+      ? await Quiz.find({ _id: { $in: quizIds } }, { _id: 1, batch: 1, category: 1 }).lean()
+      : [];
+    const quizMetaById = new Map(quizzes.map((quiz) => [String(quiz._id), quiz]));
+
+    const shapedAttempts = filteredAttempts.map((attempt) => {
+      const quizMeta = quizMetaById.get(String(attempt?.quizId || '')) || {};
+      const course = String(attempt?.category || quizMeta?.category || user.class || '').trim();
+      return {
+        ...attempt,
+        course,
+        category: course,
+        batch: String(quizMeta?.batch || '').trim()
+      };
+    });
+
+    return res.json({ attempts: shapedAttempts });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch quiz attempts.' });
   }

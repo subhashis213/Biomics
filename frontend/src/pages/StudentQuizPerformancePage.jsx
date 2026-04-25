@@ -47,38 +47,98 @@ export default function StudentQuizPerformancePage() {
   const { session } = useSessionStore();
   const { quizzes, quizAttempts, isLoading, loadError } = useCourseData();
   const [rangeFilter, setRangeFilter] = useState('30d');
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [batchFilter, setBatchFilter] = useState('all');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [topicFilter, setTopicFilter] = useState('all');
+
+  const courseOptions = useMemo(() => {
+    const courses = new Set();
+    quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      if (courseName) courses.add(courseName);
+    });
+    quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      if (courseName) courses.add(courseName);
+    });
+    return Array.from(courses).sort((a, b) => a.localeCompare(b));
+  }, [quizzes, quizAttempts]);
+
+  const batchOptions = useMemo(() => {
+    const batches = new Set();
+    quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      const batchName = normalizeText(quiz?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchName) batches.add(batchName);
+    });
+    quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchName) batches.add(batchName);
+    });
+    return Array.from(batches).sort((a, b) => a.localeCompare(b));
+  }, [courseFilter, quizzes, quizAttempts]);
 
   const moduleOptions = useMemo(() => {
     const modules = new Set();
     quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      const batchName = normalizeText(quiz?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const moduleName = normalizeText(quiz?.module || 'General');
       if (moduleName) modules.add(moduleName);
     });
     quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const moduleName = normalizeText(attempt?.module || 'General');
       if (moduleName) modules.add(moduleName);
     });
     return Array.from(modules).sort((a, b) => a.localeCompare(b));
-  }, [quizzes, quizAttempts]);
+  }, [batchFilter, courseFilter, quizzes, quizAttempts]);
 
   const topicOptions = useMemo(() => {
     const topics = new Set();
     quizzes.forEach((quiz) => {
+      const courseName = normalizeText(quiz?.course || quiz?.category || '');
+      const batchName = normalizeText(quiz?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const moduleName = normalizeText(quiz?.module || 'General');
       const topicName = normalizeText(quiz?.topic || 'General');
       if (moduleFilter !== 'all' && moduleName !== moduleFilter) return;
       if (topicName) topics.add(topicName);
     });
     quizAttempts.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const moduleName = normalizeText(attempt?.module || 'General');
       const topicName = normalizeText(attempt?.topic || 'General');
       if (moduleFilter !== 'all' && moduleName !== moduleFilter) return;
       if (topicName) topics.add(topicName);
     });
     return Array.from(topics).sort((a, b) => a.localeCompare(b));
-  }, [moduleFilter, quizzes, quizAttempts]);
+  }, [batchFilter, courseFilter, moduleFilter, quizzes, quizAttempts]);
+
+  useEffect(() => {
+    if (courseFilter !== 'all' && !courseOptions.includes(courseFilter)) {
+      setCourseFilter('all');
+    }
+  }, [courseFilter, courseOptions]);
+
+  useEffect(() => {
+    if (batchFilter !== 'all' && !batchOptions.includes(batchFilter)) {
+      setBatchFilter('all');
+    }
+  }, [batchFilter, batchOptions]);
 
   useEffect(() => {
     if (moduleFilter !== 'all' && !moduleOptions.includes(moduleFilter)) {
@@ -98,6 +158,10 @@ export default function StudentQuizPerformancePage() {
     const cutoff = rangeDays ? getPastDate(rangeDays) : null;
 
     return quizAttempts.filter((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return false;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return false;
       const moduleName = normalizeText(attempt?.module || 'General');
       const topicName = normalizeText(attempt?.topic || 'General');
       if (moduleFilter !== 'all' && moduleName !== moduleFilter) return false;
@@ -108,7 +172,7 @@ export default function StudentQuizPerformancePage() {
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= cutoff && submittedAt <= now;
     });
-  }, [moduleFilter, quizAttempts, rangeFilter, topicFilter]);
+  }, [batchFilter, courseFilter, moduleFilter, quizAttempts, rangeFilter, topicFilter]);
 
   const summary = useMemo(() => {
     if (!filteredAttempts.length) {
@@ -294,6 +358,24 @@ export default function StudentQuizPerformancePage() {
               </select>
             </label>
             <label>
+              Course
+              <select value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}>
+                <option value="all">All Courses</option>
+                {courseOptions.map((courseName) => (
+                  <option key={courseName} value={courseName}>{courseName}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Batch
+              <select value={batchFilter} onChange={(event) => setBatchFilter(event.target.value)}>
+                <option value="all">All Batches</option>
+                {batchOptions.map((batchName) => (
+                  <option key={batchName} value={batchName}>{batchName}</option>
+                ))}
+              </select>
+            </label>
+            <label>
               Module
               <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}>
                 <option value="all">All Modules</option>
@@ -409,7 +491,7 @@ export default function StudentQuizPerformancePage() {
               {recentAttempts.map((attempt, index) => (
                 <article key={`${attempt?._id || 'attempt'}-${index}`} className="performance-timeline-item">
                   <div>
-                    <strong>{normalizeText(attempt?.module || 'General')} • {normalizeText(attempt?.topic || 'General')}</strong>
+                    <strong>{normalizeText(attempt?.course || attempt?.category || 'Course')} • {normalizeText(attempt?.batch || 'No Batch')} • {normalizeText(attempt?.module || 'General')} • {normalizeText(attempt?.topic || 'General')}</strong>
                     <small>{formatDateTime(attempt?.submittedAt)}</small>
                   </div>
                   <div className="performance-score-pill">

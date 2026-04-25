@@ -36,6 +36,8 @@ export default function StudentTestSeriesPerformancePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [rangeFilter, setRangeFilter] = useState('30d');
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [batchFilter, setBatchFilter] = useState('all');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [topicFilter, setTopicFilter] = useState('all');
   const [fullMockFilter, setFullMockFilter] = useState('all');
@@ -65,14 +67,48 @@ export default function StudentTestSeriesPerformancePage() {
   const topicAttemptSource = performance?.recentTopicAttempts || [];
   const fullMockAttemptSource = performance?.recentFullMockAttempts || [];
 
+  const courseOptions = useMemo(() => {
+    const courses = new Set();
+    topicAttemptSource.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      if (courseName) courses.add(courseName);
+    });
+    fullMockAttemptSource.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      if (courseName) courses.add(courseName);
+    });
+    return Array.from(courses).sort((a, b) => a.localeCompare(b));
+  }, [fullMockAttemptSource, topicAttemptSource]);
+
+  const batchOptions = useMemo(() => {
+    const batches = new Set();
+    topicAttemptSource.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchName) batches.add(batchName);
+    });
+    fullMockAttemptSource.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchName) batches.add(batchName);
+    });
+    return Array.from(batches).sort((a, b) => a.localeCompare(b));
+  }, [courseFilter, fullMockAttemptSource, topicAttemptSource]);
+
   const moduleOptions = useMemo(() => {
     const modules = new Set((performance?.modulePerformance || []).map((item) => normalizeText(item?.module || '')).filter(Boolean));
     topicAttemptSource.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const moduleName = normalizeText(attempt?.module || 'General');
       if (moduleName) modules.add(moduleName);
     });
     return Array.from(modules).sort((a, b) => a.localeCompare(b));
-  }, [performance?.modulePerformance, topicAttemptSource]);
+  }, [batchFilter, courseFilter, performance?.modulePerformance, topicAttemptSource]);
 
   const topicOptions = useMemo(() => {
     const topics = new Set();
@@ -85,22 +121,42 @@ export default function StudentTestSeriesPerformancePage() {
       });
     });
     topicAttemptSource.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const moduleName = normalizeText(attempt?.module || 'General');
       const topicName = normalizeText(attempt?.topic || 'General');
       if (moduleFilter !== 'all' && moduleName !== moduleFilter) return;
       if (topicName) topics.add(topicName);
     });
     return Array.from(topics).sort((a, b) => a.localeCompare(b));
-  }, [moduleFilter, performance?.modulePerformance, topicAttemptSource]);
+  }, [batchFilter, courseFilter, moduleFilter, performance?.modulePerformance, topicAttemptSource]);
 
   const fullMockOptions = useMemo(() => {
     const titles = new Set((performance?.fullMockPerformance || []).map((item) => normalizeText(item?.title || '')).filter(Boolean));
     fullMockAttemptSource.forEach((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return;
       const title = normalizeText(attempt?.title || 'Full Mock Test');
       if (title) titles.add(title);
     });
     return Array.from(titles).sort((a, b) => a.localeCompare(b));
-  }, [fullMockAttemptSource, performance?.fullMockPerformance]);
+  }, [batchFilter, courseFilter, fullMockAttemptSource, performance?.fullMockPerformance]);
+
+  useEffect(() => {
+    if (courseFilter !== 'all' && !courseOptions.includes(courseFilter)) {
+      setCourseFilter('all');
+    }
+  }, [courseFilter, courseOptions]);
+
+  useEffect(() => {
+    if (batchFilter !== 'all' && !batchOptions.includes(batchFilter)) {
+      setBatchFilter('all');
+    }
+  }, [batchFilter, batchOptions]);
 
   useEffect(() => {
     if (moduleFilter !== 'all' && !moduleOptions.includes(moduleFilter)) {
@@ -126,6 +182,10 @@ export default function StudentTestSeriesPerformancePage() {
     const cutoff = rangeDays ? getPastDate(rangeDays) : null;
 
     return topicAttemptSource.filter((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return false;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return false;
       const moduleName = normalizeText(attempt?.module || 'General');
       const topicName = normalizeText(attempt?.topic || 'General');
       if (moduleFilter !== 'all' && moduleName !== moduleFilter) return false;
@@ -136,7 +196,7 @@ export default function StudentTestSeriesPerformancePage() {
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= cutoff && submittedAt <= now;
     });
-  }, [moduleFilter, rangeFilter, topicAttemptSource, topicFilter]);
+  }, [batchFilter, courseFilter, moduleFilter, rangeFilter, topicAttemptSource, topicFilter]);
 
   const filteredFullMockAttempts = useMemo(() => {
     const now = new Date();
@@ -144,6 +204,10 @@ export default function StudentTestSeriesPerformancePage() {
     const cutoff = rangeDays ? getPastDate(rangeDays) : null;
 
     return fullMockAttemptSource.filter((attempt) => {
+      const courseName = normalizeText(attempt?.course || attempt?.category || '');
+      const batchName = normalizeText(attempt?.batch || 'No Batch');
+      if (courseFilter !== 'all' && courseName !== courseFilter) return false;
+      if (batchFilter !== 'all' && batchName !== batchFilter) return false;
       const title = normalizeText(attempt?.title || 'Full Mock Test');
       if (fullMockFilter !== 'all' && title !== fullMockFilter) return false;
       if (!cutoff) return true;
@@ -152,33 +216,74 @@ export default function StudentTestSeriesPerformancePage() {
       if (Number.isNaN(submittedAt.getTime())) return false;
       return submittedAt >= cutoff && submittedAt <= now;
     });
-  }, [fullMockAttemptSource, fullMockFilter, rangeFilter]);
+  }, [batchFilter, courseFilter, fullMockAttemptSource, fullMockFilter, rangeFilter]);
 
   const filteredModulePerformance = useMemo(() => {
-    return (performance?.modulePerformance || [])
-      .filter((moduleEntry) => {
-        const moduleName = normalizeText(moduleEntry?.module || 'General');
-        if (moduleFilter !== 'all' && moduleName !== moduleFilter) return false;
-        return true;
-      })
-      .map((moduleEntry) => ({
-        ...moduleEntry,
-        topics: (moduleEntry?.topics || []).filter((topicEntry) => {
-          const topicName = normalizeText(topicEntry?.topic || 'General');
-          if (topicFilter !== 'all' && topicName !== topicFilter) return false;
-          return true;
-        })
+    const moduleMap = new Map();
+    filteredTopicAttempts.forEach((attempt) => {
+      const moduleName = normalizeText(attempt?.module || 'General');
+      const topicName = normalizeText(attempt?.topic || 'General');
+      const percentage = Number(attempt?.percentage || 0);
+      if (!moduleMap.has(moduleName)) {
+        moduleMap.set(moduleName, {
+          module: moduleName,
+          attempts: 0,
+          totalPct: 0,
+          bestScore: 0,
+          topics: new Map()
+        });
+      }
+      const moduleEntry = moduleMap.get(moduleName);
+      moduleEntry.attempts += 1;
+      moduleEntry.totalPct += percentage;
+      moduleEntry.bestScore = Math.max(moduleEntry.bestScore, percentage);
+      if (!moduleEntry.topics.has(topicName)) {
+        moduleEntry.topics.set(topicName, { topic: topicName, attempts: 0, totalPct: 0, bestScore: 0, lastAttemptAt: null });
+      }
+      const topicEntry = moduleEntry.topics.get(topicName);
+      topicEntry.attempts += 1;
+      topicEntry.totalPct += percentage;
+      topicEntry.bestScore = Math.max(topicEntry.bestScore, percentage);
+      topicEntry.lastAttemptAt = attempt?.submittedAt || topicEntry.lastAttemptAt;
+    });
+
+    return Array.from(moduleMap.values()).map((moduleEntry) => ({
+      module: moduleEntry.module,
+      attempts: moduleEntry.attempts,
+      averageScore: moduleEntry.attempts ? Math.round(moduleEntry.totalPct / moduleEntry.attempts) : 0,
+      bestScore: moduleEntry.bestScore,
+      topics: Array.from(moduleEntry.topics.values()).map((topicEntry) => ({
+        topic: topicEntry.topic,
+        attempts: topicEntry.attempts,
+        averageScore: topicEntry.attempts ? Math.round(topicEntry.totalPct / topicEntry.attempts) : 0,
+        bestScore: topicEntry.bestScore,
+        lastAttemptAt: topicEntry.lastAttemptAt
       }))
-      .filter((moduleEntry) => moduleEntry.topics.length > 0 || topicFilter === 'all');
-  }, [moduleFilter, performance?.modulePerformance, topicFilter]);
+    }));
+  }, [filteredTopicAttempts]);
 
   const filteredFullMockPerformance = useMemo(() => {
-    return (performance?.fullMockPerformance || []).filter((item) => {
-      const title = normalizeText(item?.title || 'Full Mock Test');
-      if (fullMockFilter !== 'all' && title !== fullMockFilter) return false;
-      return true;
+    const fullMockMap = new Map();
+    filteredFullMockAttempts.forEach((attempt) => {
+      const title = normalizeText(attempt?.title || 'Full Mock Test');
+      const percentage = Number(attempt?.percentage || 0);
+      if (!fullMockMap.has(title)) {
+        fullMockMap.set(title, { title, attempts: 0, totalPct: 0, bestScore: 0, lastAttemptAt: null });
+      }
+      const entry = fullMockMap.get(title);
+      entry.attempts += 1;
+      entry.totalPct += percentage;
+      entry.bestScore = Math.max(entry.bestScore, percentage);
+      entry.lastAttemptAt = attempt?.submittedAt || entry.lastAttemptAt;
     });
-  }, [fullMockFilter, performance?.fullMockPerformance]);
+    return Array.from(fullMockMap.values()).map((entry) => ({
+      title: entry.title,
+      attempts: entry.attempts,
+      averageScore: entry.attempts ? Math.round(entry.totalPct / entry.attempts) : 0,
+      bestScore: entry.bestScore,
+      lastAttemptAt: entry.lastAttemptAt
+    }));
+  }, [filteredFullMockAttempts]);
 
   const summary = useMemo(() => {
     const topicPercentages = filteredTopicAttempts.map((attempt) => Number(attempt?.percentage || 0)).filter((value) => Number.isFinite(value));
@@ -281,6 +386,24 @@ export default function StudentTestSeriesPerformancePage() {
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
                 <option value="all">All time</option>
+              </select>
+            </label>
+            <label>
+              Course
+              <select value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}>
+                <option value="all">All Courses</option>
+                {courseOptions.map((courseName) => (
+                  <option key={courseName} value={courseName}>{courseName}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Batch
+              <select value={batchFilter} onChange={(event) => setBatchFilter(event.target.value)}>
+                <option value="all">All Batches</option>
+                {batchOptions.map((batchName) => (
+                  <option key={batchName} value={batchName}>{batchName}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -461,7 +584,7 @@ export default function StudentTestSeriesPerformancePage() {
                 {filteredTopicAttempts.map((attempt) => (
                   <article key={attempt._id} className="performance-timeline-item">
                     <div>
-                      <strong>{attempt.module} • {attempt.topic}</strong>
+                      <strong>{attempt.course || attempt.category || 'Course'} • {attempt.batch || 'No Batch'} • {attempt.module} • {attempt.topic}</strong>
                       <small>{attempt.title}</small>
                     </div>
                     <div className="performance-score-pill">
@@ -487,7 +610,7 @@ export default function StudentTestSeriesPerformancePage() {
                 {filteredFullMockAttempts.map((attempt) => (
                   <article key={attempt._id} className="performance-timeline-item">
                     <div>
-                      <strong>{attempt.title}</strong>
+                      <strong>{attempt.course || attempt.category || 'Course'} • {attempt.batch || 'No Batch'} • {attempt.title}</strong>
                       <small>{formatDateTime(attempt.submittedAt)}</small>
                     </div>
                     <div className="performance-score-pill">
