@@ -74,6 +74,7 @@ export default function StudentDashboard() {
   const [upcomingClass, setUpcomingClass] = useState(null); // { _id, title, scheduledAt, meetUrl }
   const [upcomingCountdown, setUpcomingCountdown] = useState('');
   const [communityUnreadCount, setCommunityUnreadCount] = useState(0);
+  const [communityUnreadPulse, setCommunityUnreadPulse] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('pro');
   const [isUnlockingCourse, setIsUnlockingCourse] = useState(false);
@@ -112,6 +113,7 @@ export default function StudentDashboard() {
   const cartIconButtonRef = useRef(null);
   const cartPulseTimerRef = useRef(null);
   const cartVoucherRequestRef = useRef(0);
+  const previousCommunityUnreadRef = useRef(0);
 
   useEffect(() => {
     const shouldOpenFromQuery = new URLSearchParams(location?.search || '').get('cart') === 'open';
@@ -143,6 +145,19 @@ export default function StudentDashboard() {
       window.clearInterval(intervalId);
     };
   }, [session?.token]);
+
+  useEffect(() => {
+    const previous = Number(previousCommunityUnreadRef.current || 0);
+    const current = Number(communityUnreadCount || 0);
+    if (current > previous) {
+      setCommunityUnreadPulse(true);
+      const timer = window.setTimeout(() => setCommunityUnreadPulse(false), 420);
+      previousCommunityUnreadRef.current = current;
+      return () => window.clearTimeout(timer);
+    }
+    previousCommunityUnreadRef.current = current;
+    return undefined;
+  }, [communityUnreadCount]);
 
   // Sync test-series cart across tabs / pages via storage event
   useEffect(() => {
@@ -2044,7 +2059,7 @@ export default function StudentDashboard() {
               LIVE
             </span>
             {communityUnreadCount > 0 ? (
-              <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+              <span className={`community-unread-badge${communityUnreadPulse ? ' is-bumping' : ''}`} aria-label={`${communityUnreadCount} unread community messages`}>
                 {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
               </span>
             ) : null}
@@ -2685,7 +2700,7 @@ export default function StudentDashboard() {
                   LIVE
                 </span>
                 {communityUnreadCount > 0 ? (
-                  <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+                  <span className={`community-unread-badge${communityUnreadPulse ? ' is-bumping' : ''}`} aria-label={`${communityUnreadCount} unread community messages`}>
                     {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
                   </span>
                 ) : null}

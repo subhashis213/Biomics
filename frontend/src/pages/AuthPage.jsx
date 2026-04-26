@@ -373,11 +373,35 @@ export default function AuthPage() {
 
   function triggerGoogleFromSlide() {
     const host = googleButtonRef.current;
-    if (!host) return false;
-    const candidate = host.querySelector('[role="button"], button, div[tabindex]');
-    if (!candidate || typeof candidate.click !== 'function') return false;
-    candidate.click();
-    return true;
+    const candidates = host
+      ? [
+          host.querySelector('[role="button"]'),
+          host.querySelector('button'),
+          host.querySelector('div[tabindex]'),
+          host.querySelector('iframe')
+        ].filter(Boolean)
+      : [];
+
+    for (const candidate of candidates) {
+      if (typeof candidate?.click !== 'function') continue;
+      try {
+        candidate.click();
+        return true;
+      } catch {
+        // continue with next fallback
+      }
+    }
+
+    // Fallback for browsers where GIS button is rendered in a non-clickable container.
+    if (window.google?.accounts?.id?.prompt) {
+      try {
+        window.google.accounts.id.prompt();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
   }
 
   function handleGoogleSliderPointerDown(event) {
@@ -608,25 +632,30 @@ export default function AuthPage() {
     const initializeGoogleSdk = () => {
       if (cancelled) return;
       if (!window.google?.accounts?.id || !googleButtonRef.current) return;
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        ux_mode: 'popup',
-        auto_select: false,
-        callback: (response) => {
-          const token = String(response?.credential || '').trim();
-          if (token) handleGoogleCredential(token);
-        }
-      });
-      googleButtonRef.current.innerHTML = '';
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        theme: 'filled_black',
-        size: 'large',
-        shape: 'pill',
-        text: 'signin_with',
-        width: 340
-      });
-      setIsGoogleSdkReady(true);
-      setGoogleLoadError('');
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          ux_mode: 'popup',
+          auto_select: false,
+          callback: (response) => {
+            const token = String(response?.credential || '').trim();
+            if (token) handleGoogleCredential(token);
+          }
+        });
+        googleButtonRef.current.innerHTML = '';
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'pill',
+          text: 'signin_with',
+          width: 340
+        });
+        setIsGoogleSdkReady(true);
+        setGoogleLoadError('');
+      } catch {
+        setIsGoogleSdkReady(false);
+        setGoogleLoadError('Google sign-in is unavailable right now. Please refresh and try again.');
+      }
     };
 
     const tryInitializeWithRetry = () => {

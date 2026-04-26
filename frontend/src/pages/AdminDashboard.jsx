@@ -223,10 +223,12 @@ export default function AdminDashboard() {
   const [isClearingCommunityChat, setIsClearingCommunityChat] = useState(false);
   const [isClearingAiTutorHistory, setIsClearingAiTutorHistory] = useState(false);
   const [communityUnreadCount, setCommunityUnreadCount] = useState(0);
+  const [communityUnreadPulse, setCommunityUnreadPulse] = useState(false);
   const [undoItems, setUndoItems] = useState({});
   const undoTimeoutsRef = useRef({});
   const undoIntervalsRef = useRef({});
   const pricingSaveTimeoutsRef = useRef({});
+  const previousCommunityUnreadRef = useRef(0);
   const undoActiveRef = useRef(false);
   const confirmActionRef = useRef(null);
   const bannerTimeoutRef = useRef(null);
@@ -397,6 +399,19 @@ export default function AdminDashboard() {
   useEffect(() => {
     refreshData();
   }, []);
+
+  useEffect(() => {
+    const previous = Number(previousCommunityUnreadRef.current || 0);
+    const current = Number(communityUnreadCount || 0);
+    if (current > previous) {
+      setCommunityUnreadPulse(true);
+      const timer = window.setTimeout(() => setCommunityUnreadPulse(false), 420);
+      previousCommunityUnreadRef.current = current;
+      return () => window.clearTimeout(timer);
+    }
+    previousCommunityUnreadRef.current = current;
+    return undefined;
+  }, [communityUnreadCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2291,7 +2306,7 @@ export default function AdminDashboard() {
             LIVE
           </span>
           {communityUnreadCount > 0 ? (
-            <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+            <span className={`community-unread-badge${communityUnreadPulse ? ' is-bumping' : ''}`} aria-label={`${communityUnreadCount} unread community messages`}>
               {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
             </span>
           ) : null}
@@ -2468,7 +2483,7 @@ export default function AdminDashboard() {
                   LIVE
                 </span>
                 {communityUnreadCount > 0 ? (
-                  <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+                  <span className={`community-unread-badge${communityUnreadPulse ? ' is-bumping' : ''}`} aria-label={`${communityUnreadCount} unread community messages`}>
                     {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
                   </span>
                 ) : null}

@@ -875,6 +875,34 @@ function toStreamSafeUserId(role, username) {
   return `${role}-${suffix}`.slice(0, 80);
 }
 
+async function ensureCommunityChannelMembership(streamClient, streamUserId) {
+  const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
+    name: 'Biomics Community',
+    members: [streamUserId],
+    created_by_id: streamUserId
+  });
+
+  try {
+    await channel.create();
+  } catch (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (!message.includes('already exists')) {
+      throw error;
+    }
+  }
+
+  try {
+    await channel.addMembers([streamUserId]);
+  } catch (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (!message.includes('already') && !message.includes('member')) {
+      throw error;
+    }
+  }
+
+  return channel;
+}
+
 // POST /chat/community/token — issue Stream user token for real-time community chat
 router.post('/community/token', authenticateToken(), async (req, res) => {
   try {
@@ -900,29 +928,7 @@ router.post('/community/token', authenticateToken(), async (req, res) => {
       biomicsRole: role
     });
 
-    const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
-      name: 'Biomics Community',
-      members: [streamUserId],
-      created_by_id: streamUserId
-    });
-
-    try {
-      await channel.create();
-    } catch (error) {
-      const message = String(error?.message || '').toLowerCase();
-      if (!message.includes('already exists')) {
-        throw error;
-      }
-    }
-
-    try {
-      await channel.addMembers([streamUserId]);
-    } catch (error) {
-      const message = String(error?.message || '').toLowerCase();
-      if (!message.includes('already') && !message.includes('member')) {
-        throw error;
-      }
-    }
+    const channel = await ensureCommunityChannelMembership(streamClient, streamUserId);
 
     const token = streamClient.createToken(streamUserId);
     return res.json({
@@ -968,46 +974,27 @@ router.get('/community/unread', authenticateToken(), async (req, res) => {
       biomicsRole: role
     });
 
-    const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
-      name: 'Biomics Community',
-      members: [streamUserId],
-      created_by_id: streamUserId
-    });
+    await ensureCommunityChannelMembership(streamClient, streamUserId);
 
-    try {
-      await channel.create();
-    } catch (error) {
-      const message = String(error?.message || '').toLowerCase();
-      if (!message.includes('already exists')) {
-        throw error;
+    const channels = await streamClient.queryChannels(
+      {
+        type: STREAM_CHANNEL_TYPE,
+        id: STREAM_CHANNEL_ID,
+        members: { $in: [streamUserId] }
+      },
+      { last_message_at: -1 },
+      {
+        watch: false,
+        state: true,
+        presence: false,
+        limit: 1,
+        messages: { limit: 1 },
+        members: { limit: 2 }
       }
-    }
-
-    try {
-      await channel.addMembers([streamUserId]);
-    } catch (error) {
-      const message = String(error?.message || '').toLowerCase();
-      if (!message.includes('already') && !message.includes('member')) {
-        throw error;
-      }
-    }
-
-    await channel.query({
-      state: true,
-      watch: false,
-      presence: false
-    }, {
-      id: STREAM_CHANNEL_ID
-    }, {
-      messages: { limit: 0 },
-      members: { limit: 1 },
-      watchers: { limit: 0 }
-    });
-
-    const unreadCount = Math.max(
-      0,
-      Number(channel?.state?.read?.[streamUserId]?.unread_messages || 0)
     );
+
+    const targetChannel = channels?.[0] || null;
+    const unreadCount = Math.max(0, Number(targetChannel?.state?.read?.[streamUserId]?.unread_messages || 0));
 
     return res.json({ unreadCount });
   } catch (error) {
