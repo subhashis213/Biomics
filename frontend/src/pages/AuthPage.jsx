@@ -385,14 +385,13 @@ export default function AuthPage() {
     });
   }
 
-  function triggerGoogleFromSlide() {
+  function tryGoogleRenderedButtonClick() {
     const host = googleButtonRef.current;
     const candidates = host
       ? [
           host.querySelector('[role="button"]'),
           host.querySelector('button'),
-          host.querySelector('div[tabindex]'),
-          host.querySelector('iframe')
+          host.querySelector('div[tabindex]')
         ].filter(Boolean)
       : [];
 
@@ -405,17 +404,48 @@ export default function AuthPage() {
         // continue with next fallback
       }
     }
-
-    // Fallback for browsers where GIS button is rendered in a non-clickable container.
-    if (window.google?.accounts?.id?.prompt) {
-      try {
-        window.google.accounts.id.prompt();
-        return true;
-      } catch {
-        return false;
-      }
-    }
     return false;
+  }
+
+  function triggerGoogleFromSlide() {
+    if (!window.google?.accounts?.id) {
+      return Promise.resolve(false);
+    }
+
+    // Prefer prompt first because it is the officially supported user-gesture flow.
+    if (typeof window.google.accounts.id.prompt === 'function') {
+      return new Promise((resolve) => {
+        let settled = false;
+        const settle = (value) => {
+          if (settled) return;
+          settled = true;
+          resolve(Boolean(value));
+        };
+
+        const timer = window.setTimeout(() => {
+          window.clearTimeout(timer);
+          settle(tryGoogleRenderedButtonClick());
+        }, 260);
+
+        try {
+          window.google.accounts.id.prompt((notification) => {
+            window.clearTimeout(timer);
+            const notDisplayed = Boolean(notification?.isNotDisplayed?.());
+            const skipped = Boolean(notification?.isSkippedMoment?.());
+            if (notDisplayed || skipped) {
+              settle(tryGoogleRenderedButtonClick());
+              return;
+            }
+            settle(true);
+          });
+        } catch {
+          window.clearTimeout(timer);
+          settle(tryGoogleRenderedButtonClick());
+        }
+      });
+    }
+
+    return Promise.resolve(tryGoogleRenderedButtonClick());
   }
 
   function handleGoogleSliderPointerDown(event) {
@@ -438,7 +468,7 @@ export default function AuthPage() {
     queueSlideProgressFromClientX(event.clientX);
   }
 
-  function handleGoogleSliderPointerUp(event) {
+  async function handleGoogleSliderPointerUp(event) {
     if (!isGoogleSliding) return;
     try {
       if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
@@ -449,24 +479,26 @@ export default function AuthPage() {
     }
     const progress = updateSlideProgressFromClientX(event.clientX);
     setIsGoogleSliding(false);
-    if (progress >= 0.92) {
+    if (progress >= 0.9) {
       setGoogleSlideProgress(1);
       if (!isGoogleSdkReady) {
         setGoogleLoadError('Google sign-in is loading. Please wait a moment.');
       } else {
-        const opened = triggerGoogleFromSlide();
-        if (opened) {
-          setGoogleLoadError('');
-          setGoogleSlideSuccess(true);
+        // Optimistic instant feedback on full-slide release.
+        setGoogleLoadError('');
+        setGoogleSlideSuccess(true);
+        const opened = await triggerGoogleFromSlide();
+        if (!opened) {
+          setGoogleSlideSuccess(false);
+          setGoogleLoadError('Google sign-in button is still preparing. Please try again in a second.');
+        } else {
           if (googleSuccessTimerRef.current) {
             window.clearTimeout(googleSuccessTimerRef.current);
           }
           googleSuccessTimerRef.current = window.setTimeout(() => {
             setGoogleSlideSuccess(false);
             googleSuccessTimerRef.current = 0;
-          }, 1200);
-        } else {
-          setGoogleLoadError('Google sign-in button is still preparing. Please try again in a second.');
+          }, 900);
         }
       }
     } else {
@@ -635,14 +667,14 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (!hasOriginMismatchRisk) return;
-    setIsGoogleSdkReady(false);
-    setGoogleLoadError(
-      `Google sign-in is blocked on this preview URL (${runtimeOrigin}) due to OAuth origin policy. Open ${PUBLIC_APP_URL}/auth for Google login.`
-    );
+    setGoogleLoadError((current) => (
+      current
+      || `If Google popup fails on this preview URL (${runtimeOrigin}), use ${PUBLIC_APP_URL}/auth or add this origin in Google OAuth settings.`
+    ));
   }, [PUBLIC_APP_URL, hasOriginMismatchRisk, runtimeOrigin]);
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || registerOpen || isAdminUsername || hasOriginMismatchRisk) return undefined;
+    if (!GOOGLE_CLIENT_ID || registerOpen || isAdminUsername) return undefined;
     if (typeof window === 'undefined') return undefined;
     setIsGoogleSdkReady(false);
 
@@ -726,7 +758,7 @@ export default function AuthPage() {
       cancelled = true;
       if (initRetryTimer) window.clearTimeout(initRetryTimer);
     };
-  }, [GOOGLE_CLIENT_ID, registerOpen, isAdminUsername, hasOriginMismatchRisk]);
+  }, [GOOGLE_CLIENT_ID, registerOpen, isAdminUsername]);
 
   useEffect(() => () => {
     if (googleSlideRafRef.current) {
@@ -821,7 +853,7 @@ export default function AuthPage() {
                       <div className="auth-google-slide-text">Slide to Sign in with Google</div>
                     </div>
                   </div>
-                  <div className="auth-google-hidden-host" aria-hidden="true">
+                  <div className="auth-google-hidden-host">
                     <div ref={googleButtonRef} className="auth-google-button-host" />
                   </div>
                   {googleLoadError ? <small className="field-hint">⚠ {googleLoadError}</small> : null}

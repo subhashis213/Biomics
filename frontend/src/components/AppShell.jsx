@@ -198,18 +198,22 @@ export default function AppShell({
 
   const shellPad = viewportWidth <= 375 ? 8 : viewportWidth <= 720 ? 12 : 24;
   const topbarTop = viewportWidth <= 375 ? 4 : viewportWidth <= 720 ? 6 : 8;
-  const layoutTopGap = viewportWidth <= 375 ? 18 : viewportWidth <= 720 ? 16 : 10;
-  const layoutTopPadding = topbarTop + topbarHeight + layoutTopGap;
+  const layoutTopGap = viewportWidth <= 375 ? 22 : viewportWidth <= 720 ? 20 : 18;
+  const computedTopbarClearance = Math.max(64, topbarTop + topbarHeight + 8);
+  const layoutTopPadding = Math.max(
+    topbarTop + topbarHeight + layoutTopGap,
+    computedTopbarClearance + 12
+  );
+  const contentTopGap = viewportWidth <= 375 ? 10 : viewportWidth <= 720 ? 12 : 14;
   const sidePanelTop = Math.max(8, shellPad);
   const sidePanelHeight = `calc(100dvh - ${sidePanelTop + shellPad}px)`;
 
   useEffect(() => {
-    const topbarClearance = Math.max(64, topbarTop + topbarHeight + 8);
-    document.documentElement.style.setProperty('--app-shell-topbar-clearance', `${topbarClearance}px`);
+    document.documentElement.style.setProperty('--app-shell-topbar-clearance', `${computedTopbarClearance}px`);
     return () => {
       document.documentElement.style.removeProperty('--app-shell-topbar-clearance');
     };
-  }, [topbarTop, topbarHeight]);
+  }, [computedTopbarClearance]);
 
   useEffect(() => {
     const el = topbarRef.current;
@@ -324,7 +328,7 @@ export default function AppShell({
 
       <div className={`app-shell${hasSideNav ? ' app-shell--with-nav' : ''}`}>
         <div className="app-shell-layout" style={{ paddingTop: `${layoutTopPadding}px` }}>
-          <main className="app-main-content">{children}</main>
+          <main className="app-main-content" style={{ paddingTop: `${contentTopGap}px` }}>{children}</main>
         </div>
       </div>
       {roleLabel === 'Admin' ? (

@@ -7194,10 +7194,13 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 #section-community-chat,
 #section-monthly-exam,
 #section-quiz-performance,
+#section-test-series-performance,
 #section-leaderboard,
+#section-test-series,
+#section-exam-leaderboard,
 #section-feedback,
 #section-connect {
-  scroll-margin-top: calc(var(--app-shell-topbar-clearance, 96px) + 10px);
+  scroll-margin-top: calc(var(--app-shell-topbar-clearance, 96px) + 22px);
 }
 
 .course-filter-row {
@@ -14292,7 +14295,7 @@ html[data-theme='light'] .student-dashboard-view .stat-card {
 
 .student-lecture-header {
   margin-top: 0;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
   position: relative;
 }
 
@@ -14301,11 +14304,11 @@ html[data-theme='light'] .student-dashboard-view .stat-card {
 }
 
 .student-lecture-header + .video-grid {
-  margin-top: 0;
+  margin-top: 6px;
 }
 
 .student-lecture-header + .modules-view-container {
-  margin-top: 0;
+  margin-top: 6px;
 }
 
 /* Student Module View Styles */
