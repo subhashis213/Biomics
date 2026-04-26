@@ -445,7 +445,20 @@ export default function AuthPage() {
       });
     }
 
-    return Promise.resolve(tryGoogleRenderedButtonClick());
+    // Final fallback: try rendered button click with quick retries (helps on mobile).
+    return new Promise((resolve) => {
+      if (tryGoogleRenderedButtonClick()) {
+        resolve(true);
+        return;
+      }
+      window.setTimeout(() => {
+        if (tryGoogleRenderedButtonClick()) {
+          resolve(true);
+          return;
+        }
+        window.setTimeout(() => resolve(tryGoogleRenderedButtonClick()), 160);
+      }, 120);
+    });
   }
 
   function handleGoogleSliderPointerDown(event) {
@@ -825,36 +838,38 @@ export default function AuthPage() {
                   </div>
                   <div className={`auth-google-slide-wrap${isGoogleSigningIn ? ' is-loading' : ''}${isGoogleSliding ? ' is-dragging' : ''}${googleSlideSuccess ? ' is-success' : ''}${!isGoogleSdkReady ? ' is-disabled' : ''}`}>
                     <div className="auth-google-slide-label">Slide to continue with Google</div>
-                    <div
-                      ref={googleSlideTrackRef}
-                      className="auth-google-slide-track"
-                      onPointerDown={handleGoogleSliderPointerDown}
-                      onPointerMove={handleGoogleSliderPointerMove}
-                      onPointerUp={handleGoogleSliderPointerUp}
-                      onPointerCancel={() => {
-                        setIsGoogleSliding(false);
-                        setGoogleSlideProgress(0);
-                      }}
-                    >
-                      <div className="auth-google-slide-fill" style={{ '--slide-progress': googleSlideProgress }} />
+                    <div className="auth-google-slide-track-wrap">
                       <div
-                        className="auth-google-slide-thumb"
-                        style={{ '--slide-progress': googleSlideProgress }}
-                        role="button"
-                        aria-label="Slide to sign in with Google"
+                        ref={googleSlideTrackRef}
+                        className="auth-google-slide-track"
+                        onPointerDown={handleGoogleSliderPointerDown}
+                        onPointerMove={handleGoogleSliderPointerMove}
+                        onPointerUp={handleGoogleSliderPointerUp}
+                        onPointerCancel={() => {
+                          setIsGoogleSliding(false);
+                          setGoogleSlideProgress(0);
+                        }}
                       >
-                        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-                          <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.8 0-.7-.1-1.2-.2-1.9H12z" />
-                          <path fill="#34A853" d="M3.2 7.3l3.2 2.3C7.2 8 9.4 6.5 12 6.5c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 8 2 4.6 4.2 3.2 7.3z" />
-                          <path fill="#FBBC05" d="M12 22c2.6 0 4.8-.9 6.4-2.4l-3-2.5c-.8.5-1.9.9-3.4.9-2.5 0-4.7-1.7-5.5-4l-3.3 2.5C4.6 19.8 8 22 12 22z" />
-                          <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.2-.2-1.9H12v3.9h5.5c-.3 1.4-1.2 2.5-2.2 3.3l3 2.5c1.8-1.7 3.3-4.3 3.3-7.8z" />
-                        </svg>
+                        <div className="auth-google-slide-fill" style={{ '--slide-progress': googleSlideProgress }} />
+                        <div
+                          className="auth-google-slide-thumb"
+                          style={{ '--slide-progress': googleSlideProgress }}
+                          role="button"
+                          aria-label="Slide to sign in with Google"
+                        >
+                          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                            <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.4 3.6-5.5 3.6-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.8 0 9.6-4.1 9.6-9.8 0-.7-.1-1.2-.2-1.9H12z" />
+                            <path fill="#34A853" d="M3.2 7.3l3.2 2.3C7.2 8 9.4 6.5 12 6.5c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2 8 2 4.6 4.2 3.2 7.3z" />
+                            <path fill="#FBBC05" d="M12 22c2.6 0 4.8-.9 6.4-2.4l-3-2.5c-.8.5-1.9.9-3.4.9-2.5 0-4.7-1.7-5.5-4l-3.3 2.5C4.6 19.8 8 22 12 22z" />
+                            <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.2-.2-1.9H12v3.9h5.5c-.3 1.4-1.2 2.5-2.2 3.3l3 2.5c1.8-1.7 3.3-4.3 3.3-7.8z" />
+                          </svg>
+                        </div>
+                        <div className="auth-google-slide-text">Slide to Sign in with Google</div>
                       </div>
-                      <div className="auth-google-slide-text">Slide to Sign in with Google</div>
+                      <div className="auth-google-hidden-host auth-google-hidden-host--overlay">
+                        <div ref={googleButtonRef} className="auth-google-button-host" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="auth-google-hidden-host">
-                    <div ref={googleButtonRef} className="auth-google-button-host" />
                   </div>
                   {googleLoadError ? <small className="field-hint">⚠ {googleLoadError}</small> : null}
                   {hasOriginMismatchRisk ? (
