@@ -28,6 +28,7 @@ const userSchema = new mongoose.Schema({
 	completedVideos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Video' }],
 	purchasedCourses: [{
 		course: { type: String, required: true, trim: true },
+		batch: { type: String, trim: true, default: 'General' },
 		moduleName: { type: String, trim: true, default: 'ALL_MODULES' },
 		planType: { type: String, enum: ['pro', 'elite'], default: 'pro' },
 		unlockedAt: { type: Date, default: Date.now },

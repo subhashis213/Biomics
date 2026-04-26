@@ -41,7 +41,6 @@ export default function AuthPage() {
   const [googleSlideProgress, setGoogleSlideProgress] = useState(0);
   const [isGoogleSliding, setIsGoogleSliding] = useState(false);
   const [googleSlideSuccess, setGoogleSlideSuccess] = useState(false);
-  const [googleTriggerPending, setGoogleTriggerPending] = useState(false);
   const [googleProfileDraft, setGoogleProfileDraft] = useState({
     open: false,
     completionToken: '',
@@ -383,7 +382,10 @@ export default function AuthPage() {
 
   function handleGoogleSliderPointerDown(event) {
     if (isGoogleSigningIn) return;
-    setGoogleTriggerPending(false);
+    if (!isGoogleSdkReady) {
+      setGoogleLoadError('Google sign-in is loading. Please wait a moment.');
+      return;
+    }
     setIsGoogleSliding(true);
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -412,12 +414,10 @@ export default function AuthPage() {
     if (progress >= 0.92) {
       setGoogleSlideProgress(1);
       if (!isGoogleSdkReady) {
-        setGoogleTriggerPending(true);
-        setGoogleLoadError('Preparing Google sign-in. Please wait...');
+        setGoogleLoadError('Google sign-in is loading. Please wait a moment.');
       } else {
         const opened = triggerGoogleFromSlide();
         if (opened) {
-          setGoogleTriggerPending(false);
           setGoogleLoadError('');
           setGoogleSlideSuccess(true);
           if (googleSuccessTimerRef.current) {
@@ -428,8 +428,7 @@ export default function AuthPage() {
             googleSuccessTimerRef.current = 0;
           }, 1200);
         } else {
-          setGoogleTriggerPending(true);
-          setGoogleLoadError('Google sign-in not ready yet. Please wait...');
+          setGoogleLoadError('Google sign-in button is still preparing. Please try again in a second.');
         }
       }
     } else {
@@ -438,28 +437,6 @@ export default function AuthPage() {
     }
     window.setTimeout(() => setGoogleSlideProgress(0), 180);
   }
-
-  useEffect(() => {
-    if (!googleTriggerPending || !isGoogleSdkReady || isGoogleSigningIn) return;
-    const timer = window.setTimeout(() => {
-      const opened = triggerGoogleFromSlide();
-      if (opened) {
-        setGoogleTriggerPending(false);
-        setGoogleLoadError('');
-        setGoogleSlideSuccess(true);
-        if (googleSuccessTimerRef.current) {
-          window.clearTimeout(googleSuccessTimerRef.current);
-        }
-        googleSuccessTimerRef.current = window.setTimeout(() => {
-          setGoogleSlideSuccess(false);
-          googleSuccessTimerRef.current = 0;
-        }, 1200);
-      } else {
-        setGoogleLoadError('Google sign-in still loading. Please slide once more.');
-      }
-    }, 220);
-    return () => window.clearTimeout(timer);
-  }, [googleTriggerPending, isGoogleSdkReady, isGoogleSigningIn]);
 
   async function handleGoogleProfileSubmit(event) {
     event?.preventDefault?.();
@@ -763,7 +740,7 @@ export default function AuthPage() {
                     </span>
                     <span>Google Sign-In</span>
                   </div>
-                  <div className={`auth-google-slide-wrap${isGoogleSigningIn ? ' is-loading' : ''}${isGoogleSliding ? ' is-dragging' : ''}${googleSlideSuccess ? ' is-success' : ''}`}>
+                  <div className={`auth-google-slide-wrap${isGoogleSigningIn ? ' is-loading' : ''}${isGoogleSliding ? ' is-dragging' : ''}${googleSlideSuccess ? ' is-success' : ''}${!isGoogleSdkReady ? ' is-disabled' : ''}`}>
                     <div className="auth-google-slide-label">Slide to continue with Google</div>
                     <div
                       ref={googleSlideTrackRef}

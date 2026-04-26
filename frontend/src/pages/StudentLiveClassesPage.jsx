@@ -793,7 +793,7 @@ export default function StudentLiveClassesPage() {
                                           <div className="livekit-student-week-event-copy">
                                             <strong>{entry.title}</strong>
                                             <span>{isUltraCompactEvent ? formatCompactTimeRange(entry.startsAt, entry.endsAt) : formatTimeRange(entry.startsAt, entry.endsAt)}</span>
-                                            {!isUltraCompactEvent ? <small>{entry.course || 'General'}</small> : null}
+                                            {!isUltraCompactEvent ? <small>{`${entry.course || 'General'} • ${entry.batch || 'General'}`}</small> : null}
                                           </div>
                                         </button>
                                       );

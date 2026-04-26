@@ -141,14 +141,15 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
 router.delete('/', authenticateToken('admin'), async (req, res) => {
   const category = normalizeValue(req.body.category || '');
   const name = normalizeValue(req.body.name || '');
+  const batch = normalizeValue(req.body.batch || 'General') || 'General';
   if (!category || !name) {
     return res.status(400).json({ error: 'category and name are required' });
   }
 
   try {
-    await Module.deleteOne({ category, name });
+    await Module.deleteOne({ category, name, batch });
     await Topic.deleteMany({ category, module: name });
-    await ModulePricing.deleteOne({ category, moduleName: name });
+    await ModulePricing.deleteOne({ category, batch, moduleName: name });
     return res.json({ message: 'Module removed' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove module' });
@@ -181,19 +182,20 @@ router.put('/rename', authenticateToken('admin'), async (req, res) => {
   const category = normalizeValue(req.body.category || '');
   const oldName = normalizeValue(req.body.oldName || '');
   const newName = normalizeValue(req.body.newName || '');
+  const batch = normalizeValue(req.body.batch || 'General') || 'General';
   if (!category || !oldName || !newName) {
     return res.status(400).json({ error: 'category, oldName and newName are required' });
   }
   if (oldName === newName) return res.json({ message: 'No change' });
 
   try {
-    const existing = await Module.findOne({ category, name: newName }).lean();
+    const existing = await Module.findOne({ category, name: newName, batch }).lean();
     if (existing) return res.status(409).json({ error: 'A module with this name already exists' });
 
-    await Module.updateOne({ category, name: oldName }, { $set: { name: newName } });
+    await Module.updateOne({ category, name: oldName, batch }, { $set: { name: newName } });
     await Topic.updateMany({ category, module: oldName }, { $set: { module: newName } });
     await Video.updateMany({ category, module: oldName }, { $set: { module: newName } });
-    await ModulePricing.updateOne({ category, moduleName: oldName }, { $set: { moduleName: newName } });
+    await ModulePricing.updateOne({ category, batch, moduleName: oldName }, { $set: { moduleName: newName } });
     return res.json({ message: 'Module renamed' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to rename module' });

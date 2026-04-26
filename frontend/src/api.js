@@ -505,17 +505,17 @@ export async function fetchStudentCourseVideoProgress() {
   return { progressByCourse };
 }
 
-export function createCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES', course = '') {
+export function createCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES', course = '', batch = 'General') {
   return requestJson('/payments/create-order', {
     method: 'POST',
-    body: JSON.stringify({ planType, voucherCode, moduleName, course })
+    body: JSON.stringify({ planType, voucherCode, moduleName, course, batch })
   });
 }
 
-export function previewCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES', course = '') {
+export function previewCourseOrder(planType, voucherCode = '', moduleName = 'ALL_MODULES', course = '', batch = 'General') {
   return requestJson('/payments/preview-order', {
     method: 'POST',
-    body: JSON.stringify({ planType, voucherCode, moduleName, course })
+    body: JSON.stringify({ planType, voucherCode, moduleName, course, batch })
   });
 }
 
@@ -532,6 +532,10 @@ export function fetchCoursePricingAdmin() {
 
 export function fetchCourseBatchesStudent(course) {
   return requestJson(`/payments/catalog/${encodeURIComponent(course)}/batches`);
+}
+
+export function fetchBatchModulesStudent(course, batch) {
+  return requestJson(`/payments/catalog/${encodeURIComponent(course)}/batches/${encodeURIComponent(batch)}/modules`);
 }
 
 export function fetchStudentCourseVouchers(course = '') {
@@ -566,13 +570,17 @@ export function saveBatchPricingAdmin(course, batchName, payload) {
   });
 }
 
-export function fetchModulePricingAdmin(course) {
-  return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}/modules`);
+export function fetchModulePricingAdmin(course, batch = 'General') {
+  const qs = new URLSearchParams();
+  if (batch) qs.set('batch', batch);
+  return requestJson(`/payments/admin/pricing/${encodeURIComponent(course)}/modules${qs.toString() ? `?${qs.toString()}` : ''}`);
 }
 
-export function saveModulePricingAdmin(course, moduleName, payload) {
+export function saveModulePricingAdmin(course, moduleName, payload, batch = 'General') {
+  const qs = new URLSearchParams();
+  if (batch) qs.set('batch', batch);
   return requestJson(
-    `/payments/admin/pricing/${encodeURIComponent(course)}/${encodeURIComponent(moduleName)}`,
+    `/payments/admin/pricing/${encodeURIComponent(course)}/${encodeURIComponent(moduleName)}${qs.toString() ? `?${qs.toString()}` : ''}`,
     { method: 'PUT', body: JSON.stringify(payload) }
   );
 }
@@ -913,6 +921,10 @@ export function fetchCommunityChatToken() {
     method: 'POST',
     body: JSON.stringify({})
   });
+}
+
+export function fetchCommunityChatUnreadCount() {
+  return requestJson('/chat/community/unread');
 }
 
 export function clearCommunityChatAdmin() {

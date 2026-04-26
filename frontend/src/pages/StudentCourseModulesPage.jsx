@@ -147,6 +147,11 @@ export default function StudentCourseModulesPage() {
       if (!query) return true;
       return moduleMetaByKey[key].module.toLowerCase().includes(query);
     });
+  const lockedModuleCount = sortedModuleKeys.filter((moduleKey) => {
+    const meta = moduleMetaByKey[moduleKey];
+    const moduleAccess = getModuleAccess(meta.module);
+    return Boolean(moduleAccess?.purchaseRequired && !moduleAccess?.unlocked);
+  }).length;
 
   // Overall course progress
   const totalVideos = videos.filter((v) => normalizeText(v?.category || 'General') === decodedCourse);
@@ -207,6 +212,18 @@ export default function StudentCourseModulesPage() {
           <span className="course-modules-progress-pct">{overallProgress}%</span>
         </div>
       </section>
+      {!allModulesUnlocked && lockedModuleCount > 0 ? (
+        <p className="banner info">
+          {`${lockedModuleCount} module${lockedModuleCount === 1 ? '' : 's'} locked in this course. `}
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => navigate(`/student/course/${encodeURIComponent(decodedCourse)}/batches`)}
+          >
+            Upgrade or buy single modules
+          </button>
+        </p>
+      ) : null}
 
       {isLoading ? (
         <div className="modules-grid-student">

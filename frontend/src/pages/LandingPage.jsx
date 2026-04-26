@@ -85,6 +85,14 @@ function SocialIcon({ kind }) {
       </svg>
     );
   }
+  if (kind === 'whatsapp') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 21l2-5.5A8.5 8.5 0 1 1 21 11.5z" />
+        <path d="M9.5 9.5c.4-1 1-.9 1.3-.8.3.1.8.7.9 1 .1.3.1.6-.1.9l-.4.6c-.1.2 0 .5.2.8.3.5.8 1 1.3 1.3.3.2.6.3.8.2l.6-.4c.3-.2.6-.2.9-.1.3.1.9.6 1 1 .1.3.2.9-.8 1.3-.9.4-2.1.2-3.7-.8a8.3 8.3 0 0 1-2.1-2.1c-1-1.6-1.2-2.8-.8-3.7z" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polygon points="23 7 16 12 23 17 23 7" />
@@ -752,6 +760,7 @@ export default function LandingPage() {
               { label: 'Instagram', handle: '@biomics_hub', href: 'https://www.instagram.com/biomics_hub', icon: 'instagram', color: '#e1306c' },
               { label: 'Telegram', handle: 'Join Channel', href: 'https://t.me/+WVyK_obKmJ8BbxG6', icon: 'telegram', color: '#2aabee' },
               { label: 'YouTube', handle: '@biomicshub5733', href: 'https://www.youtube.com/@biomicshub5733', icon: 'youtube', color: '#ff0000' },
+              { label: 'WhatsApp', handle: 'Join Group', href: 'https://chat.whatsapp.com/Fc8P3ZUDhfYDw6swMKDHOI', icon: 'whatsapp', color: '#22c55e' },
             ].map((s) => (
               <a
                 key={s.label}

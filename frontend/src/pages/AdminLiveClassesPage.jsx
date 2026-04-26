@@ -139,6 +139,7 @@ export default function AdminLiveClassesPage() {
   const [isDeletingClassId, setIsDeletingClassId] = useState('');
   const [blockForm, setBlockForm] = useState({
     course: '',
+    batch: 'General',
     title: '',
     description: '',
     startsAt: '',
@@ -149,6 +150,7 @@ export default function AdminLiveClassesPage() {
     open: false,
     blockId: '',
     course: '',
+    batch: 'General',
     title: '',
     description: '',
     startsAt: '',
@@ -295,6 +297,34 @@ export default function AdminLiveClassesPage() {
     });
   }, [classForm.course, workspace.availableBatchesByCourse]);
 
+  const blockBatchOptions = useMemo(() => {
+    const selectedCourse = String(blockForm.course || '').trim();
+    if (!selectedCourse) return ['General'];
+    const fromWorkspace = Array.isArray(workspace.availableBatchesByCourse?.[selectedCourse])
+      ? workspace.availableBatchesByCourse[selectedCourse]
+      : [];
+    const merged = Array.from(new Set(['General', ...fromWorkspace.filter(Boolean)]));
+    return merged.sort((left, right) => {
+      if (left === 'General') return -1;
+      if (right === 'General') return 1;
+      return left.localeCompare(right, undefined, { sensitivity: 'base' });
+    });
+  }, [blockForm.course, workspace.availableBatchesByCourse]);
+
+  const editingBlockBatchOptions = useMemo(() => {
+    const selectedCourse = String(editingBlock.course || '').trim();
+    if (!selectedCourse) return ['General'];
+    const fromWorkspace = Array.isArray(workspace.availableBatchesByCourse?.[selectedCourse])
+      ? workspace.availableBatchesByCourse[selectedCourse]
+      : [];
+    const merged = Array.from(new Set(['General', ...fromWorkspace.filter(Boolean)]));
+    return merged.sort((left, right) => {
+      if (left === 'General') return -1;
+      if (right === 'General') return 1;
+      return left.localeCompare(right, undefined, { sensitivity: 'base' });
+    });
+  }, [editingBlock.course, workspace.availableBatchesByCourse]);
+
   useEffect(() => {
     if (!classForm.course) {
       if (classForm.batch !== 'General') {
@@ -306,6 +336,31 @@ export default function AdminLiveClassesPage() {
       setClassForm((current) => ({ ...current, batch: 'General' }));
     }
   }, [classBatchOptions, classForm.batch, classForm.course]);
+
+  useEffect(() => {
+    if (!blockForm.course) {
+      if (blockForm.batch !== 'General') {
+        setBlockForm((current) => ({ ...current, batch: 'General' }));
+      }
+      return;
+    }
+    if (!blockBatchOptions.includes(blockForm.batch)) {
+      setBlockForm((current) => ({ ...current, batch: 'General' }));
+    }
+  }, [blockBatchOptions, blockForm.batch, blockForm.course]);
+
+  useEffect(() => {
+    if (!editingBlock.open) return;
+    if (!editingBlock.course) {
+      if (editingBlock.batch !== 'General') {
+        setEditingBlock((current) => ({ ...current, batch: 'General' }));
+      }
+      return;
+    }
+    if (!editingBlockBatchOptions.includes(editingBlock.batch)) {
+      setEditingBlock((current) => ({ ...current, batch: 'General' }));
+    }
+  }, [editingBlock.open, editingBlock.course, editingBlock.batch, editingBlockBatchOptions]);
 
   const groupedCalendarBlocks = useMemo(
     () => groupAgendaEntries(workspace.calendarBlocks || []),
@@ -444,13 +499,14 @@ export default function AdminLiveClassesPage() {
     try {
       await createLivekitCalendarBlock({
         course: blockForm.course,
+        batch: blockForm.batch || 'General',
         title: blockForm.title,
         description: blockForm.description,
         startsAt: toLocalInputIsoString(blockForm.startsAt),
         endsAt: toLocalInputIsoString(blockForm.endsAt)
       });
       setBanner({ type: 'success', text: 'Course calendar block created.' });
-      setBlockForm((current) => ({ ...current, title: '', description: '', startsAt: '', endsAt: '' }));
+      setBlockForm((current) => ({ ...current, batch: 'General', title: '', description: '', startsAt: '', endsAt: '' }));
       await loadWorkspace();
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to create calendar block.' });
@@ -475,6 +531,7 @@ export default function AdminLiveClassesPage() {
       open: true,
       blockId: String(block._id),
       course: String(block.course || '').trim(),
+      batch: String(block.batch || 'General').trim() || 'General',
       title: String(block.title || '').trim(),
       description: String(block.description || '').trim(),
       startsAt: toDateTimeLocalInput(block.startsAt),
@@ -488,6 +545,7 @@ export default function AdminLiveClassesPage() {
       open: false,
       blockId: '',
       course: '',
+      batch: 'General',
       title: '',
       description: '',
       startsAt: '',
@@ -504,6 +562,7 @@ export default function AdminLiveClassesPage() {
     try {
       await updateLivekitCalendarBlock(blockId, {
         course: editingBlock.course,
+        batch: editingBlock.batch || 'General',
         title: editingBlock.title,
         description: editingBlock.description,
         startsAt: toLocalInputIsoString(editingBlock.startsAt),
@@ -526,7 +585,7 @@ export default function AdminLiveClassesPage() {
       title: String(block.title || '').trim(),
       description: String(block.description || '').trim(),
       course: String(block.course || '').trim(),
-      batch: 'General',
+      batch: String(block.batch || 'General').trim() || 'General',
       scheduledAt: toDateTimeLocalInput(block.startsAt),
       scheduledEndAt: toDateTimeLocalInput(block.endsAt),
       allowedUsernames: ''
@@ -819,6 +878,18 @@ export default function AdminLiveClassesPage() {
                   </select>
                 </label>
                 <label>
+                  <span>Batch access</span>
+                  <select
+                    value={blockForm.batch}
+                    onChange={(event) => setBlockForm((current) => ({ ...current, batch: event.target.value || 'General' }))}
+                    disabled={!blockForm.course}
+                  >
+                    {blockBatchOptions.map((batchName) => (
+                      <option key={`block-batch-${batchName}`} value={batchName}>{batchName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   <span>Block title</span>
                   <input type="text" value={blockForm.title} onChange={(event) => setBlockForm((current) => ({ ...current, title: event.target.value }))} placeholder="Molecular Biology revision block" required />
                 </label>
@@ -860,12 +931,13 @@ export default function AdminLiveClassesPage() {
                           <article key={block._id} className="livekit-calendar-event-card kind-blocked-slot">
                             <div className="livekit-calendar-event-topline">
                               <span className="livekit-calendar-course-pill">{block.course}</span>
+                              <span className="livekit-calendar-course-pill">{block.batch || 'General'}</span>
                               <span>{formatTimeRange(block.startsAt, block.endsAt)}</span>
                             </div>
                             <strong>{block.title}</strong>
                             <p>{block.description || 'Shared course schedule block.'}</p>
                             <div className="livekit-calendar-event-actions">
-                              <span>Visible to all students on this course</span>
+                              <span>{(block.batch || 'General') === 'General' ? 'Visible to all batches for this course' : `Visible only to ${block.batch} batch in this course`}</span>
                               <div className="livekit-calendar-inline-actions">
                                 <button type="button" className="secondary-btn" onClick={() => openEditBlockDialog(block)}>Edit</button>
                                 <button type="button" className="secondary-btn" onClick={() => handleDeleteBlock(block._id)}>Remove</button>
@@ -953,6 +1025,18 @@ export default function AdminLiveClassesPage() {
                     <option value="">Select course</option>
                     {calendarCourseOptions.map((courseName) => (
                       <option key={`edit-${courseName}`} value={courseName}>{courseName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Batch access</span>
+                  <select
+                    value={editingBlock.batch}
+                    onChange={(event) => setEditingBlock((current) => ({ ...current, batch: event.target.value || 'General' }))}
+                    disabled={!editingBlock.course}
+                  >
+                    {editingBlockBatchOptions.map((batchName) => (
+                      <option key={`edit-block-batch-${batchName}`} value={batchName}>{batchName}</option>
                     ))}
                   </select>
                 </label>

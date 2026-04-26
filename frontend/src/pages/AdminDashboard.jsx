@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   clearAiTutorHistoryAdmin,
   clearCommunityChatAdmin,
+  fetchCommunityChatUnreadCount,
   createAnnouncementAdmin,
   createVoucherAdmin,
   deleteQuiz,
@@ -221,6 +222,7 @@ export default function AdminDashboard() {
   const [isSavingVoucher, setIsSavingVoucher] = useState(false);
   const [isClearingCommunityChat, setIsClearingCommunityChat] = useState(false);
   const [isClearingAiTutorHistory, setIsClearingAiTutorHistory] = useState(false);
+  const [communityUnreadCount, setCommunityUnreadCount] = useState(0);
   const [undoItems, setUndoItems] = useState({});
   const undoTimeoutsRef = useRef({});
   const undoIntervalsRef = useRef({});
@@ -2288,6 +2290,11 @@ export default function AdminDashboard() {
             <span className="live-badge-dot" />
             LIVE
           </span>
+          {communityUnreadCount > 0 ? (
+            <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+              {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
+            </span>
+          ) : null}
         </span>
       ),
       icon: '💬'
@@ -2333,6 +2340,30 @@ export default function AdminDashboard() {
     { id: 'upload', label: 'Upload' }
   ];
   const activeCourseModalStepIndex = courseModalSteps.findIndex((step) => step.id === modalStep);
+
+  useEffect(() => {
+    const currentSession = getSession();
+    if (!currentSession?.token) return undefined;
+    let cancelled = false;
+
+    const syncCommunityUnread = async () => {
+      try {
+        const data = await fetchCommunityChatUnreadCount();
+        if (!cancelled) {
+          setCommunityUnreadCount(Math.max(0, Number(data?.unreadCount || 0)));
+        }
+      } catch {
+        if (!cancelled) setCommunityUnreadCount(0);
+      }
+    };
+
+    syncCommunityUnread();
+    const intervalId = window.setInterval(syncCommunityUnread, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   return (
     <AppShell
@@ -2436,6 +2467,11 @@ export default function AdminDashboard() {
                   <span className="live-badge-dot" />
                   LIVE
                 </span>
+                {communityUnreadCount > 0 ? (
+                  <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+                    {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
+                  </span>
+                ) : null}
               </p>
               <h2>Live student-admin community chat</h2>
               <p className="subtitle">Join the real-time room where admins and students can discuss doubts and updates together.</p>

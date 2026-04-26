@@ -42,6 +42,7 @@ export default function CommunityChatPage() {
 
         const nextChannel = streamClient.channel(data.channel.type, data.channel.id);
         await nextChannel.watch();
+        await nextChannel.markRead().catch(() => {});
 
         if (!mounted) return;
         setClient(streamClient);

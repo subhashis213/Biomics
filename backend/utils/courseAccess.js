@@ -16,6 +16,11 @@ function normalizeModuleName(value) {
   return String(value || '').replace(/\s+/g, ' ').trim() || 'General';
 }
 
+function normalizeBatchName(value) {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  return normalized || 'General';
+}
+
 function getMembershipPlan(planType) {
   return MEMBERSHIP_PLANS[String(planType || '').trim().toLowerCase()] || null;
 }
@@ -31,9 +36,10 @@ function getPlanPriceInPaise(pricing, planType) {
  * Returns active membership for a specific module (or ALL_MODULES bundle).
  * An ALL_MODULES entry also grants access to every individual module.
  */
-function getActiveModuleMembership(userDoc, course, moduleName) {
+function getActiveModuleMembership(userDoc, course, moduleName, batchName = 'General') {
   const normalizedCourse = normalizeCourseName(course);
   const normalizedModule = normalizeModuleName(moduleName);
+  const normalizedBatch = normalizeBatchName(batchName);
   if (!userDoc || !normalizedCourse || !Array.isArray(userDoc.purchasedCourses)) return null;
   const now = Date.now();
 
@@ -44,8 +50,17 @@ function getActiveModuleMembership(userDoc, course, moduleName) {
   };
 
   // Check bundle (ALL_MODULES) — gives access to every module
+  const matchBatch = (entryBatch) => {
+    const stored = normalizeBatchName(entryBatch);
+    return stored === normalizedBatch || stored === 'General';
+  };
+
   const bundleEntry = userDoc.purchasedCourses
-    .filter((e) => normalizeCourseName(e?.course) === normalizedCourse && normalizeModuleName(e?.moduleName) === ALL_MODULES)
+    .filter((e) => (
+      normalizeCourseName(e?.course) === normalizedCourse
+      && normalizeModuleName(e?.moduleName) === ALL_MODULES
+      && matchBatch(e?.batch)
+    ))
     .filter(isActive)
     .sort((a, b) => new Date(b?.expiresAt || 0).getTime() - new Date(a?.expiresAt || 0).getTime())[0];
   if (bundleEntry) return bundleEntry;
@@ -55,7 +70,11 @@ function getActiveModuleMembership(userDoc, course, moduleName) {
 
   // Check individual module entry
   const moduleEntry = userDoc.purchasedCourses
-    .filter((e) => normalizeCourseName(e?.course) === normalizedCourse && normalizeModuleName(e?.moduleName) === normalizedModule)
+    .filter((e) => (
+      normalizeCourseName(e?.course) === normalizedCourse
+      && normalizeModuleName(e?.moduleName) === normalizedModule
+      && matchBatch(e?.batch)
+    ))
     .filter(isActive)
     .sort((a, b) => new Date(b?.expiresAt || 0).getTime() - new Date(a?.expiresAt || 0).getTime())[0];
 
@@ -86,9 +105,10 @@ async function getCoursePricingDocs(course) {
 }
 
 /** Fetch a single pricing doc for a course + module. */
-async function getModulePricingDoc(course, moduleName) {
+async function getModulePricingDoc(course, moduleName, batchName = 'General') {
   const normalized = normalizeCourseName(course);
   const normalizedMod = normalizeModuleName(moduleName);
+  const normalizedBatch = normalizeBatchName(batchName);
   if (!normalized) return null;
 
   // First try batch-level pricing (if moduleName happens to be a batch name)
@@ -101,14 +121,26 @@ async function getModulePricingDoc(course, moduleName) {
 
   const direct = await ModulePricing.findOne({
     category: normalized,
+    batch: normalizedBatch,
     moduleName: normalizedMod,
     active: true
   }).lean();
   if (direct) return direct;
 
+  const generalFallback = await ModulePricing.findOne({
+    category: normalized,
+    batch: 'General',
+    moduleName: normalizedMod,
+    active: true
+  }).lean();
+  if (generalFallback) return generalFallback;
+
   // Backward-compat fallback for legacy records with inconsistent spacing.
   const candidates = await ModulePricing.find({ category: normalized, active: true }).lean();
-  return candidates.find((entry) => normalizeModuleName(entry.moduleName) === normalizedMod) || null;
+  return candidates.find(
+    (entry) => normalizeModuleName(entry.moduleName) === normalizedMod
+      && (normalizeBatchName(entry.batch) === normalizedBatch || normalizeBatchName(entry.batch) === 'General')
+  ) || null;
 }
 
 /**
@@ -118,13 +150,14 @@ async function getModulePricingDoc(course, moduleName) {
  *  - User has an active ALL_MODULES bundle
  *  - User has an active individual module entry for that module
  */
-async function hasModuleAccess(userDoc, course, moduleName) {
+async function hasModuleAccess(userDoc, course, moduleName, batchName = 'General') {
   const normalizedCourse = normalizeCourseName(course);
   const normalizedModule = normalizeModuleName(moduleName);
+  const normalizedBatch = normalizeBatchName(batchName);
   if (!userDoc || !normalizedCourse) return false;
 
   const enrolledCourse = normalizeCourseName(userDoc.class);
-  const hasMembership = Boolean(getActiveModuleMembership(userDoc, normalizedCourse, normalizedModule));
+  const hasMembership = Boolean(getActiveModuleMembership(userDoc, normalizedCourse, normalizedModule, normalizedBatch));
 
   // Prevent accidental cross-course access from being treated as free content.
   // A different course requires an explicit active membership for that course.
@@ -132,7 +165,7 @@ async function hasModuleAccess(userDoc, course, moduleName) {
     return false;
   }
 
-  const pricingDoc = await getModulePricingDoc(normalizedCourse, normalizedModule);
+  const pricingDoc = await getModulePricingDoc(normalizedCourse, normalizedModule, normalizedBatch);
   const isFree = !pricingDoc
     || (Number(pricingDoc.proPriceInPaise || 0) <= 0 && Number(pricingDoc.elitePriceInPaise || 0) <= 0);
   if (isFree) {
@@ -181,6 +214,7 @@ module.exports = {
   getActiveModuleMembership,
   normalizeCourseName,
   normalizeModuleName,
+  normalizeBatchName,
   getCoursePricing,
   getCoursePricingDocs,
   getModulePricingDoc,

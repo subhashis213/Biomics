@@ -59,6 +59,7 @@ const updatePremiumAccessSchema = z.object({
 
 const createCalendarBlockSchema = z.object({
   course: z.string().min(1).max(120),
+  batch: z.string().max(120).optional().default(GENERAL_BATCH),
   title: z.string().min(1).max(120),
   description: z.string().max(240).optional().default(''),
   startsAt: z.string().datetime(),
@@ -330,6 +331,7 @@ function serializeCalendarBlock(entry, fallback = {}) {
   return {
     _id: String(entry?._id || fallback._id || ''),
     course: String(entry?.course || fallback.course || '').trim(),
+    batch: normalizeBatchName(entry?.batch || fallback.batch || GENERAL_BATCH),
     title: String(entry?.title || fallback.title || '').trim(),
     description: String(entry?.description || fallback.description || '').trim(),
     startsAt: entry?.startsAt || fallback.startsAt || null,
@@ -345,6 +347,7 @@ function getCalendarBlockSignature(entry) {
 
   return [
     normalizeCourseName(entry?.course),
+    normalizeBatchName(entry?.batch),
     String(entry?.title || '').trim().toLowerCase(),
     startsAt && !Number.isNaN(startsAt.getTime()) ? startsAt.toISOString() : '',
     endsAt && !Number.isNaN(endsAt.getTime()) ? endsAt.toISOString() : '',
@@ -402,7 +405,13 @@ function buildCalendarEntries(user, classes = [], accessibleCourseNames = []) {
   const manualBlocks = dedupeCalendarBlocks([...sharedCalendarBlocks, ...legacyCalendarBlocks])
     .filter((entry) => {
       const course = normalizeCourseName(entry?.course);
-      return Boolean(course) && activeCourses.has(course);
+      if (!course || !activeCourses.has(course)) return false;
+      const batch = normalizeBatchName(entry?.batch);
+      if (batch === GENERAL_BATCH) return true;
+      return Boolean(
+        getActiveModuleMembership(user, course, batch)
+        || getActiveModuleMembership(user, course, ALL_MODULES)
+      );
     })
     .map((entry) => ({
       id: String(entry?._id || ''),
@@ -412,6 +421,7 @@ function buildCalendarEntries(user, classes = [], accessibleCourseNames = []) {
       endsAt: entry?.endsAt || null,
       kind: String(entry?.kind || 'blocked-slot').trim() || 'blocked-slot',
       course: normalizeCourseName(entry?.course),
+      batch: normalizeBatchName(entry?.batch),
       liveClassId: entry?.liveClassId ? String(entry.liveClassId) : '',
       status: 'blocked'
     }));
@@ -579,6 +589,13 @@ router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
         .filter((classDoc) => normalizeCourseName(classDoc?.course) === normalizeCourseName(courseName))
         .forEach((classDoc) => {
           const batchName = normalizeBatchName(classDoc?.batch);
+          if (batchName && batchName !== GENERAL_BATCH) set.add(batchName);
+        });
+
+      mergedCalendarBlocks
+        .filter((entry) => normalizeCourseName(entry?.course) === normalizeCourseName(courseName))
+        .forEach((entry) => {
+          const batchName = normalizeBatchName(entry?.batch);
           if (batchName && batchName !== GENERAL_BATCH) set.add(batchName);
         });
 
@@ -1105,6 +1122,7 @@ router.post('/calendar/blocks', authenticateToken('admin'), validate(createCalen
 
     const block = await LiveClassCalendarBlock.create({
       course,
+      batch: normalizeBatchName(req.body.batch),
       title: String(req.body.title || '').trim(),
       description: String(req.body.description || '').trim(),
       startsAt,
@@ -1117,7 +1135,7 @@ router.post('/calendar/blocks', authenticateToken('admin'), validate(createCalen
       action: 'CREATE_LIVEKIT_CALENDAR_BLOCK',
       targetType: 'Course',
       targetId: course,
-      details: { title: req.body.title, startsAt, endsAt }
+      details: { title: req.body.title, batch: normalizeBatchName(req.body.batch), startsAt, endsAt }
     });
 
     notifyStudentWorkspaceUpdated('calendar-block-created');
@@ -1127,6 +1145,7 @@ router.post('/calendar/blocks', authenticateToken('admin'), validate(createCalen
       block: {
         _id: String(block?._id || ''),
         course,
+        batch: normalizeBatchName(block?.batch),
         title: String(block?.title || '').trim(),
         description: String(block?.description || '').trim(),
         startsAt: block?.startsAt || null,
@@ -1160,6 +1179,7 @@ router.patch('/calendar/blocks/:blockId', authenticateToken('admin'), validate(u
     }
 
     block.course = course;
+    block.batch = normalizeBatchName(req.body.batch);
     block.title = String(req.body.title || '').trim();
     block.description = String(req.body.description || '').trim();
     block.startsAt = startsAt;
@@ -1170,7 +1190,7 @@ router.patch('/calendar/blocks/:blockId', authenticateToken('admin'), validate(u
       action: 'UPDATE_LIVEKIT_CALENDAR_BLOCK',
       targetType: 'Course',
       targetId: course,
-      details: { blockId, title: block.title, startsAt, endsAt }
+      details: { blockId, title: block.title, batch: block.batch, startsAt, endsAt }
     });
 
     notifyStudentWorkspaceUpdated('calendar-block-updated');
@@ -1180,6 +1200,7 @@ router.patch('/calendar/blocks/:blockId', authenticateToken('admin'), validate(u
       block: {
         _id: String(block?._id || ''),
         course,
+        batch: normalizeBatchName(block?.batch),
         title: String(block?.title || '').trim(),
         description: String(block?.description || '').trim(),
         startsAt: block?.startsAt || null,
@@ -1222,6 +1243,14 @@ router.delete('/calendar/blocks/:blockId', authenticateToken('admin'), async (re
     if (block) {
       const matchingLegacyBlock = {
         course: String(block?.course || '').trim(),
+        batch: normalizeBatchName(block?.batch),
+        title: String(block?.title || '').trim(),
+        startsAt: block?.startsAt || null,
+        endsAt: block?.endsAt || null,
+        kind: String(block?.kind || 'blocked-slot').trim() || 'blocked-slot'
+      };
+      const matchingLegacyBlockWithoutBatch = {
+        course: String(block?.course || '').trim(),
         title: String(block?.title || '').trim(),
         startsAt: block?.startsAt || null,
         endsAt: block?.endsAt || null,
@@ -1232,13 +1261,15 @@ router.delete('/calendar/blocks/:blockId', authenticateToken('admin'), async (re
         {
           $or: [
             { liveClassCalendarBlocks: { $elemMatch: matchingLegacyBlock } },
-            { calendarBlocks: { $elemMatch: matchingLegacyBlock } }
+            { calendarBlocks: { $elemMatch: matchingLegacyBlock } },
+            { liveClassCalendarBlocks: { $elemMatch: matchingLegacyBlockWithoutBatch } },
+            { calendarBlocks: { $elemMatch: matchingLegacyBlockWithoutBatch } }
           ]
         },
         {
           $pull: {
-            liveClassCalendarBlocks: matchingLegacyBlock,
-            calendarBlocks: matchingLegacyBlock
+            liveClassCalendarBlocks: { $or: [matchingLegacyBlock, matchingLegacyBlockWithoutBatch] },
+            calendarBlocks: { $or: [matchingLegacyBlock, matchingLegacyBlockWithoutBatch] }
           }
         }
       ).catch(() => ({ modifiedCount: 0 }));

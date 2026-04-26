@@ -11,6 +11,14 @@ function rupees(paise) {
   return `₹${(Number(paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
+function normalizeCourseKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function resolveTestCourseName(test = {}) {
+  return String(test?.category || test?.course || '').trim();
+}
+
 export default function AdminTestSeriesHubPage() {
   const navigate = useNavigate();
   const [topicTestCount, setTopicTestCount] = useState(0);
@@ -24,14 +32,26 @@ export default function AdminTestSeriesHubPage() {
 
   useAutoDismissMessage(banner, setBanner);
 
-  async function loadCounts() {
+  async function loadCounts(validCourseSet = null) {
     try {
       const [topicRes, mockRes] = await Promise.all([
         requestJson('/test-series/topic-tests/admin'),
         requestJson('/test-series/full-mocks/admin')
       ]);
-      setTopicTestCount(Array.isArray(topicRes?.tests) ? topicRes.tests.length : 0);
-      setFullMockCount(Array.isArray(mockRes?.mocks) ? mockRes.mocks.length : 0);
+      const allTopicTests = Array.isArray(topicRes?.tests) ? topicRes.tests : [];
+      const allFullMocks = Array.isArray(mockRes?.mocks) ? mockRes.mocks : [];
+
+      if (validCourseSet instanceof Set && validCourseSet.size > 0) {
+        setTopicTestCount(
+          allTopicTests.filter((test) => validCourseSet.has(normalizeCourseKey(resolveTestCourseName(test)))).length
+        );
+        setFullMockCount(
+          allFullMocks.filter((test) => validCourseSet.has(normalizeCourseKey(resolveTestCourseName(test)))).length
+        );
+      } else {
+        setTopicTestCount(allTopicTests.length);
+        setFullMockCount(allFullMocks.length);
+      }
     } catch {
       // counts are cosmetic
     }
@@ -56,10 +76,18 @@ export default function AdminTestSeriesHubPage() {
           thumbnailName: String(entry.thumbnailName || '').trim()
         };
       });
+      let validCourseSet = null;
       try {
         const courseRes = await fetchCoursesAdmin();
-        const courseList = Array.isArray(courseRes?.courses) ? courseRes.courses : [];
+        const courseList = Array.isArray(courseRes?.courses)
+          ? courseRes.courses.filter((entry) => entry?.active !== false && entry?.archived !== true)
+          : [];
         setCourses(courseList);
+        validCourseSet = new Set(
+          courseList
+            .map((entry) => normalizeCourseKey(entry?.name || entry))
+            .filter(Boolean)
+        );
         courseList.forEach((c) => {
           const cat = c.name || c;
           if (!form[cat]) {
@@ -80,13 +108,13 @@ export default function AdminTestSeriesHubPage() {
         // ignore course fetch error; fall back to existing form
       }
       setPriceForm(form);
+      await loadCounts(validCourseSet);
     } catch {
       setBanner({ type: 'error', text: 'Failed to load test series pricing.' });
     }
   }
 
   useEffect(() => {
-    loadCounts();
     loadPricing();
   }, []);
 

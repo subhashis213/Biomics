@@ -943,6 +943,78 @@ router.post('/community/token', authenticateToken(), async (req, res) => {
   }
 });
 
+// GET /chat/community/unread — unread count for current user in community channel
+router.get('/community/unread', authenticateToken(), async (req, res) => {
+  try {
+    const apiKey = String(process.env.STREAM_API_KEY || '').trim();
+    const apiSecret = String(process.env.STREAM_API_SECRET || '').trim();
+    if (!apiKey || !apiSecret) {
+      return res.status(500).json({ error: 'Stream chat is not configured on server.' });
+    }
+
+    const username = String(req.user?.username || '').trim();
+    const role = req.user?.role === 'admin' ? 'admin' : 'user';
+    if (!username) {
+      return res.status(400).json({ error: 'Invalid session user.' });
+    }
+
+    const streamClient = StreamChat.getInstance(apiKey, apiSecret);
+    const streamUserId = toStreamSafeUserId(role, username);
+    const displayName = role === 'admin' ? `Admin · ${username}` : username;
+
+    await streamClient.upsertUser({
+      id: streamUserId,
+      name: displayName,
+      biomicsRole: role
+    });
+
+    const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
+      name: 'Biomics Community',
+      members: [streamUserId],
+      created_by_id: streamUserId
+    });
+
+    try {
+      await channel.create();
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('already exists')) {
+        throw error;
+      }
+    }
+
+    try {
+      await channel.addMembers([streamUserId]);
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('already') && !message.includes('member')) {
+        throw error;
+      }
+    }
+
+    await channel.query({
+      state: true,
+      watch: false,
+      presence: false
+    }, {
+      id: STREAM_CHANNEL_ID
+    }, {
+      messages: { limit: 0 },
+      members: { limit: 1 },
+      watchers: { limit: 0 }
+    });
+
+    const unreadCount = Math.max(
+      0,
+      Number(channel?.state?.read?.[streamUserId]?.unread_messages || 0)
+    );
+
+    return res.json({ unreadCount });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'Failed to fetch unread community chat count.' });
+  }
+});
+
 // DELETE /chat/community/messages — admin-only wipe of all community chat messages
 router.delete('/community/messages', authenticateToken('admin'), async (req, res) => {
   try {

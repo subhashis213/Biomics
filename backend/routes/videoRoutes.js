@@ -171,7 +171,7 @@ router.post('/:id/favorite', authenticateToken('user'), async (req, res) => {
 
     const user = await User.findOne({ username: req.user.username });
     if (!user) return res.status(404).json({ error: 'Student profile not found.' });
-    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General');
+    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General', video.batch || 'General');
     if (!canAccess) return res.status(402).json({ error: 'Please unlock this module to access lectures.' });
 
     const videoId = String(video._id);
@@ -204,7 +204,7 @@ router.post('/:id/progress', authenticateToken('user'), async (req, res) => {
 
     const user = await User.findOne({ username: req.user.username });
     if (!user) return res.status(404).json({ error: 'Student profile not found.' });
-    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General');
+    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General', video.batch || 'General');
     if (!canAccess) return res.status(402).json({ error: 'Please unlock this module to track progress.' });
 
     const videoId = String(video._id);
@@ -247,8 +247,8 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     });
     await video.save();
     await Module.findOneAndUpdate(
-      { category, name: normalizedModule },
-      { $setOnInsert: { category, name: normalizedModule, createdBy: req.user?.username || '' } },
+      { category, name: normalizedModule, batch: normalizedBatch || 'General' },
+      { $setOnInsert: { category, name: normalizedModule, batch: normalizedBatch || 'General', createdBy: req.user?.username || '' } },
       { upsert: true }
     );
     await logAdminAction(req, {
@@ -381,7 +381,7 @@ router.get('/:id/materials/:filename/download', authenticateToken('user'), async
     if (!video) return res.status(404).json({ error: 'Video not found.' });
     if (!user) return res.status(404).json({ error: 'Student profile not found.' });
 
-    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General');
+    const canAccess = await hasModuleAccess(user, video.category || user.class, video.module || 'General', video.batch || 'General');
     if (!canAccess) return res.status(402).json({ error: 'Please unlock this module to access study materials.' });
 
     const material = (video.materials || []).find((entry) => String(entry.filename || '') === filename);

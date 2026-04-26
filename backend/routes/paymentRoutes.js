@@ -20,6 +20,7 @@ const {
   getActiveModuleMembership,
   hasCourseAccess,
   normalizeCourseName,
+  normalizeBatchName,
   normalizeModuleName,
   getCoursePricingDocs,
   getModulePricingDoc,
@@ -364,6 +365,21 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
       const purchasesForCourse = Array.isArray(user?.purchasedCourses)
         ? user.purchasedCourses.filter((entry) => normalizeCourseName(entry?.course) === courseName)
         : [];
+      const activePurchasesForCourse = purchasesForCourse.filter((entry) => {
+        if (!entry?.expiresAt) return true;
+        const expiresAtMs = new Date(entry.expiresAt).getTime();
+        return Number.isFinite(expiresAtMs) && expiresAtMs > Date.now();
+      });
+      const hasBundlePurchase = activePurchasesForCourse.some(
+        (entry) => normalizeModuleName(entry?.moduleName) === ALL_MODULES
+      );
+      const activeModulePurchases = Array.from(new Set(
+        activePurchasesForCourse
+          .map((entry) => normalizeModuleName(entry?.moduleName))
+          .filter((moduleName) => moduleName && moduleName !== ALL_MODULES)
+      ));
+      const totalModuleCount = Number(moduleCountMap.get(courseName) || 0);
+      const purchasedModuleCount = hasBundlePurchase ? totalModuleCount : activeModulePurchases.length;
       const activeMembership = user ? getActiveCourseMembership(user, courseName) : null;
       const plans = Object.values(MEMBERSHIP_PLANS)
         .map((plan) => buildCatalogPlanSummary(pricing, plan))
@@ -388,6 +404,9 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
         unlocked: user ? await hasCourseAccess(user, courseName) : false,
         hadPurchase: purchasesForCourse.length > 0,
         expiredMembership: purchasesForCourse.length > 0 && !activeMembership,
+        purchasedModuleCount,
+        purchasedModuleNames: activeModulePurchases,
+        hasBundlePurchase,
         plans,
         featuredPlan
       };
@@ -431,6 +450,48 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
   }
 });
 
+router.get('/catalog/:course/batches/:batch/modules', authenticateToken('user'), async (req, res) => {
+  try {
+    const courseName = normalizeCourseName(decodeURIComponent(req.params.course || ''));
+    const batchName = normalizeBatchName(decodeURIComponent(req.params.batch || 'General'));
+    if (!(await isSupportedCourse(courseName))) return res.status(400).json({ error: 'Unsupported course category.' });
+
+    const user = await User.findOne({ username: req.user.username }).lean();
+    if (!user) return res.status(404).json({ error: 'Student profile not found.' });
+
+    const modules = await Module.find({ category: courseName, batch: { $in: [batchName, '', null] } }).sort({ name: 1 }).lean();
+    const pricingDocs = await ModulePricing.find({ category: courseName, batch: { $in: [batchName, 'General'] } }).lean();
+    const pricingMap = new Map(
+      pricingDocs.map((entry) => [`${normalizeBatchName(entry.batch)}::${normalizeModuleName(entry.moduleName)}`, entry])
+    );
+
+    const moduleNames = Array.from(new Set(modules.map((entry) => normalizeModuleName(entry.name)).filter(Boolean)));
+    const moduleCards = moduleNames.map((moduleName) => {
+      const pricing = pricingMap.get(`${batchName}::${moduleName}`)
+        || pricingMap.get(`General::${moduleName}`)
+        || null;
+      const activeMembership = getActiveModuleMembership(user, courseName, moduleName, batchName);
+      return {
+        moduleName,
+        batch: batchName,
+        proPriceInPaise: Number(pricing?.proPriceInPaise || 0),
+        elitePriceInPaise: Number(pricing?.elitePriceInPaise || 0),
+        proMrpInPaise: Number(pricing?.proMrpInPaise || 0),
+        eliteMrpInPaise: Number(pricing?.eliteMrpInPaise || 0),
+        proTenureMonths: Number(pricing?.proTenureMonths || 1),
+        eliteTenureMonths: Number(pricing?.eliteTenureMonths || 3),
+        active: pricing ? pricing.active !== false : true,
+        unlocked: Boolean(activeMembership),
+        hasUpgradeSuggestion: !activeMembership && Boolean(getActiveModuleMembership(user, courseName, ALL_MODULES, batchName))
+      };
+    });
+
+    return res.json({ courseName, batchName, modules: moduleCards });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch module catalog for this batch.' });
+  }
+});
+
 router.post('/preview-order', authenticateToken('user'), async (req, res) => {
   try {
     const { user, course } = await ensureUserAndCourse(req.user.username);
@@ -442,8 +503,9 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
+    const targetBatch = normalizeBatchName(req.body?.batch || 'General');
     const targetModuleName = normalizeModuleName(req.body?.moduleName || ALL_MODULES);
-    const pricing = await getModulePricingDoc(targetCourse, targetModuleName);
+    const pricing = await getModulePricingDoc(targetCourse, targetModuleName, targetBatch);
     const planType = String(req.body?.planType || '').trim().toLowerCase();
     const selectedPlan = getMembershipPlan(planType);
     if (!selectedPlan) {
@@ -467,13 +529,14 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
       });
     }
 
-    const activeMembership = getActiveModuleMembership(user, targetCourse, targetModuleName);
+    const activeMembership = getActiveModuleMembership(user, targetCourse, targetModuleName, targetBatch);
     if (activeMembership) {
       return res.json({
         unlocked: true,
         purchaseRequired: true,
         message: 'Course already unlocked for this account.',
         pricing: {
+          batch: targetBatch,
           moduleName: targetModuleName,
           planType: selectedPlan.type,
           durationMonths: selectedPlan.durationMonths,
@@ -501,6 +564,7 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
       unlocked: false,
       purchaseRequired: true,
       pricing: {
+          batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
         durationMonths: selectedPlan.durationMonths,
@@ -527,8 +591,9 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
+    const targetBatch = normalizeBatchName(req.body?.batch || 'General');
     const targetModuleName = normalizeModuleName(req.body?.moduleName || ALL_MODULES);
-    const pricing = await getModulePricingDoc(targetCourse, targetModuleName);
+    const pricing = await getModulePricingDoc(targetCourse, targetModuleName, targetBatch);
     const planType = String(req.body?.planType || '').trim().toLowerCase();
     const selectedPlan = getMembershipPlan(planType);
     if (!selectedPlan) {
@@ -542,6 +607,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       const payment = await Payment.create({
         username: req.user.username,
         course: targetCourse,
+        batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
         durationMonths: selectedPlan.durationMonths,
@@ -561,7 +627,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
 
       await User.updateOne(
         { username: req.user.username },
-        { $pull: { purchasedCourses: { course: targetCourse, moduleName: targetModuleName } } }
+        { $pull: { purchasedCourses: { course: targetCourse, batch: targetBatch, moduleName: targetModuleName } } }
       );
       await User.updateOne(
         { username: req.user.username },
@@ -569,6 +635,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
           $push: {
             purchasedCourses: {
               course: targetCourse,
+              batch: targetBatch,
               moduleName: targetModuleName,
               planType: selectedPlan.type,
               unlockedAt: now,
@@ -585,13 +652,14 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
         message: `${targetModuleName === ALL_MODULES ? targetCourse : targetModuleName} unlocked successfully.`,
         activeMembership: {
           moduleName: targetModuleName,
+          batch: targetBatch,
           planType: selectedPlan.type,
           expiresAt
         }
       });
     }
 
-    const activeMembership = getActiveModuleMembership(user, targetCourse, targetModuleName);
+    const activeMembership = getActiveModuleMembership(user, targetCourse, targetModuleName, targetBatch);
     const alreadyUnlocked = Boolean(activeMembership);
 
     if (alreadyUnlocked) {
@@ -630,6 +698,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       const payment = await Payment.create({
         username: req.user.username,
         course: targetCourse,
+        batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
         durationMonths: selectedPlan.durationMonths,
@@ -650,7 +719,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       await User.updateOne(
         { username: req.user.username },
         {
-          $pull: { purchasedCourses: { course: targetCourse, moduleName: targetModuleName } }
+          $pull: { purchasedCourses: { course: targetCourse, batch: targetBatch, moduleName: targetModuleName } }
         }
       );
       await User.updateOne(
@@ -659,6 +728,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
           $push: {
             purchasedCourses: {
               course: targetCourse,
+              batch: targetBatch,
               moduleName: targetModuleName,
               planType: selectedPlan.type,
               unlockedAt: now,
@@ -679,6 +749,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
         message: `${targetModuleName === ALL_MODULES ? targetCourse : targetModuleName} unlocked successfully.`,
         activeMembership: {
           moduleName: targetModuleName,
+          batch: targetBatch,
           planType: selectedPlan.type,
           expiresAt
         }
@@ -701,6 +772,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
     await Payment.create({
       username: req.user.username,
       course: targetCourse,
+      batch: targetBatch,
       moduleName: targetModuleName,
       planType: selectedPlan.type,
       durationMonths: selectedPlan.durationMonths,
@@ -726,6 +798,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
         currency: String(pricing.currency || 'INR')
       },
       pricing: {
+        batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
         durationMonths: selectedPlan.durationMonths,
@@ -791,6 +864,7 @@ router.post('/verify', authenticateToken('user'), async (req, res) => {
         unlocked: true,
         message: 'Membership already unlocked.',
         activeMembership: {
+          batch: normalizeBatchName(payment.batch || 'General'),
           moduleName: normalizeModuleName(payment.moduleName) || ALL_MODULES,
           planType: payment.planType,
           expiresAt: payment.expiresAt || null
@@ -809,7 +883,15 @@ router.post('/verify', authenticateToken('user'), async (req, res) => {
 
     await User.updateOne(
       { username: req.user.username },
-      { $pull: { purchasedCourses: { course: payment.course, moduleName: normalizeModuleName(payment.moduleName) || ALL_MODULES } } }
+      {
+        $pull: {
+          purchasedCourses: {
+            course: payment.course,
+            batch: normalizeBatchName(payment.batch || 'General'),
+            moduleName: normalizeModuleName(payment.moduleName) || ALL_MODULES
+          }
+        }
+      }
     );
 
     await User.updateOne(
@@ -818,6 +900,7 @@ router.post('/verify', authenticateToken('user'), async (req, res) => {
         $push: {
           purchasedCourses: {
             course: payment.course,
+            batch: normalizeBatchName(payment.batch || 'General'),
             moduleName: normalizeModuleName(payment.moduleName) || ALL_MODULES,
             planType: payment.planType,
             unlockedAt: now,
@@ -960,13 +1043,14 @@ router.post('/admin/pricing-thumbnail', authenticateToken('admin'), (req, res) =
 router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (req, res) => {
   try {
     const category = normalizeCourseName(decodeURIComponent(req.params.course));
+    const batch = normalizeBatchName(req.query?.batch || 'General');
     if (!(await isSupportedCourse(category))) {
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
     const [modules, pricingDocs] = await Promise.all([
-      Module.find({ category }).sort({ name: 1 }).lean(),
-      ModulePricing.find({ category }).sort({ moduleName: 1 }).lean()
+      Module.find({ category, batch: { $in: [batch, '', null] } }).sort({ name: 1 }).lean(),
+      ModulePricing.find({ category, batch: { $in: [batch, 'General'] } }).sort({ moduleName: 1 }).lean()
     ]);
 
     const pricingMap = new Map(
@@ -978,10 +1062,11 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
     ]));
 
     // Cleanup stale pricing rows left behind by older module deletions.
-    await ModulePricing.deleteMany({ category, moduleName: { $nin: moduleNames } });
+    await ModulePricing.deleteMany({ category, batch, moduleName: { $nin: moduleNames } });
 
     return res.json({
       category,
+      batch,
       modules: moduleNames.map((moduleName) => {
         const pricing = pricingMap.get(moduleName);
         return {
@@ -1002,6 +1087,7 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
 router.put('/admin/pricing/:course/:module', authenticateToken('admin'), async (req, res) => {
   try {
     const category = normalizeCourseName(decodeURIComponent(req.params.course));
+    const batch = normalizeBatchName(req.query?.batch || req.body?.batch || 'General');
     const moduleName = normalizeModuleName(decodeURIComponent(req.params.module));
     const proPriceInPaise = Math.floor(Number(req.body?.proPriceInPaise || 0));
     const elitePriceInPaise = Math.floor(Number(req.body?.elitePriceInPaise || 0));
@@ -1021,10 +1107,11 @@ router.put('/admin/pricing/:course/:module', authenticateToken('admin'), async (
     }
 
     const pricing = await ModulePricing.findOneAndUpdate(
-      { category, moduleName },
+      { category, batch, moduleName },
       {
         $set: {
           category,
+          batch,
           moduleName,
           proPriceInPaise,
           elitePriceInPaise,

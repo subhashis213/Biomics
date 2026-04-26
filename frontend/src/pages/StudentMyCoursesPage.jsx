@@ -31,6 +31,13 @@ function getCourseProgressPercent(courseName, progressByCourse) {
   return Math.max(0, Math.min(100, Number(progress.completionPercent || 0)));
 }
 
+function formatPurchasedModuleLabel(item) {
+  const purchasedCount = Math.max(0, Number(item?.purchasedModuleCount || 0));
+  if (item?.hasBundlePurchase) return 'Full bundle purchased';
+  if (purchasedCount <= 0) return 'No module purchase yet';
+  return `${purchasedCount} module${purchasedCount === 1 ? '' : 's'} purchased`;
+}
+
 export default function StudentMyCoursesPage() {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
@@ -108,32 +115,6 @@ export default function StudentMyCoursesPage() {
       )}
     >
       <main className="student-my-courses-page">
-        <section className="card student-my-courses-hero">
-          <div className="student-my-courses-hero-copy">
-            <p className="eyebrow">My Courses</p>
-            <h2>Premium access, ready to continue</h2>
-            <p className="subtitle">Your unlocked and enrolled course bundles are organized here in one premium learning shelf.</p>
-          </div>
-          <div className="student-my-courses-hero-stats">
-            <article>
-              <strong>{myCourses.length}</strong>
-              <span>Active courses</span>
-            </article>
-            <article>
-              <strong>{premiumCount}</strong>
-              <span>Premium unlocked</span>
-            </article>
-            <article>
-              <strong>{totalModules}</strong>
-              <span>Modules visible</span>
-            </article>
-            <article>
-              <strong>{enrolledCount}</strong>
-              <span>Primary track</span>
-            </article>
-          </div>
-        </section>
-
         {loadError ? <p className="banner error">{loadError}</p> : null}
 
         <section className="card student-my-courses-grid-wrap">
@@ -174,6 +155,7 @@ export default function StudentMyCoursesPage() {
                       <div className="student-my-course-meta-row">
                         <p className="eyebrow">{formatAccessLabel(item)}</p>
                         <span className="student-my-course-badge">{item.moduleCount || 0} modules</span>
+                        <span className="student-my-course-badge">{formatPurchasedModuleLabel(item)}</span>
                       </div>
                       <h4>{meta.displayName || item.courseName}</h4>
                       <p>{meta.blurb || 'Premium course access is active for this learning track.'}</p>

@@ -5,6 +5,7 @@ import {
   fetchMockExamLeaderboard,
   createCourseOrder,
   downloadMaterial,
+  fetchCommunityChatUnreadCount,
   fetchMyMockExams,
   previewCourseOrder,
   fetchQuizLeaderboard,
@@ -26,6 +27,7 @@ import { useThemeStore } from '../stores/themeStore';
 
 const ALL_MODULES = 'ALL_MODULES';
 const CART_STORAGE_PREFIX = 'biomics:student-cart:';
+const BIOMICS_MISSION_COPY = `At Biomics Hub Biology, we deliver an exceptional learning experience through comprehensive video tutorials that cover every aspect of Biology. Our content is carefully structured to support students across a wide range of academic and competitive pathways, including core science studies as well as specialized examinations such as IIT JAM, CSIR NET, GAT-B, TIFR, CUET, DBT, ICMR, ICAR, and GATE. Our curriculum is designed to meet the needs of learners at all stages, beginning with foundational concepts and gradually advancing to more complex and in-depth topics, ensuring a strong and progressive understanding of the subject.`;
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -71,6 +73,7 @@ export default function StudentDashboard() {
   const [lockedLiveClass, setLockedLiveClass] = useState(null);
   const [upcomingClass, setUpcomingClass] = useState(null); // { _id, title, scheduledAt, meetUrl }
   const [upcomingCountdown, setUpcomingCountdown] = useState('');
+  const [communityUnreadCount, setCommunityUnreadCount] = useState(0);
   const [voucherCode, setVoucherCode] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('pro');
   const [isUnlockingCourse, setIsUnlockingCourse] = useState(false);
@@ -102,6 +105,7 @@ export default function StudentDashboard() {
   const [examLeaderboardMonthFilter, setExamLeaderboardMonthFilter] = useState('all');
   const [examLeaderboardLoading, setExamLeaderboardLoading] = useState(false);
   const [examLeaderboardError, setExamLeaderboardError] = useState('');
+  const [testSeriesStreakDays, setTestSeriesStreakDays] = useState(0);
   const profileScrollLockRef = useRef(0);
   const profileCloseTimerRef = useRef(null);
   const recentlyAddedCartTimerRef = useRef(null);
@@ -110,11 +114,35 @@ export default function StudentDashboard() {
   const cartVoucherRequestRef = useRef(0);
 
   useEffect(() => {
-    if (location?.state?.openCart) {
+    const shouldOpenFromQuery = new URLSearchParams(location?.search || '').get('cart') === 'open';
+    if (location?.state?.openCart || shouldOpenFromQuery) {
       setCartOpen(true);
       navigate('/student', { replace: true, state: null });
     }
-  }, [location?.state, navigate]);
+  }, [location?.state, location?.search, navigate]);
+
+  useEffect(() => {
+    if (!session?.token) return undefined;
+    let cancelled = false;
+
+    const syncCommunityUnread = async () => {
+      try {
+        const data = await fetchCommunityChatUnreadCount();
+        if (!cancelled) {
+          setCommunityUnreadCount(Math.max(0, Number(data?.unreadCount || 0)));
+        }
+      } catch {
+        if (!cancelled) setCommunityUnreadCount(0);
+      }
+    };
+
+    syncCommunityUnread();
+    const intervalId = window.setInterval(syncCommunityUnread, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [session?.token]);
 
   // Sync test-series cart across tabs / pages via storage event
   useEffect(() => {
@@ -165,11 +193,6 @@ export default function StudentDashboard() {
   const hasAnyUnlockedModule = allModulesUnlocked || unlockedModuleSet.size > 0;
   const activeMembership = access?.activeMembership || null;
 
-  const moduleMemberships = Object.values(moduleAccessMap)
-    .map((entry) => entry?.activeMembership)
-    .filter(Boolean)
-    .sort((left, right) => new Date(left?.expiresAt || 0).getTime() - new Date(right?.expiresAt || 0).getTime());
-  const visibleMembership = activeMembership || moduleMemberships[0] || null;
   const shouldShowLeaderboard = hasAnyUnlockedModule && !selectedModule;
 
   const profilePasswordHint =
@@ -233,6 +256,10 @@ export default function StudentDashboard() {
   }
 
   function normalizeCourseName(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ');
+  }
+
+  function normalizeText(value) {
     return String(value || '').trim().replace(/\s+/g, ' ');
   }
 
@@ -306,13 +333,6 @@ export default function StudentDashboard() {
     return `Rs ${(Number(amountInPaise || 0) / 100).toFixed(2)}`;
   }
 
-  function formatMembershipDate(value) {
-    if (!value) return '';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '';
-    return parsed.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
   function toLocalDateKey(value) {
     if (!value) return '';
     const parsed = new Date(value);
@@ -323,8 +343,8 @@ export default function StudentDashboard() {
     return `${year}-${month}-${day}`;
   }
 
-  function buildLockedCartKey(moduleName, moduleCourse) {
-    return `${normalizeCourseName(moduleCourse || '')}::${normalizeModuleName(moduleName || '')}`;
+  function buildLockedCartKey(moduleName, moduleCourse, batchName = 'General') {
+    return `${normalizeCourseName(moduleCourse || '')}::${normalizeText(batchName || 'General')}::${normalizeModuleName(moduleName || '')}`;
   }
 
   function triggerCartIconPulse() {
@@ -405,10 +425,11 @@ export default function StudentDashboard() {
     };
   }
 
-  function addLockedModuleToCart(moduleName, moduleCourse, moduleAccessInfo, originElement) {
+  function addLockedModuleToCart(moduleName, moduleCourse, moduleAccessInfo, originElement, batchName = 'General') {
     const normalizedModule = normalizeModuleName(moduleName);
     const normalizedCourse = normalizeCourseName(moduleCourse || course || 'General');
-    const itemKey = buildLockedCartKey(normalizedModule, normalizedCourse);
+    const normalizedBatch = normalizeText(batchName || 'General');
+    const itemKey = buildLockedCartKey(normalizedModule, normalizedCourse, normalizedBatch);
     const planPrices = (Array.isArray(moduleAccessInfo?.pricing?.plans) ? moduleAccessInfo.pricing.plans : []).reduce((acc, plan) => {
       const planType = String(plan?.type || '').toLowerCase();
       if (!planType) return acc;
@@ -429,6 +450,7 @@ export default function StudentDashboard() {
           key: itemKey,
           moduleName: normalizedModule,
           moduleCourse: normalizedCourse,
+          batchName: normalizedBatch,
           planPrices,
           crossCourse
         }
@@ -512,7 +534,7 @@ export default function StudentDashboard() {
       const results = await Promise.all(
         payableCartItems.map(async (item) => {
           try {
-            const preview = await previewCourseOrder(planType, normalizedVoucher, item.moduleName, item.moduleCourse);
+            const preview = await previewCourseOrder(planType, normalizedVoucher, item.moduleName, item.moduleCourse, item.batchName || 'General');
             return {
               key: item.key,
               ok: true,
@@ -634,12 +656,13 @@ export default function StudentDashboard() {
               key: String(item.key || ''),
               moduleName: normalizeModuleName(item.moduleName || ''),
               moduleCourse: normalizeCourseName(item.moduleCourse || String(item.key || '').split('::')[0] || course || 'General'),
+              batchName: normalizeText(item.batchName || String(item.key || '').split('::')[1] || 'General'),
               planPrices: item.planPrices && typeof item.planPrices === 'object' ? item.planPrices : {},
               crossCourse: Boolean(item.crossCourse)
             }))
             .map((item) => ({
               ...item,
-              key: item.key || buildLockedCartKey(item.moduleName, item.moduleCourse)
+              key: item.key || buildLockedCartKey(item.moduleName, item.moduleCourse, item.batchName)
             }))
             .filter((item) => item.key && item.moduleName)
             .filter((item, index, current) => current.findIndex((entry) => entry.key === item.key) === index);
@@ -675,8 +698,8 @@ export default function StudentDashboard() {
       const updates = await Promise.all(
         lockedModuleCart.map(async (item) => {
           const [proPreview, elitePreview] = await Promise.all([
-            previewCourseOrder('pro', '', item.moduleName, item.moduleCourse).catch(() => null),
-            previewCourseOrder('elite', '', item.moduleName, item.moduleCourse).catch(() => null)
+            previewCourseOrder('pro', '', item.moduleName, item.moduleCourse, item.batchName || 'General').catch(() => null),
+            previewCourseOrder('elite', '', item.moduleName, item.moduleCourse, item.batchName || 'General').catch(() => null)
           ]);
 
           const nextPro = Number(proPreview?.pricing?.originalAmountInPaise ?? item?.planPrices?.pro ?? 0);
@@ -737,6 +760,7 @@ export default function StudentDashboard() {
 
   async function startMembershipCheckout({
     targetCourse,
+    targetBatch = 'General',
     targetModuleName,
     planType,
     voucher = '',
@@ -753,7 +777,8 @@ export default function StudentDashboard() {
       planType,
       voucher.trim(),
       targetModuleName || ALL_MODULES,
-      normalizedTargetCourse
+      normalizedTargetCourse,
+      targetBatch || 'General'
     );
     if (orderResponse?.unlocked) {
       if (showSuccessBanner) {
@@ -850,6 +875,7 @@ export default function StudentDashboard() {
       for (const item of payableCartItems) {
         const result = await startMembershipCheckout({
           targetCourse: item.moduleCourse,
+          targetBatch: item.batchName || 'General',
           targetModuleName: item.moduleName,
           planType: cartPlanType,
           voucher: appliedCartVoucherCode,
@@ -982,6 +1008,7 @@ export default function StudentDashboard() {
     try {
       const result = await startMembershipCheckout({
         targetCourse: item.moduleCourse,
+        targetBatch: item.batchName || 'General',
         targetModuleName: item.moduleName,
         planType: cartPlanType,
         voucher: appliedCartVoucherCode,
@@ -1385,29 +1412,20 @@ export default function StudentDashboard() {
 
   const quizTopicOptions = quizTopicMetadata.options;
 
-  const quizStreakDays = useMemo(() => {
-    const attemptedDayKeys = new Set();
-    quizAttempts.forEach((attempt) => {
-      const dateKey = toLocalDateKey(attempt?.submittedAt || attempt?.attemptedAt || attempt?.createdAt);
-      if (dateKey) attemptedDayKeys.add(dateKey);
-    });
-
-    if (!attemptedDayKeys.size) return 0;
-
-    const today = new Date();
-    const todayKey = toLocalDateKey(today);
-    if (!attemptedDayKeys.has(todayKey)) {
-      return 0;
-    }
-
-    let streak = 0;
-    const cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    while (attemptedDayKeys.has(toLocalDateKey(cursor))) {
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return streak;
-  }, [quizAttempts]);
+  useEffect(() => {
+    let cancelled = false;
+    requestJson('/test-series/performance/student')
+      .then((response) => {
+        if (cancelled) return;
+        setTestSeriesStreakDays(Math.max(0, Number(response?.summary?.dailyAttemptStreak || 0)));
+      })
+      .catch(() => {
+        if (!cancelled) setTestSeriesStreakDays(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fallbackLeaderboardModules = Array.from(new Set(
     visibleModules.map((moduleKey) => moduleMetaByKey[moduleKey]?.module).filter(Boolean)
@@ -2025,6 +2043,11 @@ export default function StudentDashboard() {
               <span className="live-badge-dot" />
               LIVE
             </span>
+            {communityUnreadCount > 0 ? (
+              <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+                {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
+              </span>
+            ) : null}
           </span>
         ),
         icon: '💬'
@@ -2201,25 +2224,14 @@ export default function StudentDashboard() {
               <span>{profile?.class || course || 'Course unavailable'}</span>
               <span>{profile?.city || 'City unavailable'}</span>
               <div
-                className={`profile-streak-chip profile-streak-chip-compact ${quizStreakDays > 0 ? 'is-active' : ''}`}
+                className={`profile-streak-chip profile-streak-chip-compact ${testSeriesStreakDays > 0 ? 'is-active' : ''}`}
                 role="status"
                 aria-live="polite"
-                aria-label={`${quizStreakDays} day${quizStreakDays === 1 ? '' : 's'} streak`}
+                aria-label={`${testSeriesStreakDays} day${testSeriesStreakDays === 1 ? '' : 's'} streak`}
               >
                 <span className="profile-streak-fire" aria-hidden="true">🔥</span>
-                <span className="profile-streak-count" aria-hidden="true">{quizStreakDays}</span>
+                <span className="profile-streak-count" aria-hidden="true">{testSeriesStreakDays}</span>
               </div>
-              {visibleMembership ? (
-                <div className="profile-membership-card" role="status" aria-live="polite">
-                  <div className="profile-membership-head">
-                    <span className="profile-membership-label">Active membership</span>
-                    <span className="profile-membership-tag">{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'}</span>
-                  </div>
-                  <span className="profile-membership-expiry">
-                    Expires {formatMembershipDate(visibleMembership.expiresAt)}
-                  </span>
-                </div>
-              ) : null}
               <button
                 type="button"
                 className="profile-theme-btn"
@@ -2351,7 +2363,7 @@ export default function StudentDashboard() {
                             <strong>{item.moduleName === ALL_MODULES ? 'All Modules Bundle' : item.moduleName}</strong>
                             <span className={`student-cart-course-chip tone-${getCourseTone(item.moduleCourse)}`}>{item.moduleCourse}</span>
                           </div>
-                          <p>Course purchase</p>
+                          <p>{`Course purchase • Batch: ${item.batchName || 'General'}`}</p>
                           <span>
                             {`${cartPlanType === 'elite' ? 'Elite' : 'Pro'} • ${formatPriceInPaise(getCartItemEffectivePrice(item, cartPlanType))}`}
                           </span>
@@ -2672,6 +2684,11 @@ export default function StudentDashboard() {
                   <span className="live-badge-dot" />
                   LIVE
                 </span>
+                {communityUnreadCount > 0 ? (
+                  <span className="community-unread-badge" aria-label={`${communityUnreadCount} unread community messages`}>
+                    {communityUnreadCount > 99 ? '99+' : communityUnreadCount}
+                  </span>
+                ) : null}
               </p>
               <h2>Talk with admins and learners in real time</h2>
               <p className="subtitle">Ask doubts, share tips, and stay connected with the whole Biomics community.</p>
@@ -3092,7 +3109,7 @@ export default function StudentDashboard() {
       ) : null}
 
       {/* ── Connect With Us ─────────────────────────── */}
-      <section id="section-connect" className="connect-section">
+      <section id="section-connect" className="connect-section app-shell-full-bleed">
         <div className="connect-inner">
           <div className="connect-text">
             <p className="connect-eyebrow">Stay Connected</p>
@@ -3147,38 +3164,65 @@ export default function StudentDashboard() {
               <span className="social-card-handle">@biomicshub5733</span>
               <span className="social-card-arrow">↗</span>
             </a>
+
+            <a
+              href="https://chat.whatsapp.com/Fc8P3ZUDhfYDw6swMKDHOI"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="social-card social-card--whatsapp"
+            >
+              <span className="social-card-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12.04 2C6.54 2 2.08 6.45 2.08 11.95c0 1.77.46 3.5 1.34 5.03L2 22l5.17-1.35a9.9 9.9 0 0 0 4.87 1.25h.01c5.5 0 9.95-4.45 9.95-9.95A9.96 9.96 0 0 0 12.04 2zm5.81 14.02c-.24.67-1.41 1.25-1.95 1.33-.5.08-1.13.11-1.83-.11-.43-.14-.99-.32-1.7-.63-2.99-1.29-4.94-4.32-5.09-4.52-.14-.2-1.22-1.62-1.22-3.09 0-1.47.77-2.19 1.05-2.49.27-.3.6-.37.8-.37.2 0 .4 0 .57.01.19.01.44-.07.68.52.24.58.8 2.01.87 2.16.07.15.12.33.02.53-.1.2-.15.32-.3.5-.14.17-.3.39-.42.52-.14.15-.28.31-.12.6.16.3.7 1.16 1.5 1.88 1.03.92 1.89 1.21 2.19 1.35.3.14.48.12.66-.07.17-.2.75-.88.95-1.18.2-.3.4-.25.68-.15.28.1 1.77.83 2.07.98.3.15.5.22.57.35.07.12.07.72-.17 1.39z"/>
+                </svg>
+              </span>
+              <span className="social-card-label">WhatsApp</span>
+              <span className="social-card-handle">Join group</span>
+              <span className="social-card-arrow">↗</span>
+            </a>
           </div>
         </div>
       </section>
 
       {/* ── Footer ──────────────────────────────────── */}
-      <footer className="student-footer">
-        <div className="footer-inner">
-          <div className="footer-brand">
-            <img src={logoImg} alt="Biomics Hub" className="footer-logo" />
-            <div>
-              <p className="footer-brand-name">Biomics Hub</p>
-              <p className="footer-tagline">Empowering students with quality biology &amp; science education.</p>
+      <footer className="lp-footer app-shell-full-bleed">
+        <div className="lp-footer-inner">
+          <div className="lp-footer-brand-col">
+            <div className="lp-footer-brand">
+              <img src={logoImg} alt="Biomics Hub" className="lp-footer-logo" />
+              <div>
+                <p className="lp-footer-name">Biomics Hub</p>
+                <p className="lp-footer-tagline">Premium biology learning for ambitious students.</p>
+              </div>
+            </div>
+            <p className="lp-footer-about">{BIOMICS_MISSION_COPY}</p>
+          </div>
+
+          <div className="lp-footer-col">
+            <p className="lp-footer-col-title">Dashboard</p>
+            <nav className="lp-footer-nav" aria-label="Footer navigation">
+              <button type="button" className="lp-footer-link" onClick={() => document.getElementById('section-learning')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Learning Content</button>
+              <button type="button" className="lp-footer-link" onClick={() => document.getElementById('section-test-series')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Test Series</button>
+              <button type="button" className="lp-footer-link" onClick={() => document.getElementById('section-feedback')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Feedback</button>
+              <button type="button" className="lp-footer-link" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Back to Top</button>
+            </nav>
+          </div>
+
+          <div className="lp-footer-col">
+            <p className="lp-footer-col-title">Contact</p>
+            <div className="lp-footer-contact-list">
+              <p className="lp-footer-contact-item">📍 Bhubaneswar, Khandagiri, Lane R7, Odisha, PIN 751030</p>
+              <a href="mailto:biomicshub@gmail.com" className="lp-footer-contact-item lp-footer-contact-link">✉ biomicshub@gmail.com</a>
+              <p className="lp-footer-contact-item">🕒 Open: Mon - Sat, 9:00 AM - 9:00 PM</p>
             </div>
           </div>
-
-          <div className="footer-cols">
-            <nav className="footer-col" aria-label="Learn section links">
-              <p className="footer-col-label">Learn</p>
-              <button type="button" className="footer-nav-link" onClick={() => document.getElementById('section-learning')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Learning Content</button>
-              <button type="button" className="footer-nav-link" onClick={() => document.getElementById('section-feedback')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Feedback</button>
-              <button type="button" className="footer-nav-link" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Back to Top ↑</button>
-            </nav>
-            <nav className="footer-col" aria-label="Community section links">
-              <p className="footer-col-label">Community</p>
-              <button type="button" className="footer-nav-link" onClick={() => document.getElementById('section-connect')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Connect with Us</button>
-              <a href="https://www.instagram.com/biomics_hub?igsh=aGJyNzhrOWZkeWV5" target="_blank" rel="noopener noreferrer" className="footer-nav-link footer-nav-link--external">Instagram ↗</a>
-              <a href="https://t.me/+WVyK_obKmJ8BbxG6" target="_blank" rel="noopener noreferrer" className="footer-nav-link footer-nav-link--external">Telegram ↗</a>
-              <a href="https://www.youtube.com/@biomicshub5733" target="_blank" rel="noopener noreferrer" className="footer-nav-link footer-nav-link--external">YouTube ↗</a>
-            </nav>
+        </div>
+        <div className="lp-footer-bottom">
+          <p className="lp-footer-copy">© {new Date().getFullYear()} Biomics Hub. All rights reserved.</p>
+          <div className="lp-footer-legal">
+            <button type="button" className="lp-footer-legal-btn">Privacy Policy</button>
+            <button type="button" className="lp-footer-legal-btn">Terms of Service</button>
           </div>
-
-          <p className="footer-copy">© {new Date().getFullYear()} Biomics Hub. All rights reserved.</p>
         </div>
       </footer>
 
@@ -3231,21 +3275,10 @@ export default function StudentDashboard() {
                     <div><span>Course</span><strong>{profile?.class || '-'}</strong></div>
                     <div><span>City</span><strong>{profile?.city || '-'}</strong></div>
                   </div>
-                  <div className={`profile-streak-chip ${quizStreakDays > 0 ? 'is-active' : ''}`} role="status" aria-live="polite">
+                  <div className={`profile-streak-chip ${testSeriesStreakDays > 0 ? 'is-active' : ''}`} role="status" aria-live="polite">
                     <span className="profile-streak-fire" aria-hidden="true">🔥</span>
-                    <span className="profile-streak-text">{quizStreakDays} day{quizStreakDays === 1 ? '' : 's'} streak</span>
+                    <span className="profile-streak-text">{testSeriesStreakDays} day{testSeriesStreakDays === 1 ? '' : 's'} streak</span>
                   </div>
-                  {visibleMembership ? (
-                    <div className="profile-membership-card" role="status" aria-live="polite">
-                      <div className="profile-membership-head">
-                        <span className="profile-membership-label">Active membership</span>
-                        <span className="profile-membership-tag">{visibleMembership.planType === 'elite' ? 'Elite' : 'Pro'}</span>
-                      </div>
-                      <span className="profile-membership-expiry">
-                        Expires {formatMembershipDate(visibleMembership.expiresAt)}
-                      </span>
-                    </div>
-                  ) : null}
                   <button
                     type="button"
                     className="secondary-btn profile-theme-modal-btn"

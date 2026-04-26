@@ -3,7 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchCoursesAdmin,
   fetchCourseBatchesAdmin,
+  fetchModulePricingAdmin,
   saveBatchPricingAdmin,
+  saveModulePricingAdmin,
   uploadCoursePricingThumbnailAdmin
 } from '../api';
 import AppShell from '../components/AppShell';
@@ -37,6 +39,8 @@ export default function AdminBatchPricingPage() {
   });
   const [savingBatch, setSavingBatch] = useState(null);
   const [uploadingBatchThumb, setUploadingBatchThumb] = useState(null);
+  const [modulePricingByBatch, setModulePricingByBatch] = useState({});
+  const [modulePricingLoadingKey, setModulePricingLoadingKey] = useState('');
 
   useAutoDismissMessage(banner, setBanner);
   const adminSession = getSession();
@@ -212,6 +216,52 @@ export default function AdminBatchPricingPage() {
     }
   }
 
+  async function loadModulePricingForBatch(course, batch) {
+    const key = `${course}::${batch}`;
+    setModulePricingLoadingKey(key);
+    try {
+      const response = await fetchModulePricingAdmin(course, batch);
+      const modules = Array.isArray(response?.modules) ? response.modules.filter((entry) => !entry?.isBundle) : [];
+      const form = {};
+      modules.forEach((entry) => {
+        form[entry.moduleName] = {
+          proAmount: paiseToRupees(entry.proPriceInPaise),
+          eliteAmount: paiseToRupees(entry.elitePriceInPaise),
+          proTenure: entry.proTenureMonths || 1,
+          eliteTenure: entry.eliteTenureMonths || 3
+        };
+      });
+      setModulePricingByBatch((current) => ({
+        ...current,
+        [key]: { modules, form, open: true }
+      }));
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to load module pricing for batch.' });
+    } finally {
+      setModulePricingLoadingKey('');
+    }
+  }
+
+  async function saveModulePricingForBatch(course, batch, moduleName) {
+    const key = `${course}::${batch}`;
+    const moduleState = modulePricingByBatch[key];
+    const form = moduleState?.form?.[moduleName];
+    if (!form) return;
+    try {
+      await saveModulePricingAdmin(course, moduleName, {
+        proPriceInPaise: rupeesToPaise(form.proAmount),
+        elitePriceInPaise: rupeesToPaise(form.eliteAmount),
+        proTenureMonths: form.proTenure || 1,
+        eliteTenureMonths: form.eliteTenure || 3,
+        active: true,
+        currency: 'INR'
+      }, batch);
+      setBanner({ type: 'success', text: `Saved ${moduleName} pricing for ${batch}.` });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to save module pricing.' });
+    }
+  }
+
   if (loading) {
     return (
       <AppShell title="Batch Pricing" roleLabel="Admin" showThemeSwitch>
@@ -278,6 +328,8 @@ export default function AdminBatchPricingPage() {
                         {course.batches.map((batch) => {
                           const isEditing = editingBatch?.course === course.courseName && editingBatch?.batch === batch.batchName;
                           const isSaving = savingBatch === `${course.courseName}-${batch.batchName}`;
+                          const moduleKey = `${course.courseName}::${batch.batchName}`;
+                          const moduleState = modulePricingByBatch[moduleKey];
 
                           return (
                             <tr key={batch.batchName} style={{ borderBottom: '1px solid #eee' }}>
@@ -431,14 +483,25 @@ export default function AdminBatchPricingPage() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <button
-                                    type="button"
-                                    className="secondary-btn"
-                                    onClick={() => startEditBatch(course, batch)}
-                                    style={{ padding: '6px 12px', fontSize: '12px' }}
-                                  >
-                                    Edit
-                                  </button>
+                                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                                    <button
+                                      type="button"
+                                      className="secondary-btn"
+                                      onClick={() => startEditBatch(course, batch)}
+                                      style={{ padding: '6px 12px', fontSize: '12px' }}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="secondary-btn"
+                                      disabled={modulePricingLoadingKey === moduleKey}
+                                      onClick={() => loadModulePricingForBatch(course.courseName, batch.batchName)}
+                                      style={{ padding: '6px 12px', fontSize: '12px' }}
+                                    >
+                                      {modulePricingLoadingKey === moduleKey ? 'Loading...' : 'Module Pricing'}
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                             </tr>
@@ -447,6 +510,31 @@ export default function AdminBatchPricingPage() {
                       </tbody>
                     </table>
                   )}
+                  {course.batches.map((batch) => {
+                    const moduleKey = `${course.courseName}::${batch.batchName}`;
+                    const moduleState = modulePricingByBatch[moduleKey];
+                    if (!moduleState?.open || !moduleState.modules?.length) return null;
+                    return (
+                      <div key={`module-pricing-${moduleKey}`} style={{ marginTop: 14, border: '1px solid #dbe2ef', borderRadius: 12, padding: 12 }}>
+                        <h4 style={{ margin: '0 0 10px' }}>{batch.batchName} - Module Pricing</h4>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {moduleState.modules.map((moduleEntry) => {
+                            const form = moduleState.form[moduleEntry.moduleName] || {};
+                            return (
+                              <div key={`${moduleKey}-${moduleEntry.moduleName}`} style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, minmax(90px, 1fr)) auto', gap: 8, alignItems: 'center' }}>
+                                <strong>{moduleEntry.moduleName}</strong>
+                                <input type="number" value={form.proAmount || '0'} onChange={(e) => setModulePricingByBatch((cur) => ({ ...cur, [moduleKey]: { ...cur[moduleKey], form: { ...cur[moduleKey].form, [moduleEntry.moduleName]: { ...(cur[moduleKey].form[moduleEntry.moduleName] || {}), proAmount: e.target.value } } } }))} />
+                                <select value={form.proTenure || 1} onChange={(e) => setModulePricingByBatch((cur) => ({ ...cur, [moduleKey]: { ...cur[moduleKey], form: { ...cur[moduleKey].form, [moduleEntry.moduleName]: { ...(cur[moduleKey].form[moduleEntry.moduleName] || {}), proTenure: parseInt(e.target.value, 10) } } } }))}>{[1, 2, 3, 6, 12].map((m) => <option key={`p-${m}`} value={m}>{m}m</option>)}</select>
+                                <input type="number" value={form.eliteAmount || '0'} onChange={(e) => setModulePricingByBatch((cur) => ({ ...cur, [moduleKey]: { ...cur[moduleKey], form: { ...cur[moduleKey].form, [moduleEntry.moduleName]: { ...(cur[moduleKey].form[moduleEntry.moduleName] || {}), eliteAmount: e.target.value } } } }))} />
+                                <select value={form.eliteTenure || 3} onChange={(e) => setModulePricingByBatch((cur) => ({ ...cur, [moduleKey]: { ...cur[moduleKey], form: { ...cur[moduleKey].form, [moduleEntry.moduleName]: { ...(cur[moduleKey].form[moduleEntry.moduleName] || {}), eliteTenure: parseInt(e.target.value, 10) } } } }))}>{[1, 2, 3, 6, 12].map((m) => <option key={`e-${m}`} value={m}>{m}m</option>)}</select>
+                                <button type="button" className="primary-btn" onClick={() => saveModulePricingForBatch(course.courseName, batch.batchName, moduleEntry.moduleName)}>Save</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>

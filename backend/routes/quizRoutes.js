@@ -654,7 +654,7 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
 
     const accessibleQuizzes = [];
     for (const quiz of quizzes) {
-      const canAccessModule = await hasModuleAccess(user, quiz.category, quiz.module || 'General');
+      const canAccessModule = await hasModuleAccess(user, quiz.category, quiz.module || 'General', quiz.batch || 'General');
       if (canAccessModule) accessibleQuizzes.push(quiz);
     }
 
@@ -691,7 +691,7 @@ router.get('/my-course/quiz/:id', authenticateToken('user'), async (req, res) =>
     if (!user?.class || user.class !== quiz.category) {
       return res.status(403).json({ error: 'You are not authorized for this quiz.' });
     }
-    const canAccess = await hasModuleAccess(user, quiz.category, quiz.module || 'General');
+    const canAccess = await hasModuleAccess(user, quiz.category, quiz.module || 'General', quiz.batch || 'General');
     if (!canAccess) {
       return res.status(402).json({ error: 'Please unlock this module to access quizzes.' });
     }
@@ -722,7 +722,7 @@ router.get('/my-course/:module', authenticateToken('user'), async (req, res) => 
 
     const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const canAccess = await hasModuleAccess(user, user.class, moduleName);
+    const canAccess = await hasModuleAccess(user, user.class, moduleName, req.query?.batch || 'General');
     if (!canAccess) {
       return res.status(402).json({ error: 'Please unlock this module to access quizzes.' });
     }
@@ -761,7 +761,7 @@ router.post('/:id/submit', authenticateToken('user'), async (req, res) => {
     if (!user?.class || user.class !== quiz.category) {
       return res.status(403).json({ error: 'You are not authorized for this quiz.' });
     }
-    const canAccess = await hasModuleAccess(user, quiz.category, quiz.module || 'General');
+    const canAccess = await hasModuleAccess(user, quiz.category, quiz.module || 'General', quiz.batch || 'General');
     if (!canAccess) {
       return res.status(402).json({ error: 'Please unlock this module to submit quizzes.' });
     }
@@ -830,7 +830,7 @@ router.get('/my-attempts/recent', authenticateToken('user'), async (req, res) =>
       .lean();
     const filteredAttempts = [];
     for (const attempt of attempts) {
-      const canAccessModule = await hasModuleAccess(user, attempt.category || user.class, attempt.module || 'General');
+      const canAccessModule = await hasModuleAccess(user, attempt.category || user.class, attempt.module || 'General', attempt.batch || 'General');
       if (canAccessModule) filteredAttempts.push(attempt);
     }
     const quizIds = Array.from(new Set(
@@ -870,7 +870,7 @@ router.get('/leaderboard', authenticateToken('user'), async (req, res) => {
 
     const moduleFilter = String(req.query.module || '').trim();
     if (moduleFilter) {
-      const canAccessModule = await hasModuleAccess(user, user.class, moduleFilter);
+      const canAccessModule = await hasModuleAccess(user, user.class, moduleFilter, req.query?.batch || 'General');
       if (!canAccessModule) return res.json({ leaderboard: [], modules: [] });
     }
     const matchFilter = { category: user.class };

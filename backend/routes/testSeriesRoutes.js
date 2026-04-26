@@ -364,6 +364,36 @@ function summarizeAttempts(attempts = []) {
   };
 }
 
+function toLocalDateKey(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function computeDailyStreakFromAttempts(attempts = []) {
+  const attemptedDays = new Set(
+    attempts
+      .map((attempt) => toLocalDateKey(attempt?.submittedAt || attempt?.attemptedAt || attempt?.createdAt))
+      .filter(Boolean)
+  );
+  if (!attemptedDays.size) return 0;
+
+  const today = new Date();
+  const cursor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (!attemptedDays.has(toLocalDateKey(cursor))) return 0;
+
+  let streak = 0;
+  while (attemptedDays.has(toLocalDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 router.post('/question-image', authenticateToken('admin'), (req, res) => {
   questionImageUpload.single('image')(req, res, async (uploadError) => {
     try {
@@ -1245,6 +1275,10 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
         }
       : (accessByCourse[selectedCourse] || { hasTopicTest: false, hasFullMock: false });
 
+    const combinedAttempts = [...topicAttempts, ...fullMockAttempts]
+      .sort((left, right) => new Date(right?.submittedAt || 0).getTime() - new Date(left?.submittedAt || 0).getTime());
+    const dailyAttemptStreak = computeDailyStreakFromAttempts(combinedAttempts);
+
     return res.json({
       course: normalizeCourse(user.class),
       selectedCourse,
@@ -1257,7 +1291,8 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
           modulesCovered: modulePerformance.length,
           topicsCovered: topicKeys.size
         },
-        fullMocks: summarizeAttempts(fullMockAttempts)
+        fullMocks: summarizeAttempts(fullMockAttempts),
+        dailyAttemptStreak
       },
       modulePerformance,
       fullMockPerformance,

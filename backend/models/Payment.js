@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const paymentSchema = new mongoose.Schema({
   username: { type: String, required: true, trim: true, index: true },
   course: { type: String, required: true, trim: true, index: true },
+  batch: { type: String, trim: true, default: 'General', index: true },
   moduleName: { type: String, trim: true, default: 'ALL_MODULES', index: true },
   planType: { type: String, enum: ['pro', 'elite'], required: true },
   durationMonths: { type: Number, required: true, min: 1 },
