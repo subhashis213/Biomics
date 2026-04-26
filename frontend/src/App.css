@@ -30045,6 +30045,72 @@ html[data-theme='light'] .lp-voice-card:hover {
   line-height: 1.75;
   color: hsl(203 36% 84%);
 }
+.lp-store-badges {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.lp-store-badge {
+  min-width: 154px;
+  min-height: 50px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: #0b0b0b;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 8px 16px -12px rgba(0, 0, 0, 0.65);
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.lp-store-badge:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.56);
+  box-shadow: 0 12px 22px -12px rgba(0, 0, 0, 0.78);
+}
+.lp-store-badge-icon {
+  width: 19px;
+  height: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+.lp-store-badge-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.lp-store-badge-copy {
+  display: grid;
+  line-height: 1.1;
+  gap: 2px;
+}
+.lp-store-badge-copy small {
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+.lp-store-badge-copy strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.lp-store-badge--appstore .lp-store-badge-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.lp-store-badge--googleplay .lp-store-badge-icon svg {
+  width: 19px;
+  height: 19px;
+}
 .lp-footer-col {
   display: grid;
   gap: 12px;
@@ -30202,6 +30268,11 @@ html[data-theme='light'] .lp-footer-about,
 html[data-theme='light'] .lp-footer-contact-item,
 html[data-theme='light'] .lp-footer-copy,
 html[data-theme='light'] .lp-footer-link { color: hsl(226 12% 38%); }
+html[data-theme='light'] .lp-store-badge {
+  background: #111;
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 16px -14px rgba(0, 0, 0, 0.35);
+}
 html[data-theme='light'] .lp-footer-col-title { color: hsl(166 52% 28%); }
 html[data-theme='light'] .lp-footer-bottom {
   border-top-color: rgba(93, 173, 189, 0.28);

@@ -65,7 +65,8 @@ const FEATURE_CARDS = [
   },
 ];
 
-const BIOMICS_MISSION_COPY = `At Biomics Hub Biology, we deliver an exceptional learning experience through comprehensive video tutorials that cover every aspect of Biology. Our content supports core science studies and competitive pathways including IIT JAM, CSIR NET, GAT-B, TIFR, CUET, DBT, ICMR, ICAR, and GATE. Our curriculum starts from strong fundamentals and progressively advances to in-depth concepts for every stage of preparation.`;
+const BIOMICS_MISSION_COPY = `At Biomics Hub, we deliver an exceptional learning experience through comprehensive video tutorials that cover every aspect of Biology. Our content supports core science studies and competitive pathways including IIT JAM, CSIR NET, GAT-B, TIFR, CUET, DBT, ICMR, ICAR, and GATE. Our curriculum starts from strong fundamentals and progressively advances to in-depth concepts for every stage of preparation.`;
+const BIOMICS_FOOTER_COPY = `Biomics Hub offers structured video learning for core science and top competitive exams like IIT JAM, CSIR NET, GAT-B, TIFR, CUET, DBT, ICMR, ICAR, and GATE. Learn from fundamentals to advanced concepts with a clear, progressive path.`;
 
 function SocialIcon({ kind }) {
   if (kind === 'instagram') {
@@ -105,6 +106,8 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeStore();
   const isLightTheme = theme === 'light';
+  const androidAppUrl = String(import.meta.env.VITE_ANDROID_APP_URL || '').trim() || 'https://play.google.com/store';
+  const iosAppUrl = String(import.meta.env.VITE_IOS_APP_URL || '').trim() || 'https://www.apple.com/app-store/';
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
 
@@ -804,7 +807,46 @@ export default function LandingPage() {
                 <p className="lp-footer-tagline">Premium biology learning for ambitious students.</p>
               </div>
             </div>
-            <p className="lp-footer-about">{BIOMICS_MISSION_COPY}</p>
+            <p className="lp-footer-about">{BIOMICS_FOOTER_COPY}</p>
+            <div className="lp-store-badges">
+              <a
+                href={iosAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="lp-store-badge lp-store-badge--appstore"
+                aria-label="Download on the App Store"
+              >
+                <span className="lp-store-badge-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="#fff">
+                    <path d="M16.42 12.3c.03 2.58 2.26 3.44 2.28 3.45-.02.06-.35 1.2-1.15 2.38-.69 1.02-1.41 2.03-2.54 2.05-1.11.02-1.47-.66-2.75-.66s-1.67.64-2.72.68c-1.09.04-1.92-1.08-2.62-2.09-1.43-2.07-2.53-5.84-1.06-8.39.73-1.27 2.04-2.08 3.46-2.1 1.08-.02 2.09.72 2.75.72.66 0 1.9-.9 3.2-.77.54.02 2.05.22 3.03 1.66-.08.05-1.81 1.06-1.78 3.17zm-2.1-5.37c.58-.7.97-1.67.86-2.64-.84.03-1.86.56-2.46 1.26-.54.62-1.01 1.61-.88 2.56.94.07 1.9-.48 2.48-1.18z"/>
+                  </svg>
+                </span>
+                <span className="lp-store-badge-copy">
+                  <small>Download on the</small>
+                  <strong>App Store</strong>
+                </span>
+              </a>
+              <a
+                href={androidAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="lp-store-badge lp-store-badge--googleplay"
+                aria-label="Get it on Google Play"
+              >
+                <span className="lp-store-badge-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M3 2.75v18.5c0 .55.45 1 1 1 .18 0 .36-.05.52-.15l10.73-6.2-3.75-3.9L3 2.75z" fill="#00E676"/>
+                    <path d="M17.24 10.87l-2.98-1.72-2.01 2.09 2.02 2.11 2.97-1.71c.58-.33.58-1.17 0-1.5z" fill="#FFB300"/>
+                    <path d="M15.23 15.86L4.52 22.1c.45.29 1.05.34 1.56.05l8.95-5.17-1.8-1.12z" fill="#FF3A44"/>
+                    <path d="M13.43 7.02L5.98 2.7A1.59 1.59 0 0 0 4.5 2.68l8.74 9.1 1.19-1.26z" fill="#00A0FF"/>
+                  </svg>
+                </span>
+                <span className="lp-store-badge-copy">
+                  <small>GET IT ON</small>
+                  <strong>Google Play</strong>
+                </span>
+              </a>
+            </div>
           </div>
 
           <div className="lp-footer-col">
