@@ -1050,7 +1050,7 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
 
     const [modules, pricingDocs] = await Promise.all([
       Module.find({ category, batch: { $in: [batch, '', null] } }).sort({ name: 1 }).lean(),
-      ModulePricing.find({ category, batch: { $in: [batch, 'General'] } }).sort({ moduleName: 1 }).lean()
+      ModulePricing.find({ category, batch: { $in: [batch, 'General', '', null] } }).sort({ moduleName: 1 }).lean()
     ]);
 
     const pricingMap = new Map(
@@ -1062,7 +1062,11 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
     ]));
 
     // Cleanup stale pricing rows left behind by older module deletions.
-    await ModulePricing.deleteMany({ category, batch, moduleName: { $nin: moduleNames } });
+    await ModulePricing.deleteMany({
+      category,
+      batch: { $in: [batch, '', null] },
+      moduleName: { $nin: moduleNames }
+    });
 
     return res.json({
       category,
@@ -1106,7 +1110,7 @@ router.put('/admin/pricing/:course/:module', authenticateToken('admin'), async (
       return res.status(400).json({ error: 'Tenure must be at least 1 month.' });
     }
 
-    const pricing = await ModulePricing.findOneAndUpdate(
+    let pricing = await ModulePricing.findOneAndUpdate(
       { category, batch, moduleName },
       {
         $set: {
@@ -1125,8 +1129,68 @@ router.put('/admin/pricing/:course/:module', authenticateToken('admin'), async (
       { upsert: true, new: true }
     ).lean();
 
+    // Backward compatibility: handle legacy records/indexes where batch was absent.
+    if (!pricing) {
+      pricing = await ModulePricing.findOneAndUpdate(
+        { category, moduleName },
+        {
+          $set: {
+            category,
+            batch,
+            moduleName,
+            proPriceInPaise,
+            elitePriceInPaise,
+            proTenureMonths,
+            eliteTenureMonths,
+            currency,
+            active,
+            updatedBy: req.user.username
+          }
+        },
+        { upsert: true, new: true }
+      ).lean();
+    }
+
     return res.json({ pricing });
   } catch (err) {
+    if (err?.code === 11000) {
+      try {
+        const category = normalizeCourseName(decodeURIComponent(req.params.course));
+        const batch = normalizeBatchName(req.query?.batch || req.body?.batch || 'General');
+        const moduleName = normalizeModuleName(decodeURIComponent(req.params.module));
+        const proPriceInPaise = Math.floor(Number(req.body?.proPriceInPaise || 0));
+        const elitePriceInPaise = Math.floor(Number(req.body?.elitePriceInPaise || 0));
+        const proTenureMonths = Math.floor(Number(req.body?.proTenureMonths || 1));
+        const eliteTenureMonths = Math.floor(Number(req.body?.eliteTenureMonths || 3));
+        const currency = String(req.body?.currency || 'INR').trim().toUpperCase();
+        const active = req.body?.active !== false;
+
+        const pricing = await ModulePricing.findOneAndUpdate(
+          { category, moduleName },
+          {
+            $set: {
+              category,
+              batch,
+              moduleName,
+              proPriceInPaise,
+              elitePriceInPaise,
+              proTenureMonths,
+              eliteTenureMonths,
+              currency,
+              active,
+              updatedBy: req.user.username
+            }
+          },
+          { new: true }
+        ).lean();
+
+        if (pricing) {
+          return res.json({ pricing });
+        }
+      } catch {
+        // fallback to generic error below
+      }
+    }
     return res.status(500).json({ error: 'Failed to save module pricing.' });
   }
 });

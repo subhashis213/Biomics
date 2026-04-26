@@ -602,7 +602,7 @@ export default function LandingPage() {
               {FEATURE_CARDS.map((f, index) => (
               <div
                 key={f.title}
-                className={`lp-feature-card lp-reveal${activeFeatureIndex === index ? ' is-active' : ''}`}
+                className={`lp-feature-card${activeFeatureIndex === index ? ' is-active' : ''}`}
                 style={{ '--lp-feat-color': f.color }}
               >
                 <span className="lp-feature-icon">{f.icon}</span>

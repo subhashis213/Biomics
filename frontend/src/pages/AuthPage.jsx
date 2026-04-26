@@ -8,6 +8,20 @@ import { useSessionStore } from '../stores/sessionStore';
 export default function AuthPage() {
   const REGISTER_FLIP_BACK_MS = 3000;
   const GOOGLE_CLIENT_ID = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+  const PUBLIC_APP_URL = String(import.meta.env.VITE_PUBLIC_APP_URL || 'https://biomicshub.com').trim().replace(/\/+$/, '');
+  const runtimeHostname = typeof window !== 'undefined' ? String(window.location.hostname || '').trim().toLowerCase() : '';
+  const runtimeOrigin = typeof window !== 'undefined' ? String(window.location.origin || '').trim() : '';
+  const publicAppHostname = (() => {
+    try {
+      if (!PUBLIC_APP_URL) return '';
+      return String(new URL(PUBLIC_APP_URL).hostname || '').trim().toLowerCase();
+    } catch {
+      return '';
+    }
+  })();
+  const isVercelHost = /\.vercel\.app$/i.test(runtimeHostname);
+  const isCanonicalHost = publicAppHostname && runtimeHostname === publicAppHostname;
+  const hasOriginMismatchRisk = isVercelHost && !isCanonicalHost;
   const navigate = useNavigate();
   const existingSession = getSession();
   const { login } = useSessionStore();
@@ -620,7 +634,15 @@ export default function AuthPage() {
   }, [GOOGLE_CLIENT_ID]);
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || registerOpen || isAdminUsername) return undefined;
+    if (!hasOriginMismatchRisk) return;
+    setIsGoogleSdkReady(false);
+    setGoogleLoadError(
+      `Google sign-in is blocked on this preview URL (${runtimeOrigin}) due to OAuth origin policy. Open ${PUBLIC_APP_URL}/auth for Google login.`
+    );
+  }, [PUBLIC_APP_URL, hasOriginMismatchRisk, runtimeOrigin]);
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || registerOpen || isAdminUsername || hasOriginMismatchRisk) return undefined;
     if (typeof window === 'undefined') return undefined;
     setIsGoogleSdkReady(false);
 
@@ -704,7 +726,7 @@ export default function AuthPage() {
       cancelled = true;
       if (initRetryTimer) window.clearTimeout(initRetryTimer);
     };
-  }, [GOOGLE_CLIENT_ID, registerOpen, isAdminUsername]);
+  }, [GOOGLE_CLIENT_ID, registerOpen, isAdminUsername, hasOriginMismatchRisk]);
 
   useEffect(() => () => {
     if (googleSlideRafRef.current) {
@@ -803,6 +825,19 @@ export default function AuthPage() {
                     <div ref={googleButtonRef} className="auth-google-button-host" />
                   </div>
                   {googleLoadError ? <small className="field-hint">⚠ {googleLoadError}</small> : null}
+                  {hasOriginMismatchRisk ? (
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.location.assign(`${PUBLIC_APP_URL}/auth`);
+                        }
+                      }}
+                    >
+                      Open Official Login
+                    </button>
+                  ) : null}
                   {isGoogleSigningIn ? <small className="field-hint">Signing in with Google…</small> : null}
                 </div>
               ) : null}
