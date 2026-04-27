@@ -12,6 +12,7 @@ import {
   deleteVoucherAdmin,
   fetchAdminAnnouncements,
   fetchAdminQuizzes,
+  fetchCoursesAdmin,
   fetchRecoveryActionsAdmin,
   fetchAuditLogsAdmin,
   fetchCoursePricingAdmin,
@@ -100,6 +101,8 @@ const COURSE_MODAL_THEME = {
 };
 
 const CSIR_COURSE = 'CSIR-NET Life Science';
+const normalizeCourseKey = (value) => String(value || '').trim().toLowerCase();
+const resolveTestCourseName = (test = {}) => String(test?.category || test?.course || '').trim();
 
 export default function AdminDashboard() {
   const UNDO_DURATION_MS = 5000;
@@ -1827,12 +1830,32 @@ export default function AdminDashboard() {
 
   async function loadTestSeriesCounts() {
     try {
-      const [topicTestsData, fullMocksData] = await Promise.all([
+      const [topicTestsData, fullMocksData, courseCatalog] = await Promise.all([
         requestJson('/test-series/topic-tests/admin'),
-        requestJson('/test-series/full-mocks/admin')
+        requestJson('/test-series/full-mocks/admin'),
+        fetchCoursesAdmin()
       ]);
-      setTopicTestCount(Array.isArray(topicTestsData?.tests) ? topicTestsData.tests.length : 0);
-      setFullMockTestCount(Array.isArray(fullMocksData?.mocks) ? fullMocksData.mocks.length : 0);
+      const tests = Array.isArray(topicTestsData?.tests) ? topicTestsData.tests : [];
+      const mocks = Array.isArray(fullMocksData?.mocks) ? fullMocksData.mocks : [];
+      const validCourseSet = new Set(
+        (Array.isArray(courseCatalog?.courses) ? courseCatalog.courses : [])
+          .filter((entry) => entry?.active !== false && entry?.archived !== true)
+          .map((entry) => normalizeCourseKey(entry?.name || entry))
+          .filter(Boolean)
+      );
+
+      if (validCourseSet.size > 0) {
+        setTopicTestCount(
+          tests.filter((test) => validCourseSet.has(normalizeCourseKey(resolveTestCourseName(test)))).length
+        );
+        setFullMockTestCount(
+          mocks.filter((test) => validCourseSet.has(normalizeCourseKey(resolveTestCourseName(test)))).length
+        );
+        return;
+      }
+
+      setTopicTestCount(tests.length);
+      setFullMockTestCount(mocks.length);
     } catch (error) {
       setBanner({ type: 'error', text: error.message || 'Failed to load test series counts.' });
     }
