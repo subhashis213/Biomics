@@ -140,7 +140,9 @@ export default function StudentCourseBatchesPage() {
   const moduleSections = visibleBatches
     .map((batch) => ({
       batch,
-      modules: Array.isArray(modulesByBatch[batch.batchName]) ? modulesByBatch[batch.batchName] : []
+      modules: (Array.isArray(modulesByBatch[batch.batchName]) ? modulesByBatch[batch.batchName] : [])
+        // Buy section should only show paid modules.
+        .filter((moduleItem) => Number(moduleItem?.proPriceInPaise || 0) > 0 || Number(moduleItem?.elitePriceInPaise || 0) > 0)
     }))
     .filter((entry) => entry.modules.length > 0);
 

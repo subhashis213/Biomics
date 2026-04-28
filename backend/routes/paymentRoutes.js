@@ -474,13 +474,34 @@ router.get('/catalog/:course/batches/:batch/modules', authenticateToken('user'),
     const user = await User.findOne({ username: req.user.username }).lean();
     if (!user) return res.status(404).json({ error: 'Student profile not found.' });
 
-    const modules = await Module.find({ category: courseName, batch: { $in: [batchName, '', null] } }).sort({ name: 1 }).lean();
-    const pricingDocs = await ModulePricing.find({ category: courseName, batch: { $in: [batchName, 'General'] } }).lean();
+    const batchFilter = { $in: [batchName, 'General', '', null] };
+    const [modules, pricingDocs, videoModules, quizModules, topicTestModules, mockExamModules, fullMockModules] = await Promise.all([
+      Module.find({ category: courseName, batch: batchFilter }).sort({ name: 1 }).lean(),
+      ModulePricing.find({ category: courseName, batch: batchFilter }).lean(),
+      Video.distinct('module', { category: courseName, batch: batchFilter }),
+      Quiz.distinct('module', { category: courseName, batch: batchFilter }),
+      TopicTest.distinct('module', { category: courseName, batch: batchFilter }),
+      MockExam.distinct('module', { category: courseName, batch: batchFilter }),
+      FullMockTest.distinct('module', { category: courseName, batch: batchFilter })
+    ]);
     const pricingMap = new Map(
       pricingDocs.map((entry) => [`${normalizeBatchName(entry.batch)}::${normalizeModuleName(entry.moduleName)}`, entry])
     );
 
-    const moduleNames = Array.from(new Set(modules.map((entry) => normalizeModuleName(entry.name)).filter(Boolean)));
+    const contentModuleNames = [
+      ...videoModules,
+      ...quizModules,
+      ...topicTestModules,
+      ...mockExamModules,
+      ...fullMockModules
+    ].map((entry) => normalizeModuleName(entry)).filter(Boolean);
+    const pricedModuleNames = pricingDocs.map((entry) => normalizeModuleName(entry.moduleName)).filter(Boolean);
+
+    const moduleNames = Array.from(new Set([
+      ...modules.map((entry) => normalizeModuleName(entry.name)),
+      ...pricedModuleNames,
+      ...contentModuleNames
+    ].filter((moduleName) => moduleName && moduleName !== ALL_MODULES)));
     const moduleCards = moduleNames.map((moduleName) => {
       const pricing = pricingMap.get(`${batchName}::${moduleName}`)
         || pricingMap.get(`General::${moduleName}`)
