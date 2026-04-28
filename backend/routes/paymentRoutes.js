@@ -13,6 +13,11 @@ const Payment = require('../models/Payment');
 const User = require('../models/User');
 const Module = require('../models/Module');
 const Course = require('../models/Course');
+const Video = require('../models/Video');
+const Quiz = require('../models/Quiz');
+const TopicTest = require('../models/TopicTest');
+const MockExam = require('../models/MockExam');
+const FullMockTest = require('../models/FullMockTest');
 const { logAdminAction } = require('../utils/auditLog');
 const {
   ALL_MODULES,
@@ -427,7 +432,17 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
     const pricingDocs = await BatchPricing.find({ category: courseName }).lean();
     const pricingMap = new Map(pricingDocs.map((p) => [String(p.batchName || '').trim().toLowerCase(), p]));
 
-    const batches = (Array.isArray(courseDoc?.batches) ? courseDoc.batches.filter((b) => b?.active !== false).map((b) => String(b.name || '').trim()).filter(Boolean) : []);
+    const courseBatches = Array.isArray(courseDoc?.batches)
+      ? courseDoc.batches
+        .filter((b) => b?.active !== false)
+        .map((b) => String(b.name || '').trim())
+        .filter(Boolean)
+      : [];
+    const pricingBatches = pricingDocs
+      .filter((p) => p?.active !== false)
+      .map((p) => String(p?.batchName || '').trim())
+      .filter(Boolean);
+    const batches = Array.from(new Set([...courseBatches, ...pricingBatches]));
 
     return res.json({
       courseName,
@@ -1048,17 +1063,32 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
-    const [modules, pricingDocs] = await Promise.all([
-      Module.find({ category, batch: { $in: [batch, '', null] } }).sort({ name: 1 }).lean(),
-      ModulePricing.find({ category, batch: { $in: [batch, 'General', '', null] } }).sort({ moduleName: 1 }).lean()
+    const batchFilter = { $in: [batch, 'General', '', null] };
+    const [modules, pricingDocs, videoModules, quizModules, topicTestModules, mockExamModules, fullMockModules] = await Promise.all([
+      Module.find({ category, batch: batchFilter }).sort({ name: 1 }).lean(),
+      ModulePricing.find({ category, batch: batchFilter }).sort({ moduleName: 1 }).lean(),
+      Video.distinct('module', { category, batch: batchFilter }),
+      Quiz.distinct('module', { category, batch: batchFilter }),
+      TopicTest.distinct('module', { category, batch: batchFilter }),
+      MockExam.distinct('module', { category, batch: batchFilter }),
+      FullMockTest.distinct('module', { category, batch: batchFilter })
     ]);
 
     const pricingMap = new Map(
       pricingDocs.map((entry) => [normalizeModuleName(entry.moduleName), entry])
     );
+    const contentModuleNames = [
+      ...videoModules,
+      ...quizModules,
+      ...topicTestModules,
+      ...mockExamModules,
+      ...fullMockModules
+    ].map((entry) => normalizeModuleName(entry)).filter(Boolean);
+
     const moduleNames = Array.from(new Set([
       ALL_MODULES,
-      ...modules.map((entry) => normalizeModuleName(entry.name))
+      ...modules.map((entry) => normalizeModuleName(entry.name)),
+      ...contentModuleNames
     ]));
 
     // Cleanup stale pricing rows left behind by older module deletions.

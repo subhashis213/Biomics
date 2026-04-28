@@ -629,6 +629,75 @@ router.post('/admin/:courseName/migrate-content', authenticateToken('admin'), as
       runner(FullMockTest)
     ]);
 
+    // Keep pricing workspace in sync by ensuring migrated modules exist in Module collection
+    // for the target course + batch, even when content came from another course.
+    const migratedModuleNames = collectNormalizedNames([
+      ...(await Video.distinct('module', { category: courseName, batch: targetBatch })),
+      ...(await Quiz.distinct('module', { category: courseName, batch: targetBatch })),
+      ...(await TopicTest.distinct('module', { category: courseName, batch: targetBatch })),
+      ...(await MockExam.distinct('module', { category: courseName, batch: targetBatch })),
+      ...(await FullMockTest.distinct('module', { category: courseName, batch: targetBatch }))
+    ]);
+
+    if (migratedModuleNames.length) {
+      await Promise.all(
+        migratedModuleNames.map((moduleEntry) => Module.updateOne(
+          { category: courseName, name: moduleEntry, batch: targetBatch },
+          {
+            $setOnInsert: {
+              category: courseName,
+              name: moduleEntry,
+              batch: targetBatch,
+              createdBy: String(req.user?.username || '').trim()
+            }
+          },
+          { upsert: true }
+        ))
+      );
+    }
+
+    // When a specific source batch is selected, carry its module pricing template
+    // to the target batch so newly migrated modules appear immediately in pricing UI.
+    let pricingTemplatesSynced = 0;
+    if (fromBatch) {
+      const sourcePricingDocs = await ModulePricing.find({
+        category: contentSourceCourse,
+        batch: fromBatch,
+        moduleName: { $ne: ALL_MODULES }
+      }).lean();
+      const allowedModuleKeys = new Set(migratedModuleNames.map((name) => normalizeNameKey(name)));
+      const docsToSync = sourcePricingDocs.filter((doc) => allowedModuleKeys.has(normalizeNameKey(doc?.moduleName)));
+      if (docsToSync.length) {
+        await Promise.all(
+          docsToSync.map((doc) => ModulePricing.updateOne(
+            {
+              category: courseName,
+              batch: targetBatch,
+              moduleName: normalizeValue(doc.moduleName)
+            },
+            {
+              $set: {
+                category: courseName,
+                batch: targetBatch,
+                moduleName: normalizeValue(doc.moduleName),
+                proPriceInPaise: Number(doc.proPriceInPaise || 0),
+                elitePriceInPaise: Number(doc.elitePriceInPaise || 0),
+                proMrpInPaise: Number(doc.proMrpInPaise || 0),
+                eliteMrpInPaise: Number(doc.eliteMrpInPaise || 0),
+                proTenureMonths: Number(doc.proTenureMonths || 1),
+                eliteTenureMonths: Number(doc.eliteTenureMonths || 3),
+                currency: String(doc.currency || 'INR').trim().toUpperCase(),
+                active: doc.active !== false,
+                updatedBy: String(req.user?.username || '').trim()
+              }
+            },
+            { upsert: true }
+          ))
+        );
+        pricingTemplatesSynced = docsToSync.length;
+      }
+    }
+
     return res.json({
       success: true,
       mode,
@@ -642,6 +711,10 @@ router.post('/admin/:courseName/migrate-content', authenticateToken('admin'), as
         topicTests,
         mockExams,
         testSeries
+      },
+      sync: {
+        modulesEnsured: migratedModuleNames.length,
+        pricingTemplatesSynced
       }
     });
   } catch (error) {
