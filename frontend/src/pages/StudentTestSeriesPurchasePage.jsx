@@ -347,7 +347,22 @@ export default function StudentTestSeriesPurchasePage() {
                                 </button>
                               </div>
                             ) : (
-                              <span className={`ts-access-badge ${isTopicSelected ? 'ts-badge-topic' : 'ts-badge-mock'}`}>Unlocked</span>
+                              <div className="ts-catalog-plan-actions">
+                                <span className={`ts-access-badge ${isTopicSelected ? 'ts-badge-topic' : 'ts-badge-mock'}`}>Unlocked</span>
+                                <button
+                                  type="button"
+                                  className="primary-btn ts-catalog-plan-buy-btn"
+                                  onClick={() => {
+                                    if (isTopicSelected) {
+                                      navigate(`/student/test-series/topic-tests/modules?course=${encodeURIComponent(cardCourse)}`);
+                                      return;
+                                    }
+                                    navigate(`/student/test-series?tab=mock&course=${encodeURIComponent(cardCourse)}`);
+                                  }}
+                                >
+                                  Open Test Series
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
