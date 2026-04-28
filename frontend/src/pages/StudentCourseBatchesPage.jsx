@@ -152,6 +152,10 @@ export default function StudentCourseBatchesPage() {
   function getModuleCartKey(batchName, moduleName) {
     return `${decodedCourseName}::${batchName}::${moduleName}`;
   }
+
+  function openCourseContent() {
+    navigate(`/student/course/${encodeURIComponent(decodedCourseName)}/modules`);
+  }
   function handleAddBatchToCart(batch) {
     const planType = selectedPlanByBatch[batch.batchName] || 'pro';
     const storageKey = getCartKey();
@@ -289,6 +293,7 @@ export default function StudentCourseBatchesPage() {
                 ? Math.round(((mrpPrice - salePrice) / mrpPrice) * 100)
                 : 0;
               const isLocked = salePrice > 0;
+              const canOpenContent = Boolean(coursePreview?.unlocked || coursePreview?.isEnrolledCourse || !isLocked);
               const cartEntryKey = getBatchCartKey(batch.batchName);
               const isInCart = cartKeys.has(cartEntryKey);
 
@@ -355,6 +360,15 @@ export default function StudentCourseBatchesPage() {
                       </div>
                     </div>
                     <div className="student-course-catalog-cta-row">
+                      {canOpenContent ? (
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          onClick={openCourseContent}
+                        >
+                          Open Content
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="secondary-btn"
