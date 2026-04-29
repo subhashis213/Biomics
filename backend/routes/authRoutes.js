@@ -314,6 +314,7 @@ function formatAttemptSummary(item, extra = {}) {
     attemptType: String(extra.attemptType || item?.attemptType || 'assessment').trim() || 'assessment',
     title: String(extra.title || item?.title || 'Untitled').trim() || 'Untitled',
     category: String(extra.category || item?.category || '').trim(),
+    batch: String(extra.batch || item?.batch || '').trim(),
     module: String(extra.module || item?.module || '').trim(),
     topic: String(extra.topic || item?.topic || '').trim(),
     score,
@@ -330,6 +331,7 @@ function formatCurrencyRecord(record, voucherLookup) {
   return {
     id: String(record?._id || ''),
     course: String(record?.course || '').trim(),
+    batch: String(record?.targetBatch || record?.batch || '').trim(),
     moduleName: String(record?.moduleName || 'ALL_MODULES').trim() || 'ALL_MODULES',
     planType: String(record?.planType || '').trim(),
     status: String(record?.status || '').trim(),
@@ -353,6 +355,7 @@ function formatTestSeriesRecord(record, voucherLookup) {
   return {
     id: String(record?._id || ''),
     course: String(record?.course || '').trim(),
+    batch: String(record?.batch || '').trim(),
     seriesType: String(record?.seriesType || '').trim(),
     status: String(record?.status || '').trim(),
     amountInPaise: Number(record?.amountInPaise || 0),
@@ -1683,7 +1686,7 @@ router.get('/me', authenticateToken('user'), async (req, res) => {
   try {
     const user = await findAuthenticatedUser(
       req.user,
-      { username: 1, phone: 1, class: 1, city: 1, avatar: 1, _id: 0 }
+      { username: 1, phone: 1, class: 1, city: 1, avatar: 1, purchasedCourses: 1, _id: 0 }
     )?.lean();
 
     if (!user) return res.status(404).json({ error: 'Student profile not found' });
@@ -1702,7 +1705,8 @@ router.get('/me', authenticateToken('user'), async (req, res) => {
         phone: user.phone,
         class: user.class,
         city: user.city,
-        avatarUrl: avatarState.avatarUrl
+        avatarUrl: avatarState.avatarUrl,
+        purchasedCourses: Array.isArray(user.purchasedCourses) ? user.purchasedCourses : []
       }
     });
   } catch (err) {

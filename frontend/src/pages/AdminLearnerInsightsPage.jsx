@@ -127,6 +127,10 @@ function filterAttemptList(items, range) {
   return items.filter((item) => matchesDateRange(item.submittedAt, range));
 }
 
+function normalizeFilterToken(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function buildFrequencySummary(items) {
   const summary = new Map();
   items.forEach((item) => {
@@ -271,7 +275,7 @@ function ActivityPanel({ title, eyebrow, items, emptyText, tone, summaryLabel = 
                     <div>
                       <strong>{item.title}</strong>
                       <p>
-                        {[item.category, item.module, item.topic].filter(Boolean).join(' • ') || 'General'}
+                        {[item.category, item.batch, item.module, item.topic].filter(Boolean).join(' • ') || 'General'}
                       </p>
                     </div>
                     {'percent' in item ? <span className="learner-insights-score-pill">{formatPercent(item.percent)}</span> : null}
@@ -304,7 +308,7 @@ function ActivityPanel({ title, eyebrow, items, emptyText, tone, summaryLabel = 
                   {items.map((item) => (
                     <tr key={`history-${title}-${item.id}-${item.submittedAt || item.uploadedAt || ''}`}>
                       <td><strong>{item.title}</strong></td>
-                      <td>{[item.category, item.module, item.topic].filter(Boolean).join(' • ') || 'General'}</td>
+                      <td>{[item.category, item.batch, item.module, item.topic].filter(Boolean).join(' • ') || 'General'}</td>
                       {hasScores ? <td>{item.score}/{item.total}</td> : null}
                       {hasScores ? <td>{formatPercent(item.percent)}</td> : null}
                       <td>{'durationSeconds' in item ? formatDurationCompact(item.durationSeconds || 0) : 'NA'}</td>
@@ -508,7 +512,9 @@ export default function AdminLearnerInsightsPage() {
   const [filters, setFilters] = useState({
     from: shiftDate(-6),
     to: shiftDate(0),
-    dayWindow: '7'
+    dayWindow: '7',
+    course: 'all',
+    batch: 'all'
   });
 
   useAutoDismissMessage(banner, setBanner);
@@ -547,10 +553,6 @@ export default function AdminLearnerInsightsPage() {
   const testSeriesPayments = Array.isArray(insights?.purchases?.testSeriesPayments) ? insights.purchases.testSeriesPayments : [];
   const siteUsage = insights?.activity?.siteUsage || {};
   const siteUsageDaily = Array.isArray(siteUsage?.dailyUsage) ? siteUsage.dailyUsage : [];
-  const voucherUsage = useMemo(
-    () => [...coursePayments, ...testSeriesPayments].filter((item) => item.voucherCode),
-    [coursePayments, testSeriesPayments]
-  );
   const avatarSrc = useMemo(() => buildAvatarSrc(learner.avatarUrl), [learner.avatarUrl]);
   const learnerInitial = String(learner.username || username || 'L').trim().charAt(0).toUpperCase();
 
@@ -568,15 +570,103 @@ export default function AdminLearnerInsightsPage() {
     : (Array.isArray(insights?.activity?.recentMockExamAttempts) ? insights.activity.recentMockExamAttempts : []);
   const recentCompletedVideos = Array.isArray(insights?.activity?.recentCompletedVideos) ? insights.activity.recentCompletedVideos : [];
 
+  const availableCourses = useMemo(() => {
+    const values = new Set();
+    [
+      learner?.class,
+      ...coursePayments.map((item) => item.course),
+      ...testSeriesPayments.map((item) => item.course),
+      ...quizAttempts.map((item) => item.category),
+      ...topicTestAttempts.map((item) => item.category),
+      ...fullMockAttempts.map((item) => item.category),
+      ...mockExamAttempts.map((item) => item.category),
+      ...recentCompletedVideos.map((item) => item.category),
+      ...(Array.isArray(learner?.purchasedCourses) ? learner.purchasedCourses.map((item) => item?.course) : [])
+    ]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .forEach((value) => values.add(value));
+    return Array.from(values).sort((left, right) => left.localeCompare(right));
+  }, [learner?.class, learner?.purchasedCourses, coursePayments, testSeriesPayments, quizAttempts, topicTestAttempts, fullMockAttempts, mockExamAttempts, recentCompletedVideos]);
+
+  const availableBatches = useMemo(() => {
+    const selectedCourse = normalizeFilterToken(filters.course);
+    const values = new Set();
+    const addIfMatchingCourse = (courseValue, batchValue) => {
+      const normalizedCourse = normalizeFilterToken(courseValue);
+      if (selectedCourse !== 'all' && normalizedCourse !== selectedCourse) return;
+      const batch = String(batchValue || '').trim();
+      if (batch) values.add(batch);
+    };
+
+    coursePayments.forEach((item) => addIfMatchingCourse(item.course, item.batch));
+    testSeriesPayments.forEach((item) => addIfMatchingCourse(item.course, item.batch));
+    quizAttempts.forEach((item) => addIfMatchingCourse(item.category, item.batch));
+    topicTestAttempts.forEach((item) => addIfMatchingCourse(item.category, item.batch));
+    fullMockAttempts.forEach((item) => addIfMatchingCourse(item.category, item.batch));
+    mockExamAttempts.forEach((item) => addIfMatchingCourse(item.category, item.batch));
+    (Array.isArray(learner?.purchasedCourses) ? learner.purchasedCourses : []).forEach((item) => addIfMatchingCourse(item?.course, item?.batch));
+
+    return Array.from(values).sort((left, right) => left.localeCompare(right));
+  }, [filters.course, coursePayments, testSeriesPayments, quizAttempts, topicTestAttempts, fullMockAttempts, mockExamAttempts, learner?.purchasedCourses]);
+
+  useEffect(() => {
+    if (filters.batch === 'all') return;
+    if (availableBatches.includes(filters.batch)) return;
+    setFilters((current) => ({ ...current, batch: 'all' }));
+  }, [availableBatches, filters.batch]);
+
+  function matchesCourseBatch(courseValue, batchValue) {
+    const selectedCourse = normalizeFilterToken(filters.course);
+    const selectedBatch = normalizeFilterToken(filters.batch);
+    const currentCourse = normalizeFilterToken(courseValue);
+    const currentBatch = normalizeFilterToken(batchValue || 'General');
+    if (selectedCourse !== 'all' && currentCourse !== selectedCourse) return false;
+    if (selectedBatch !== 'all' && currentBatch !== selectedBatch) return false;
+    return true;
+  }
+
   const dateRange = useMemo(() => normalizeDateRange(filters.from, filters.to), [filters.from, filters.to]);
 
-  const filteredQuizAttempts = useMemo(() => filterAttemptList(quizAttempts, dateRange), [quizAttempts, dateRange]);
-  const filteredTopicTestAttempts = useMemo(() => filterAttemptList(topicTestAttempts, dateRange), [topicTestAttempts, dateRange]);
-  const filteredFullMockAttempts = useMemo(() => filterAttemptList(fullMockAttempts, dateRange), [fullMockAttempts, dateRange]);
-  const filteredMockExamAttempts = useMemo(() => filterAttemptList(mockExamAttempts, dateRange), [mockExamAttempts, dateRange]);
+  const filteredQuizAttempts = useMemo(
+    () => filterAttemptList(quizAttempts, dateRange).filter((item) => matchesCourseBatch(item.category, item.batch)),
+    [quizAttempts, dateRange, filters.course, filters.batch]
+  );
+  const filteredTopicTestAttempts = useMemo(
+    () => filterAttemptList(topicTestAttempts, dateRange).filter((item) => matchesCourseBatch(item.category, item.batch)),
+    [topicTestAttempts, dateRange, filters.course, filters.batch]
+  );
+  const filteredFullMockAttempts = useMemo(
+    () => filterAttemptList(fullMockAttempts, dateRange).filter((item) => matchesCourseBatch(item.category, item.batch)),
+    [fullMockAttempts, dateRange, filters.course, filters.batch]
+  );
+  const filteredMockExamAttempts = useMemo(
+    () => filterAttemptList(mockExamAttempts, dateRange).filter((item) => matchesCourseBatch(item.category, item.batch)),
+    [mockExamAttempts, dateRange, filters.course, filters.batch]
+  );
   const filteredAssessmentAttempts = useMemo(
     () => [...filteredQuizAttempts, ...filteredTopicTestAttempts, ...filteredFullMockAttempts, ...filteredMockExamAttempts],
     [filteredQuizAttempts, filteredTopicTestAttempts, filteredFullMockAttempts, filteredMockExamAttempts]
+  );
+  const filteredCoursePayments = useMemo(
+    () => coursePayments.filter((item) => matchesCourseBatch(item.course, item.batch)),
+    [coursePayments, filters.course, filters.batch]
+  );
+  const filteredTestSeriesPayments = useMemo(
+    () => testSeriesPayments.filter((item) => matchesCourseBatch(item.course, item.batch)),
+    [testSeriesPayments, filters.course, filters.batch]
+  );
+  const filteredVoucherUsage = useMemo(
+    () => [...filteredCoursePayments, ...filteredTestSeriesPayments].filter((item) => item.voucherCode),
+    [filteredCoursePayments, filteredTestSeriesPayments]
+  );
+  const filteredCompletedVideos = useMemo(
+    () => recentCompletedVideos.filter((item) => matchesCourseBatch(item.category, item.batch)),
+    [recentCompletedVideos, filters.course, filters.batch]
+  );
+  const filteredPurchasedCourses = useMemo(
+    () => (Array.isArray(learner.purchasedCourses) ? learner.purchasedCourses : []).filter((item) => matchesCourseBatch(item?.course, item?.batch)),
+    [learner.purchasedCourses, filters.course, filters.batch]
   );
 
   const selectedRangeTrackedSeconds = useMemo(
@@ -601,17 +691,23 @@ export default function AdminLearnerInsightsPage() {
   );
 
   const filterSummary = useMemo(() => {
+    const scope = [
+      filters.course !== 'all' ? filters.course : null,
+      filters.batch !== 'all' ? filters.batch : null
+    ].filter(Boolean).join(' • ');
     if (filters.from && filters.to) {
-      return `${formatDate(filters.from)} to ${formatDate(filters.to)}`;
+      return scope
+        ? `${formatDate(filters.from)} to ${formatDate(filters.to)} · ${scope}`
+        : `${formatDate(filters.from)} to ${formatDate(filters.to)}`;
     }
     if (filters.from) {
-      return `From ${formatDate(filters.from)}`;
+      return scope ? `From ${formatDate(filters.from)} · ${scope}` : `From ${formatDate(filters.from)}`;
     }
     if (filters.to) {
-      return `Up to ${formatDate(filters.to)}`;
+      return scope ? `Up to ${formatDate(filters.to)} · ${scope}` : `Up to ${formatDate(filters.to)}`;
     }
-    return 'All-time attempt history';
-  }, [filters.from, filters.to]);
+    return scope ? `All-time attempt history · ${scope}` : 'All-time attempt history';
+  }, [filters.from, filters.to, filters.course, filters.batch]);
 
   const coursePurchaseColumns = useMemo(() => ([
     {
@@ -620,7 +716,10 @@ export default function AdminLearnerInsightsPage() {
       render: (item) => (
         <div className="learner-insights-table-strong">
           <strong>{item.course}</strong>
-          <span>{item.moduleName === 'ALL_MODULES' ? 'Full course access' : item.moduleName}</span>
+          <span>
+            {(item.moduleName === 'ALL_MODULES' ? 'Full course access' : item.moduleName)}
+            {item.batch ? ` • Batch: ${item.batch}` : ''}
+          </span>
         </div>
       )
     },
@@ -638,7 +737,10 @@ export default function AdminLearnerInsightsPage() {
       render: (item) => (
         <div className="learner-insights-table-strong">
           <strong>{item.course}</strong>
-          <span>{item.seriesType === 'topic_test' ? 'Topic Tests' : 'Full Mocks'}</span>
+          <span>
+            {item.seriesType === 'topic_test' ? 'Topic Tests' : 'Full Mocks'}
+            {item.batch ? ` • Batch: ${item.batch}` : ''}
+          </span>
         </div>
       )
     },
@@ -787,16 +889,19 @@ export default function AdminLearnerInsightsPage() {
                   <div><span>Class</span><strong>{learner.class || 'Not available'}</strong></div>
                 </div>
                 <div className="learner-insights-access-list">
-                  {(learner.purchasedCourses || []).length ? (
-                    learner.purchasedCourses.map((item, index) => (
+                  {filteredPurchasedCourses.length ? (
+                    filteredPurchasedCourses.map((item, index) => (
                       <article key={`${item.course}-${item.moduleName}-${index}`} className="learner-insights-access-item">
                         <strong>{item.course}</strong>
-                        <p>{item.moduleName === 'ALL_MODULES' ? 'Full course unlocked' : item.moduleName}</p>
+                        <p>
+                          {item.moduleName === 'ALL_MODULES' ? 'Full course unlocked' : item.moduleName}
+                          {item.batch ? ` • Batch: ${item.batch}` : ''}
+                        </p>
                         <span>{String(item.planType || '').toUpperCase()} · {formatDate(item.unlockedAt)}</span>
                       </article>
                     ))
                   ) : (
-                    <p className="empty-note">No unlocked course access found in the learner profile.</p>
+                    <p className="empty-note">No unlocked course access found for the selected course/batch filters.</p>
                   )}
                 </div>
               </section>
@@ -828,6 +933,30 @@ export default function AdminLearnerInsightsPage() {
                   />
                 </label>
                 <label>
+                  <span>Course</span>
+                  <select
+                    value={filters.course}
+                    onChange={(event) => setFilters((current) => ({ ...current, course: event.target.value }))}
+                  >
+                    <option value="all">All courses</option>
+                    {availableCourses.map((courseName) => (
+                      <option key={`course-filter-${courseName}`} value={courseName}>{courseName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Batch</span>
+                  <select
+                    value={filters.batch}
+                    onChange={(event) => setFilters((current) => ({ ...current, batch: event.target.value }))}
+                  >
+                    <option value="all">All batches</option>
+                    {availableBatches.map((batchName) => (
+                      <option key={`batch-filter-${batchName}`} value={batchName}>{batchName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   <span>Tracked usage window</span>
                   <div className="learner-insights-window-switcher" role="tablist" aria-label="Tracked usage window">
                     {TRACKED_WINDOW_OPTIONS.map((option) => {
@@ -851,7 +980,7 @@ export default function AdminLearnerInsightsPage() {
                   <button
                     type="button"
                     className="secondary-btn"
-                    onClick={() => setFilters({ from: shiftDate(-6), to: shiftDate(0), dayWindow: '7' })}
+                    onClick={() => setFilters({ from: shiftDate(-6), to: shiftDate(0), dayWindow: '7', course: 'all', batch: 'all' })}
                   >
                     Last 7 days
                   </button>
@@ -867,6 +996,7 @@ export default function AdminLearnerInsightsPage() {
               <div className="learner-insights-filter-stats">
                 <StatCard label="Active Range" value={filterSummary} />
                 <StatCard label="Filtered Attempts" value={filteredAssessmentAttempts.length} />
+                <StatCard label="Filtered Orders" value={filteredCoursePayments.length + filteredTestSeriesPayments.length} />
                 <StatCard label="Range Usage" value={formatUsageTime(selectedRangeTrackedSeconds)} />
                 <StatCard label="Usage Sessions" value={siteUsage.totalSessions || 0} />
                 <StatCard label="Top Repeat Exam" value={examFrequency[0] ? `${examFrequency[0].attempts}x` : '0x'} />
@@ -939,7 +1069,7 @@ export default function AdminLearnerInsightsPage() {
               <CollapsiblePurchaseTable
                 title="Course memberships bought by this learner"
                 eyebrow="Purchases"
-                items={coursePayments}
+                items={filteredCoursePayments}
                 summaryLabel="Open course purchase table"
                 columns={coursePurchaseColumns}
                 emptyText="No course purchase history found."
@@ -947,7 +1077,7 @@ export default function AdminLearnerInsightsPage() {
               <CollapsiblePurchaseTable
                 title="Topic test and full mock purchases"
                 eyebrow="Test Series"
-                items={testSeriesPayments}
+                items={filteredTestSeriesPayments}
                 summaryLabel="Open test series purchase table"
                 columns={testSeriesColumns}
                 emptyText="No test series purchase history found."
@@ -960,18 +1090,18 @@ export default function AdminLearnerInsightsPage() {
                   <p className="eyebrow">Voucher Usage</p>
                   <h3>All voucher codes used by this learner</h3>
                 </div>
-                <StatCard label="Used" value={voucherUsage.length} />
+                <StatCard label="Used" value={filteredVoucherUsage.length} />
               </div>
-              {!voucherUsage.length ? (
-                <p className="empty-note">This learner has not used any voucher code yet.</p>
+              {!filteredVoucherUsage.length ? (
+                <p className="empty-note">This learner has not used any voucher code in the selected scope.</p>
               ) : (
                 <div className="learner-insights-voucher-grid">
-                  {voucherUsage.map((item) => (
+                  {filteredVoucherUsage.map((item) => (
                     <article key={`voucher-${item.id}`} className="learner-insights-voucher-card">
                       <strong>{item.voucherCode}</strong>
                       <p>{item.voucherDescription || 'Voucher applied on purchase'}</p>
                       <div className="learner-insights-voucher-meta">
-                        <span>{item.course}</span>
+                        <span>{item.course}{item.batch ? ` • ${item.batch}` : ''}</span>
                         <span>{formatDate(item.paidAt || item.createdAt)}</span>
                       </div>
                     </article>
@@ -1014,7 +1144,7 @@ export default function AdminLearnerInsightsPage() {
             <ActivityPanel
               title="Completed Videos"
               eyebrow="Learning Progress"
-              items={recentCompletedVideos}
+              items={filteredCompletedVideos}
               emptyText="No completed videos recorded yet."
               tone="teal"
               summaryLabel="Open completed video table"

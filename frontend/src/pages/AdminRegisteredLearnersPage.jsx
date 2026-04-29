@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { fetchAdminUsers } from '../api';
+import { fetchAdminUsers, removeAdminUser } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
@@ -27,6 +27,7 @@ export default function AdminRegisteredLearnersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [banner, setBanner] = useState(null);
+  const [removingUsername, setRemovingUsername] = useState('');
 
   useAutoDismissMessage(banner, setBanner);
 
@@ -73,6 +74,24 @@ export default function AdminRegisteredLearnersPage() {
     setSearchInput('');
     setPage(1);
     setSearchQuery('');
+  }
+
+  async function handleRemoveLearner(learner) {
+    const username = String(learner?.username || '').trim();
+    if (!username || removingUsername) return;
+    const confirmed = window.confirm(`Remove learner "${username}" from the webapp? This action removes their account.`);
+    if (!confirmed) return;
+    setRemovingUsername(username);
+    try {
+      await removeAdminUser(username);
+      setLearners((current) => current.filter((entry) => String(entry?.username || '').trim() !== username));
+      setPagination((current) => ({ ...current, total: Math.max(0, Number(current.total || 0) - 1) }));
+      setBanner({ type: 'success', text: `${username} removed successfully.` });
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || `Failed to remove ${username}.` });
+    } finally {
+      setRemovingUsername('');
+    }
   }
 
   const learnerStats = useMemo(() => {
@@ -200,6 +219,14 @@ export default function AdminRegisteredLearnersPage() {
                       >
                         Open Insights
                       </button>
+                      <button
+                        type="button"
+                        className="danger-btn registered-learners-remove-btn"
+                        disabled={removingUsername === learner.username}
+                        onClick={() => handleRemoveLearner(learner)}
+                      >
+                        {removingUsername === learner.username ? 'Removing…' : 'Remove Learner'}
+                      </button>
                     </div>
                   </article>
                 ))}
@@ -216,6 +243,7 @@ export default function AdminRegisteredLearnersPage() {
                       <th>Email</th>
                       <th>Registered On</th>
                       <th>Insights</th>
+                      <th>Remove</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -236,6 +264,16 @@ export default function AdminRegisteredLearnersPage() {
                             })}
                           >
                             Open Insights
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="danger-btn registered-learners-remove-btn"
+                            disabled={removingUsername === learner.username}
+                            onClick={() => handleRemoveLearner(learner)}
+                          >
+                            {removingUsername === learner.username ? 'Removing…' : 'Remove'}
                           </button>
                         </td>
                       </tr>

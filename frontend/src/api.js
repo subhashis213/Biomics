@@ -645,6 +645,12 @@ export function fetchAdminUserInsights(username) {
   return requestJson(`/auth/users/${encodeURIComponent(username)}/insights`);
 }
 
+export function removeAdminUser(username) {
+  return requestJson(`/auth/users/${encodeURIComponent(username)}`, {
+    method: 'DELETE'
+  });
+}
+
 export function removeStudentFromLivekitClass(classId, username) {
   return requestJson(`/api/livekit/classes/${encodeURIComponent(classId)}/remove-student`, {
     method: 'POST',

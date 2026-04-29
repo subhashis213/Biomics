@@ -7867,9 +7867,17 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 .registered-learners-mobile-actions {
   display: flex;
   justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .registered-learners-open-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.registered-learners-remove-btn {
   min-height: 36px;
   padding: 0 12px;
   white-space: nowrap;
@@ -8052,7 +8060,7 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 
 .learner-insights-filter-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 

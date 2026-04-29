@@ -569,16 +569,30 @@ router.get('/topic-tests/admin', authenticateToken('admin'), async (req, res) =>
         )
       ])
     );
+    const inactiveBatchMap = new Map(
+      activeCourseDocs.map((entry) => [
+        normalizeCourse(entry?.name),
+        new Set(
+          (Array.isArray(entry?.batches) ? entry.batches : [])
+            .filter((batch) => batch?.active === false)
+            .map((batch) => normalizeBatch(batch?.name))
+            .filter(Boolean)
+        )
+      ])
+    );
 
     const tests = await TopicTest.find({ category: { $in: scopedCourses } }).sort({ category: 1, module: 1, topic: 1 }).lean();
     const filteredTests = tests.filter((test) => {
       const courseName = normalizeCourse(test?.category);
       if (!courseName || !scopedCourses.includes(courseName)) return false;
       const activeBatches = activeBatchMap.get(courseName);
+      const inactiveBatches = inactiveBatchMap.get(courseName);
       if (!activeBatches || !activeBatches.size) return true;
       const testBatch = normalizeBatch(test?.batch);
       if (!testBatch) return true;
-      return activeBatches.has(testBatch);
+      // Keep legacy/migrated batch records visible in admin unless the batch is explicitly inactive.
+      if (inactiveBatches?.has(testBatch)) return false;
+      return true;
     });
     return res.json({ tests: filteredTests });
   } catch {

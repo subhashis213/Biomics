@@ -21,9 +21,7 @@ const FullMockTest = require('../models/FullMockTest');
 const { logAdminAction } = require('../utils/auditLog');
 const {
   ALL_MODULES,
-  getActiveCourseMembership,
   getActiveModuleMembership,
-  hasCourseAccess,
   normalizeCourseName,
   normalizeBatchName,
   normalizeModuleName,
@@ -349,9 +347,11 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
     const courseDocByName = new Map(
       courseDocs.map((entry) => [normalizeCourseName(entry?.name), entry])
     );
-    const [bundlePricingDocs, modules] = await Promise.all([
+    const [bundlePricingDocs, modules, modulePricingDocs, batchPricingDocs] = await Promise.all([
       ModulePricing.find({ moduleName: ALL_MODULES, category: { $in: supportedCourses } }).lean(),
-      Module.find({ category: { $in: supportedCourses } }).select({ category: 1 }).lean()
+      Module.find({ category: { $in: supportedCourses } }).select({ category: 1, name: 1 }).lean(),
+      ModulePricing.find({ category: { $in: supportedCourses }, active: true }).select({ category: 1, moduleName: 1 }).lean(),
+      BatchPricing.find({ category: { $in: supportedCourses }, active: true }).select({ category: 1, batchName: 1 }).lean()
     ]);
 
     const bundlePricingMap = new Map(
@@ -363,6 +363,23 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
       acc.set(category, Number(acc.get(category) || 0) + 1);
       return acc;
     }, new Map());
+    const validAccessMap = new Map();
+    const addValidAccess = (courseName, value) => {
+      const courseKey = normalizeCourseName(courseName || '');
+      const accessKey = normalizeModuleName(value);
+      if (!courseKey || !accessKey || accessKey === ALL_MODULES) return;
+      if (!validAccessMap.has(courseKey)) validAccessMap.set(courseKey, new Set());
+      validAccessMap.get(courseKey).add(accessKey);
+    };
+    modules.forEach((entry) => addValidAccess(entry?.category, entry?.name));
+    modulePricingDocs.forEach((entry) => addValidAccess(entry?.category, entry?.moduleName));
+    batchPricingDocs.forEach((entry) => addValidAccess(entry?.category, entry?.batchName));
+    courseDocs.forEach((entry) => {
+      const category = normalizeCourseName(entry?.name || '');
+      (Array.isArray(entry?.batches) ? entry.batches : [])
+        .filter((batch) => batch?.active !== false)
+        .forEach((batch) => addValidAccess(category, batch?.name));
+    });
 
     const courses = await Promise.all(supportedCourses.map(async (courseName) => {
       const pricing = bundlePricingMap.get(courseName) || null;
@@ -375,17 +392,19 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
         const expiresAtMs = new Date(entry.expiresAt).getTime();
         return Number.isFinite(expiresAtMs) && expiresAtMs > Date.now();
       });
-      const hasBundlePurchase = activePurchasesForCourse.some(
+      const validAccessKeys = validAccessMap.get(courseName) || new Set();
+      const hasVisibleCourseUnits = validAccessKeys.size > 0;
+      const hasBundlePurchase = hasVisibleCourseUnits && activePurchasesForCourse.some(
         (entry) => normalizeModuleName(entry?.moduleName) === ALL_MODULES
       );
       const activeModulePurchases = Array.from(new Set(
         activePurchasesForCourse
           .map((entry) => normalizeModuleName(entry?.moduleName))
-          .filter((moduleName) => moduleName && moduleName !== ALL_MODULES)
+          .filter((moduleName) => moduleName && moduleName !== ALL_MODULES && validAccessKeys.has(moduleName))
       ));
       const totalModuleCount = Number(moduleCountMap.get(courseName) || 0);
       const purchasedModuleCount = hasBundlePurchase ? totalModuleCount : activeModulePurchases.length;
-      const activeMembership = user ? getActiveCourseMembership(user, courseName) : null;
+      const hasActivePurchase = hasBundlePurchase || activeModulePurchases.length > 0;
       const plans = Object.values(MEMBERSHIP_PLANS)
         .map((plan) => buildCatalogPlanSummary(pricing, plan))
         .filter((plan) => plan.saleAmountInPaise > 0 || plan.mrpAmountInPaise > 0);
@@ -406,9 +425,9 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
         thumbnailUrl: String(pricing?.thumbnailUrl || '').trim(),
         thumbnailName: String(pricing?.thumbnailName || '').trim(),
         isEnrolledCourse: normalizeCourseName(user?.class) === courseName,
-        unlocked: user ? await hasCourseAccess(user, courseName) : false,
+        unlocked: hasActivePurchase,
         hadPurchase: purchasesForCourse.length > 0,
-        expiredMembership: purchasesForCourse.length > 0 && !activeMembership,
+        expiredMembership: purchasesForCourse.length > 0 && !hasActivePurchase,
         purchasedModuleCount,
         purchasedModuleNames: activeModulePurchases,
         hasBundlePurchase,
