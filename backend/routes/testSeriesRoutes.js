@@ -87,6 +87,10 @@ function normalizeCourse(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
+function normalizeBatch(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
 async function getSupportedCourses() {
   const docs = await Course.find({}).sort({ name: 1 }).lean();
   const names = docs
@@ -549,9 +553,34 @@ router.post('/pricing-thumbnail', authenticateToken('admin'), (req, res) => {
 router.get('/topic-tests/admin', authenticateToken('admin'), async (req, res) => {
   try {
     const category = normalizeCourse(req.query.category);
-    const filter = category ? { category } : {};
-    const tests = await TopicTest.find(filter).sort({ category: 1, module: 1, topic: 1 }).lean();
-    return res.json({ tests });
+    const supportedCourses = await getSupportedCourses();
+    const scopedCourses = category ? [category] : supportedCourses;
+    if (!scopedCourses.length) return res.json({ tests: [] });
+
+    const activeCourseDocs = await Course.find({ name: { $in: scopedCourses } }).select({ name: 1, batches: 1 }).lean();
+    const activeBatchMap = new Map(
+      activeCourseDocs.map((entry) => [
+        normalizeCourse(entry?.name),
+        new Set(
+          (Array.isArray(entry?.batches) ? entry.batches : [])
+            .filter((batch) => batch?.active !== false)
+            .map((batch) => normalizeBatch(batch?.name))
+            .filter(Boolean)
+        )
+      ])
+    );
+
+    const tests = await TopicTest.find({ category: { $in: scopedCourses } }).sort({ category: 1, module: 1, topic: 1 }).lean();
+    const filteredTests = tests.filter((test) => {
+      const courseName = normalizeCourse(test?.category);
+      if (!courseName || !scopedCourses.includes(courseName)) return false;
+      const activeBatches = activeBatchMap.get(courseName);
+      if (!activeBatches || !activeBatches.size) return true;
+      const testBatch = normalizeBatch(test?.batch);
+      if (!testBatch) return true;
+      return activeBatches.has(testBatch);
+    });
+    return res.json({ tests: filteredTests });
   } catch {
     return res.status(500).json({ error: 'Failed to fetch topic tests.' });
   }

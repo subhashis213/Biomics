@@ -438,10 +438,16 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
         .map((b) => String(b.name || '').trim())
         .filter(Boolean)
       : [];
+    const activeCourseBatchKeys = new Set(courseBatches.map((name) => String(name || '').trim().toLowerCase()));
     const pricingBatches = pricingDocs
       .filter((p) => p?.active !== false)
       .map((p) => String(p?.batchName || '').trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((name) => {
+        // Prevent stale pricing docs from showing deleted/inactive batches to students.
+        if (!activeCourseBatchKeys.size) return true;
+        return activeCourseBatchKeys.has(String(name || '').trim().toLowerCase());
+      });
     const batches = Array.from(new Set([...courseBatches, ...pricingBatches]));
 
     return res.json({

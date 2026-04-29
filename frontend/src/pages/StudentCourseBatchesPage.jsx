@@ -136,7 +136,7 @@ export default function StudentCourseBatchesPage() {
     return () => window.removeEventListener('storage', handleStorageSync);
   }, [session?.username]);
 
-  const visibleBatches = batches;
+  const visibleBatches = (Array.isArray(batches) ? batches : []).filter((entry) => entry?.active !== false);
   const moduleSections = visibleBatches
     .map((batch) => ({
       batch,
@@ -293,7 +293,10 @@ export default function StudentCourseBatchesPage() {
                 ? Math.round(((mrpPrice - salePrice) / mrpPrice) * 100)
                 : 0;
               const isLocked = salePrice > 0;
-              const canOpenContent = Boolean(coursePreview?.unlocked || coursePreview?.isEnrolledCourse || !isLocked);
+              const isPurchasedBatch = Boolean(coursePreview?.unlocked || coursePreview?.isEnrolledCourse);
+              const canOpenContent = Boolean(isPurchasedBatch || !isLocked);
+              const lockPillClass = isPurchasedBatch || !isLocked ? 'free' : 'locked';
+              const lockPillLabel = isPurchasedBatch ? '🔓 Unlocked' : (isLocked ? '🔒 Locked' : '🔓 Free');
               const cartEntryKey = getBatchCartKey(batch.batchName);
               const isInCart = cartKeys.has(cartEntryKey);
 
@@ -355,8 +358,8 @@ export default function StudentCourseBatchesPage() {
                           {discountPercent > 0 ? <span>{discountPercent}% OFF</span> : null}
                         </div>
                       </div>
-                      <div className={`student-batch-lock-pill ${isLocked ? 'locked' : 'free'}`}>
-                        {isLocked ? '🔒 Locked' : '🔓 Free'}
+                      <div className={`student-batch-lock-pill ${lockPillClass}`}>
+                        {lockPillLabel}
                       </div>
                     </div>
                     <div className="student-course-catalog-cta-row">
@@ -369,29 +372,33 @@ export default function StudentCourseBatchesPage() {
                           Open Content
                         </button>
                       ) : null}
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={() => {
-                          if (isInCart) {
-                            navigate('/student?cart=open', { state: { openCart: true } });
-                            return;
-                          }
-                          handleAddBatchToCart(batch);
-                        }}
-                      >
-                        {isInCart ? 'Go to Cart' : '🛒 Add to Cart'}
-                      </button>
-                      <button
-                        type="button"
-                        className="primary-btn"
-                        onClick={() => {
-                          handleAddBatchToCart(batch);
-                          navigate('/student?cart=open', { state: { openCart: true } });
-                        }}
-                      >
-                        Buy Now
-                      </button>
+                      {isPurchasedBatch ? null : (
+                        <>
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => {
+                              if (isInCart) {
+                                navigate('/student?cart=open', { state: { openCart: true } });
+                                return;
+                              }
+                              handleAddBatchToCart(batch);
+                            }}
+                          >
+                            {isInCart ? 'Go to Cart' : '🛒 Add to Cart'}
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-btn"
+                            onClick={() => {
+                              handleAddBatchToCart(batch);
+                              navigate('/student?cart=open', { state: { openCart: true } });
+                            }}
+                          >
+                            Buy Now
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </article>
