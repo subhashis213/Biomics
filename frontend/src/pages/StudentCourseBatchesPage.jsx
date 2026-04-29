@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
-import { fetchBatchModulesStudent, fetchCourseBatchesStudent, fetchStudentCourseCatalog, fetchStudentCourseVouchers, resolveApiAssetUrl } from '../api';
+import { fetchBatchModulesStudent, fetchCourseBatchesStudent, fetchStudentCourseVouchers, resolveApiAssetUrl } from '../api';
 import { useSessionStore } from '../stores/sessionStore';
 
 function formatPriceInPaise(amountInPaise) {
@@ -21,7 +21,6 @@ export default function StudentCourseBatchesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [banner, setBanner] = useState(null);
   const [selectedPlanByBatch, setSelectedPlanByBatch] = useState({});
-  const [coursePreview, setCoursePreview] = useState(null);
   const [availableVouchers, setAvailableVouchers] = useState([]);
   const [openCouponBatch, setOpenCouponBatch] = useState('');
   const [cartKeys, setCartKeys] = useState(new Set());
@@ -60,25 +59,6 @@ export default function StudentCourseBatchesPage() {
       }
     }
     loadVouchers();
-    return () => { cancelled = true; };
-  }, [courseName]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadCoursePreview() {
-      try {
-        const response = await fetchStudentCourseCatalog();
-        if (cancelled) return;
-        const normalizedCourse = decodeURIComponent(courseName || '');
-        const match = (Array.isArray(response?.courses) ? response.courses : []).find(
-          (entry) => String(entry?.courseName || '').trim().toLowerCase() === normalizedCourse.toLowerCase()
-        );
-        setCoursePreview(match || null);
-      } catch {
-        if (!cancelled) setCoursePreview(null);
-      }
-    }
-    loadCoursePreview();
     return () => { cancelled = true; };
   }, [courseName]);
 
@@ -293,10 +273,12 @@ export default function StudentCourseBatchesPage() {
                 ? Math.round(((mrpPrice - salePrice) / mrpPrice) * 100)
                 : 0;
               const isLocked = salePrice > 0;
-              const isPurchasedBatch = Boolean(coursePreview?.unlocked || coursePreview?.isEnrolledCourse);
-              const canOpenContent = Boolean(isPurchasedBatch || !isLocked);
-              const lockPillClass = isPurchasedBatch || !isLocked ? 'free' : 'locked';
-              const lockPillLabel = isPurchasedBatch ? '🔓 Unlocked' : (isLocked ? '🔒 Locked' : '🔓 Free');
+              const selectedPlanUnlocked = selectedPlan === 'elite'
+                ? Boolean(batch?.hasEliteAccess)
+                : Boolean(batch?.hasProAccess);
+              const canOpenContent = Boolean(selectedPlanUnlocked || !isLocked);
+              const lockPillClass = selectedPlanUnlocked || !isLocked ? 'free' : 'locked';
+              const lockPillLabel = selectedPlanUnlocked ? '🔓 Unlocked' : (isLocked ? '🔒 Locked' : '🔓 Free');
               const cartEntryKey = getBatchCartKey(batch.batchName);
               const isInCart = cartKeys.has(cartEntryKey);
 
@@ -372,7 +354,7 @@ export default function StudentCourseBatchesPage() {
                           Open Content
                         </button>
                       ) : null}
-                      {isPurchasedBatch ? null : (
+                      {selectedPlanUnlocked ? null : (
                         <>
                           <button
                             type="button"

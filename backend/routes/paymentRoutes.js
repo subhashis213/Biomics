@@ -428,6 +428,9 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
     const courseName = normalizeCourseName(decodeURIComponent(req.params.course || ''));
     if (!(await isSupportedCourse(courseName))) return res.status(400).json({ error: 'Unsupported course category.' });
 
+    const user = await User.findOne({ username: req.user.username }).lean();
+    if (!user) return res.status(404).json({ error: 'Student profile not found.' });
+
     const courseDoc = await Course.findOne({ name: courseName }).lean();
     const pricingDocs = await BatchPricing.find({ category: courseName }).lean();
     const pricingMap = new Map(pricingDocs.map((p) => [String(p.batchName || '').trim().toLowerCase(), p]));
@@ -453,6 +456,22 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
     return res.json({
       courseName,
       batches: batches.map((name) => {
+        const normalizedBatch = normalizeBatchName(name);
+        const now = Date.now();
+        const memberships = (Array.isArray(user?.purchasedCourses) ? user.purchasedCourses : []).filter((entry) => {
+          if (normalizeCourseName(entry?.course) !== courseName) return false;
+          const entryBatch = normalizeBatchName(entry?.batch);
+          const batchMatches = entryBatch === normalizedBatch || entryBatch === 'General';
+          if (!batchMatches) return false;
+          const entryModule = normalizeModuleName(entry?.moduleName);
+          const moduleMatches = entryModule === normalizeModuleName(name) || entryModule === ALL_MODULES;
+          if (!moduleMatches) return false;
+          if (!entry?.expiresAt) return true;
+          const exp = new Date(entry.expiresAt).getTime();
+          return Number.isFinite(exp) && exp > now;
+        });
+        const hasEliteAccess = memberships.some((entry) => String(entry?.planType || '').trim().toLowerCase() === 'elite');
+        const hasProAccess = hasEliteAccess || memberships.some((entry) => String(entry?.planType || '').trim().toLowerCase() === 'pro');
         const pricing = pricingMap.get(String(name || '').trim().toLowerCase()) || {};
         return {
           batchName: name,
@@ -462,7 +481,9 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
           eliteMrpInPaise: Number(pricing.eliteMrpInPaise || 0),
           thumbnailUrl: String(pricing.thumbnailUrl || '').trim(),
           thumbnailName: String(pricing.thumbnailName || '').trim(),
-          active: pricing ? pricing.active !== false : true
+          active: pricing ? pricing.active !== false : true,
+          hasProAccess,
+          hasEliteAccess
         };
       })
     });
