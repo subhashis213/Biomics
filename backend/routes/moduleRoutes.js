@@ -3,6 +3,10 @@ const router = express.Router();
 const Module = require('../models/Module');
 const Topic = require('../models/Topic');
 const Video = require('../models/Video');
+const Quiz = require('../models/Quiz');
+const TopicTest = require('../models/TopicTest');
+const MockExam = require('../models/MockExam');
+const FullMockTest = require('../models/FullMockTest');
 const ModulePricing = require('../models/ModulePricing');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -89,8 +93,25 @@ router.delete('/topics', authenticateToken('admin'), async (req, res) => {
   }
 
   try {
-    await Topic.deleteOne({ category, module: moduleName, name });
-    return res.json({ message: 'Topic removed' });
+    const [topicDeleteResult, videoDeleteResult, quizDeleteResult, topicTestDeleteResult, mockExamDeleteResult, fullMockDeleteResult] = await Promise.all([
+      Topic.deleteOne({ category, module: moduleName, name }),
+      Video.deleteMany({ category, module: moduleName, topic: name }),
+      Quiz.deleteMany({ category, module: moduleName, topic: name }),
+      TopicTest.deleteMany({ category, module: moduleName, topic: name }),
+      MockExam.deleteMany({ category, module: moduleName, topic: name }),
+      FullMockTest.deleteMany({ category, module: moduleName, topic: name })
+    ]);
+    return res.json({
+      message: 'Topic removed',
+      deleted: {
+        topics: Number(topicDeleteResult?.deletedCount || 0),
+        videos: Number(videoDeleteResult?.deletedCount || 0),
+        quizzes: Number(quizDeleteResult?.deletedCount || 0),
+        topicTests: Number(topicTestDeleteResult?.deletedCount || 0),
+        mockExams: Number(mockExamDeleteResult?.deletedCount || 0),
+        fullMocks: Number(fullMockDeleteResult?.deletedCount || 0)
+      }
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove topic' });
   }
@@ -141,16 +162,44 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
 router.delete('/', authenticateToken('admin'), async (req, res) => {
   const category = normalizeValue(req.body.category || '');
   const name = normalizeValue(req.body.name || '');
-  const batch = normalizeValue(req.body.batch || 'General') || 'General';
+  const batch = normalizeValue(req.body.batch || '');
+  const hasBatchFilter = Boolean(batch);
   if (!category || !name) {
     return res.status(400).json({ error: 'category and name are required' });
   }
 
   try {
-    await Module.deleteOne({ category, name, batch });
-    await Topic.deleteMany({ category, module: name });
-    await ModulePricing.deleteOne({ category, batch, moduleName: name });
-    return res.json({ message: 'Module removed' });
+    const scopedFilter = { category, module: name };
+    if (hasBatchFilter) scopedFilter.batch = batch;
+    const moduleScopedFilter = { category, name };
+    if (hasBatchFilter) moduleScopedFilter.batch = batch;
+    const pricingScopedFilter = { category, moduleName: name };
+    if (hasBatchFilter) pricingScopedFilter.batch = batch;
+
+    const [moduleDeleteResult, topicDeleteResult, pricingDeleteResult, videoDeleteResult, quizDeleteResult, topicTestDeleteResult, mockExamDeleteResult, fullMockDeleteResult] = await Promise.all([
+      Module.deleteMany(moduleScopedFilter),
+      Topic.deleteMany({ category, module: name }),
+      ModulePricing.deleteMany(pricingScopedFilter),
+      Video.deleteMany(scopedFilter),
+      Quiz.deleteMany(scopedFilter),
+      TopicTest.deleteMany(scopedFilter),
+      MockExam.deleteMany(scopedFilter),
+      FullMockTest.deleteMany(scopedFilter)
+    ]);
+
+    return res.json({
+      message: 'Module removed',
+      deleted: {
+        modules: Number(moduleDeleteResult?.deletedCount || 0),
+        topics: Number(topicDeleteResult?.deletedCount || 0),
+        pricingRows: Number(pricingDeleteResult?.deletedCount || 0),
+        videos: Number(videoDeleteResult?.deletedCount || 0),
+        quizzes: Number(quizDeleteResult?.deletedCount || 0),
+        topicTests: Number(topicTestDeleteResult?.deletedCount || 0),
+        mockExams: Number(mockExamDeleteResult?.deletedCount || 0),
+        fullMocks: Number(fullMockDeleteResult?.deletedCount || 0)
+      }
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove module' });
   }

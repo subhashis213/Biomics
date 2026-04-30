@@ -681,13 +681,16 @@ router.get('/student/workspace', authenticateToken('user'), async (req, res) => 
       item,
       canAccess: await canUserAccessClass(currentUser, item, 'user')
     })));
+    const hasAnyAccessibleClass = classAccessStates.some((entry) => entry.canAccess);
     const accessibleClasses = classAccessStates.filter((entry) => entry.canAccess).map((entry) => entry.item);
     const activeClass = accessibleClasses.find((item) => isClassCurrentlyLive(item)) || null;
     const upcomingClasses = accessibleClasses.filter((item) => isClassScheduledForStudents(item));
 
     return res.json({
       access: {
-        hasCourseAccess: hasEnrolledCourseAccess,
+        // For enrolled students, if live classes are accessible by enrollment/batch mapping,
+        // reflect access as enabled even when generic course-paywall checks return false.
+        hasCourseAccess: Boolean(hasEnrolledCourseAccess || hasAnyAccessibleClass),
         enrolledCourse: String(currentUser?.class || '').trim(),
         notes: String(currentUser?.liveClassAccess?.notes || '').trim()
       },

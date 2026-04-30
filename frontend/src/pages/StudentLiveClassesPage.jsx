@@ -551,6 +551,7 @@ export default function StudentLiveClassesPage() {
             </div>
             <aside className="livekit-student-hero-spotlight">
               <span className="livekit-student-hero-spotlight-kicker">Next classroom moment</span>
+              {filteredActiveClass ? <span className="live-badge pulsing">CLASS STARTED • LIVE NOW</span> : null}
               <strong>{filteredActiveClass?.title || nextCalendarEntry?.title || 'No live class scheduled for selected course'}</strong>
               <p>
                 {filteredActiveClass
