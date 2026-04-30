@@ -558,22 +558,6 @@ export default function AdminPricingWorkspacePage() {
                     ) : null}
                     <button
                       type="button"
-                      className="secondary-btn module-price-toggle-btn"
-                      onClick={async () => {
-                        if (isExpanded) {
-                          setExpandedPricingCourse(null);
-                        } else {
-                          setExpandedPricingCourse(courseName);
-                          if (!modulePricingByCourse[courseName]) {
-                            await loadModulePricing(courseName);
-                          }
-                        }
-                      }}
-                    >
-                      {isExpanded ? 'Close Module Editor' : 'Open Module Editor'}
-                    </button>
-                    <button
-                      type="button"
                       className="primary-btn module-price-toggle-btn pricing-set-batch-btn"
                       disabled={!isAdminAuthenticated}
                       title={!isAdminAuthenticated ? 'Admin not authenticated — please login' : ''}

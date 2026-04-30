@@ -65,6 +65,21 @@ function getActiveModuleMembership(userDoc, course, moduleName, batchName = 'Gen
     .sort((a, b) => new Date(b?.expiresAt || 0).getTime() - new Date(a?.expiresAt || 0).getTime())[0];
   if (bundleEntry) return bundleEntry;
 
+  // Batch-level purchase compatibility:
+  // In batch checkout flows, moduleName may be stored as the batch name itself.
+  // Treat that as "all modules unlocked for this batch".
+  const batchLevelEntry = normalizedBatch !== 'General'
+    ? userDoc.purchasedCourses
+      .filter((e) => (
+        normalizeCourseName(e?.course) === normalizedCourse
+        && normalizeModuleName(e?.moduleName) === normalizedBatch
+        && matchBatch(e?.batch)
+      ))
+      .filter(isActive)
+      .sort((a, b) => new Date(b?.expiresAt || 0).getTime() - new Date(a?.expiresAt || 0).getTime())[0]
+    : null;
+  if (batchLevelEntry) return batchLevelEntry;
+
   // If asking for ALL_MODULES specifically, no individual module entry counts
   if (normalizedModule === ALL_MODULES) return null;
 

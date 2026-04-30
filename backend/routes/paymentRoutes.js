@@ -1161,11 +1161,15 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
       ...mockExamModules,
       ...fullMockModules
     ].map((entry) => normalizeModuleName(entry)).filter(Boolean);
+    const pricedModuleNames = pricingDocs
+      .map((entry) => normalizeModuleName(entry?.moduleName))
+      .filter((moduleName) => moduleName && moduleName !== ALL_MODULES);
 
     const moduleNames = Array.from(new Set([
       ALL_MODULES,
       ...modules.map((entry) => normalizeModuleName(entry.name)),
-      ...contentModuleNames
+      ...contentModuleNames,
+      ...pricedModuleNames
     ]));
 
     // Cleanup stale pricing rows left behind by older module deletions.
