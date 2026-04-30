@@ -6,6 +6,7 @@ function normalizeCourseText(value) {
 
 const courseBatchSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
+  description: { type: String, trim: true, default: '' },
   active: { type: Boolean, default: true }
 }, { _id: false });
 
@@ -34,7 +35,11 @@ courseSchema.pre('validate', function normalizeFields(next) {
     const key = name.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    normalizedBatches.push({ name, active: entry?.active !== false });
+    normalizedBatches.push({
+      name,
+      description: String(entry?.description || '').trim(),
+      active: entry?.active !== false
+    });
   });
   this.batches = normalizedBatches;
   next();

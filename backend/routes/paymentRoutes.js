@@ -457,10 +457,16 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
     const courseBatches = Array.isArray(courseDoc?.batches)
       ? courseDoc.batches
         .filter((b) => b?.active !== false)
-        .map((b) => String(b.name || '').trim())
-        .filter(Boolean)
+        .map((b) => ({
+          name: String(b?.name || '').trim(),
+          description: String(b?.description || '').trim()
+        }))
+        .filter((b) => Boolean(b.name))
       : [];
-    const activeCourseBatchKeys = new Set(courseBatches.map((name) => String(name || '').trim().toLowerCase()));
+    const courseBatchDescriptionByName = new Map(
+      courseBatches.map((entry) => [String(entry?.name || '').trim().toLowerCase(), String(entry?.description || '').trim()])
+    );
+    const activeCourseBatchKeys = new Set(courseBatches.map((entry) => String(entry?.name || '').trim().toLowerCase()));
     const pricingBatches = pricingDocs
       .filter((p) => p?.active !== false)
       .map((p) => String(p?.batchName || '').trim())
@@ -470,7 +476,10 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
         if (!activeCourseBatchKeys.size) return true;
         return activeCourseBatchKeys.has(String(name || '').trim().toLowerCase());
       });
-    const batches = Array.from(new Set([...courseBatches, ...pricingBatches]));
+    const batches = Array.from(new Set([
+      ...courseBatches.map((entry) => entry?.name),
+      ...pricingBatches
+    ]));
 
     return res.json({
       courseName,
@@ -494,6 +503,7 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
         const pricing = pricingMap.get(String(name || '').trim().toLowerCase()) || {};
         return {
           batchName: name,
+          description: String(courseBatchDescriptionByName.get(String(name || '').trim().toLowerCase()) || '').trim(),
           proPriceInPaise: Number(pricing.proPriceInPaise || 0),
           elitePriceInPaise: Number(pricing.elitePriceInPaise || 0),
           proMrpInPaise: Number(pricing.proMrpInPaise || 0),

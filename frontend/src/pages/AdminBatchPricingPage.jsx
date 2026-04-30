@@ -78,7 +78,8 @@ export default function AdminBatchPricingPage() {
     setLoading(true);
     try {
       const coursesResponse = await fetchCoursesAdmin();
-      const coursesList = Array.isArray(coursesResponse?.courses) ? coursesResponse.courses : [];
+      const coursesList = (Array.isArray(coursesResponse?.courses) ? coursesResponse.courses : [])
+        .filter((course) => course?.active !== false);
 
       // Fetch batch pricing for each course
       const coursesWithBatches = await Promise.all(

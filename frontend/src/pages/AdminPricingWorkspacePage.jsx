@@ -15,16 +15,6 @@ import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 import { getSession } from '../session';
 
-const COURSE_CATEGORIES = [
-  '11th',
-  '12th',
-  'NEET',
-  'GAT-B',
-  'IIT-JAM',
-  'CSIR-NET Life Science',
-  'GATE'
-];
-
 const COURSE_META = {
   '11th':                  { icon: '📖' },
   '12th':                  { icon: '🎓' },
@@ -59,6 +49,11 @@ export default function AdminPricingWorkspacePage() {
 
   const adminSession = getSession();
   const isAdminAuthenticated = Boolean(adminSession?.role === 'admin' && adminSession?.token);
+  const visibleCourses = Array.from(new Set(coursesList.filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const configuredVisibleCourseCount = visibleCourses.filter((courseName) =>
+    coursePricing.some((entry) => String(entry?.category || '').trim() === courseName)
+  ).length;
 
   function setPricingInlineStatus(key, type, text) {
     setPricingSaveStatus((current) => ({
@@ -78,6 +73,18 @@ export default function AdminPricingWorkspacePage() {
 
   async function loadPaymentSettings() {
     try {
+      let activeCourseNames = [];
+      try {
+        const coursesRes = await fetchCoursesAdmin();
+        activeCourseNames = (Array.isArray(coursesRes?.courses) ? coursesRes.courses : [])
+          .filter((entry) => entry?.active !== false)
+          .map((entry) => String(entry?.name || '').trim())
+          .filter(Boolean);
+      } catch {
+        activeCourseNames = [];
+      }
+      setCoursesList(activeCourseNames);
+
       const pricingResponse = await fetchCoursePricingAdmin();
       const pricing = Array.isArray(pricingResponse?.pricing) ? pricingResponse.pricing : [];
       const bundlePricing = pricing.filter((entry) => String(entry?.moduleName || '') === 'ALL_MODULES');
@@ -98,7 +105,7 @@ export default function AdminPricingWorkspacePage() {
         };
       });
 
-      COURSE_CATEGORIES.forEach((courseName) => {
+      activeCourseNames.forEach((courseName) => {
         if (!nextPriceForm[courseName]) {
           nextPriceForm[courseName] = {
             proAmountRupees: '0',
@@ -111,30 +118,6 @@ export default function AdminPricingWorkspacePage() {
           };
         }
       });
-
-      // Fetch full course list so newly created courses appear in pricing UI
-      try {
-        const coursesRes = await fetchCoursesAdmin();
-        const courses = Array.isArray(coursesRes?.courses) ? coursesRes.courses.map((c) => c.name) : [];
-        setCoursesList(courses);
-        // Ensure any fetched course has an entry in the price form
-        courses.forEach((cName) => {
-          if (!nextPriceForm[cName]) {
-            nextPriceForm[cName] = {
-              proAmountRupees: '0',
-              eliteAmountRupees: '0',
-              proMrpAmountRupees: '0',
-              eliteMrpAmountRupees: '0',
-              thumbnailUrl: '',
-              thumbnailName: '',
-              active: true
-            };
-          }
-        });
-      } catch (err) {
-        // non-fatal: fall back to COURSE_CATEGORIES
-        setCoursesList(COURSE_CATEGORIES.slice());
-      }
 
       setPriceFormByCourse(nextPriceForm);
     } catch (error) {
@@ -183,7 +166,9 @@ export default function AdminPricingWorkspacePage() {
           // Case-insensitive match for course name
           const courseEntry = courseEntries.find((c) => String(c.name || '').trim().toLowerCase() === String(courseName || '').trim().toLowerCase());
           if (courseEntry && Array.isArray(courseEntry.batches) && courseEntry.batches.length) {
-            batches = courseEntry.batches.map((b) => ({ batchName: String(b.name || '').trim() }));
+            batches = courseEntry.batches
+              .filter((b) => b?.active !== false)
+              .map((b) => ({ batchName: String(b.name || '').trim() }));
           }
         } catch (err) {
           // ignore
@@ -194,7 +179,9 @@ export default function AdminPricingWorkspacePage() {
           const coursesRes = await fetchCoursesAdmin();
           const courseEntries = Array.isArray(coursesRes?.courses) ? coursesRes.courses : [];
           const courseEntry = courseEntries.find((c) => String(c.name || '').trim().toLowerCase() === String(courseName || '').trim().toLowerCase());
-          const courseBatches = Array.isArray(courseEntry?.batches) ? courseEntry.batches : [];
+          const courseBatches = Array.isArray(courseEntry?.batches)
+            ? courseEntry.batches.filter((b) => b?.active !== false)
+            : [];
           const existingNames = new Set((batches || []).map((b) => String(b.batchName || '').trim().toLowerCase()));
           courseBatches.forEach((cb) => {
             const nm = String(cb?.name || '').trim();
@@ -463,8 +450,8 @@ export default function AdminPricingWorkspacePage() {
             <p className="subtitle">Configure Pro and Elite pricing with separate controls per course.</p>
           </div>
           <div className="workspace-hero-stats">
-            <StatCard label="Courses" value={COURSE_CATEGORIES.length} />
-            <StatCard label="Configured" value={coursePricing.length} />
+            <StatCard label="Courses" value={visibleCourses.length} />
+            <StatCard label="Configured" value={configuredVisibleCourseCount} />
           </div>
         </section>
 
@@ -479,7 +466,7 @@ export default function AdminPricingWorkspacePage() {
           </div>
 
           <div className="quiz-admin-items pricing-workspace-list">
-            {(coursesList.length ? coursesList : COURSE_CATEGORIES).map((courseName) => {
+            {visibleCourses.map((courseName) => {
               const meta = COURSE_META[courseName] || {};
               const form = priceFormByCourse[courseName] || {
                 proAmountRupees: '0',
@@ -929,6 +916,9 @@ export default function AdminPricingWorkspacePage() {
                 </article>
               );
             })}
+            {!visibleCourses.length ? (
+              <p className="empty-note">No active courses found. Create a course first in Course Setup Workspace.</p>
+            ) : null}
           </div>
         </section>
       </main>

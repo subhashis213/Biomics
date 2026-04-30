@@ -981,23 +981,30 @@ router.post('/topic-tests/student/:testId/submit', authenticateToken('user'), as
 
     const durationSeconds = Number.isFinite(Number(req.body?.durationSeconds)) ? Math.max(0, Number(req.body.durationSeconds)) : 0;
 
-    await TopicTestAttempt.create({
-      testId: test._id,
-      username: req.user.username,
-      category: test.category,
-      module: test.module,
-      topic: test.topic,
-      title: test.title,
-      score,
-      total: test.questions.length,
-      durationSeconds
-    }).catch(() => { /* non-fatal — don't block result delivery */ });
+    let savedAttempt = null;
+    try {
+      savedAttempt = await TopicTestAttempt.create({
+        testId: test._id,
+        username: req.user.username,
+        category: test.category,
+        module: test.module,
+        topic: test.topic,
+        title: test.title,
+        score,
+        total: test.questions.length,
+        durationSeconds
+      });
+    } catch {
+      // non-fatal — don't block result delivery
+    }
 
     return res.json({
       score,
       total: test.questions.length,
       percentage: Math.round((score / test.questions.length) * 100),
-      review
+      review,
+      attemptId: savedAttempt?._id ? String(savedAttempt._id) : '',
+      feedbackReaction: savedAttempt?.feedbackReaction || null
     });
   } catch {
     return res.status(500).json({ error: 'Failed to submit topic test.' });
@@ -1106,24 +1113,144 @@ router.post('/full-mocks/student/:mockId/submit', authenticateToken('user'), asy
 
     const durationSeconds = Number.isFinite(Number(req.body?.durationSeconds)) ? Math.max(0, Number(req.body.durationSeconds)) : 0;
 
-    await FullMockAttempt.create({
-      mockId: mock._id,
-      username: req.user.username,
-      category: mock.category,
-      title: mock.title,
-      score,
-      total: mock.questions.length,
-      durationSeconds
-    }).catch(() => { /* non-fatal — don't block result delivery */ });
+    let savedAttempt = null;
+    try {
+      savedAttempt = await FullMockAttempt.create({
+        mockId: mock._id,
+        username: req.user.username,
+        category: mock.category,
+        title: mock.title,
+        score,
+        total: mock.questions.length,
+        durationSeconds
+      });
+    } catch {
+      // non-fatal — don't block result delivery
+    }
 
     return res.json({
       score,
       total: mock.questions.length,
       percentage: Math.round((score / mock.questions.length) * 100),
-      review
+      review,
+      attemptId: savedAttempt?._id ? String(savedAttempt._id) : '',
+      feedbackReaction: savedAttempt?.feedbackReaction || null
     });
   } catch {
     return res.status(500).json({ error: 'Failed to submit full mock test.' });
+  }
+});
+
+// POST /test-series/attempt-feedback
+router.post('/attempt-feedback', authenticateToken('user'), async (req, res) => {
+  try {
+    const attemptType = String(req.body?.attemptType || '').trim().toLowerCase();
+    const attemptId = String(req.body?.attemptId || '').trim();
+    const reaction = String(req.body?.reaction || '').trim().toLowerCase();
+    if (!['topic', 'mock'].includes(attemptType)) {
+      return res.status(400).json({ error: 'Invalid attempt type.' });
+    }
+    if (!attemptId) {
+      return res.status(400).json({ error: 'Attempt id is required.' });
+    }
+    if (!['up', 'down'].includes(reaction)) {
+      return res.status(400).json({ error: 'Feedback must be thumbs up or thumbs down.' });
+    }
+
+    const Model = attemptType === 'topic' ? TopicTestAttempt : FullMockAttempt;
+    const attempt = await Model.findById(attemptId);
+    if (!attempt) return res.status(404).json({ error: 'Attempt not found.' });
+    if (String(attempt.username || '').trim() !== String(req.user.username || '').trim()) {
+      return res.status(403).json({ error: 'Not allowed to update this attempt feedback.' });
+    }
+
+    attempt.feedbackReaction = reaction;
+    attempt.feedbackAt = new Date();
+    await attempt.save();
+
+    return res.json({
+      ok: true,
+      feedback: {
+        attemptId: String(attempt._id),
+        attemptType,
+        reaction: attempt.feedbackReaction,
+        feedbackAt: attempt.feedbackAt
+      }
+    });
+  } catch {
+    return res.status(500).json({ error: 'Failed to save attempt feedback.' });
+  }
+});
+
+// GET /test-series/attempt-feedback/admin
+router.get('/attempt-feedback/admin', authenticateToken('admin'), async (req, res) => {
+  try {
+    const limit = Math.min(200, Math.max(1, Number(req.query?.limit || 50)));
+    const reactionFilter = String(req.query?.reaction || 'all').trim().toLowerCase();
+    const courseFilter = normalizeCourse(req.query?.course || '');
+    const filters = {};
+    if (['up', 'down'].includes(reactionFilter)) {
+      filters.feedbackReaction = reactionFilter;
+    } else {
+      filters.feedbackReaction = { $in: ['up', 'down'] };
+    }
+    if (courseFilter) {
+      filters.category = courseFilter;
+    }
+
+    const [topicFeedback, mockFeedback] = await Promise.all([
+      TopicTestAttempt.find(filters)
+        .sort({ feedbackAt: -1, submittedAt: -1 })
+        .limit(limit)
+        .lean(),
+      FullMockAttempt.find(filters)
+        .sort({ feedbackAt: -1, submittedAt: -1 })
+        .limit(limit)
+        .lean()
+    ]);
+
+    const rows = [
+      ...topicFeedback.map((entry) => ({
+        _id: String(entry?._id || ''),
+        attemptType: 'topic',
+        username: String(entry?.username || '').trim(),
+        course: String(entry?.category || '').trim(),
+        title: String(entry?.title || '').trim(),
+        module: String(entry?.module || '').trim(),
+        topic: String(entry?.topic || '').trim(),
+        reaction: String(entry?.feedbackReaction || '').trim(),
+        feedbackAt: entry?.feedbackAt || null,
+        submittedAt: entry?.submittedAt || null
+      })),
+      ...mockFeedback.map((entry) => ({
+        _id: String(entry?._id || ''),
+        attemptType: 'mock',
+        username: String(entry?.username || '').trim(),
+        course: String(entry?.category || '').trim(),
+        title: String(entry?.title || '').trim(),
+        module: '',
+        topic: '',
+        reaction: String(entry?.feedbackReaction || '').trim(),
+        feedbackAt: entry?.feedbackAt || null,
+        submittedAt: entry?.submittedAt || null
+      }))
+    ].sort((left, right) => new Date(right?.feedbackAt || 0).getTime() - new Date(left?.feedbackAt || 0).getTime()).slice(0, limit);
+
+    const summary = rows.reduce((acc, entry) => {
+      if (entry.reaction === 'up') acc.thumbsUp += 1;
+      if (entry.reaction === 'down') acc.thumbsDown += 1;
+      return acc;
+    }, { thumbsUp: 0, thumbsDown: 0 });
+
+    return res.json({
+      summary: {
+        ...summary,
+        total: summary.thumbsUp + summary.thumbsDown
+      },
+      feedback: rows
+    });
+  } catch {
+    return res.status(500).json({ error: 'Failed to fetch test series feedback.' });
   }
 });
 

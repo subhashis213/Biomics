@@ -190,6 +190,7 @@ async function buildCoursesWithMeta(filter = {}) {
         ? entry.batches
           .map((batch) => ({
             name: normalizeValue(batch?.name),
+            description: String(batch?.description || '').trim(),
             active: batch?.active !== false
           }))
           .filter((batch) => Boolean(batch.name))
@@ -400,6 +401,7 @@ router.post('/admin/:courseName/batches', authenticateToken('admin'), async (req
   try {
     const courseName = normalizeValue(req.params.courseName);
     const batchName = normalizeValue(req.body?.name);
+    const batchDescription = String(req.body?.description || '').trim();
 
     if (!courseName || !batchName) {
       return res.status(400).json({ error: 'Course name and batch name are required.' });
@@ -415,7 +417,7 @@ router.post('/admin/:courseName/batches', authenticateToken('admin'), async (req
       return res.status(409).json({ error: 'Batch already exists for this course.' });
     }
 
-    courseDoc.batches = [...(courseDoc.batches || []), { name: batchName, active: true }];
+    courseDoc.batches = [...(courseDoc.batches || []), { name: batchName, description: batchDescription, active: true }];
     courseDoc.updatedBy = String(req.user?.username || '').trim();
     await courseDoc.save();
 
@@ -423,6 +425,47 @@ router.post('/admin/:courseName/batches', authenticateToken('admin'), async (req
     return res.status(201).json({ courses });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to add batch.' });
+  }
+});
+
+router.put('/admin/:courseName/batches/:batchName', authenticateToken('admin'), async (req, res) => {
+  try {
+    const courseName = normalizeValue(req.params.courseName);
+    const batchName = normalizeValue(req.params.batchName);
+    const batchDescription = String(req.body?.description || '').trim();
+    const active = req.body?.active !== false;
+
+    if (!courseName || !batchName) {
+      return res.status(400).json({ error: 'Course name and batch name are required.' });
+    }
+
+    const courseDoc = await findCourseDocByName(courseName);
+    if (!courseDoc) {
+      return res.status(404).json({ error: 'Course not found.' });
+    }
+
+    let found = false;
+    courseDoc.batches = (courseDoc.batches || []).map((entry) => {
+      if (normalizeNameKey(entry?.name) !== normalizeNameKey(batchName)) return entry;
+      found = true;
+      return {
+        name: normalizeValue(entry?.name),
+        description: batchDescription,
+        active
+      };
+    });
+
+    if (!found) {
+      return res.status(404).json({ error: 'Batch not found for this course.' });
+    }
+
+    courseDoc.updatedBy = String(req.user?.username || '').trim();
+    await courseDoc.save();
+
+    const courses = await buildCoursesWithMeta({});
+    return res.json({ courses });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to update batch.' });
   }
 });
 
@@ -481,7 +524,11 @@ router.put('/admin/:courseName/batches/:batchName/rename', authenticateToken('ad
 
     courseDoc.batches = (courseDoc.batches || []).map((entry) => {
       if (normalizeNameKey(entry?.name) !== normalizeNameKey(batchName)) return entry;
-      return { name: nextBatchName, active: entry?.active !== false };
+      return {
+        name: nextBatchName,
+        description: String(entry?.description || '').trim(),
+        active: entry?.active !== false
+      };
     });
     courseDoc.updatedBy = String(req.user?.username || '').trim();
     await courseDoc.save();

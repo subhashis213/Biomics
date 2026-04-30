@@ -2360,12 +2360,11 @@ export default function AdminDashboard() {
   const currentModuleTopics = moduleTopicsByKey[topicBucketKey] || [];
   const selectedCourseTheme = COURSE_MODAL_THEME[selectedCourse] || COURSE_MODAL_THEME['11th'];
   const catalogCourseNames = adminCourseCatalog
+    .filter((entry) => entry?.active !== false)
     .map((entry) => String(entry?.name || '').trim())
     .filter(Boolean);
-  const courseManagerCourses = (catalogCourseNames.length
-    ? Array.from(new Set(catalogCourseNames))
-    : COURSE_CATEGORIES
-  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const courseManagerCourses = Array.from(new Set(catalogCourseNames))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const courseModalStyle = {
     '--course-modal-accent': selectedCourseTheme.accent,
     '--course-modal-accent-alt': selectedCourseTheme.accentAlt,
@@ -2580,6 +2579,9 @@ export default function AdminDashboard() {
                   </button>
                 );
               })}
+              {!courseManagerCourses.length ? (
+                <p className="empty-note">No active courses found. Create a course in Course Setup Workspace.</p>
+              ) : null}
             </div>
           </section>
 

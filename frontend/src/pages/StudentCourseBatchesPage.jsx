@@ -320,6 +320,12 @@ export default function StudentCourseBatchesPage() {
                       <span>FREE CONTENT</span>
                     </div>
                     <h4>{batch.batchName}</h4>
+                    {batch.description ? (
+                      <div className="student-batch-about-box">
+                        <p className="student-batch-about-label">About this course</p>
+                        <p className="student-batch-about-text">{batch.description}</p>
+                      </div>
+                    ) : null}
                     <div className="student-course-catalog-controls">
                       <label className="student-course-plan-select">
                         <span>Choose plan</span>

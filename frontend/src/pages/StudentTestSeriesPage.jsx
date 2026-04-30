@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { previewTestSeriesVoucher, requestJson, resolveApiAssetUrl } from '../api';
+import { previewTestSeriesVoucher, requestJson, resolveApiAssetUrl, submitTestSeriesAttemptFeedback } from '../api';
 import AppShell from '../components/AppShell';
 import TopicTestCatalogBoard from '../components/TopicTestCatalogBoard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
@@ -353,6 +353,7 @@ export default function StudentTestSeriesPage() {
   // syllabusView: null | { type:'topic'|'mock', items:[], hasAccess:bool, course:string }
   const [syllabusView, setSyllabusView]     = useState(null);
   const [loadingSyllabus, setLoadingSyllabus] = useState(false);
+  const [resultFeedbackSaving, setResultFeedbackSaving] = useState(false);
 
   // Voucher state — keyed by seriesType: 'topic_test' | 'full_mock'
   const [voucherInputs,   setVoucherInputs]   = useState({ topic_test: '', full_mock: '' });
@@ -781,6 +782,43 @@ export default function StudentTestSeriesPage() {
     }
   }
 
+  async function handleSubmitAttemptFeedback(reaction) {
+    const normalizedReaction = String(reaction || '').trim().toLowerCase();
+    if (!['up', 'down'].includes(normalizedReaction)) return;
+    if (!testSession?.submitted || !testSession?.result?.attemptId) return;
+    if (resultFeedbackSaving) return;
+
+    const attemptType = testSession.type === 'mock' ? 'mock' : 'topic';
+    setResultFeedbackSaving(true);
+    try {
+      await submitTestSeriesAttemptFeedback({
+        attemptType,
+        attemptId: testSession.result.attemptId,
+        reaction: normalizedReaction
+      });
+      setTestSession((prev) => {
+        if (!prev?.result) return prev;
+        return {
+          ...prev,
+          result: {
+            ...prev.result,
+            feedbackReaction: normalizedReaction
+          }
+        };
+      });
+      setBanner({
+        type: 'success',
+        text: normalizedReaction === 'up'
+          ? 'Thanks for the feedback. Glad this test helped!'
+          : 'Thanks for the feedback. We will improve this test experience.'
+      });
+    } catch (error) {
+      setBanner({ type: 'error', text: error?.message || 'Failed to submit feedback.' });
+    } finally {
+      setResultFeedbackSaving(false);
+    }
+  }
+
   useEffect(() => {
     if (!testSession || testSession.submitted || testSession.isSubmitting || !testSession.hasStarted) return undefined;
 
@@ -1059,6 +1097,32 @@ export default function StudentTestSeriesPage() {
                   {showReview ? '▲ Hide Answer Review' : '▼ View Answer Review'}
                 </button>
                 <button type="button" className="secondary-btn" onClick={quitTest}>← Back to Tests</button>
+              </div>
+            </div>
+          </section>
+
+          <section className="card ts-result-feedback-card">
+            <div className="ts-result-feedback-inner">
+              <p className="ts-result-feedback-question">How was your practice experience?</p>
+              <div className="ts-result-feedback-actions">
+                <button
+                  type="button"
+                  className={`ts-feedback-btn down${result.feedbackReaction === 'down' ? ' active' : ''}`}
+                  onClick={() => handleSubmitAttemptFeedback('down')}
+                  disabled={resultFeedbackSaving}
+                  aria-label="Thumbs down feedback"
+                >
+                  👎
+                </button>
+                <button
+                  type="button"
+                  className={`ts-feedback-btn up${result.feedbackReaction === 'up' ? ' active' : ''}`}
+                  onClick={() => handleSubmitAttemptFeedback('up')}
+                  disabled={resultFeedbackSaving}
+                  aria-label="Thumbs up feedback"
+                >
+                  👍
+                </button>
               </div>
             </div>
           </section>

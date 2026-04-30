@@ -9,6 +9,7 @@ import {
   renameCourseAdmin,
   renameCourseBatchAdmin,
   removeCourseBatchAdmin,
+  updateCourseBatchAdmin,
   requestJson,
   uploadMaterial
 } from '../api';
@@ -102,12 +103,15 @@ export default function AdminCourseWorkspacePage() {
   const [selectedCourse, setSelectedCourse] = useState('');
   const [newCourseName, setNewCourseName] = useState('');
   const [newBatchName, setNewBatchName] = useState('');
+  const [newBatchDescription, setNewBatchDescription] = useState('');
   const [renameCourseValue, setRenameCourseValue] = useState('');
   const [renamingCourse, setRenamingCourse] = useState(false);
   const [renamingBatchName, setRenamingBatchName] = useState('');
   const [renameBatchValue, setRenameBatchValue] = useState('');
   const [renamingBatch, setRenamingBatch] = useState(false);
   const [selectedBatchByCourse, setSelectedBatchByCourse] = useState({});
+  const [batchDescriptionValue, setBatchDescriptionValue] = useState('');
+  const [savingBatchDescription, setSavingBatchDescription] = useState(false);
   const [savingBatch, setSavingBatch] = useState(false);
   const [deletePrompt, setDeletePrompt] = useState(null);
   const [deletingEntity, setDeletingEntity] = useState(false);
@@ -163,6 +167,7 @@ export default function AdminCourseWorkspacePage() {
   const selectedCourseEntry = courseCatalog.find((entry) => entry.name === selectedCourse) || null;
   const availableBatches = (selectedCourseEntry?.batches || []).filter((batch) => batch.active !== false).map((batch) => batch.name);
   const selectedBatch = selectedBatchByCourse[selectedCourse] || availableBatches[0] || '';
+  const selectedBatchEntry = (selectedCourseEntry?.batches || []).find((batch) => normalizeKey(batch?.name) === normalizeKey(selectedBatch)) || null;
 
   useEffect(() => {
     if (!modalMessage) return undefined;
@@ -258,6 +263,10 @@ export default function AdminCourseWorkspacePage() {
     if (!firstBatch) return;
     setSelectedBatchByCourse((current) => ({ ...current, [selectedCourse]: firstBatch }));
   }, [selectedCourse, selectedBatchByCourse, availableBatches]);
+
+  useEffect(() => {
+    setBatchDescriptionValue(String(selectedBatchEntry?.description || '').trim());
+  }, [selectedCourse, selectedBatch, selectedBatchEntry?.description]);
 
   async function loadTopicsForModule(course, moduleName) {
     if (!course || !moduleName) return;
@@ -368,7 +377,7 @@ export default function AdminCourseWorkspacePage() {
     if (!selectedCourse || !batchName) return;
     setSavingBatch(true);
     try {
-      const response = await addCourseBatchAdmin(selectedCourse, batchName);
+      const response = await addCourseBatchAdmin(selectedCourse, batchName, newBatchDescription);
       const nextCourses = Array.isArray(response?.courses) ? response.courses : [];
       const nextCourse = nextCourses.find((entry) => normalizeKey(entry?.name) === normalizeKey(selectedCourse));
       const matchedBatch = (nextCourse?.batches || []).find((entry) => normalizeKey(entry?.name) === normalizeKey(batchName));
@@ -378,6 +387,7 @@ export default function AdminCourseWorkspacePage() {
         [selectedCourse]: matchedBatch?.name || batchName
       }));
       setNewBatchName('');
+      setNewBatchDescription('');
       setModalMessage({ type: 'success', text: `Batch "${matchedBatch?.name || batchName}" added to ${selectedCourse}.` });
       // Navigate to batch pricing editor for quick price setup
       try {
@@ -438,6 +448,23 @@ export default function AdminCourseWorkspacePage() {
       setModalMessage({ type: 'error', text: error.message || 'Failed to rename batch.' });
     } finally {
       setRenamingBatch(false);
+    }
+  }
+
+  async function handleSaveBatchDescription() {
+    if (!selectedCourse || !selectedBatch) return;
+    setSavingBatchDescription(true);
+    try {
+      const response = await updateCourseBatchAdmin(selectedCourse, selectedBatch, {
+        description: String(batchDescriptionValue || '').trim()
+      });
+      const nextCourses = Array.isArray(response?.courses) ? response.courses : [];
+      setCourseCatalog(nextCourses);
+      setModalMessage({ type: 'success', text: `Description updated for "${selectedBatch}".` });
+    } catch (error) {
+      setModalMessage({ type: 'error', text: error.message || 'Failed to update batch description.' });
+    } finally {
+      setSavingBatchDescription(false);
     }
   }
 
@@ -842,6 +869,13 @@ export default function AdminCourseWorkspacePage() {
                   onChange={(event) => setNewBatchName(event.target.value)}
                   disabled={!selectedCourse}
                 />
+                <input
+                  type="text"
+                  placeholder="Batch description (optional)"
+                  value={newBatchDescription}
+                  onChange={(event) => setNewBatchDescription(event.target.value)}
+                  disabled={!selectedCourse}
+                />
                 <button type="button" className="primary-btn" onClick={handleAddBatch} disabled={!selectedCourse || !newBatchName.trim() || savingBatch}>
                   {savingBatch ? 'Saving...' : 'Add Batch'}
                 </button>
@@ -897,6 +931,29 @@ export default function AdminCourseWorkspacePage() {
                   )) : <p className="empty-note">No batch added yet for this course.</p>}
                 </div>
               ) : <p className="empty-note">Select a course to manage batches.</p>}
+
+              {selectedCourse && selectedBatch ? (
+                <div className="course-batch-description-editor">
+                  <label htmlFor="selected-batch-description">About this batch (shown to students)</label>
+                  <textarea
+                    id="selected-batch-description"
+                    rows={3}
+                    placeholder="Write a short, premium description for this batch."
+                    value={batchDescriptionValue}
+                    onChange={(event) => setBatchDescriptionValue(event.target.value)}
+                  />
+                  <div className="course-batch-description-actions">
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      onClick={handleSaveBatchDescription}
+                      disabled={savingBatchDescription}
+                    >
+                      {savingBatchDescription ? 'Saving...' : 'Save Description'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </article>
           </div>
         </section>

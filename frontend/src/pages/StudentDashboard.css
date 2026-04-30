@@ -424,3 +424,192 @@
     font-size: 0.8rem;
   }
 }
+
+/* Premium dashboard refresh (teal + indigo) */
+.student-dashboard-view {
+  --sd-primary: #0F766E;
+  --sd-accent: #4F46E5;
+  --sd-highlight: #14B8A6;
+  --sd-neutral: #334155;
+  --sd-neutral-soft: #CBD5E1;
+}
+
+.student-premium-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--sd-primary) 32%, var(--line));
+  background:
+    radial-gradient(380px 160px at 0% 0%, color-mix(in srgb, var(--sd-highlight) 22%, transparent), transparent 70%),
+    radial-gradient(420px 180px at 100% 100%, color-mix(in srgb, var(--sd-accent) 18%, transparent), transparent 72%),
+    color-mix(in srgb, var(--bg-card) 94%, transparent);
+}
+
+.student-premium-hero-copy h2 {
+  margin: 4px 0 4px;
+  font-size: 1.5rem;
+  color: var(--text-strong);
+}
+
+.student-premium-hero-copy .subtitle {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.student-premium-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.student-premium-kpi-chip {
+  min-width: 116px;
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, var(--sd-neutral-soft) 34%, var(--line));
+  background: color-mix(in srgb, var(--bg-card-soft) 86%, transparent);
+}
+
+.student-premium-kpi-chip span {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.student-premium-kpi-chip strong {
+  font-size: 1rem;
+  color: var(--text-strong);
+}
+
+.student-premium-kpi-chip.is-positive {
+  border-color: color-mix(in srgb, var(--sd-highlight) 54%, var(--line));
+}
+
+.student-premium-cta {
+  min-height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--sd-primary), var(--sd-accent));
+  border: none;
+}
+
+.student-progress-first-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.student-progress-card {
+  padding: 14px;
+}
+
+.student-progress-label {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.student-progress-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.32rem;
+  color: var(--text-strong);
+}
+
+.student-progress-note {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.student-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.student-quick-actions .secondary-btn {
+  min-height: 42px;
+  border-radius: 12px;
+  border-color: color-mix(in srgb, var(--sd-accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+}
+
+.student-progress-first-grid > *,
+.student-quick-actions > * {
+  grid-column: auto !important;
+  min-width: 0;
+}
+
+.premium-sync-card {
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--sd-neutral-soft) 30%, var(--line));
+  box-shadow: 0 10px 24px color-mix(in srgb, #0b1220 8%, transparent);
+  animation: premiumFadeIn 320ms ease both;
+}
+
+.premium-sync-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--sd-accent) 14%, transparent);
+  transition: transform 180ms ease, box-shadow 220ms ease;
+}
+
+.premium-sync-card .primary-btn:active,
+.premium-sync-card .secondary-btn:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+@keyframes premiumFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 980px) {
+  .student-progress-first-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-quick-actions .secondary-btn {
+    width: 100%;
+    max-width: none;
+  }
+
+  .student-premium-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .student-premium-hero-meta {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-progress-first-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

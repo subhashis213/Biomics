@@ -12,6 +12,8 @@ const topicTestAttemptSchema = new mongoose.Schema({
   score: { type: Number, required: true, min: 0 },
   total: { type: Number, required: true, min: 1 },
   durationSeconds: { type: Number, min: 0, default: 0 },
+  feedbackReaction: { type: String, enum: ['up', 'down'], default: null },
+  feedbackAt: { type: Date, default: null },
   submittedAt: { type: Date, default: Date.now }
 });
 

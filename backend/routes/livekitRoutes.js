@@ -214,6 +214,29 @@ function getUserActiveCourseNames(user) {
   );
 }
 
+function hasActiveBatchEnrollment(user, course, batch) {
+  const normalizedCourse = normalizeCourseName(course);
+  const normalizedBatch = normalizeBatchName(batch);
+  if (!normalizedCourse || normalizedBatch === GENERAL_BATCH) return true;
+  if (!Array.isArray(user?.purchasedCourses)) return false;
+  const now = Date.now();
+
+  return user.purchasedCourses.some((entry) => {
+    if (normalizeCourseName(entry?.course) !== normalizedCourse) return false;
+    if (entry?.expiresAt) {
+      const expiresAt = new Date(entry.expiresAt).getTime();
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) return false;
+    }
+
+    const entryBatch = normalizeBatchName(entry?.batch);
+    // Legacy records may store batch in moduleName for bundle purchases.
+    const legacyBatch = normalizeBatchName(entry?.moduleName);
+    return entryBatch === normalizedBatch
+      || entryBatch === GENERAL_BATCH
+      || legacyBatch === normalizedBatch;
+  });
+}
+
 async function userHasCourseContentAccess(user, classDoc) {
   const targetCourse = normalizeCourseName(classDoc?.course);
   if (!targetCourse) return true;
@@ -258,7 +281,8 @@ async function canUserAccessClass(user, classDoc, role = 'user') {
   const targetBatch = normalizeBatchName(classDoc?.batch);
   if (!targetCourse || targetBatch === GENERAL_BATCH) return true;
 
-  const batchMembership = getActiveModuleMembership(user, targetCourse, targetBatch);
+  const batchMembership = getActiveModuleMembership(user, targetCourse, targetBatch)
+    || hasActiveBatchEnrollment(user, targetCourse, targetBatch);
   if (batchMembership) return true;
 
   // Explicit ALL_MODULES bundle always grants access to every batch under the course.
@@ -408,10 +432,7 @@ function buildCalendarEntries(user, classes = [], accessibleCourseNames = []) {
       if (!course || !activeCourses.has(course)) return false;
       const batch = normalizeBatchName(entry?.batch);
       if (batch === GENERAL_BATCH) return true;
-      return Boolean(
-        getActiveModuleMembership(user, course, batch)
-        || getActiveModuleMembership(user, course, ALL_MODULES)
-      );
+      return Boolean(getActiveModuleMembership(user, course, ALL_MODULES) || hasActiveBatchEnrollment(user, course, batch));
     })
     .map((entry) => ({
       id: String(entry?._id || ''),
@@ -560,18 +581,6 @@ router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
     courseDocs.forEach((courseDoc) => {
       const name = String(courseDoc?.name || courseDoc?.displayName || '').trim();
       if (name) availableCoursesSet.add(name);
-    });
-    students.forEach((student) => {
-      const enrolledCourse = String(student?.class || '').trim();
-      if (enrolledCourse) availableCoursesSet.add(enrolledCourse);
-      (Array.isArray(student?.purchasedCourses) ? student.purchasedCourses : []).forEach((entry) => {
-        const courseName = String(entry?.course || '').trim();
-        if (courseName) availableCoursesSet.add(courseName);
-      });
-    });
-    classes.forEach((classDoc) => {
-      const courseName = String(classDoc?.course || '').trim();
-      if (courseName) availableCoursesSet.add(courseName);
     });
 
     const availableBatchesByCourse = {};

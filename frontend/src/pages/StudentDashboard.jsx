@@ -212,6 +212,16 @@ export default function StudentDashboard() {
   const activeMembership = access?.activeMembership || null;
 
   const shouldShowLeaderboard = hasAnyUnlockedModule && !selectedModule;
+  const safeVideoTotal = Math.max(0, Number(videos?.length || 0));
+  const completedVideoCount = completedIds instanceof Set
+    ? completedIds.size
+    : (Array.isArray(completedIds) ? completedIds.length : 0);
+  const courseProgressPercent = safeVideoTotal > 0
+    ? Math.max(0, Math.min(100, Math.round((completedVideoCount / safeVideoTotal) * 100)))
+    : 0;
+  const hasLiveNow = Boolean(liveClass && hasPurchasedCourseAccess(liveClass.course));
+  const hasUpcomingLive = Boolean(upcomingClass && hasPurchasedCourseAccess(upcomingClass.course));
+  const dashboardDisplayName = String(profile?.username || session?.username || 'Student').trim() || 'Student';
 
   const profilePasswordHint =
     profileForm.password.length > 0 && profileForm.password.length < 8
@@ -2115,7 +2125,7 @@ export default function StudentDashboard() {
     const visibleLiveClass = liveClass && hasPurchasedCourseAccess(liveClass.course) ? liveClass : null;
     if (visibleLiveClass) {
       return (
-        <section className="card student-learning-live-card student-learning-live-card--live">
+        <section className="card student-learning-live-card student-learning-live-card--live premium-sync-card">
           <div className="student-learning-live-header">
             <div className="student-learning-live-topline">
               <span className="live-badge pulsing">LIVE NOW</span>
@@ -2145,7 +2155,7 @@ export default function StudentDashboard() {
     const visibleUpcomingClass = upcomingClass && hasPurchasedCourseAccess(upcomingClass.course) ? upcomingClass : null;
     if (visibleUpcomingClass) {
       return (
-        <section className="card student-learning-live-card student-learning-live-card--upcoming">
+        <section className="card student-learning-live-card student-learning-live-card--upcoming premium-sync-card">
           <div className="student-learning-live-header">
             <div className="student-learning-live-topline">
               <span className="live-badge">UPCOMING</span>
@@ -2170,7 +2180,7 @@ export default function StudentDashboard() {
     }
 
     return (
-      <section className="card student-learning-live-card student-learning-live-card--default">
+      <section className="card student-learning-live-card student-learning-live-card--default premium-sync-card">
         <div className="student-learning-live-header">
           <div className="student-learning-live-topline">
             <span className="live-badge">LIVE</span>
@@ -2265,6 +2275,28 @@ export default function StudentDashboard() {
     >
       <div id="section-overview" className="student-dashboard-view">
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
+
+        {!selectedModule ? (
+          <section className="card student-premium-hero premium-sync-card">
+            <div className="student-premium-hero-copy">
+              <h2>Welcome back, {dashboardDisplayName}</h2>
+              <p className="subtitle">Track progress, jump into classes, and continue your preparation with focused daily actions.</p>
+            </div>
+            <div className="student-premium-hero-meta">
+              <div className={`student-premium-kpi-chip ${testSeriesStreakDays > 0 ? 'is-positive' : ''}`}>
+                <span>🔥 Streak</span>
+                <strong>{testSeriesStreakDays} day{testSeriesStreakDays === 1 ? '' : 's'}</strong>
+              </div>
+              <button
+                type="button"
+                className="primary-btn student-premium-cta"
+                onClick={() => navigate(`/student/course/${encodeURIComponent(course || 'General')}/modules`)}
+              >
+                Continue Learning
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {cartOpen && typeof document !== 'undefined' ? createPortal(
           <div className="student-cart-overlay" role="presentation" onClick={() => setCartOpen(false)}>
@@ -2463,7 +2495,7 @@ export default function StudentDashboard() {
         ) : null}
 
       {hasAnyUnlockedModule && !selectedModule && favoriteVideos.length ? (
-        <section className="card favorites-panel">
+        <section className="card favorites-panel premium-sync-card">
           <div className="section-header compact">
             <div>
               <p className="eyebrow">Saved for Later</p>
@@ -2693,7 +2725,7 @@ export default function StudentDashboard() {
       )}
 
       {!selectedModule ? (
-        <section id="section-community-chat" className="card student-community-launch-card">
+        <section id="section-community-chat" className="card student-community-launch-card premium-sync-card">
           <div className="section-header compact">
             <div>
               <p className="eyebrow section-live-eyebrow">
@@ -2720,11 +2752,32 @@ export default function StudentDashboard() {
         </section>
       ) : null}
 
+      {!selectedModule ? (
+        <section id="section-test-series" className="card ts-student-entry-card premium-sync-card">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Premium Add-on</p>
+              <h2>Test Series</h2>
+              <p className="subtitle">Topic-wise tests and full-length mock exams — purchased separately from your course plan.</p>
+            </div>
+            <div className="quiz-count-cards">
+              <StatCard label="Topic Tests" value="∞" />
+              <StatCard label="Full Mocks" value="∞" />
+            </div>
+          </div>
+          <div className="workspace-link-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series')}>
+              Go to Test Series →
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {hasAnyUnlockedModule && !selectedModule ? (
         <div className="student-performance-spotlight-grid">
           <section
             id="section-quiz-performance"
-            className="card student-route-entry-card quiz-performance-entry-card"
+            className="card student-route-entry-card quiz-performance-entry-card premium-sync-card"
             role="button"
             tabIndex={0}
             onClick={() => navigate('/student/quiz-performance')}
@@ -2758,7 +2811,7 @@ export default function StudentDashboard() {
 
           <section
             id="section-test-series-performance"
-            className="card student-route-entry-card test-series-performance-entry-card"
+            className="card student-route-entry-card test-series-performance-entry-card premium-sync-card"
             role="button"
             tabIndex={0}
             onClick={() => navigate('/student/test-series-performance')}
@@ -2881,7 +2934,7 @@ export default function StudentDashboard() {
       ) : null}
 
       {!selectedModule ? (
-        <section id="section-monthly-exam" className="card monthly-exam-panel">
+        <section id="section-monthly-exam" className="card monthly-exam-panel premium-sync-card">
           <div className="section-header compact">
             <div>
               <p className="eyebrow">Monthly Mock Test</p>
@@ -2940,28 +2993,7 @@ export default function StudentDashboard() {
       ) : null}
 
       {!selectedModule ? (
-        <section id="section-test-series" className="card ts-student-entry-card">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Premium Add-on</p>
-              <h2>Test Series</h2>
-              <p className="subtitle">Topic-wise tests and full-length mock exams — purchased separately from your course plan.</p>
-            </div>
-            <div className="quiz-count-cards">
-              <StatCard label="Topic Tests" value="∞" />
-              <StatCard label="Full Mocks" value="∞" />
-            </div>
-          </div>
-          <div className="workspace-link-actions">
-            <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series')}>
-              Go to Test Series →
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {!selectedModule ? (
-        <section id="section-exam-leaderboard" className="card quiz-leaderboard-panel">
+        <section id="section-exam-leaderboard" className="card quiz-leaderboard-panel premium-sync-card">
           <div className="section-header compact">
             <div>
               <p className="eyebrow">Exam Leaderboard</p>

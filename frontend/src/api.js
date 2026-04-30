@@ -428,10 +428,10 @@ export function deleteCourseAdmin(courseName) {
   });
 }
 
-export function addCourseBatchAdmin(courseName, batchName) {
+export function addCourseBatchAdmin(courseName, batchName, description = '') {
   return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/batches`, {
     method: 'POST',
-    body: JSON.stringify({ name: batchName })
+    body: JSON.stringify({ name: batchName, description: String(description || '').trim() })
   });
 }
 
@@ -452,6 +452,13 @@ export function renameCourseBatchAdmin(courseName, batchName, nextName) {
   return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/batches/${encodeURIComponent(batchName)}/rename`, {
     method: 'PUT',
     body: JSON.stringify({ name: nextName })
+  });
+}
+
+export function updateCourseBatchAdmin(courseName, batchName, payload = {}) {
+  return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/batches/${encodeURIComponent(batchName)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
   });
 }
 
@@ -1007,6 +1014,21 @@ export function fetchTestSeriesCatalogStudent() {
 
 export function fetchTestSeriesPerformanceStudent() {
   return requestJson('/test-series/performance/student');
+}
+
+export function submitTestSeriesAttemptFeedback(payload) {
+  return requestJson('/test-series/attempt-feedback', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchTestSeriesAttemptFeedbackAdmin(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.limit) qs.set('limit', String(params.limit));
+  if (params.reaction) qs.set('reaction', String(params.reaction));
+  if (params.course) qs.set('course', String(params.course));
+  return requestJson(`/test-series/attempt-feedback/admin${qs.toString() ? `?${qs.toString()}` : ''}`);
 }
 
 export function createTestSeriesOrder(seriesType, voucherCode, course = '') {

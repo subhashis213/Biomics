@@ -12,7 +12,7 @@ const CALENDAR_HOUR_ROW_HEIGHT = 64;
 const MIN_CALENDAR_EVENT_HEIGHT = 24;
 const MOBILE_CALENDAR_BREAKPOINT = 768;
 const WORKSPACE_REFRESH_INTERVAL_MS = 15000;
-const DEFAULT_LIVE_CLASS_COURSE_FILTER = 'CSIR-NET Life Science';
+const DEFAULT_LIVE_CLASS_COURSE_FILTER = 'all';
 
 function normalizeCourseName(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -398,7 +398,7 @@ export default function StudentLiveClassesPage() {
     );
   }, [rawCalendarEntries, showAllCourses, normalizedSelectedCourseFilter]);
   const courseFilterOptions = useMemo(() => {
-    const courses = new Set([DEFAULT_LIVE_CLASS_COURSE_FILTER]);
+    const courses = new Set();
     rawCalendarEntries.forEach((entry) => {
       const courseName = normalizeCourseName(entry?.course);
       if (courseName) courses.add(courseName);

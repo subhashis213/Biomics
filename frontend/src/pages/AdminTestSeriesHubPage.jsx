@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { requestJson, resolveApiAssetUrl, uploadTestSeriesPricingThumbnailAdmin, fetchCoursesAdmin } from '../api';
+import { requestJson, resolveApiAssetUrl, uploadTestSeriesPricingThumbnailAdmin, fetchCoursesAdmin, fetchTestSeriesAttemptFeedbackAdmin } from '../api';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
@@ -29,6 +29,8 @@ export default function AdminTestSeriesHubPage() {
   const [savingCourse, setSavingCourse] = useState('');
   const [uploadingCourse, setUploadingCourse] = useState('');
   const [courses, setCourses] = useState([]);
+  const [attemptFeedbackSummary, setAttemptFeedbackSummary] = useState({ thumbsUp: 0, thumbsDown: 0, total: 0 });
+  const [attemptFeedbackRows, setAttemptFeedbackRows] = useState([]);
 
   useAutoDismissMessage(banner, setBanner);
 
@@ -109,9 +111,23 @@ export default function AdminTestSeriesHubPage() {
       }
       setPriceForm(form);
       await loadCounts(validCourseSet);
+      try {
+        const feedbackRes = await fetchTestSeriesAttemptFeedbackAdmin({ limit: 60 });
+        setAttemptFeedbackSummary(feedbackRes?.summary || { thumbsUp: 0, thumbsDown: 0, total: 0 });
+        setAttemptFeedbackRows(Array.isArray(feedbackRes?.feedback) ? feedbackRes.feedback : []);
+      } catch {
+        setAttemptFeedbackSummary({ thumbsUp: 0, thumbsDown: 0, total: 0 });
+        setAttemptFeedbackRows([]);
+      }
     } catch {
       setBanner({ type: 'error', text: 'Failed to load test series pricing.' });
     }
+  }
+
+  function formatFeedbackDate(value) {
+    const dt = new Date(value || 0);
+    if (Number.isNaN(dt.getTime())) return '--';
+    return dt.toLocaleString();
   }
 
   useEffect(() => {
@@ -208,10 +224,52 @@ export default function AdminTestSeriesHubPage() {
           <div className="workspace-hero-stats">
             <StatCard label="Topic Tests" value={topicTestCount} />
             <StatCard label="Full Mocks" value={fullMockCount} />
+            <StatCard label="👍" value={attemptFeedbackSummary.thumbsUp || 0} />
+            <StatCard label="👎" value={attemptFeedbackSummary.thumbsDown || 0} />
           </div>
         </section>
 
         {banner ? <p className={`inline-message page-banner ${banner.type}`}>{banner.text}</p> : null}
+
+        <section className="card workspace-panel">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Post Exam Feedback</p>
+              <h3>Students who gave thumbs feedback</h3>
+              <p className="subtitle">Track whether students marked the test experience as 👍 or 👎 after submission.</p>
+            </div>
+          </div>
+          {!attemptFeedbackRows.length ? (
+            <p className="empty-note">No post-exam feedback submitted yet.</p>
+          ) : (
+            <div className="module-pricing-scroll">
+              <table className="module-pricing-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Type</th>
+                    <th>Course</th>
+                    <th>Test</th>
+                    <th>Reaction</th>
+                    <th>Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attemptFeedbackRows.map((row) => (
+                    <tr key={`${row.attemptType}-${row._id}`}>
+                      <td>{row.username || '--'}</td>
+                      <td>{row.attemptType === 'topic' ? 'Topic Test' : 'Full Mock'}</td>
+                      <td>{row.course || '--'}</td>
+                      <td>{row.title || '--'}</td>
+                      <td>{row.reaction === 'up' ? '👍' : '👎'}</td>
+                      <td>{formatFeedbackDate(row.feedbackAt || row.submittedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         {/* ── two builder cards ── */}
         <section className="ts-hub-grid">

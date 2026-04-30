@@ -17,8 +17,6 @@ import StatCard from '../components/StatCard';
 import TeacherRoom from '../components/TeacherRoom';
 import './AdminLiveClassesPage.css';
 
-const COURSE_CATEGORIES = ['11th', '12th', 'NEET', 'IIT-JAM', 'CSIR-NET Life Science', 'GATE'];
-
 function formatDateTime(value) {
   if (!value) return 'Not scheduled';
   const parsed = new Date(value);
@@ -279,7 +277,7 @@ export default function AdminLiveClassesPage() {
   }
 
   const calendarCourseOptions = useMemo(
-    () => Array.from(new Set([...COURSE_CATEGORIES, ...(workspace.availableCourses || [])])).filter(Boolean),
+    () => Array.from(new Set(workspace.availableCourses || [])).filter(Boolean),
     [workspace.availableCourses]
   );
 
