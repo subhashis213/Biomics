@@ -219,8 +219,6 @@ export default function StudentDashboard() {
   const courseProgressPercent = safeVideoTotal > 0
     ? Math.max(0, Math.min(100, Math.round((completedVideoCount / safeVideoTotal) * 100)))
     : 0;
-  const hasLiveNow = Boolean(liveClass && hasPurchasedCourseAccess(liveClass.course));
-  const hasUpcomingLive = Boolean(upcomingClass && hasPurchasedCourseAccess(upcomingClass.course));
   const dashboardDisplayName = String(profile?.username || session?.username || 'Student').trim() || 'Student';
 
   const profilePasswordHint =
