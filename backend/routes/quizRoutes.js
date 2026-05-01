@@ -368,6 +368,18 @@ function sanitizeQuestionsForStudent(questions = []) {
   }));
 }
 
+function alphanumericKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function sameCourseCategory(left, right) {
+  const l = normalizeCourseName(left || '');
+  const r = normalizeCourseName(right || '');
+  if (!l || !r) return false;
+  if (l.toLowerCase() === r.toLowerCase()) return true;
+  return alphanumericKey(l) === alphanumericKey(r);
+}
+
 function validateQuizPayload(payload) {
   if (!payload || typeof payload !== 'object') return 'Invalid quiz payload.';
   const { category, module, title, questions, difficulty, timeLimitMinutes, requireExplanation, topic } = payload;
@@ -638,8 +650,10 @@ router.delete('/:id', authenticateToken('admin'), async (req, res) => {
 router.get('/', authenticateToken('admin'), async (req, res) => {
   try {
     const category = String(req.query.category || '').trim();
-    const filter = category ? { category } : {};
-    const quizzes = await Quiz.find(filter).sort({ category: 1, module: 1, topic: 1, updatedAt: -1 }).lean();
+    const quizzesRaw = await Quiz.find({}).sort({ category: 1, module: 1, topic: 1, updatedAt: -1 }).lean();
+    const quizzes = category
+      ? quizzesRaw.filter((quiz) => sameCourseCategory(quiz?.category, category))
+      : quizzesRaw;
     return res.json({ quizzes });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch quizzes.' });
@@ -662,12 +676,13 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
     );
     if (!canonicalCourse) return res.status(404).json({ error: 'Course not found.' });
 
-    const quizzes = await Quiz.find(
-      { category: canonicalCourse },
+    const quizzesRaw = await Quiz.find(
+      {},
       { category: 1, batch: 1, module: 1, topic: 1, title: 1, difficulty: 1, requireExplanation: 1, timeLimitMinutes: 1, updatedAt: 1, questions: 1 }
     )
       .sort({ module: 1 })
       .lean();
+    const quizzes = quizzesRaw.filter((quiz) => sameCourseCategory(quiz?.category, canonicalCourse));
 
     const accessibleQuizzes = [];
     for (const quiz of quizzes) {
@@ -764,7 +779,8 @@ router.get('/my-course/:module', authenticateToken('user'), async (req, res) => 
       return res.status(402).json({ error: 'Please unlock this module to access quizzes.' });
     }
 
-    const quizList = await Quiz.find({ category: canonicalCourse, module: moduleName }).lean();
+    const quizListRaw = await Quiz.find({ module: moduleName }).lean();
+    const quizList = quizListRaw.filter((quiz) => sameCourseCategory(quiz?.category, canonicalCourse));
     if (!quizList.length) return res.status(404).json({ error: 'Quiz not found for this module.' });
 
     return res.json({

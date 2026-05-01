@@ -12,6 +12,8 @@ function normalizeText(value) {
   return String(value || '').trim();
 }
 
+const QUIZ_CATEGORY_STORAGE_KEY = 'adminQuizBuilder:selectedCategory';
+
 export default function AdminQuizBuilderPage() {
   const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
@@ -102,10 +104,19 @@ export default function AdminQuizBuilderPage() {
         if (!ignore) {
           const courseList = Array.isArray(response?.courses) ? response.courses : [];
           setCourses(courseList);
-          // Set default course if not set and courses are loaded
-          if (!quizCategory && courseList.length > 0) {
-            setQuizCategory(courseList[0].name);
-          }
+          const savedCategory = (() => {
+            try {
+              return String(window.localStorage.getItem(QUIZ_CATEGORY_STORAGE_KEY) || '').trim();
+            } catch {
+              return '';
+            }
+          })();
+          const preferred = courseList.find((course) => normalizeText(course?.name) === savedCategory)?.name;
+          setQuizCategory((current) => {
+            const existing = courseList.find((course) => normalizeText(course?.name) === normalizeText(current || ''))?.name;
+            if (existing) return existing;
+            return preferred || courseList[0]?.name || '';
+          });
         }
       } catch {
         if (!ignore) setCourses([]);
@@ -116,6 +127,16 @@ export default function AdminQuizBuilderPage() {
     return () => {
       ignore = true;
     };
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (quizCategory) {
+        window.localStorage.setItem(QUIZ_CATEGORY_STORAGE_KEY, quizCategory);
+      }
+    } catch {
+      // ignore localStorage failures
+    }
   }, [quizCategory]);
 
   useEffect(() => {
