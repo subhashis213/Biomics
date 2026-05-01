@@ -2414,13 +2414,6 @@ export default function StudentDashboard() {
                 <span>🔥 Streak</span>
                 <strong>{testSeriesStreakDays} day{testSeriesStreakDays === 1 ? '' : 's'}</strong>
               </div>
-              <button
-                type="button"
-                className="primary-btn student-premium-cta"
-                onClick={() => navigate(`/student/course/${encodeURIComponent(course || 'General')}/modules`)}
-              >
-                Continue Learning
-              </button>
             </div>
           </section>
         ) : null}
@@ -2900,7 +2893,7 @@ export default function StudentDashboard() {
         </section>
       ) : null}
 
-      {hasAnyUnlockedModule && !selectedModule ? (
+      {!selectedModule ? (
         <div className="student-performance-spotlight-grid">
           <section
             id="section-quiz-performance"
