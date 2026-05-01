@@ -8,6 +8,7 @@ import {
   fetchCommunityChatUnreadCount,
   fetchMyMockExams,
   previewCourseOrder,
+  previewTestSeriesVoucher,
   fetchQuizLeaderboard,
   getApiBase,
   requestJson,
@@ -540,6 +541,11 @@ export default function StudentDashboard() {
   const payableCartEstimate = payableCartItems.reduce((total, item) => total + getCartItemEffectivePrice(item, cartPlanType), 0);
   const payableCartOriginalTotal = payableCartItems.reduce((total, item) => total + getCartItemPlanPrice(item, cartPlanType), 0);
   const payableCartDiscountTotal = Math.max(0, payableCartOriginalTotal - payableCartEstimate);
+  const tsCartOriginalTotal = tsCartItems.reduce((total, item) => total + Number(item.originalPaise ?? item.finalPaise ?? 0), 0);
+  const tsCartEstimate = tsCartItems.reduce((total, item) => total + Number(item.finalPaise ?? 0), 0);
+  const tsCartDiscountTotal = Math.max(0, tsCartOriginalTotal - tsCartEstimate);
+  const combinedCartEstimate = payableCartEstimate + tsCartEstimate;
+  const combinedCartDiscountTotal = payableCartDiscountTotal + tsCartDiscountTotal;
 
   async function buildVoucherPreviewForCart(voucherCode, planType) {
     const normalizedVoucher = String(voucherCode || '').trim().toUpperCase();
@@ -548,9 +554,9 @@ export default function StudentDashboard() {
       return { success: false, message: 'Enter a voucher code to apply.' };
     }
 
-    if (!payableCartItems.length) {
+    if (!payableCartItems.length && !tsCartItems.length) {
       setCartVoucherPreviewByKey({});
-      return { success: false, message: 'No payable modules in cart.' };
+      return { success: false, message: 'Your cart is empty.' };
     }
 
     const requestId = Date.now();
@@ -558,56 +564,107 @@ export default function StudentDashboard() {
     setIsApplyingCartVoucher(true);
 
     try {
-      const results = await Promise.all(
-        payableCartItems.map(async (item) => {
-          try {
-            const preview = await previewCourseOrder(planType, normalizedVoucher, item.moduleName, item.moduleCourse, item.batchName || 'General');
-            return {
-              key: item.key,
-              ok: true,
-              pricing: preview?.pricing || null
+      const previewMap = {};
+      let firstError = '';
+
+      if (payableCartItems.length) {
+        const results = await Promise.all(
+          payableCartItems.map(async (item) => {
+            try {
+              const preview = await previewCourseOrder(planType, normalizedVoucher, item.moduleName, item.moduleCourse, item.batchName || 'General');
+              return {
+                key: item.key,
+                ok: true,
+                pricing: preview?.pricing || null
+              };
+            } catch (error) {
+              return {
+                key: item.key,
+                ok: false,
+                error: error?.message || 'Failed to validate voucher.'
+              };
+            }
+          })
+        );
+
+        results.forEach((entry) => {
+          if (entry.ok && entry.pricing) {
+            previewMap[entry.key] = {
+              originalAmountInPaise: Number(entry.pricing.originalAmountInPaise || 0),
+              discountInPaise: Number(entry.pricing.discountInPaise || 0),
+              finalAmountInPaise: Number(entry.pricing.finalAmountInPaise || 0)
             };
-          } catch (error) {
-            return {
-              key: item.key,
-              ok: false,
-              error: error?.message || 'Failed to validate voucher.'
-            };
+          } else if (!firstError) {
+            firstError = entry.error || 'Voucher is invalid.';
           }
-        })
-      );
+        });
+
+        if (Object.keys(previewMap).length !== payableCartItems.length) {
+          setCartVoucherPreviewByKey({});
+          return { success: false, message: firstError || 'Voucher is invalid for one or more course items.' };
+        }
+      }
+
+      let tsUpdated = null;
+      if (tsCartItems.length) {
+        const tsResults = await Promise.all(
+          tsCartItems.map(async (item) => {
+            try {
+              const res = await previewTestSeriesVoucher(
+                item.seriesType,
+                normalizedVoucher,
+                String(item.course || '').trim()
+              );
+              const finalAmt = Number(res?.finalAmountInPaise);
+              if (res?.valid === false || !Number.isFinite(finalAmt)) {
+                return {
+                  ok: false,
+                  error: res?.error || res?.message || 'Voucher is not valid for this test series.'
+                };
+              }
+              return {
+                ok: true,
+                item: {
+                  ...item,
+                  originalPaise: Number(res.originalAmountInPaise ?? item.originalPaise ?? 0),
+                  finalPaise: finalAmt,
+                  discountPaise: Math.max(0, Number(res.discountInPaise ?? 0)),
+                  voucherCode: res.voucherCode || normalizedVoucher
+                }
+              };
+            } catch (error) {
+              return { ok: false, error: error?.message || 'Voucher is not valid for test series.' };
+            }
+          })
+        );
+
+        for (const r of tsResults) {
+          if (!r.ok && !firstError) {
+            firstError = r.error || 'Voucher is invalid for test series.';
+          }
+        }
+        if (tsResults.some((r) => !r.ok)) {
+          setCartVoucherPreviewByKey({});
+          return { success: false, message: firstError || 'Voucher is invalid for test series.' };
+        }
+        tsUpdated = tsResults.map((r) => r.item);
+        setTsCartItems(tsUpdated);
+        try {
+          localStorage.setItem('ts_cart', JSON.stringify(tsUpdated));
+        } catch {
+          // ignore
+        }
+        window.dispatchEvent(new Event('ts-cart-updated'));
+      }
 
       if (cartVoucherRequestRef.current !== requestId) {
         return { success: false, message: 'Preview superseded by a newer request.' };
       }
 
-      const previewMap = {};
-      let successCount = 0;
-      let firstError = '';
-      results.forEach((entry) => {
-        if (entry.ok && entry.pricing) {
-          successCount += 1;
-          previewMap[entry.key] = {
-            originalAmountInPaise: Number(entry.pricing.originalAmountInPaise || 0),
-            discountInPaise: Number(entry.pricing.discountInPaise || 0),
-            finalAmountInPaise: Number(entry.pricing.finalAmountInPaise || 0)
-          };
-        } else if (!firstError) {
-          firstError = entry.error || 'Voucher is invalid.';
-        }
-      });
-
-      if (successCount === 0) {
-        setCartVoucherPreviewByKey({});
-        return { success: false, message: firstError || 'Voucher is invalid.' };
-      }
-
       setCartVoucherPreviewByKey(previewMap);
       return {
         success: true,
-        message: successCount === payableCartItems.length
-          ? `Voucher ${normalizedVoucher} applied.`
-          : `Voucher applied for ${successCount} item${successCount === 1 ? '' : 's'}.`
+        message: `Voucher ${normalizedVoucher} applied.`
       };
     } finally {
       if (cartVoucherRequestRef.current === requestId) {
@@ -634,6 +691,21 @@ export default function StudentDashboard() {
     setAppliedCartVoucherCode('');
     setCartVoucherCode('');
     setCartVoucherPreviewByKey({});
+    setTsCartItems((prev) => {
+      const next = prev.map((item) => ({
+        ...item,
+        finalPaise: Number(item.originalPaise ?? item.finalPaise ?? 0),
+        voucherCode: null,
+        discountPaise: 0
+      }));
+      try {
+        localStorage.setItem('ts_cart', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      window.dispatchEvent(new Event('ts-cart-updated'));
+      return next;
+    });
     setCartVoucherMessage('Voucher removed. Price reverted to original rate.');
   }
 
@@ -655,7 +727,12 @@ export default function StudentDashboard() {
       });
     // Intentionally track length and plan for re-pricing cart on structure changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedCartVoucherCode, cartPlanType, payableCartItems.length]);
+  }, [
+    appliedCartVoucherCode,
+    cartPlanType,
+    payableCartItems.length,
+    tsCartItems.map((i) => `${String(i.course || '').toLowerCase()}::${i.seriesType}`).join('|')
+  ]);
 
   useEffect(() => {
     const username = getCartStorageUsernameKey(session?.username);
@@ -952,13 +1029,18 @@ export default function StudentDashboard() {
   async function handleCheckoutTsCartItem(item, skipMutex = false) {
     if (!item || (!skipMutex && tsCartCheckoutKey)) return;
     const seriesType = item.seriesType;
-    const voucherCode = item.voucherCode || '';
+    const voucherCode = String(item.voucherCode || appliedCartVoucherCode || '').trim();
+    const courseParam = String(item.course || '').trim();
     if (!skipMutex) setTsCartCheckoutKey(seriesType);
     setBanner(null);
     try {
       const orderRes = await requestJson('/test-series/payment/create-order', {
         method: 'POST',
-        body: JSON.stringify({ seriesType, ...(voucherCode ? { voucherCode } : {}) })
+        body: JSON.stringify({
+          seriesType,
+          ...(courseParam ? { course: courseParam } : {}),
+          ...(voucherCode ? { voucherCode } : {})
+        })
       });
       if (orderRes?.alreadyOwned || orderRes?.free) {
         const label = seriesType === 'topic_test' ? 'Topic Test Series' : 'Full Mock Series';
@@ -2439,9 +2521,9 @@ export default function StudentDashboard() {
               <footer className="student-cart-drawer-foot">
                 <div>
                   <small>{appliedCartVoucherCode ? 'Estimated total (voucher applied)' : 'Estimated total'}</small>
-                  <strong>{formatPriceInPaise(payableCartEstimate + tsCartItems.reduce((s, i) => s + i.finalPaise, 0))}</strong>
-                  {appliedCartVoucherCode && payableCartDiscountTotal > 0 ? (
-                    <span className="student-cart-savings-note">You save {formatPriceInPaise(payableCartDiscountTotal)}</span>
+                  <strong>{formatPriceInPaise(combinedCartEstimate)}</strong>
+                  {appliedCartVoucherCode && combinedCartDiscountTotal > 0 ? (
+                    <span className="student-cart-savings-note">You save {formatPriceInPaise(combinedCartDiscountTotal)}</span>
                   ) : null}
                 </div>
                 <button
@@ -3299,6 +3381,17 @@ export default function StudentDashboard() {
           <div className="lp-footer-col">
             <p className="lp-footer-col-title">Contact</p>
             <div className="lp-footer-contact-list">
+              <div className="lp-footer-tech-support">
+                <span className="lp-footer-tech-icon" aria-hidden="true">🛟</span>
+                <div className="lp-footer-tech-content">
+                  <p className="lp-footer-tech-title">Technical Support Team</p>
+                  <p className="lp-footer-tech-copy">Facing a technical issue? We are here to help.</p>
+                  <a href="mailto:biomicshub@gmail.com" className="lp-footer-tech-link">
+                    <span aria-hidden="true">✉</span>
+                    <span>biomicshub@gmail.com</span>
+                  </a>
+                </div>
+              </div>
               <p className="lp-footer-contact-item">📍 Bhubaneswar, Khandagiri, Lane R7, Odisha, PIN 751030</p>
               <a href="mailto:biomicshub@gmail.com" className="lp-footer-contact-item lp-footer-contact-link">✉ biomicshub@gmail.com</a>
               <p className="lp-footer-contact-item">🕒 Open: Mon - Sat, 9:00 AM - 9:00 PM</p>
