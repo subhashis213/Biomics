@@ -40,8 +40,11 @@ export default function StudentModuleQuizPage() {
     let cancelled = false;
     setIsLoading(true);
     setLoadError('');
+    const courseQuery = decodedCourseName
+      ? `?course=${encodeURIComponent(decodedCourseName)}`
+      : '';
 
-    requestJson(`/quizzes/my-course/${encodeURIComponent(decodedModuleName)}`)
+    requestJson(`/quizzes/my-course/${encodeURIComponent(decodedModuleName)}${courseQuery}`)
       .then((data) => {
         if (cancelled) return;
         const quizList = Array.isArray(data?.quizzes) ? data.quizzes : [];
@@ -58,7 +61,7 @@ export default function StudentModuleQuizPage() {
     return () => {
       cancelled = true;
     };
-  }, [decodedModuleName]);
+  }, [decodedCourseName, decodedModuleName]);
 
   useEffect(() => {
     let cancelled = false;

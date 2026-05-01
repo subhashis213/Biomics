@@ -380,6 +380,10 @@ function sameCourseCategory(left, right) {
   return alphanumericKey(l) === alphanumericKey(r);
 }
 
+function normalizeModuleKey(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 function validateQuizPayload(payload) {
   if (!payload || typeof payload !== 'object') return 'Invalid quiz payload.';
   const { category, module, title, questions, difficulty, timeLimitMinutes, requireExplanation, topic } = payload;
@@ -779,8 +783,12 @@ router.get('/my-course/:module', authenticateToken('user'), async (req, res) => 
       return res.status(402).json({ error: 'Please unlock this module to access quizzes.' });
     }
 
-    const quizListRaw = await Quiz.find({ module: moduleName }).lean();
-    const quizList = quizListRaw.filter((quiz) => sameCourseCategory(quiz?.category, canonicalCourse));
+    const normalizedModule = normalizeModuleKey(moduleName);
+    const quizListRaw = await Quiz.find({}).lean();
+    const quizList = quizListRaw.filter(
+      (quiz) => sameCourseCategory(quiz?.category, canonicalCourse)
+        && normalizeModuleKey(quiz?.module || 'General') === normalizedModule
+    );
     if (!quizList.length) return res.status(404).json({ error: 'Quiz not found for this module.' });
 
     return res.json({
