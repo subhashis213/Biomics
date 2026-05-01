@@ -301,7 +301,17 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
       ? { $or: [{ module: 'General' }, { module: '' }, { module: null }, { module: { $exists: false } }] }
       : { module: normalizedModule };
     const match = { category, ...moduleFilter };
-    if (batchFilter) match.batch = batchFilter;
+    if (batchFilter) {
+      match.$and = [{
+        $or: [
+          { batch: batchFilter },
+          { batch: 'General' },
+          { batch: '' },
+          { batch: null },
+          { batch: { $exists: false } }
+        ]
+      }];
+    }
     const videos = await Video.find(match);
     let deletedCount = 0;
     for (const video of videos) {

@@ -1096,20 +1096,10 @@ export default function AdminDashboard() {
   async function handleModuleDelete(moduleName) {
     if (!selectedCourse || !moduleName) return;
     try {
-      await Promise.all([
-        requestJson('/videos/module', {
-          method: 'DELETE',
-          body: JSON.stringify({ category: selectedCourse, module: moduleName })
-        }),
-        requestJson('/quizzes/module', {
-          method: 'DELETE',
-          body: JSON.stringify({ category: selectedCourse, module: moduleName })
-        }),
-        requestJson('/modules', {
-          method: 'DELETE',
-          body: JSON.stringify({ category: selectedCourse, name: moduleName })
-        })
-      ]);
+      await requestJson('/modules', {
+        method: 'DELETE',
+        body: JSON.stringify({ category: selectedCourse, name: moduleName })
+      });
       // Remove from local module list
       setCourseModules((prev) => ({
         ...prev,

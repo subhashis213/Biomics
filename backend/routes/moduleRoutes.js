@@ -14,6 +14,29 @@ function normalizeValue(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
+function buildBatchOrClause(batchName) {
+  const normalized = normalizeValue(batchName || '');
+  if (!normalized) return null;
+  return [
+    { batch: normalized },
+    { batch: 'General' },
+    { batch: '' },
+    { batch: null },
+    { batch: { $exists: false } }
+  ];
+}
+
+function withOptionalBatch(baseFilter, batchName) {
+  const batchClause = buildBatchOrClause(batchName);
+  if (!batchClause) return baseFilter;
+  return {
+    $and: [
+      baseFilter,
+      { $or: batchClause }
+    ]
+  };
+}
+
 router.get('/catalog', authenticateToken('user'), async (req, res) => {
   try {
     const modules = await Module.find({}, { category: 1, name: 1, _id: 0 })
@@ -169,12 +192,9 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
   }
 
   try {
-    const scopedFilter = { category, module: name };
-    if (hasBatchFilter) scopedFilter.batch = batch;
-    const moduleScopedFilter = { category, name };
-    if (hasBatchFilter) moduleScopedFilter.batch = batch;
-    const pricingScopedFilter = { category, moduleName: name };
-    if (hasBatchFilter) pricingScopedFilter.batch = batch;
+    const scopedFilter = withOptionalBatch({ category, module: name }, hasBatchFilter ? batch : '');
+    const moduleScopedFilter = withOptionalBatch({ category, name }, hasBatchFilter ? batch : '');
+    const pricingScopedFilter = withOptionalBatch({ category, moduleName: name }, hasBatchFilter ? batch : '');
 
     const topicDeletion = hasBatchFilter
       ? Promise.resolve({ deletedCount: 0 })
