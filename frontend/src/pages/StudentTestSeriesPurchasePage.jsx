@@ -47,6 +47,33 @@ function readTestSeriesCart() {
   }
 }
 
+async function createTestSeriesOrderWithFallback({ course, seriesType, voucherCode = '' }) {
+  const normalizedCourse = String(course || '').trim();
+  const payload = {
+    seriesType,
+    ...(voucherCode ? { voucherCode } : {})
+  };
+  const shouldRetryWithoutCourse = (message) => /course|invalid course|profile|category/i.test(String(message || ''));
+
+  try {
+    return await requestJson('/test-series/payment/create-order', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        ...(normalizedCourse ? { course: normalizedCourse } : {})
+      })
+    });
+  } catch (error) {
+    if (!normalizedCourse || !shouldRetryWithoutCourse(error?.message)) {
+      throw error;
+    }
+    return requestJson('/test-series/payment/create-order', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+}
+
 export default function StudentTestSeriesPurchasePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -129,9 +156,9 @@ export default function StudentTestSeriesPurchasePage() {
 
     try {
       const course = String(selectedCourse || '').trim();
-      const orderRes = await requestJson('/test-series/payment/create-order', {
-        method: 'POST',
-        body: JSON.stringify({ course, seriesType })
+      const orderRes = await createTestSeriesOrderWithFallback({
+        course,
+        seriesType
       });
 
       if (orderRes?.alreadyOwned) {
@@ -336,7 +363,7 @@ export default function StudentTestSeriesPurchasePage() {
                                   className="secondary-btn ts-catalog-plan-add-btn"
                                   onClick={() => {
                                     if (inCartSelected) {
-                                      navigate('/student/test-series?cart=open');
+                                      navigate('/student?cart=open', { state: { openCart: true } });
                                       return;
                                     }
                                     handleAddToCart(planFromQuery, cardCourse, cardPricing);

@@ -50,6 +50,34 @@ function readTestSeriesCart() {
   }
 }
 
+async function createTestSeriesOrderWithFallback({ course, seriesType, voucherCode }) {
+  const normalizedCourse = String(course || '').trim();
+  const payload = {
+    seriesType,
+    ...(voucherCode ? { voucherCode } : {})
+  };
+
+  const shouldRetryWithoutCourse = (message) => /course|invalid course|profile|category/i.test(String(message || ''));
+
+  try {
+    return await requestJson('/test-series/payment/create-order', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        ...(normalizedCourse ? { course: normalizedCourse } : {})
+      })
+    });
+  } catch (error) {
+    if (!normalizedCourse || !shouldRetryWithoutCourse(error?.message)) {
+      throw error;
+    }
+    return requestJson('/test-series/payment/create-order', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+}
+
 function matchesRequestedTopic(test, requestedTopic) {
   const query = String(requestedTopic || '').trim().toLowerCase();
   if (!query) return true;
@@ -162,13 +190,10 @@ function TsCartButton({ session, openOnLoad = false }) {
     if (checkoutKey) return;
     setCheckoutKey(getTsCartItemKey(item));
     try {
-      const orderRes = await requestJson('/test-series/payment/create-order', {
-        method: 'POST',
-        body: JSON.stringify({
-          course: item.course,
-          seriesType: item.seriesType,
-          ...(item.voucherCode ? { voucherCode: item.voucherCode } : {})
-        })
+      const orderRes = await createTestSeriesOrderWithFallback({
+        course: item.course,
+        seriesType: item.seriesType,
+        voucherCode: item.voucherCode || ''
       });
       if (orderRes?.alreadyOwned || orderRes?.free) {
         remove(item);
@@ -636,9 +661,10 @@ export default function StudentTestSeriesPage() {
     setBanner(null);
     try {
       const course = String(selectedCourse || accessData?.course || '').trim();
-      const orderRes = await requestJson('/test-series/payment/create-order', {
-        method: 'POST',
-        body: JSON.stringify({ course, seriesType, ...(voucherCode ? { voucherCode } : {}) })
+      const orderRes = await createTestSeriesOrderWithFallback({
+        course,
+        seriesType,
+        voucherCode: voucherCode || ''
       });
       if (orderRes?.alreadyOwned) {
         setBanner({ type: 'success', text: 'Already purchased — refreshing your access.' });

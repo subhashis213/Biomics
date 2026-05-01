@@ -98,7 +98,12 @@ export default function StudentDashboard() {
   const [cartItemCheckoutKey, setCartItemCheckoutKey] = useState('');
   const [tsCartCheckoutKey, setTsCartCheckoutKey] = useState(''); // seriesType being paid for test series
   const [tsCartItems, setTsCartItems] = useState(() => {
-    try { const s = localStorage.getItem('ts_cart'); return s ? JSON.parse(s) : []; } catch { return []; }
+    try {
+      const s = localStorage.getItem('ts_cart');
+      return normalizeTsCartItems(s ? JSON.parse(s) : []);
+    } catch {
+      return [];
+    }
   });
   const [isCartHydrated, setIsCartHydrated] = useState(false);
   const [mockExams, setMockExams] = useState([]);
@@ -167,7 +172,12 @@ export default function StudentDashboard() {
   useEffect(() => {
     function onStorage(event) {
       if (event.key === 'ts_cart') {
-        try { setTsCartItems(event.newValue ? JSON.parse(event.newValue) : []); } catch { setTsCartItems([]); }
+        try {
+          const next = normalizeTsCartItems(event.newValue ? JSON.parse(event.newValue) : []);
+          setTsCartItems((prev) => (areSameTsCartItems(prev, next) ? prev : next));
+        } catch {
+          setTsCartItems((prev) => (prev.length ? [] : prev));
+        }
       }
     }
     window.addEventListener('storage', onStorage);
@@ -177,7 +187,13 @@ export default function StudentDashboard() {
   // Also re-read ts_cart when the page gains focus (same-tab navigation back from test series page)
   useEffect(() => {
     function onFocus() {
-      try { const s = localStorage.getItem('ts_cart'); setTsCartItems(s ? JSON.parse(s) : []); } catch { setTsCartItems([]); }
+      try {
+        const s = localStorage.getItem('ts_cart');
+        const next = normalizeTsCartItems(s ? JSON.parse(s) : []);
+        setTsCartItems((prev) => (areSameTsCartItems(prev, next) ? prev : next));
+      } catch {
+        setTsCartItems((prev) => (prev.length ? [] : prev));
+      }
     }
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
@@ -289,6 +305,34 @@ export default function StudentDashboard() {
 
   function normalizeText(value) {
     return String(value || '').trim().replace(/\s+/g, ' ');
+  }
+
+  function normalizeTsCartItems(items = []) {
+    return (Array.isArray(items) ? items : []).map((item) => ({
+      ...item,
+      course: String(item?.course || '').trim(),
+      seriesType: String(item?.seriesType || '').trim(),
+      originalPaise: Number(item?.originalPaise ?? item?.finalPaise ?? 0),
+      finalPaise: Number(item?.finalPaise ?? 0),
+      discountPaise: Math.max(0, Number(item?.discountPaise ?? 0)),
+      voucherCode: String(item?.voucherCode || '').trim() || null
+    }));
+  }
+
+  function areSameTsCartItems(left = [], right = []) {
+    if (left === right) return true;
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      const a = left[index] || {};
+      const b = right[index] || {};
+      if (String(a.course || '').trim() !== String(b.course || '').trim()) return false;
+      if (String(a.seriesType || '').trim() !== String(b.seriesType || '').trim()) return false;
+      if (Number(a.originalPaise ?? 0) !== Number(b.originalPaise ?? 0)) return false;
+      if (Number(a.finalPaise ?? 0) !== Number(b.finalPaise ?? 0)) return false;
+      if (Number(a.discountPaise ?? 0) !== Number(b.discountPaise ?? 0)) return false;
+      if ((String(a.voucherCode || '').trim() || null) !== (String(b.voucherCode || '').trim() || null)) return false;
+    }
+    return true;
   }
 
   function getCartStorageUsernameKey(usernameValue) {
@@ -647,14 +691,16 @@ export default function StudentDashboard() {
           setCartVoucherPreviewByKey({});
           return { success: false, message: firstError || 'Voucher is invalid for test series.' };
         }
-        tsUpdated = tsResults.map((r) => r.item);
-        setTsCartItems(tsUpdated);
-        try {
-          localStorage.setItem('ts_cart', JSON.stringify(tsUpdated));
-        } catch {
-          // ignore
-        }
-        window.dispatchEvent(new Event('ts-cart-updated'));
+        tsUpdated = normalizeTsCartItems(tsResults.map((r) => r.item));
+        setTsCartItems((prev) => {
+          if (areSameTsCartItems(prev, tsUpdated)) return prev;
+          try {
+            localStorage.setItem('ts_cart', JSON.stringify(tsUpdated));
+          } catch {
+            // ignore
+          }
+          return tsUpdated;
+        });
       }
 
       if (cartVoucherRequestRef.current !== requestId) {
@@ -692,18 +738,18 @@ export default function StudentDashboard() {
     setCartVoucherCode('');
     setCartVoucherPreviewByKey({});
     setTsCartItems((prev) => {
-      const next = prev.map((item) => ({
+      const next = normalizeTsCartItems(prev.map((item) => ({
         ...item,
         finalPaise: Number(item.originalPaise ?? item.finalPaise ?? 0),
         voucherCode: null,
         discountPaise: 0
-      }));
+      })));
+      if (areSameTsCartItems(prev, next)) return prev;
       try {
         localStorage.setItem('ts_cart', JSON.stringify(next));
       } catch {
         // ignore
       }
-      window.dispatchEvent(new Event('ts-cart-updated'));
       return next;
     });
     setCartVoucherMessage('Voucher removed. Price reverted to original rate.');
