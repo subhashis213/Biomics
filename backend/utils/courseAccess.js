@@ -52,6 +52,9 @@ function getActiveModuleMembership(userDoc, course, moduleName, batchName = 'Gen
   // Check bundle (ALL_MODULES) — gives access to every module
   const matchBatch = (entryBatch) => {
     const stored = normalizeBatchName(entryBatch);
+    // Quiz/video records with "General" batch should be visible to any active batch
+    // purchase for the same course/module, while still honoring explicit batch filters.
+    if (normalizedBatch === 'General') return true;
     return stored === normalizedBatch || stored === 'General';
   };
 
