@@ -9,6 +9,7 @@ const Course = require('../models/Course');
 const Quiz = require('../models/Quiz');
 const User = require('../models/User');
 const { resolveStudentCourseFromRequest } = require('../utils/resolveStudentCourse');
+const { withOptionalBatch } = require('../utils/adminBatchScope');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken } = require('../middleware/auth');
 const {
@@ -300,17 +301,9 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
     const moduleFilter = isGeneralModule
       ? { $or: [{ module: 'General' }, { module: '' }, { module: null }, { module: { $exists: false } }] }
       : { module: normalizedModule };
-    const match = { category, ...moduleFilter };
+    let match = { category, ...moduleFilter };
     if (batchFilter) {
-      match.$and = [{
-        $or: [
-          { batch: batchFilter },
-          { batch: 'General' },
-          { batch: '' },
-          { batch: null },
-          { batch: { $exists: false } }
-        ]
-      }];
+      match = withOptionalBatch({ category, ...moduleFilter }, batchFilter);
     }
     const videos = await Video.find(match);
     let deletedCount = 0;

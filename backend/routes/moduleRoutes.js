@@ -9,32 +9,14 @@ const MockExam = require('../models/MockExam');
 const FullMockTest = require('../models/FullMockTest');
 const ModulePricing = require('../models/ModulePricing');
 const { authenticateToken } = require('../middleware/auth');
+const { normalizeValue, withOptionalBatch, sameBatchStored } = require('../utils/adminBatchScope');
 
-function normalizeValue(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ');
-}
-
-function buildBatchOrClause(batchName) {
-  const normalized = normalizeValue(batchName || '');
-  if (!normalized) return null;
-  return [
-    { batch: normalized },
-    { batch: 'General' },
-    { batch: '' },
-    { batch: null },
-    { batch: { $exists: false } }
-  ];
-}
-
-function withOptionalBatch(baseFilter, batchName) {
-  const batchClause = buildBatchOrClause(batchName);
-  if (!batchClause) return baseFilter;
-  return {
-    $and: [
-      baseFilter,
-      { $or: batchClause }
-    ]
-  };
+async function sweepByBatchHint(Model, baseFilter, batchHint) {
+  const docs = await Model.find(baseFilter).select('_id batch').lean();
+  const ids = docs.filter((d) => sameBatchStored(d.batch, batchHint)).map((d) => d._id);
+  if (!ids.length) return 0;
+  const r = await Model.deleteMany({ _id: { $in: ids } });
+  return Number(r.deletedCount || 0);
 }
 
 router.get('/catalog', authenticateToken('user'), async (req, res) => {
@@ -211,15 +193,28 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
       FullMockTest.deleteMany(scopedFilter)
     ]);
 
+    let extraVideos = 0;
+    let extraQuizzes = 0;
+    let extraTopicTests = 0;
+    let extraModules = 0;
+    let extraPricing = 0;
+    if (hasBatchFilter && batch) {
+      extraVideos = await sweepByBatchHint(Video, { category, module: name }, batch);
+      extraQuizzes = await sweepByBatchHint(Quiz, { category, module: name }, batch);
+      extraTopicTests = await sweepByBatchHint(TopicTest, { category, module: name }, batch);
+      extraModules = await sweepByBatchHint(Module, { category, name }, batch);
+      extraPricing = await sweepByBatchHint(ModulePricing, { category, moduleName: name }, batch);
+    }
+
     return res.json({
       message: 'Module removed',
       deleted: {
-        modules: Number(moduleDeleteResult?.deletedCount || 0),
+        modules: Number(moduleDeleteResult?.deletedCount || 0) + extraModules,
         topics: Number(topicDeleteResult?.deletedCount || 0),
-        pricingRows: Number(pricingDeleteResult?.deletedCount || 0),
-        videos: Number(videoDeleteResult?.deletedCount || 0),
-        quizzes: Number(quizDeleteResult?.deletedCount || 0),
-        topicTests: Number(topicTestDeleteResult?.deletedCount || 0),
+        pricingRows: Number(pricingDeleteResult?.deletedCount || 0) + extraPricing,
+        videos: Number(videoDeleteResult?.deletedCount || 0) + extraVideos,
+        quizzes: Number(quizDeleteResult?.deletedCount || 0) + extraQuizzes,
+        topicTests: Number(topicTestDeleteResult?.deletedCount || 0) + extraTopicTests,
         mockExams: Number(mockExamDeleteResult?.deletedCount || 0),
         fullMocks: Number(fullMockDeleteResult?.deletedCount || 0)
       }

@@ -8,6 +8,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { hasCourseAccess, hasModuleAccess, normalizeCourseName } = require('../utils/courseAccess');
 const { resolveStudentCourseFromRequest } = require('../utils/resolveStudentCourse');
 const { logAdminAction } = require('../utils/auditLog');
+const { withOptionalBatch } = require('../utils/adminBatchScope');
 
 const router = express.Router();
 const PDF_MAX_SIZE_BYTES = 25 * 1024 * 1024;
@@ -582,17 +583,9 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
     const moduleFilter = isGeneralModule
       ? { $or: [{ module: 'General' }, { module: '' }, { module: null }, { module: { $exists: false } }] }
       : { module: normalizedModule };
-    const match = { category, ...moduleFilter };
+    let match = { category, ...moduleFilter };
     if (batchFilter) {
-      match.$and = [{
-        $or: [
-          { batch: batchFilter },
-          { batch: 'General' },
-          { batch: '' },
-          { batch: null },
-          { batch: { $exists: false } }
-        ]
-      }];
+      match = withOptionalBatch({ category, ...moduleFilter }, batchFilter);
     }
     const quizzes = await Quiz.find(match);
     const ids = quizzes.map(q => q._id);

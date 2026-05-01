@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   addCourseBatchAdmin,
@@ -85,6 +85,15 @@ function safeDecode(value) {
 
 function normalizeKey(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+/** Module / video rows match the workspace batch (legacy General = visible in all). */
+function workspaceBatchMatches(moduleBatch, selectedBatch) {
+  const sel = String(selectedBatch || '').trim();
+  const mb = String(moduleBatch || '').trim();
+  if (!sel) return true;
+  if (!mb || mb === 'General') return true;
+  return mb.toLowerCase() === sel.toLowerCase();
 }
 
 export default function AdminCourseWorkspacePage() {
@@ -209,52 +218,49 @@ export default function AdminCourseWorkspacePage() {
     };
   }, [routeCourseName]);
 
-  useEffect(() => {
+  const refreshCourseModules = useCallback(async () => {
     if (!selectedCourse) {
       setCourseModules([]);
       return;
     }
+    try {
+      const [moduleRes, videosRes] = await Promise.allSettled([
+        requestJson(`/modules?category=${encodeURIComponent(selectedCourse)}`),
+        requestJson('/videos')
+      ]);
 
-    let ignore = false;
-    async function loadCourseData() {
-      try {
-        const [moduleRes, videosRes] = await Promise.allSettled([
-          requestJson(`/modules?category=${encodeURIComponent(selectedCourse)}`),
-          requestJson('/videos')
-        ]);
-
-        if (ignore) return;
-
-        const moduleNames = [];
-        if (moduleRes.status === 'fulfilled') {
-          (moduleRes.value?.modules || []).forEach((entry) => {
-            const category = String(entry?.category || '').trim();
-            const name = String(entry?.name || '').trim();
-            if (category === selectedCourse && name) moduleNames.push(name);
-          });
-        }
-
-        if (videosRes.status === 'fulfilled') {
-          (Array.isArray(videosRes.value) ? videosRes.value : []).forEach((video) => {
-            const category = String(video?.category || '').trim();
-            const moduleName = String(video?.module || 'General').trim();
-            if (category === selectedCourse && moduleName) moduleNames.push(moduleName);
-          });
-        }
-
-        setCourseModules(Array.from(new Set(moduleNames)).sort((a, b) => a.localeCompare(b)));
-      } catch (error) {
-        if (!ignore) {
-          setModalMessage({ type: 'error', text: error.message || 'Failed to load modules.' });
-        }
+      const moduleNames = [];
+      if (moduleRes.status === 'fulfilled') {
+        (moduleRes.value?.modules || []).forEach((entry) => {
+          const category = String(entry?.category || '').trim();
+          const name = String(entry?.name || '').trim();
+          const batch = String(entry?.batch || '').trim();
+          if (category !== selectedCourse || !name) return;
+          if (!workspaceBatchMatches(batch, selectedBatch)) return;
+          moduleNames.push(name);
+        });
       }
-    }
 
-    loadCourseData();
-    return () => {
-      ignore = true;
-    };
-  }, [selectedCourse]);
+      if (videosRes.status === 'fulfilled') {
+        (Array.isArray(videosRes.value) ? videosRes.value : []).forEach((video) => {
+          const category = String(video?.category || '').trim();
+          const moduleName = String(video?.module || 'General').trim();
+          const batch = String(video?.batch || '').trim();
+          if (category !== selectedCourse || !moduleName) return;
+          if (!workspaceBatchMatches(batch, selectedBatch)) return;
+          moduleNames.push(moduleName);
+        });
+      }
+
+      setCourseModules(Array.from(new Set(moduleNames)).sort((a, b) => a.localeCompare(b)));
+    } catch (error) {
+      setModalMessage({ type: 'error', text: error.message || 'Failed to load modules.' });
+    }
+  }, [selectedCourse, selectedBatch]);
+
+  useEffect(() => {
+    refreshCourseModules();
+  }, [refreshCourseModules]);
 
   useEffect(() => {
     if (!selectedCourse) return;
@@ -544,7 +550,7 @@ export default function AdminCourseWorkspacePage() {
         modulePayload.batch = batch;
       }
       await requestJson('/modules', { method: 'DELETE', body: JSON.stringify(modulePayload) });
-      setCourseModules((prev) => prev.filter((item) => item !== moduleName));
+      await refreshCourseModules();
       if (selectedModule === moduleName) {
         setSelectedModule(null);
         setSelectedTopic(null);
