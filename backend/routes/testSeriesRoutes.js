@@ -16,6 +16,7 @@ const TestSeriesPayment = require('../models/TestSeriesPayment');
 const User = require('../models/User');
 const Voucher = require('../models/Voucher');
 const Course = require('../models/Course');
+const { pickCanonicalCourseName, resolveStudentCourseFromRequest } = require('../utils/resolveStudentCourse');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -340,12 +341,51 @@ async function uploadTestSeriesThumbnailToCloudinary(localPath) {
 }
 
 function resolveTargetCourse(userCourse, requestedCourse, supportedCourses = []) {
-  const normalizedUserCourse = normalizeCourse(userCourse);
-  const normalizedRequestedCourse = normalizeCourse(requestedCourse);
-  if (normalizedRequestedCourse && supportedCourses.includes(normalizedRequestedCourse)) {
-    return normalizedRequestedCourse;
+  const list = Array.isArray(supportedCourses) ? supportedCourses : [];
+  if (!list.length) return normalizeCourse(requestedCourse) || normalizeCourse(userCourse);
+  return pickCanonicalCourseName(requestedCourse, userCourse, list) || '';
+}
+
+/** Match profile + purchases to an active catalog course name (for pricing / vouchers). */
+async function resolveTargetCourseForStudent(username, requestedCourseRaw, supportedCourses) {
+  const user = await User.findOne({ username }, { class: 1, purchasedCourses: 1 }).lean();
+  const list = Array.isArray(supportedCourses) ? supportedCourses : [];
+  if (!user || !list.length) return '';
+  const purchasedHints = (user.purchasedCourses || []).map((p) => p.course).filter(Boolean);
+  const enrolledAnchor = (user.class && String(user.class).trim()) || purchasedHints[0] || '';
+  if (!enrolledAnchor) return '';
+
+  const reqStr = typeof requestedCourseRaw === 'string' ? requestedCourseRaw.trim() : '';
+  const tryHints = [...new Set([reqStr, user.class, ...purchasedHints].filter(Boolean))];
+  for (const h of tryHints) {
+    const hit = pickCanonicalCourseName(h, enrolledAnchor, list);
+    if (hit) return hit;
   }
-  return normalizedUserCourse;
+
+  const merged = await resolveStudentCourseFromRequest(
+    reqStr || enrolledAnchor,
+    enrolledAnchor,
+    purchasedHints
+  );
+  if (merged) return pickCanonicalCourseName(merged, merged, list) || '';
+  return '';
+}
+
+function testSeriesVoucherRejectReason(voucher, seriesType, course) {
+  if (!voucher) return 'Invalid or inactive voucher code.';
+  const hasTs = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0;
+  const hasCoursesList = Array.isArray(voucher.applicableCourses) && voucher.applicableCourses.length > 0;
+  if (hasCoursesList && !hasTs) {
+    return 'This voucher is only valid for course purchases, not test series.';
+  }
+  if (hasTs && !voucher.applicableTestSeries.includes(seriesType)) {
+    return 'This voucher is not applicable for this test series type.';
+  }
+  if (hasCoursesList) {
+    const ok = voucher.applicableCourses.some((c) => normalizeCourse(c) === normalizeCourse(course));
+    if (!ok) return 'This voucher is not applicable for your course.';
+  }
+  return '';
 }
 
 function summarizeAttempts(attempts = []) {
@@ -814,12 +854,12 @@ router.get('/full-mocks/syllabus', authenticateToken('user'), async (req, res) =
 // GET /test-series/pricing/student — returns pricing + access status for the student's course
 router.get('/pricing/student', authenticateToken('user'), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
-    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
     const supportedCourses = await getSupportedCourses();
-    const course = resolveTargetCourse(user.class, req.query?.course, supportedCourses);
-    if (!supportedCourses.includes(course)) {
-      return res.status(400).json({ error: 'Invalid course category.' });
+    const course = await resolveTargetCourseForStudent(req.user.username, req.query?.course, supportedCourses);
+    if (!course || !supportedCourses.includes(course)) {
+      return res.status(400).json({
+        error: 'Could not match your profile to an active course for test series pricing. Update your enrolled course or contact support.'
+      });
     }
     const pricing = await TestSeriesPricing.findOne({ category: course }).lean();
     const access = await resolveStudentAccess(req.user.username, course);
@@ -1501,9 +1541,14 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
 // GET /test-series/payment/preview?seriesType=topic_test|full_mock
 router.get('/payment/preview', authenticateToken('user'), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
-    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
-    const course = normalizeCourse(user.class);
+    const supportedCourses = await getSupportedCourses();
+    const queryCourse = typeof req.query.course === 'string' ? req.query.course.trim() : '';
+    const course = await resolveTargetCourseForStudent(req.user.username, queryCourse, supportedCourses);
+    if (!course || !supportedCourses.includes(course)) {
+      return res.status(400).json({
+        error: 'Could not match your profile to an active course for test series pricing. Update your enrolled course or contact support.'
+      });
+    }
 
     const seriesType = String(req.query.seriesType || '').trim();
     if (!SERIES_TYPES.includes(seriesType)) {
@@ -1542,12 +1587,12 @@ router.get('/payment/preview', authenticateToken('user'), async (req, res) => {
 // POST /test-series/payment/preview-voucher
 router.post('/payment/preview-voucher', authenticateToken('user'), async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
-    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
     const supportedCourses = await getSupportedCourses();
-    const course = resolveTargetCourse(user.class, req.body?.course, supportedCourses);
-    if (!supportedCourses.includes(course)) {
-      return res.status(400).json({ error: 'Invalid course category.' });
+    const course = await resolveTargetCourseForStudent(req.user.username, req.body?.course, supportedCourses);
+    if (!course || !supportedCourses.includes(course)) {
+      return res.status(400).json({
+        error: 'Could not match your profile to an active course for test series pricing. Update your enrolled course or contact support.'
+      });
     }
 
     const seriesType = String(req.body?.seriesType || '').trim();
@@ -1585,21 +1630,9 @@ router.post('/payment/preview-voucher', authenticateToken('user'), async (req, r
       return res.status(400).json({ error: 'This voucher has reached its usage limit.' });
     }
 
-    // Check if voucher is applicable to test series
-    const hasTestSeriesRestriction = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0;
-    if (hasTestSeriesRestriction && !voucher.applicableTestSeries.includes(seriesType)) {
-      return res.status(400).json({ error: 'This voucher is not applicable for this test series type.' });
-    }
-
-    // Check course restriction
-    if (Array.isArray(voucher.applicableCourses) && voucher.applicableCourses.length > 0) {
-      const normalizedCourse = normalizeCourse(course);
-      const applicable = voucher.applicableCourses.some(
-        (c) => normalizeCourse(c) === normalizedCourse
-      );
-      if (!applicable) {
-        return res.status(400).json({ error: 'This voucher is not applicable for your course.' });
-      }
+    const scopeReject = testSeriesVoucherRejectReason(voucher, seriesType, course);
+    if (scopeReject) {
+      return res.status(400).json({ error: scopeReject });
     }
 
     // Compute discount
@@ -1635,12 +1668,12 @@ router.post('/payment/preview-voucher', authenticateToken('user'), async (req, r
 router.post('/payment/create-order', authenticateToken('user'), async (req, res) => {
   try {
     const { keyId, client: razorpay, hasConfig } = getRazorpayConfig();
-    const user = await User.findOne({ username: req.user.username }, { class: 1 }).lean();
-    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
     const supportedCourses = await getSupportedCourses();
-    const course = resolveTargetCourse(user.class, req.body?.course, supportedCourses);
-    if (!supportedCourses.includes(course)) {
-      return res.status(400).json({ error: 'Invalid course category.' });
+    const course = await resolveTargetCourseForStudent(req.user.username, req.body?.course, supportedCourses);
+    if (!course || !supportedCourses.includes(course)) {
+      return res.status(400).json({
+        error: 'Could not match your profile to an active course for test series pricing. Update your enrolled course or contact support.'
+      });
     }
 
     const seriesType = String(req.body?.seriesType || '').trim();
@@ -1669,26 +1702,36 @@ router.post('/payment/create-order', authenticateToken('user'), async (req, res)
     let appliedVoucherId = null;
     if (voucherCode && originalAmountInPaise > 0) {
       const voucher = await Voucher.findOne({ code: voucherCode, active: true }).lean();
-      if (voucher) {
-        const now = Date.now();
-        const notExpired = !voucher.validUntil || new Date(voucher.validUntil).getTime() >= now;
-        const notBeforeStart = !voucher.validFrom || new Date(voucher.validFrom).getTime() <= now;
-        const withinLimit = !Number.isFinite(voucher.usageLimit) || voucher.usageLimit <= 0 || voucher.usedCount < voucher.usageLimit;
-        const tsApplicable = !Array.isArray(voucher.applicableTestSeries) || voucher.applicableTestSeries.length === 0 || voucher.applicableTestSeries.includes(seriesType);
-        const courseApplicable = !Array.isArray(voucher.applicableCourses) || voucher.applicableCourses.length === 0 || voucher.applicableCourses.some((c) => normalizeCourse(c) === course);
-        if (notExpired && notBeforeStart && withinLimit && tsApplicable && courseApplicable) {
-          if (voucher.discountType === 'percent') {
-            discountInPaise = Math.floor((originalAmountInPaise * Math.max(0, Number(voucher.discountValue || 0))) / 100);
-          } else {
-            discountInPaise = Math.floor(Math.max(0, Number(voucher.discountValue || 0)));
-          }
-          if (Number.isFinite(voucher.maxDiscountInPaise) && voucher.maxDiscountInPaise > 0) {
-            discountInPaise = Math.min(discountInPaise, Math.floor(voucher.maxDiscountInPaise));
-          }
-          discountInPaise = Math.max(0, Math.min(originalAmountInPaise, discountInPaise));
-          appliedVoucherId = voucher._id;
-        }
+      if (!voucher) {
+        return res.status(400).json({ error: 'Invalid or inactive voucher code.' });
       }
+      const now = Date.now();
+      const notExpired = !voucher.validUntil || new Date(voucher.validUntil).getTime() >= now;
+      const notBeforeStart = !voucher.validFrom || new Date(voucher.validFrom).getTime() <= now;
+      const withinLimit = !Number.isFinite(voucher.usageLimit) || voucher.usageLimit <= 0 || voucher.usedCount < voucher.usageLimit;
+      if (!notExpired) {
+        return res.status(400).json({ error: 'This voucher has expired.' });
+      }
+      if (!notBeforeStart) {
+        return res.status(400).json({ error: 'This voucher is not yet active.' });
+      }
+      if (!withinLimit) {
+        return res.status(400).json({ error: 'This voucher has reached its usage limit.' });
+      }
+      const scopeReject = testSeriesVoucherRejectReason(voucher, seriesType, course);
+      if (scopeReject) {
+        return res.status(400).json({ error: scopeReject });
+      }
+      if (voucher.discountType === 'percent') {
+        discountInPaise = Math.floor((originalAmountInPaise * Math.max(0, Number(voucher.discountValue || 0))) / 100);
+      } else {
+        discountInPaise = Math.floor(Math.max(0, Number(voucher.discountValue || 0)));
+      }
+      if (Number.isFinite(voucher.maxDiscountInPaise) && voucher.maxDiscountInPaise > 0) {
+        discountInPaise = Math.min(discountInPaise, Math.floor(voucher.maxDiscountInPaise));
+      }
+      discountInPaise = Math.max(0, Math.min(originalAmountInPaise, discountInPaise));
+      appliedVoucherId = voucher._id;
     }
     const finalAmountInPaise = Math.max(0, originalAmountInPaise - discountInPaise);
 

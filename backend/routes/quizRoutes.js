@@ -650,10 +650,16 @@ router.get('/', authenticateToken('admin'), async (req, res) => {
 router.get('/my-course', authenticateToken('user'), async (req, res) => {
   try {
     const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
-    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const purchasedHints = (user?.purchasedCourses || []).map((p) => p.course).filter(Boolean);
+    const enrolledAnchor = (user?.class && String(user.class).trim()) || purchasedHints[0] || '';
+    if (!user || !enrolledAnchor) return res.status(404).json({ error: 'Student profile not found.' });
 
     const queryCourse = typeof req.query.course === 'string' ? req.query.course.trim() : '';
-    const canonicalCourse = await resolveStudentCourseFromRequest(queryCourse || user.class, user.class);
+    const canonicalCourse = await resolveStudentCourseFromRequest(
+      queryCourse || enrolledAnchor,
+      enrolledAnchor,
+      purchasedHints
+    );
     if (!canonicalCourse) return res.status(404).json({ error: 'Course not found.' });
 
     const quizzes = await Quiz.find(
@@ -699,11 +705,17 @@ router.get('/my-course/quiz/:id', authenticateToken('user'), async (req, res) =>
     if (!quiz) return res.status(404).json({ error: 'Quiz not found.' });
 
     const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
-    if (!user?.class) {
+    const purchasedHints = (user?.purchasedCourses || []).map((p) => p.course).filter(Boolean);
+    const enrolledAnchor = (user?.class && String(user.class).trim()) || purchasedHints[0] || '';
+    if (!user || !enrolledAnchor) {
       return res.status(403).json({ error: 'You are not authorized for this quiz.' });
     }
     const queryCourse = typeof req.query.course === 'string' ? req.query.course.trim() : '';
-    const scopeCourse = await resolveStudentCourseFromRequest(queryCourse || quiz.category, user.class);
+    const scopeCourse = await resolveStudentCourseFromRequest(
+      queryCourse || quiz.category,
+      enrolledAnchor,
+      purchasedHints
+    );
     if (normalizeCourseName(quiz.category) !== normalizeCourseName(scopeCourse)) {
       return res.status(403).json({ error: 'You are not authorized for this quiz.' });
     }
@@ -737,9 +749,15 @@ router.get('/my-course/:module', authenticateToken('user'), async (req, res) => 
     if (!moduleName) return res.status(400).json({ error: 'Module is required.' });
 
     const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1, _id: 0 }).lean();
-    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+    const purchasedHints = (user?.purchasedCourses || []).map((p) => p.course).filter(Boolean);
+    const enrolledAnchor = (user?.class && String(user.class).trim()) || purchasedHints[0] || '';
+    if (!user || !enrolledAnchor) return res.status(404).json({ error: 'Student profile not found.' });
     const queryCourse = typeof req.query.course === 'string' ? req.query.course.trim() : '';
-    const canonicalCourse = await resolveStudentCourseFromRequest(queryCourse || user.class, user.class);
+    const canonicalCourse = await resolveStudentCourseFromRequest(
+      queryCourse || enrolledAnchor,
+      enrolledAnchor,
+      purchasedHints
+    );
     if (!canonicalCourse) return res.status(404).json({ error: 'Course not found.' });
     const canAccess = await hasModuleAccess(user, canonicalCourse, moduleName, req.query?.batch || 'General');
     if (!canAccess) {

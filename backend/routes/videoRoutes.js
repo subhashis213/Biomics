@@ -153,12 +153,18 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
       { username: req.user.username },
       { class: 1, favorites: 1, completedVideos: 1, purchasedCourses: 1, _id: 0 }
     ).lean();
-    if (!user || !user.class) {
+    const purchasedHints = (user?.purchasedCourses || []).map((p) => p.course).filter(Boolean);
+    const enrolledAnchor = (user?.class && String(user.class).trim()) || purchasedHints[0] || '';
+    if (!user || !enrolledAnchor) {
       return res.status(404).json({ error: 'Student profile not found' });
     }
 
     const queryCourse = typeof req.query.course === 'string' ? req.query.course.trim() : '';
-    const canonicalCourse = await resolveStudentCourseFromRequest(queryCourse || user.class, user.class);
+    const canonicalCourse = await resolveStudentCourseFromRequest(
+      queryCourse || enrolledAnchor,
+      enrolledAnchor,
+      purchasedHints
+    );
     if (!canonicalCourse) {
       return res.status(404).json({ error: 'Course not found' });
     }

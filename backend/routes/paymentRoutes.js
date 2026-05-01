@@ -232,7 +232,14 @@ function isVoucherApplicable(voucher, course) {
     return false;
   }
 
-  if (!Array.isArray(voucher.applicableCourses) || voucher.applicableCourses.length === 0) {
+  const hasTestSeriesScope = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0;
+  const hasCourseScope = Array.isArray(voucher.applicableCourses) && voucher.applicableCourses.length > 0;
+  // Test-series-only vouchers must not apply to course/module checkout
+  if (hasTestSeriesScope && !hasCourseScope) {
+    return false;
+  }
+
+  if (!hasCourseScope) {
     return true;
   }
 
@@ -1424,6 +1431,9 @@ router.get('/vouchers/student', authenticateToken('user'), async (req, res) => {
         const notExpired = !voucher.validUntil || new Date(voucher.validUntil).getTime() >= now;
         const started = !voucher.validFrom || new Date(voucher.validFrom).getTime() <= now;
         const underLimit = !Number.isFinite(voucher.usageLimit) || voucher.usageLimit <= 0 || voucher.usedCount < voucher.usageLimit;
+        const testSeriesOnly = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0
+          && (!Array.isArray(voucher.applicableCourses) || voucher.applicableCourses.length === 0);
+        if (testSeriesOnly) return false;
         const courseAllowed = !Array.isArray(voucher.applicableCourses)
           || voucher.applicableCourses.length === 0
           || voucher.applicableCourses.some((entry) => normalizeCourseName(entry) === targetCourse);
