@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function ModuleManager({
   course,
   modules = [],
   batches = [],
+  defaultCreateBatch = '',
   selectedModule,
   onModuleSelect,
   onModuleCreate,
@@ -14,7 +15,11 @@ export default function ModuleManager({
   onClearMessage
 }) {
   const [newModuleName, setNewModuleName] = useState('');
-  const [newModuleBatch, setNewModuleBatch] = useState('');
+  const [newModuleBatch, setNewModuleBatch] = useState(String(defaultCreateBatch || '').trim());
+
+  useEffect(() => {
+    setNewModuleBatch(String(defaultCreateBatch || '').trim());
+  }, [defaultCreateBatch]);
   const [showCreateForm, setShowCreateForm] = useState(modules.length === 0);
   const [createError, setCreateError] = useState(null);
   const [confirmDeleteModule, setConfirmDeleteModule] = useState(null);
@@ -33,7 +38,7 @@ export default function ModuleManager({
     try {
       if (onModuleCreate) await onModuleCreate(newModuleName.trim(), newModuleBatch || '');
       setNewModuleName('');
-      setNewModuleBatch('');
+      setNewModuleBatch(String(defaultCreateBatch || '').trim());
       setShowCreateForm(false);
       setCreateError(null);
     } catch {
@@ -240,7 +245,12 @@ export default function ModuleManager({
                 <button
                   type="button"
                   className="secondary-btn"
-                  onClick={() => { setShowCreateForm(false); setNewModuleName(''); setCreateError(null); }}
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setNewModuleName('');
+                    setNewModuleBatch(String(defaultCreateBatch || '').trim());
+                    setCreateError(null);
+                  }}
                   disabled={isProcessing}
                 >
                   Cancel

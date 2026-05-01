@@ -87,15 +87,6 @@ function normalizeKey(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-/** Module / video rows match the workspace batch (legacy General = visible in all). */
-function workspaceBatchMatches(moduleBatch, selectedBatch) {
-  const sel = String(selectedBatch || '').trim();
-  const mb = String(moduleBatch || '').trim();
-  if (!sel) return true;
-  if (!mb || mb === 'General') return true;
-  return mb.toLowerCase() === sel.toLowerCase();
-}
-
 export default function AdminCourseWorkspacePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -234,9 +225,7 @@ export default function AdminCourseWorkspacePage() {
         (moduleRes.value?.modules || []).forEach((entry) => {
           const category = String(entry?.category || '').trim();
           const name = String(entry?.name || '').trim();
-          const batch = String(entry?.batch || '').trim();
           if (category !== selectedCourse || !name) return;
-          if (!workspaceBatchMatches(batch, selectedBatch)) return;
           moduleNames.push(name);
         });
       }
@@ -245,9 +234,7 @@ export default function AdminCourseWorkspacePage() {
         (Array.isArray(videosRes.value) ? videosRes.value : []).forEach((video) => {
           const category = String(video?.category || '').trim();
           const moduleName = String(video?.module || 'General').trim();
-          const batch = String(video?.batch || '').trim();
           if (category !== selectedCourse || !moduleName) return;
-          if (!workspaceBatchMatches(batch, selectedBatch)) return;
           moduleNames.push(moduleName);
         });
       }
@@ -256,7 +243,7 @@ export default function AdminCourseWorkspacePage() {
     } catch (error) {
       setModalMessage({ type: 'error', text: error.message || 'Failed to load modules.' });
     }
-  }, [selectedCourse, selectedBatch]);
+  }, [selectedCourse]);
 
   useEffect(() => {
     refreshCourseModules();
@@ -1051,6 +1038,7 @@ export default function AdminCourseWorkspacePage() {
               selectedModule={selectedModule}
               onModuleSelect={handleModuleSelect}
               batches={availableBatches}
+              defaultCreateBatch={selectedBatch}
               onModuleCreate={handleModuleCreate}
               onModuleDelete={handleModuleDelete}
               onModuleRename={handleModuleRename}
