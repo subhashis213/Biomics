@@ -531,11 +531,9 @@ export default function AdminCourseWorkspacePage() {
   async function handleModuleDelete(moduleName) {
     if (!selectedCourse || !moduleName) return;
     try {
-      const batch = String(selectedBatch || '').trim();
+      // Omit batch: workspace lists modules from all batches (videos + Module docs). Scoped
+      // delete by selected batch leaves other-batch videos/topic rows → module reappears on refresh.
       const modulePayload = { category: selectedCourse, name: moduleName };
-      if (batch) {
-        modulePayload.batch = batch;
-      }
       await requestJson('/modules', { method: 'DELETE', body: JSON.stringify(modulePayload) });
       await refreshCourseModules();
       if (selectedModule === moduleName) {
