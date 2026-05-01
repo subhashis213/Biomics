@@ -538,20 +538,18 @@ export default function AdminCourseWorkspacePage() {
   async function handleModuleDelete(moduleName) {
     if (!selectedCourse || !moduleName) return;
     try {
-      await Promise.all([
-        requestJson('/videos/module', {
-          method: 'DELETE',
-          body: JSON.stringify({ category: selectedCourse, module: moduleName })
-        }),
-        requestJson('/quizzes/module', {
-          method: 'DELETE',
-          body: JSON.stringify({ category: selectedCourse, module: moduleName })
-        }),
-        requestJson('/modules', {
-          method: 'DELETE',
-          body: JSON.stringify({ category: selectedCourse, name: moduleName })
-        })
-      ]);
+      const batch = String(selectedBatch || '').trim();
+      const videoPayload = { category: selectedCourse, module: moduleName };
+      const quizPayload = { category: selectedCourse, module: moduleName };
+      const modulePayload = { category: selectedCourse, name: moduleName };
+      if (batch) {
+        videoPayload.batch = batch;
+        quizPayload.batch = batch;
+        modulePayload.batch = batch;
+      }
+      await requestJson('/videos/module', { method: 'DELETE', body: JSON.stringify(videoPayload) });
+      await requestJson('/quizzes/module', { method: 'DELETE', body: JSON.stringify(quizPayload) });
+      await requestJson('/modules', { method: 'DELETE', body: JSON.stringify(modulePayload) });
       setCourseModules((prev) => prev.filter((item) => item !== moduleName));
       if (selectedModule === moduleName) {
         setSelectedModule(null);

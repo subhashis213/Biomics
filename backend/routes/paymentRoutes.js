@@ -246,9 +246,11 @@ async function ensureUserAndCourse(username) {
 }
 
 async function buildStudentPricingSnapshot(user, course) {
-  const [pricingDocs, modules] = await Promise.all([
+  const [pricingDocs, modules, videoModules, quizModules] = await Promise.all([
     getCoursePricingDocs(course),
-    Module.find({ category: course }).sort({ name: 1 }).lean()
+    Module.find({ category: course }).sort({ name: 1 }).lean(),
+    Video.distinct('module', { category: course }),
+    Quiz.distinct('module', { category: course })
   ]);
 
   const pricingByModule = new Map(
@@ -260,8 +262,10 @@ async function buildStudentPricingSnapshot(user, course) {
     ...modules.map((entry) => normalizeModuleName(entry.name)),
     ...pricingDocs
       .map((entry) => normalizeModuleName(entry.moduleName))
-      .filter((moduleName) => moduleName !== ALL_MODULES)
-  ])).sort((left, right) => left.localeCompare(right));
+      .filter((moduleName) => moduleName !== ALL_MODULES),
+    ...(Array.isArray(videoModules) ? videoModules : []).map((m) => normalizeModuleName(m)),
+    ...(Array.isArray(quizModules) ? quizModules : []).map((m) => normalizeModuleName(m))
+  ])).filter((name) => Boolean(name) && name !== ALL_MODULES).sort((left, right) => left.localeCompare(right));
 
   const moduleAccess = {};
   moduleNames.forEach((moduleName) => {

@@ -266,6 +266,7 @@ export default function StudentDashboard() {
   } = useQuizSession({
     selectedModule: quizEnabledForSelection ? selectedModuleName : null,
     quizzes,
+    courseScope: course || '',
     onError: (msg) => setBanner({ type: 'error', text: msg }),
     onAttemptsRefresh: refreshAttempts
   });

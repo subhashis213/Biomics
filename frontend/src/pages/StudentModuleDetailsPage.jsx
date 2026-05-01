@@ -38,9 +38,12 @@ export default function StudentModuleDetailsPage() {
     favoriteIds,
     completedIds,
     access,
+    course,
     isLoading,
     loadError
-  } = useCourseData();
+  } = useCourseData(decodedCourseName);
+
+  const scopeCourseLabel = normalizeText(course || decodedCourseName);
 
   const [catalogTopics, setCatalogTopics] = useState([]);
   const [topicsLoadedFromCatalog, setTopicsLoadedFromCatalog] = useState(false);
@@ -58,7 +61,7 @@ export default function StudentModuleDetailsPage() {
 
   const moduleLocked = Boolean(moduleAccess?.purchaseRequired && !moduleAccess?.unlocked);
 
-  const courseKey = decodedCourseName.toLowerCase();
+  const courseKey = scopeCourseLabel.toLowerCase();
   const moduleKey = decodedModuleName.toLowerCase();
 
   useEffect(() => {
@@ -66,7 +69,7 @@ export default function StudentModuleDetailsPage() {
     setCatalogTopics([]);
     setTopicsLoadedFromCatalog(false);
 
-    fetchModuleTopics(decodedCourseName, decodedModuleName)
+    fetchModuleTopics(scopeCourseLabel, decodedModuleName)
       .then((data) => {
         if (cancelled) return;
         const topics = Array.isArray(data?.topics)
@@ -82,7 +85,7 @@ export default function StudentModuleDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [decodedCourseName, decodedModuleName]);
+  }, [scopeCourseLabel, decodedModuleName]);
 
   const moduleVideos = useMemo(() => {
     return videos.filter((video) => {
@@ -94,21 +97,21 @@ export default function StudentModuleDetailsPage() {
 
   const moduleQuizzes = useMemo(() => {
     return quizzes.filter((quiz) => {
-      const sameCourse = normalizeText(quiz?.category || decodedCourseName).toLowerCase() === courseKey;
+      const sameCourse = normalizeText(quiz?.category || scopeCourseLabel).toLowerCase() === courseKey;
       const sameModule = normalizeText(quiz?.module || 'General').toLowerCase() === moduleKey;
       return sameCourse && sameModule;
     });
-  }, [quizzes, decodedCourseName, courseKey, moduleKey]);
+  }, [quizzes, scopeCourseLabel, courseKey, moduleKey]);
 
   const moduleAttempts = useMemo(() => {
     return quizAttempts
       .filter((attempt) => {
-        const sameCourse = normalizeText(attempt?.category || decodedCourseName).toLowerCase() === courseKey;
+        const sameCourse = normalizeText(attempt?.category || scopeCourseLabel).toLowerCase() === courseKey;
         const sameModule = normalizeText(attempt?.module || 'General').toLowerCase() === moduleKey;
         return sameCourse && sameModule;
       })
       .sort((a, b) => new Date(b?.submittedAt || 0).getTime() - new Date(a?.submittedAt || 0).getTime());
-  }, [quizAttempts, decodedCourseName, courseKey, moduleKey]);
+  }, [quizAttempts, scopeCourseLabel, courseKey, moduleKey]);
 
   const completedCount = moduleVideos.filter((video) => completedIds.has(String(video?._id || ''))).length;
   const savedCount = moduleVideos.filter((video) => favoriteIds.has(String(video?._id || ''))).length;
@@ -131,7 +134,7 @@ export default function StudentModuleDetailsPage() {
   }, [moduleVideos, moduleQuizzes, catalogTopics, topicsLoadedFromCatalog]);
 
   function handleBack() {
-    navigate(`/student/course/${encodeURIComponent(decodedCourseName)}/modules`);
+    navigate(`/student/course/${encodeURIComponent(scopeCourseLabel)}/modules`);
   }
 
   const primaryPlan = Array.isArray(moduleAccess?.pricing?.plans)
@@ -148,7 +151,7 @@ export default function StudentModuleDetailsPage() {
         <div className="lecture-page-hero-left">
           <p className="eyebrow">Module Details</p>
           <h1>{decodedModuleName}</h1>
-          <p className="lecture-page-subtitle">{decodedCourseName} • Complete learning snapshot</p>
+          <p className="lecture-page-subtitle">{scopeCourseLabel} • Complete learning snapshot</p>
         </div>
         <div className="lecture-page-hero-actions">
           <button type="button" className="secondary-btn module-detail-back-btn" onClick={handleBack}>
@@ -198,7 +201,7 @@ export default function StudentModuleDetailsPage() {
           <button
             type="button"
             className="primary-btn"
-            onClick={() => navigate(`/student/course/${encodeURIComponent(decodedCourseName)}/modules`)}
+            onClick={() => navigate(`/student/course/${encodeURIComponent(scopeCourseLabel)}/modules`)}
           >
             Open Unlock Panel
           </button>
@@ -209,7 +212,7 @@ export default function StudentModuleDetailsPage() {
             <button
               type="button"
               className="module-detail-action-card"
-              onClick={() => navigate(`/student/module/${encodeURIComponent(decodedCourseName)}/${encodeURIComponent(decodedModuleName)}/lectures`)}
+              onClick={() => navigate(`/student/module/${encodeURIComponent(scopeCourseLabel)}/${encodeURIComponent(decodedModuleName)}/lectures`)}
               disabled={isLoading}
             >
               <span aria-hidden="true">🎬</span>
@@ -219,7 +222,7 @@ export default function StudentModuleDetailsPage() {
             <button
               type="button"
               className="module-detail-action-card"
-              onClick={() => navigate(`/student/module/${encodeURIComponent(decodedCourseName)}/${encodeURIComponent(decodedModuleName)}/quizzes`)}
+              onClick={() => navigate(`/student/module/${encodeURIComponent(scopeCourseLabel)}/${encodeURIComponent(decodedModuleName)}/quizzes`)}
               disabled={isLoading}
             >
               <span aria-hidden="true">🧪</span>

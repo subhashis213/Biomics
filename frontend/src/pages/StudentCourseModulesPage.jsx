@@ -31,10 +31,13 @@ export default function StudentCourseModulesPage() {
     quizAttempts,
     completedIds,
     access,
+    course,
     isLoading,
     loadError,
     moduleCatalog,
-  } = useCourseData();
+  } = useCourseData(decodedCourse);
+
+  const scopeCourseLabel = normalizeText(course || decodedCourse);
 
   const allModulesUnlocked = Boolean(access?.allModulesUnlocked || access?.unlocked);
   const moduleAccessMap = access?.moduleAccess || {};
@@ -50,15 +53,15 @@ export default function StudentCourseModulesPage() {
 
     videos.forEach((video) => {
       const cat = normalizeText(video?.category || 'General');
-      if (cat !== decodedCourse) return;
+      if (cat !== scopeCourseLabel) return;
       const mod = normalizeText(video?.module || 'General');
       const key = resolveKey(cat, mod);
       if (!map[key]) map[key] = { module: mod, category: cat };
     });
 
     quizzes.forEach((quiz) => {
-      const cat = normalizeText(quiz?.category || decodedCourse);
-      if (cat !== decodedCourse) return;
+      const cat = normalizeText(quiz?.category || scopeCourseLabel);
+      if (cat !== scopeCourseLabel) return;
       const mod = normalizeText(quiz?.module || 'General');
       const key = resolveKey(cat, mod);
       if (!map[key]) map[key] = { module: mod, category: cat };
@@ -66,7 +69,7 @@ export default function StudentCourseModulesPage() {
 
     (Array.isArray(moduleCatalog) ? moduleCatalog : []).forEach((entry) => {
       const cat = normalizeText(entry?.category || '');
-      if (cat !== decodedCourse) return;
+      if (cat !== scopeCourseLabel) return;
       const mod = normalizeText(entry?.name || '');
       if (!mod) return;
       const key = resolveKey(cat, mod);
@@ -78,55 +81,55 @@ export default function StudentCourseModulesPage() {
     Object.keys(moduleAccessMap).forEach((modName) => {
       const modNorm = normalizeText(modName);
       if (!modNorm || modNorm === 'ALL_MODULES') return;
-      const key = resolveKey(decodedCourse, modNorm);
+      const key = resolveKey(scopeCourseLabel, modNorm);
       const hasContentSignals = Boolean(map[key]);
       const existsInCatalog = catalogModuleKeySet.has(key);
       if (!hasContentSignals && !existsInCatalog) return;
-      if (!map[key]) map[key] = { module: modNorm, category: decodedCourse };
+      if (!map[key]) map[key] = { module: modNorm, category: scopeCourseLabel };
     });
 
     return map;
-  }, [videos, quizzes, moduleCatalog, moduleAccessMap, decodedCourse]);
+  }, [videos, quizzes, moduleCatalog, moduleAccessMap, scopeCourseLabel]);
 
   const videosByModule = useMemo(() => {
     const map = {};
     videos.forEach((video) => {
       const cat = normalizeText(video?.category || 'General');
-      if (cat !== decodedCourse) return;
+      if (cat !== scopeCourseLabel) return;
       const mod = normalizeText(video?.module || 'General');
       const key = `${cat}::${mod}`;
       if (!map[key]) map[key] = [];
       map[key].push(video);
     });
     return map;
-  }, [videos, decodedCourse]);
+  }, [videos, scopeCourseLabel]);
 
   const quizzesByModule = useMemo(() => {
     const map = {};
     quizzes.forEach((quiz) => {
-      const cat = normalizeText(quiz?.category || decodedCourse);
-      if (cat !== decodedCourse) return;
+      const cat = normalizeText(quiz?.category || scopeCourseLabel);
+      if (cat !== scopeCourseLabel) return;
       const mod = normalizeText(quiz?.module || 'General');
       const key = `${cat}::${mod}`;
       if (!map[key]) map[key] = [];
       map[key].push(quiz);
     });
     return map;
-  }, [quizzes, decodedCourse]);
+  }, [quizzes, scopeCourseLabel]);
 
   const latestAttemptByModule = useMemo(() => {
     const map = {};
     [...quizAttempts]
       .sort((a, b) => new Date(b?.submittedAt || 0).getTime() - new Date(a?.submittedAt || 0).getTime())
       .forEach((attempt) => {
-        const cat = normalizeText(attempt?.category || decodedCourse);
-        if (cat !== decodedCourse) return;
+        const cat = normalizeText(attempt?.category || scopeCourseLabel);
+        if (cat !== scopeCourseLabel) return;
         const mod = normalizeText(attempt?.module || 'General');
         const key = `${cat}::${mod}`;
         if (!map[key]) map[key] = attempt;
       });
     return map;
-  }, [quizAttempts, decodedCourse]);
+  }, [quizAttempts, scopeCourseLabel]);
 
   function getModuleAccess(moduleName) {
     if (allModulesUnlocked) return { unlocked: true, purchaseRequired: false };
@@ -154,7 +157,7 @@ export default function StudentCourseModulesPage() {
   }).length;
 
   // Overall course progress
-  const totalVideos = videos.filter((v) => normalizeText(v?.category || 'General') === decodedCourse);
+  const totalVideos = videos.filter((v) => normalizeText(v?.category || 'General') === scopeCourseLabel);
   const totalCompleted = totalVideos.filter((v) => completedIds.has(normalizeId(v._id))).length;
   const overallProgress = totalVideos.length
     ? Math.round((totalCompleted / totalVideos.length) * 100)
@@ -165,7 +168,7 @@ export default function StudentCourseModulesPage() {
       <header className="lecture-page-hero lecture-enter-stage-1">
         <div className="lecture-page-hero-left">
           <p className="eyebrow">Course Workspace</p>
-          <h1>{decodedCourse}</h1>
+          <h1>{scopeCourseLabel}</h1>
           <p className="lecture-page-subtitle">
             {sortedModuleKeys.length} module{sortedModuleKeys.length === 1 ? '' : 's'} •{' '}
             {totalVideos.length} lecture{totalVideos.length === 1 ? '' : 's'} •{' '}
@@ -218,7 +221,7 @@ export default function StudentCourseModulesPage() {
           <button
             type="button"
             className="link-btn"
-            onClick={() => navigate(`/student/course/${encodeURIComponent(decodedCourse)}/batches`)}
+            onClick={() => navigate(`/student/course/${encodeURIComponent(scopeCourseLabel)}/batches`)}
           >
             Upgrade or buy single modules
           </button>
@@ -240,8 +243,8 @@ export default function StudentCourseModulesPage() {
       ) : sortedModuleKeys.length === 0 ? (
         <p className="empty-state">
           {query
-            ? `No modules match "${searchQuery}" in ${decodedCourse}.`
-            : `No modules available yet in ${decodedCourse}.`}
+            ? `No modules match "${searchQuery}" in ${scopeCourseLabel}.`
+            : `No modules available yet in ${scopeCourseLabel}.`}
         </p>
       ) : (
         <div className="modules-grid-student lecture-enter-stage-3">
@@ -266,7 +269,7 @@ export default function StudentCourseModulesPage() {
                 className={`module-card-btn${isLocked ? ' module-card-btn-locked' : ''}`}
                 onClick={() =>
                   navigate(
-                    `/student/module/${encodeURIComponent(decodedCourse)}/${encodeURIComponent(modName)}`
+                    `/student/module/${encodeURIComponent(scopeCourseLabel)}/${encodeURIComponent(modName)}`
                   )
                 }
               >

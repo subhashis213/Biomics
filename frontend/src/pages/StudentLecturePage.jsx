@@ -32,13 +32,16 @@ export default function StudentLecturePage() {
     videos,
     quizzes,
     access,
+    course,
     favoriteIds,
     completedIds,
     isLoading,
     loadError,
     toggleFavorite,
     toggleCompleted
-  } = useCourseData();
+  } = useCourseData(decodedCourseName);
+
+  const scopeCourseLabel = normalizeText(course || decodedCourseName);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('latest');
@@ -51,23 +54,31 @@ export default function StudentLecturePage() {
   const [allTopics, setAllTopics] = useState([]);
   const [topicsLoadedFromCatalog, setTopicsLoadedFromCatalog] = useState(false);
 
-  const moduleAccess = access?.moduleAccess?.[decodedModuleName] || null;
+  const moduleAccessMap = access?.moduleAccess || {};
+  const moduleAccess = useMemo(() => {
+    if (moduleAccessMap[decodedModuleName]) return moduleAccessMap[decodedModuleName];
+    const target = normalizeText(decodedModuleName).toLowerCase();
+    const matchedKey = Object.keys(moduleAccessMap).find(
+      (key) => normalizeText(key).toLowerCase() === target
+    );
+    return matchedKey ? moduleAccessMap[matchedKey] : null;
+  }, [moduleAccessMap, decodedModuleName]);
   const moduleLocked = Boolean(moduleAccess?.purchaseRequired && !moduleAccess?.unlocked);
   const moduleVideos = useMemo(() => {
     return videos.filter((video) => {
-      const sameCourse = normalizeText(video?.category) === decodedCourseName;
+      const sameCourse = normalizeText(video?.category) === scopeCourseLabel;
       const sameModule = normalizeText(video?.module || 'General') === decodedModuleName;
       return sameCourse && sameModule;
     });
-  }, [videos, decodedCourseName, decodedModuleName]);
+  }, [videos, scopeCourseLabel, decodedModuleName]);
 
   const moduleQuizzes = useMemo(() => {
     return quizzes.filter((quiz) => {
-      const sameCourse = normalizeText(quiz?.category) === decodedCourseName;
+      const sameCourse = normalizeText(quiz?.category) === scopeCourseLabel;
       const sameModule = normalizeText(quiz?.module || 'General') === decodedModuleName;
       return sameCourse && sameModule;
     });
-  }, [quizzes, decodedCourseName, decodedModuleName]);
+  }, [quizzes, scopeCourseLabel, decodedModuleName]);
 
   const videoTopics = useMemo(() => {
     return Array.from(new Set(
@@ -101,7 +112,7 @@ export default function StudentLecturePage() {
     let cancelled = false;
     setAllTopics([]);
     setTopicsLoadedFromCatalog(false);
-    fetchModuleTopics(decodedCourseName, decodedModuleName)
+    fetchModuleTopics(scopeCourseLabel, decodedModuleName)
       .then((data) => {
         if (cancelled) return;
         setAllTopics(Array.isArray(data?.topics) ? data.topics : []);
@@ -112,11 +123,11 @@ export default function StudentLecturePage() {
         if (!cancelled) setTopicsLoadedFromCatalog(false);
       });
     return () => { cancelled = true; };
-  }, [decodedCourseName, decodedModuleName]);
+  }, [scopeCourseLabel, decodedModuleName]);
 
   useEffect(() => {
     setSelectedTopicFolder('');
-  }, [decodedCourseName, decodedModuleName]);
+  }, [scopeCourseLabel, decodedModuleName]);
 
   useEffect(() => {
     let previousY = window.scrollY;
@@ -155,7 +166,7 @@ export default function StudentLecturePage() {
     if (isExiting) return;
     setIsExiting(true);
     exitTimerRef.current = window.setTimeout(() => {
-      navigate(`/student/module/${encodeURIComponent(decodedCourseName || 'General')}/${encodeURIComponent(decodedModuleName || 'General')}`);
+      navigate(`/student/module/${encodeURIComponent(scopeCourseLabel || 'General')}/${encodeURIComponent(decodedModuleName || 'General')}`);
     }, 320);
   }
 
@@ -225,7 +236,7 @@ export default function StudentLecturePage() {
           <p className="eyebrow">Lecture Workspace</p>
           <h1>{decodedModuleName}</h1>
           <p className="lecture-page-subtitle">
-            {decodedCourseName} • {hasTopicFolders && !selectedTopicFolder ? 'Chapter Folders' : 'Video Library'}
+            {scopeCourseLabel} • {hasTopicFolders && !selectedTopicFolder ? 'Chapter Folders' : 'Video Library'}
           </p>
         </div>
         <div className="lecture-page-hero-actions">

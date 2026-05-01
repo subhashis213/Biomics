@@ -6,7 +6,9 @@ const multer = require('multer');
 const Video = require('../models/Video');
 const Module = require('../models/Module');
 const Course = require('../models/Course');
+const Quiz = require('../models/Quiz');
 const User = require('../models/User');
+const { resolveStudentCourseFromRequest } = require('../utils/resolveStudentCourse');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken } = require('../middleware/auth');
 const {
@@ -55,11 +57,14 @@ function sanitizeIdList(items = []) {
   return items.map((item) => String(item));
 }
 
-async function getUserCourseAccessSnapshot(user) {
-  const course = normalizeCourseName(user?.class);
-  const [pricingDocs, modules] = await Promise.all([
+async function getUserCourseAccessSnapshot(user, snapshotCourse) {
+  const course = normalizeCourseName(snapshotCourse || user?.class);
+  if (!course) return null;
+  const [pricingDocs, modules, videoModules, quizModules] = await Promise.all([
     getCoursePricingDocs(course),
-    Module.find({ category: course }).sort({ name: 1 }).lean()
+    Module.find({ category: course }).sort({ name: 1 }).lean(),
+    Video.distinct('module', { category: course }),
+    Quiz.distinct('module', { category: course })
   ]);
   const pricingByModule = new Map(pricingDocs.map((entry) => [normalizeModuleName(entry.moduleName), entry]));
   const bundlePricing = pricingByModule.get(ALL_MODULES) || null;
@@ -71,8 +76,10 @@ async function getUserCourseAccessSnapshot(user) {
   }));
   const moduleNames = Array.from(new Set([
     ...modules.map((entry) => normalizeModuleName(entry.name)),
-    ...pricingDocs.map((entry) => normalizeModuleName(entry.moduleName)).filter((moduleName) => moduleName !== ALL_MODULES)
-  ])).sort((left, right) => left.localeCompare(right));
+    ...pricingDocs.map((entry) => normalizeModuleName(entry.moduleName)).filter((moduleName) => moduleName !== ALL_MODULES),
+    ...(Array.isArray(videoModules) ? videoModules : []).map((m) => normalizeModuleName(m)),
+    ...(Array.isArray(quizModules) ? quizModules : []).map((m) => normalizeModuleName(m))
+  ])).filter((name) => Boolean(name) && name !== ALL_MODULES).sort((left, right) => left.localeCompare(right));
   const moduleAccess = {};
   moduleNames.forEach((moduleName) => {
     const pricing = pricingByModule.get(moduleName) || null;
@@ -149,10 +156,21 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
       return res.status(404).json({ error: 'Student profile not found' });
     }
 
-    const access = await getUserCourseAccessSnapshot(user);
-    const videos = await Video.find({ category: user.class }).sort({ uploadedAt: -1 });
+    const queryCourse = typeof req.query.course === 'string' ? req.query.course.trim() : '';
+    const canonicalCourse = await resolveStudentCourseFromRequest(queryCourse || user.class, user.class);
+    if (!canonicalCourse) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const access = await getUserCourseAccessSnapshot(user, canonicalCourse);
+    if (!access) {
+      return res.status(404).json({ error: 'Unable to resolve course access' });
+    }
+
+    const videos = await Video.find({ category: canonicalCourse }).sort({ uploadedAt: -1 });
     return res.json({
-      course: user.class,
+      course: canonicalCourse,
+      enrollmentCourse: user.class,
       videos,
       favorites: sanitizeIdList(user.favorites || []),
       completedVideos: sanitizeIdList(user.completedVideos || []),
@@ -271,17 +289,20 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
 
 // Bulk-delete all videos for a category+module — admin only
 router.delete('/module', authenticateToken('admin'), async (req, res) => {
-  const { category, module: moduleName } = req.body;
+  const { category, module: moduleName, batch } = req.body || {};
   if (!category || !moduleName) {
     return res.status(400).json({ error: 'category and module are required' });
   }
   try {
     const normalizedModule = String(moduleName).trim();
+    const batchFilter = String(batch || '').trim();
     const isGeneralModule = normalizedModule.toLowerCase() === 'general';
     const moduleFilter = isGeneralModule
       ? { $or: [{ module: 'General' }, { module: '' }, { module: null }, { module: { $exists: false } }] }
       : { module: normalizedModule };
-    const videos = await Video.find({ category, ...moduleFilter });
+    const match = { category, ...moduleFilter };
+    if (batchFilter) match.batch = batchFilter;
+    const videos = await Video.find(match);
     let deletedCount = 0;
     for (const video of videos) {
       if (video.materials && video.materials.length) {
@@ -297,7 +318,7 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
       action: 'module.delete',
       targetType: 'module',
       targetId: `${category}::${normalizedModule}`,
-      details: { category, module: normalizedModule, videosDeleted: deletedCount }
+      details: { category, module: normalizedModule, batch: batchFilter || null, videosDeleted: deletedCount }
     });
     return res.json({ message: `Module deleted`, deletedCount });
   } catch (err) {

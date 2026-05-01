@@ -10,23 +10,33 @@ import {
 
 const normalizeId = (v) => String(v || '');
 
+function normalizeCourseDataScope(courseScope) {
+  if (courseScope === null || courseScope === undefined) return '';
+  const s = String(courseScope || '').trim().replace(/\s+/g, ' ');
+  return s;
+}
+
 /**
- * Fetches and caches all course data for the student:
- * videos, quizzes, quiz attempts, favorites, completedVideos.
+ * Fetches and caches course data for the student.
  *
- * Provides optimistic mutations for toggling favorites and completion.
- * Uses React Query so data is cached, deduplicated and auto-stale.
+ * @param {string} [courseScope] When set (e.g. URL `/student/course/:name`),
+ * `/videos/my-course` and quizzes are scoped to that canonical course so unlock
+ * state matches marketplace navigation. Omit on the dashboard (enrolled profile course).
  */
-export function useCourseData() {
+export function useCourseData(courseScope) {
   const queryClient = useQueryClient();
 
+  const scope = normalizeCourseDataScope(courseScope);
+  const scopeKey = scope || '__default__';
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['courseData'],
+    queryKey: ['courseData', scopeKey],
     queryFn: async () => {
+      const qs = scope ? `?course=${encodeURIComponent(scope)}` : '';
       const [allVideos, profileData, quizData, attemptData, moduleCatalogData] = await Promise.all([
         requestJson('/videos'),
-        requestJson('/videos/my-course'),
-        fetchCourseQuizzes(),
+        requestJson(`/videos/my-course${qs}`),
+        fetchCourseQuizzes(scope),
         fetchRecentQuizAttempts(),
         requestJson('/modules/catalog')
       ]);
@@ -42,7 +52,7 @@ export function useCourseData() {
   const favMutation = useMutation({
     mutationFn: apiFavorite,
     onSuccess: (result) => {
-      queryClient.setQueryData(['courseData'], (old) =>
+      queryClient.setQueryData(['courseData', scopeKey], (old) =>
         old ? { ...old, profileData: { ...old.profileData, favorites: result.favorites || [] } } : old
       );
     }
@@ -51,7 +61,7 @@ export function useCourseData() {
   const progressMutation = useMutation({
     mutationFn: ({ videoId, completed }) => apiProgress(videoId, completed),
     onSuccess: (result) => {
-      queryClient.setQueryData(['courseData'], (old) =>
+      queryClient.setQueryData(['courseData', scopeKey], (old) =>
         old ? { ...old, profileData: { ...old.profileData, completedVideos: result.completedVideos || [] } } : old
       );
     }
@@ -61,7 +71,7 @@ export function useCourseData() {
   async function refreshAttempts() {
     try {
       const attemptData = await fetchRecentQuizAttempts();
-      queryClient.setQueryData(['courseData'], (old) =>
+      queryClient.setQueryData(['courseData', scopeKey], (old) =>
         old ? { ...old, attemptData } : old
       );
     } catch {
@@ -77,8 +87,10 @@ export function useCourseData() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const completedIds = useMemo(() => new Set(rawCompleted.map(normalizeId)), [rawCompleted]);
 
+  const videos = scope ? (data?.profileData?.videos || []) : (data?.allVideos || []);
+
   return {
-    videos: data?.allVideos || [],
+    videos,
     course: data?.profileData?.course || '',
     access: data?.profileData?.access || {
       unlocked: true,

@@ -309,20 +309,31 @@ export function updateVideoProgress(videoId, completed) {
   });
 }
 
-export function fetchCourseQuizzes() {
-  return requestJson('/quizzes/my-course');
+export function fetchCourseQuizzes(courseName = '') {
+  const q = typeof courseName === 'string' && courseName.trim()
+    ? `?course=${encodeURIComponent(courseName.trim())}`
+    : '';
+  return requestJson(`/quizzes/my-course${q}`);
 }
 
 export function fetchModuleTopics(courseName, moduleName) {
   return requestJson(`/modules/topics/for-student?category=${encodeURIComponent(courseName)}&module=${encodeURIComponent(moduleName)}`);
 }
 
-export function fetchModuleQuiz(moduleName) {
-  return requestJson(`/quizzes/my-course/${encodeURIComponent(moduleName)}`);
+export function fetchModuleQuiz(moduleName, courseName = '') {
+  const q =
+    typeof courseName === 'string' && courseName.trim()
+      ? `?course=${encodeURIComponent(courseName.trim())}`
+      : '';
+  return requestJson(`/quizzes/my-course/${encodeURIComponent(moduleName)}${q}`);
 }
 
-export function fetchQuizById(quizId) {
-  return requestJson(`/quizzes/my-course/quiz/${encodeURIComponent(quizId)}`);
+export function fetchQuizById(quizId, courseName = '') {
+  const q =
+    typeof courseName === 'string' && courseName.trim()
+      ? `?course=${encodeURIComponent(courseName.trim())}`
+      : '';
+  return requestJson(`/quizzes/my-course/quiz/${encodeURIComponent(quizId)}${q}`);
 }
 
 export function submitQuiz(quizId, answers, durationSeconds) {

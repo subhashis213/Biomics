@@ -17,7 +17,7 @@ const getQuestionCount = (quiz) =>
  * - Auto-submitting on timeout
  * - Submitting answers and storing results/review
  */
-export function useQuizSession({ selectedModule, quizzes, onError, onAttemptsRefresh }) {
+export function useQuizSession({ selectedModule, quizzes, courseScope = '', onError, onAttemptsRefresh }) {
   const [moduleQuiz, setModuleQuiz] = useState(null);
   const [moduleQuizList, setModuleQuizList] = useState([]);
   const [quizAnswers, setQuizAnswers] = useState([]);
@@ -67,7 +67,7 @@ export function useQuizSession({ selectedModule, quizzes, onError, onAttemptsRef
     let cancelled = false;
     setLoadingQuiz(true);
 
-    fetchModuleQuiz(selectedModule)
+    fetchModuleQuiz(selectedModule, courseScope)
       .then((data) => {
         if (cancelled) return;
         const fetched = Array.isArray(data?.quizzes) ? data.quizzes : (data?.quiz ? [data.quiz] : []);
@@ -98,7 +98,7 @@ export function useQuizSession({ selectedModule, quizzes, onError, onAttemptsRef
       .finally(() => { if (!cancelled) setLoadingQuiz(false); });
 
     return () => { cancelled = true; };
-  }, [selectedModule, moduleHasQuiz]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedModule, moduleHasQuiz, courseScope]);
 
   // Countdown timer.
   useEffect(() => {
@@ -189,7 +189,7 @@ export function useQuizSession({ selectedModule, quizzes, onError, onAttemptsRef
         
         try {
           console.log('[Quiz] Attempting to fetch quiz by ID:', quiz._id);
-          const d = await fetchQuizById(quiz._id);
+          const d = await fetchQuizById(quiz._id, courseScope);
           fullQuiz = d?.quiz || null;
           console.log('[Quiz] Fetch by ID result:', fullQuiz ? 'Success' : 'No quiz data');
         } catch (fetchErr) {
@@ -204,7 +204,7 @@ export function useQuizSession({ selectedModule, quizzes, onError, onAttemptsRef
             throw new Error('Module name is required to fetch quiz details.');
           }
           
-          const md = await fetchModuleQuiz(module);
+          const md = await fetchModuleQuiz(module, courseScope);
           const list = Array.isArray(md?.quizzes) ? md.quizzes : (md?.quiz ? [md.quiz] : []);
           console.log('[Quiz] Module fetch returned', list.length, 'quizzes');
           
@@ -259,7 +259,7 @@ export function useQuizSession({ selectedModule, quizzes, onError, onAttemptsRef
       setLoadingQuiz(true);
       setQuizResult(null);
       try {
-        const data = await fetchModuleQuiz(selectedModule);
+        const data = await fetchModuleQuiz(selectedModule, courseScope);
         const list = Array.isArray(data.quizzes) ? data.quizzes : (data.quiz ? [data.quiz] : []);
         if (!list.length) { onError?.('No quizzes found for this module.'); return; }
         setModuleQuizList(list);

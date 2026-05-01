@@ -176,9 +176,13 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
     const pricingScopedFilter = { category, moduleName: name };
     if (hasBatchFilter) pricingScopedFilter.batch = batch;
 
+    const topicDeletion = hasBatchFilter
+      ? Promise.resolve({ deletedCount: 0 })
+      : Topic.deleteMany({ category, module: name });
+
     const [moduleDeleteResult, topicDeleteResult, pricingDeleteResult, videoDeleteResult, quizDeleteResult, topicTestDeleteResult, mockExamDeleteResult, fullMockDeleteResult] = await Promise.all([
       Module.deleteMany(moduleScopedFilter),
-      Topic.deleteMany({ category, module: name }),
+      topicDeletion,
       ModulePricing.deleteMany(pricingScopedFilter),
       Video.deleteMany(scopedFilter),
       Quiz.deleteMany(scopedFilter),
