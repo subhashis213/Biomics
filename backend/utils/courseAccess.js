@@ -228,6 +228,32 @@ async function getCoursePricing(course) {
   return getModulePricingDoc(course, ALL_MODULES);
 }
 
+/**
+ * When multiple ModulePricing rows exist for the same module (different batches),
+ * pick the doc that applies to the student's batch. Avoids showing another batch's prices.
+ * Precedence: exact batch match → General → pricing whose batch is not another named course batch (migrated/orphan batch strings).
+ */
+function pickModulePricingDocForBatch(candidates = [], preferredBatch, courseBatchDisplayNames = []) {
+  const pb = normalizeBatchName(preferredBatch);
+  const list = (Array.isArray(candidates) ? candidates : []).filter(Boolean);
+  if (!list.length) return null;
+
+  const exact = list.find((d) => normalizeBatchName(d.batch) === pb);
+  if (exact) return exact;
+
+  const general = list.find((d) => normalizeBatchName(d.batch) === 'General');
+  if (general) return general;
+
+  const siblingOthers = new Set(
+    (Array.isArray(courseBatchDisplayNames) ? courseBatchDisplayNames : [])
+      .map((n) => normalizeBatchName(n))
+      .filter((n) => n && n !== pb && n !== 'General')
+  );
+
+  const notAnotherSibling = list.find((d) => !siblingOthers.has(normalizeBatchName(d.batch)));
+  return notAnotherSibling || null;
+}
+
 module.exports = {
   ALL_MODULES,
   MEMBERSHIP_PLANS,
@@ -242,5 +268,6 @@ module.exports = {
   getMembershipPlan,
   getPlanPriceInPaise,
   hasCourseAccess,
-  hasModuleAccess
+  hasModuleAccess,
+  pickModulePricingDocForBatch
 };

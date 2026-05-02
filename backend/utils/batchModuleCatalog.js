@@ -17,6 +17,38 @@ function normalizeNameKey(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeCatalogText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Content (Video/Quiz/Module) query for a batch:
+ * - If the course has only one batch → all content for the category (migrated batch strings included).
+ * - If multiple batches → target batch OR General/empty OR batch string that is not another sibling batch name
+ *   (so migrated "old course" batch labels still surface modules under the right catalog).
+ */
+async function buildCategoryContentScopeFilter(category, targetBatchName) {
+  const cat = normalizeCourseName(category);
+  const B = normalizeBatchName(targetBatchName);
+  const course = await findCourseDocByName(cat);
+
+  const siblingExactStrings = (course?.batches || [])
+    .map((b) => normalizeCatalogText(b?.name))
+    .filter((name) => name && normalizeNameKey(name) !== normalizeNameKey(B));
+
+  if (!siblingExactStrings.length) {
+    return { category: cat };
+  }
+
+  return {
+    category: cat,
+    $or: [
+      { batch: { $in: [B, 'General', '', null] } },
+      { batch: { $nin: siblingExactStrings } }
+    ]
+  };
+}
+
 async function findCourseDocByName(courseName) {
   const normalizedKey = normalizeNameKey(courseName);
   if (!normalizedKey) return null;
@@ -49,18 +81,17 @@ async function getConfiguredModuleNamesForBatch(courseName, batchName) {
 /**
  * Inferred module names from Module rows and published content (no ModulePricing — caller merges pricing).
  */
-async function inferModuleNamesFromContentAndRows(courseName, batchName) {
+async function inferModuleNamesFromContentAndRows(courseName, batchName, precomputedScope = null) {
   const cat = normalizeCourseName(courseName);
-  const batch = normalizeBatchName(batchName);
-  const batchFilter = { $in: [batch, 'General', '', null] };
+  const scope = precomputedScope || await buildCategoryContentScopeFilter(cat, batchName);
 
   const [modules, videoModules, quizModules, topicTestModules, mockExamModules, fullMockModules] = await Promise.all([
-    Module.find({ category: cat, batch: batchFilter }).sort({ name: 1 }).lean(),
-    Video.distinct('module', { category: cat, batch: batchFilter }),
-    Quiz.distinct('module', { category: cat, batch: batchFilter }),
-    TopicTest.distinct('module', { category: cat, batch: batchFilter }),
-    MockExam.distinct('module', { category: cat, batch: batchFilter }),
-    FullMockTest.distinct('module', { category: cat, batch: batchFilter })
+    Module.find(scope).sort({ name: 1 }).lean(),
+    Video.distinct('module', scope),
+    Quiz.distinct('module', scope),
+    TopicTest.distinct('module', scope),
+    MockExam.distinct('module', scope),
+    FullMockTest.distinct('module', scope)
   ]);
 
   const contentModuleNames = [
@@ -83,19 +114,9 @@ async function inferModuleNamesFromContentAndRows(courseName, batchName) {
   return Array.from(inferred);
 }
 
-/** @deprecated use inferModuleNamesFromContentAndRows */
+/** @deprecated use getMergedModuleNamesForBatch */
 async function inferModuleNamesForBatch(courseName, batchName) {
-  const cat = normalizeCourseName(courseName);
-  const batch = normalizeBatchName(batchName);
-  const batchFilter = { $in: [batch, 'General', '', null] };
-  const [fromRows, pricingDocs] = await Promise.all([
-    inferModuleNamesFromContentAndRows(courseName, batchName),
-    ModulePricing.find({ category: cat, batch: batchFilter }).lean()
-  ]);
-  const priced = pricingDocs
-    .map((entry) => normalizeModuleName(entry?.moduleName))
-    .filter((moduleName) => moduleName && moduleName !== ALL_MODULES);
-  return Array.from(new Set([...fromRows, ...priced]));
+  return getMergedModuleNamesForBatch(courseName, batchName);
 }
 
 /**
@@ -104,12 +125,12 @@ async function inferModuleNamesForBatch(courseName, batchName) {
 async function fetchBatchModuleCatalogAndPricing(courseName, batchName) {
   const cat = normalizeCourseName(courseName);
   const batch = normalizeBatchName(batchName);
-  const batchFilter = { $in: [batch, 'General', '', null] };
+  const scope = await buildCategoryContentScopeFilter(cat, batch);
 
   const [configured, fromRows, pricingDocs] = await Promise.all([
     getConfiguredModuleNamesForBatch(courseName, batchName),
-    inferModuleNamesFromContentAndRows(courseName, batchName),
-    ModulePricing.find({ category: cat, batch: batchFilter }).lean()
+    inferModuleNamesFromContentAndRows(courseName, batchName, scope),
+    ModulePricing.find(scope).lean()
   ]);
 
   const pricedModuleNames = pricingDocs
@@ -187,6 +208,7 @@ module.exports = {
   getConfiguredModuleNamesForBatch,
   inferModuleNamesForBatch,
   inferModuleNamesFromContentAndRows,
+  buildCategoryContentScopeFilter,
   fetchBatchModuleCatalogAndPricing,
   getMergedModuleNamesForBatch,
   appendModuleNameToCourseBatch,

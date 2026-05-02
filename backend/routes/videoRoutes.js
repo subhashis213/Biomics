@@ -21,7 +21,8 @@ const {
   hasModuleAccess,
   MEMBERSHIP_PLANS,
   normalizeCourseName,
-  normalizeModuleName
+  normalizeModuleName,
+  pickModulePricingDocForBatch
 } = require('../utils/courseAccess');
 
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -61,14 +62,29 @@ function sanitizeIdList(items = []) {
 async function getUserCourseAccessSnapshot(user, snapshotCourse) {
   const course = normalizeCourseName(snapshotCourse || user?.class);
   if (!course) return null;
-  const [pricingDocs, modules, videoModules, quizModules] = await Promise.all([
+  const [pricingDocs, modules, videoModules, quizModules, courseDoc] = await Promise.all([
     getCoursePricingDocs(course),
     Module.find({ category: course }).sort({ name: 1 }).lean(),
     Video.distinct('module', { category: course }),
-    Quiz.distinct('module', { category: course })
+    Quiz.distinct('module', { category: course }),
+    Course.find({}).select({ name: 1, batches: 1 }).lean()
   ]);
-  const pricingByModule = new Map(pricingDocs.map((entry) => [normalizeModuleName(entry.moduleName), entry]));
-  const bundlePricing = pricingByModule.get(ALL_MODULES) || null;
+  const courseEntry = (courseDoc || []).find(
+    (entry) => normalizeCourseName(entry?.name) === course
+  );
+  const courseBatchNames = (courseEntry?.batches || []).map((b) => String(b?.name || '').trim()).filter(Boolean);
+  const preferredBatch = String(user?.batch || 'General').trim() || 'General';
+
+  const pricingByModuleName = new Map();
+  pricingDocs.forEach((doc) => {
+    const m = normalizeModuleName(doc.moduleName);
+    if (!pricingByModuleName.has(m)) pricingByModuleName.set(m, []);
+    pricingByModuleName.get(m).push(doc);
+  });
+
+  const bundleCandidates = pricingByModuleName.get(ALL_MODULES) || [];
+  const bundlePricing = pickModulePricingDocForBatch(bundleCandidates, preferredBatch, courseBatchNames);
+
   const buildPlans = (pricing) => Object.values(MEMBERSHIP_PLANS).map((plan) => ({
     type: plan.type,
     label: plan.label,
@@ -83,7 +99,8 @@ async function getUserCourseAccessSnapshot(user, snapshotCourse) {
   ])).filter((name) => Boolean(name) && name !== ALL_MODULES).sort((left, right) => left.localeCompare(right));
   const moduleAccess = {};
   moduleNames.forEach((moduleName) => {
-    const pricing = pricingByModule.get(moduleName) || null;
+    const candidates = pricingByModuleName.get(moduleName) || [];
+    const pricing = pickModulePricingDocForBatch(candidates, preferredBatch, courseBatchNames);
     const activeMembership = getActiveModuleMembership(user, course, moduleName);
     const purchaseRequired = Boolean(pricing && buildPlans(pricing).some((plan) => plan.amountInPaise > 0));
     moduleAccess[moduleName] = {

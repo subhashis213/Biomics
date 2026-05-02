@@ -29,7 +29,8 @@ const {
   getModulePricingDoc,
   getMembershipPlan,
   getPlanPriceInPaise,
-  MEMBERSHIP_PLANS
+  MEMBERSHIP_PLANS,
+  pickModulePricingDocForBatch
 } = require('../utils/courseAccess');
 const { fetchBatchModuleCatalogAndPricing } = require('../utils/batchModuleCatalog');
 
@@ -282,18 +283,33 @@ async function ensureUserAndCourse(username) {
 }
 
 async function buildStudentPricingSnapshot(user, course) {
-  const [pricingDocs, modules, videoModules, quizModules] = await Promise.all([
+  const [pricingDocs, modules, videoModules, quizModules, courseDocs] = await Promise.all([
     getCoursePricingDocs(course),
     Module.find({ category: course }).sort({ name: 1 }).lean(),
     Video.distinct('module', { category: course }),
-    Quiz.distinct('module', { category: course })
+    Quiz.distinct('module', { category: course }),
+    Course.find({}).select({ name: 1, batches: 1 }).lean()
   ]);
 
-  const pricingByModule = new Map(
-    pricingDocs.map((doc) => [normalizeModuleName(doc.moduleName), doc])
+  const courseEntry = (courseDocs || []).find(
+    (entry) => normalizeCourseName(entry?.name) === course
+  );
+  const courseBatchNames = (courseEntry?.batches || []).map((b) => String(b?.name || '').trim()).filter(Boolean);
+  const preferredBatch = String(user?.batch || 'General').trim() || 'General';
+
+  const pricingByModuleName = new Map();
+  pricingDocs.forEach((doc) => {
+    const m = normalizeModuleName(doc.moduleName);
+    if (!pricingByModuleName.has(m)) pricingByModuleName.set(m, []);
+    pricingByModuleName.get(m).push(doc);
+  });
+
+  const bundlePricing = pickModulePricingDocForBatch(
+    pricingByModuleName.get(ALL_MODULES) || [],
+    preferredBatch,
+    courseBatchNames
   );
 
-  const bundlePricing = pricingByModule.get(ALL_MODULES) || null;
   const moduleNames = Array.from(new Set([
     ...modules.map((entry) => normalizeModuleName(entry.name)),
     ...pricingDocs
@@ -305,7 +321,11 @@ async function buildStudentPricingSnapshot(user, course) {
 
   const moduleAccess = {};
   moduleNames.forEach((moduleName) => {
-    const pricing = pricingByModule.get(moduleName) || null;
+    const pricing = pickModulePricingDocForBatch(
+      pricingByModuleName.get(moduleName) || [],
+      preferredBatch,
+      courseBatchNames
+    );
     const activeMembership = getActiveModuleMembership(user, course, moduleName);
     const purchaseRequired = hasPaidPlans(pricing);
     moduleAccess[moduleName] = {
