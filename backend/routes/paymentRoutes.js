@@ -33,6 +33,34 @@ const {
 } = require('../utils/courseAccess');
 
 const router = express.Router();
+
+/** Map ModulePricing docs by `batch::moduleName` so batch-specific rows do not overwrite each other. */
+function buildBatchModulePricingMap(pricingDocs = []) {
+  const pricingMap = new Map();
+  pricingDocs.forEach((entry) => {
+    const b = normalizeBatchName(entry?.batch);
+    const m = normalizeModuleName(entry?.moduleName);
+    pricingMap.set(`${b}::${m}`, entry);
+  });
+  return pricingMap;
+}
+
+function resolvePricingDocForAdminBatch(pricingMap, batch, moduleName) {
+  const b = normalizeBatchName(batch);
+  const m = normalizeModuleName(moduleName);
+  if (m === ALL_MODULES) {
+    return (
+      pricingMap.get(`${b}::${ALL_MODULES}`)
+      || pricingMap.get(`General::${ALL_MODULES}`)
+      || null
+    );
+  }
+  return (
+    pricingMap.get(`${b}::${m}`)
+    || pricingMap.get(`General::${m}`)
+    || null
+  );
+}
 const uploadsDir = path.join(__dirname, '../uploads');
 
 const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
@@ -1162,9 +1190,7 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
       FullMockTest.distinct('module', { category, batch: batchFilter })
     ]);
 
-    const pricingMap = new Map(
-      pricingDocs.map((entry) => [normalizeModuleName(entry.moduleName), entry])
-    );
+    const pricingMap = buildBatchModulePricingMap(pricingDocs);
     const contentModuleNames = [
       ...videoModules,
       ...quizModules,
@@ -1183,24 +1209,21 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
       ...pricedModuleNames
     ]));
 
-    // Cleanup stale pricing rows left behind by older module deletions.
-    await ModulePricing.deleteMany({
-      category,
-      batch: { $in: [batch, '', null] },
-      moduleName: { $nin: moduleNames }
-    });
-
     return res.json({
       category,
       batch,
       modules: moduleNames.map((moduleName) => {
-        const pricing = pricingMap.get(moduleName);
+        const pricing = resolvePricingDocForAdminBatch(pricingMap, batch, moduleName);
         return {
           moduleName,
           label: moduleName === ALL_MODULES ? 'All Modules Bundle' : moduleName,
           isBundle: moduleName === ALL_MODULES,
           proPriceInPaise: Number(pricing?.proPriceInPaise || 0),
           elitePriceInPaise: Number(pricing?.elitePriceInPaise || 0),
+          proMrpInPaise: Number(pricing?.proMrpInPaise || 0),
+          eliteMrpInPaise: Number(pricing?.eliteMrpInPaise || 0),
+          proTenureMonths: Number(pricing?.proTenureMonths || 1),
+          eliteTenureMonths: Number(pricing?.eliteTenureMonths || 3),
           active: pricing ? pricing.active !== false : true
         };
       })

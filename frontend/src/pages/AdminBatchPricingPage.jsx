@@ -514,12 +514,19 @@ export default function AdminBatchPricingPage() {
                   {course.batches.map((batch) => {
                     const moduleKey = `${course.courseName}::${batch.batchName}`;
                     const moduleState = modulePricingByBatch[moduleKey];
-                    if (!moduleState?.open || !moduleState.modules?.length) return null;
+                    if (!moduleState?.open) return null;
+                    const moduleRows = Array.isArray(moduleState.modules) ? moduleState.modules : [];
                     return (
                       <div key={`module-pricing-${moduleKey}`} style={{ marginTop: 14, border: '1px solid #dbe2ef', borderRadius: 12, padding: 12 }}>
                         <h4 style={{ margin: '0 0 10px' }}>{batch.batchName} - Module Pricing</h4>
+                        <p className="subtitle" style={{ margin: '0 0 12px' }}>
+                          Same module list as the student batch catalog (modules, published content, and saved prices for this batch).
+                        </p>
+                        {!moduleRows.length ? (
+                          <p className="subtitle" style={{ margin: 0 }}>No modules found for this batch. Add modules in the course workspace or attach videos/quizzes to this batch.</p>
+                        ) : null}
                         <div style={{ display: 'grid', gap: 10 }}>
-                          {moduleState.modules.map((moduleEntry) => {
+                          {moduleRows.map((moduleEntry) => {
                             const form = moduleState.form[moduleEntry.moduleName] || {};
                             return (
                               <div key={`${moduleKey}-${moduleEntry.moduleName}`} style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, minmax(90px, 1fr)) auto', gap: 8, alignItems: 'center' }}>
