@@ -4,6 +4,7 @@ import {
   fetchCoursesAdmin,
   fetchCourseBatchesAdmin,
   fetchModulePricingAdmin,
+  rebuildCourseBatchModuleCatalogAdmin,
   saveBatchPricingAdmin,
   saveModulePricingAdmin,
   uploadCoursePricingThumbnailAdmin
@@ -41,6 +42,7 @@ export default function AdminBatchPricingPage() {
   const [uploadingBatchThumb, setUploadingBatchThumb] = useState(null);
   const [modulePricingByBatch, setModulePricingByBatch] = useState({});
   const [modulePricingLoadingKey, setModulePricingLoadingKey] = useState('');
+  const [catalogSyncKey, setCatalogSyncKey] = useState('');
 
   useAutoDismissMessage(banner, setBanner);
   const adminSession = getSession();
@@ -240,6 +242,20 @@ export default function AdminBatchPricingPage() {
       setBanner({ type: 'error', text: error.message || 'Failed to load module pricing for batch.' });
     } finally {
       setModulePricingLoadingKey('');
+    }
+  }
+
+  async function syncBatchModuleCatalogThenReload(course, batch) {
+    const key = `${course}::${batch}`;
+    setCatalogSyncKey(key);
+    try {
+      await rebuildCourseBatchModuleCatalogAdmin(course, batch);
+      setBanner({ type: 'success', text: `Module catalog synced for “${batch}”. Reloading prices…` });
+      await loadModulePricingForBatch(course, batch);
+    } catch (error) {
+      setBanner({ type: 'error', text: error.message || 'Failed to sync module catalog.' });
+    } finally {
+      setCatalogSyncKey('');
     }
   }
 
@@ -518,9 +534,20 @@ export default function AdminBatchPricingPage() {
                     const moduleRows = Array.isArray(moduleState.modules) ? moduleState.modules : [];
                     return (
                       <div key={`module-pricing-${moduleKey}`} style={{ marginTop: 14, border: '1px solid #dbe2ef', borderRadius: 12, padding: 12 }}>
-                        <h4 style={{ margin: '0 0 10px' }}>{batch.batchName} - Module Pricing</h4>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                          <h4 style={{ margin: 0 }}>{batch.batchName} - Module Pricing</h4>
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                            disabled={catalogSyncKey === moduleKey}
+                            onClick={() => syncBatchModuleCatalogThenReload(course.courseName, batch.batchName)}
+                          >
+                            {catalogSyncKey === moduleKey ? 'Syncing…' : 'Sync catalog from workspace & DB'}
+                          </button>
+                        </div>
                         <p className="subtitle" style={{ margin: '0 0 12px' }}>
-                          Same module list as the student batch catalog (modules, published content, and saved prices for this batch).
+                          Uses the same union as students: course batch module list, Module records, published content, and ModulePricing — all merged per batch.
                         </p>
                         {!moduleRows.length ? (
                           <p className="subtitle" style={{ margin: 0 }}>No modules found for this batch. Add modules in the course workspace or attach videos/quizzes to this batch.</p>

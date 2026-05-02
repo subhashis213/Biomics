@@ -191,7 +191,10 @@ async function buildCoursesWithMeta(filter = {}) {
           .map((batch) => ({
             name: normalizeValue(batch?.name),
             description: String(batch?.description || '').trim(),
-            active: batch?.active !== false
+            active: batch?.active !== false,
+            moduleNames: Array.isArray(batch?.moduleNames)
+              ? batch.moduleNames.map((m) => normalizeValue(m)).filter(Boolean)
+              : []
           }))
           .filter((batch) => Boolean(batch.name))
         : [],
@@ -417,7 +420,7 @@ router.post('/admin/:courseName/batches', authenticateToken('admin'), async (req
       return res.status(409).json({ error: 'Batch already exists for this course.' });
     }
 
-    courseDoc.batches = [...(courseDoc.batches || []), { name: batchName, description: batchDescription, active: true }];
+    courseDoc.batches = [...(courseDoc.batches || []), { name: batchName, description: batchDescription, active: true, moduleNames: [] }];
     courseDoc.updatedBy = String(req.user?.username || '').trim();
     await courseDoc.save();
 
@@ -445,13 +448,29 @@ router.put('/admin/:courseName/batches/:batchName', authenticateToken('admin'), 
     }
 
     let found = false;
+    const bodyModuleNames = req.body?.moduleNames;
     courseDoc.batches = (courseDoc.batches || []).map((entry) => {
       if (normalizeNameKey(entry?.name) !== normalizeNameKey(batchName)) return entry;
       found = true;
+      const preservedMods = Array.isArray(entry?.moduleNames) ? entry.moduleNames : [];
+      let moduleNames = preservedMods;
+      if (Array.isArray(bodyModuleNames)) {
+        const seen = new Set();
+        moduleNames = [];
+        bodyModuleNames.forEach((raw) => {
+          const m = normalizeValue(raw);
+          if (!m) return;
+          const k = m.toLowerCase();
+          if (seen.has(k)) return;
+          seen.add(k);
+          moduleNames.push(m);
+        });
+      }
       return {
         name: normalizeValue(entry?.name),
         description: batchDescription,
-        active
+        active,
+        moduleNames
       };
     });
 
@@ -466,6 +485,22 @@ router.put('/admin/:courseName/batches/:batchName', authenticateToken('admin'), 
     return res.json({ courses });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update batch.' });
+  }
+});
+
+/** Persist merged module catalog (Course batch.moduleNames) from Module rows + content + ModulePricing — aligns admin pricing with student catalog. */
+router.post('/admin/:courseName/batches/:batchName/module-catalog/rebuild', authenticateToken('admin'), async (req, res) => {
+  try {
+    const courseName = normalizeValue(req.params.courseName);
+    const batchName = normalizeValue(req.params.batchName);
+    if (!courseName || !batchName) {
+      return res.status(400).json({ error: 'Course name and batch name are required.' });
+    }
+    const { rebuildCourseBatchModuleCatalog } = require('../utils/batchModuleCatalog');
+    const moduleNames = await rebuildCourseBatchModuleCatalog(courseName, batchName);
+    return res.json({ courseName, batchName, moduleNames, count: moduleNames.length });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to rebuild batch module catalog.' });
   }
 });
 
@@ -527,7 +562,8 @@ router.put('/admin/:courseName/batches/:batchName/rename', authenticateToken('ad
       return {
         name: nextBatchName,
         description: String(entry?.description || '').trim(),
-        active: entry?.active !== false
+        active: entry?.active !== false,
+        moduleNames: Array.isArray(entry?.moduleNames) ? entry.moduleNames : []
       };
     });
     courseDoc.updatedBy = String(req.user?.username || '').trim();

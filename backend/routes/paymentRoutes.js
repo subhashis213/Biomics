@@ -31,6 +31,7 @@ const {
   getPlanPriceInPaise,
   MEMBERSHIP_PLANS
 } = require('../utils/courseAccess');
+const { fetchBatchModuleCatalogAndPricing } = require('../utils/batchModuleCatalog');
 
 const router = express.Router();
 
@@ -569,35 +570,12 @@ router.get('/catalog/:course/batches/:batch/modules', authenticateToken('user'),
     const user = await User.findOne({ username: req.user.username }).lean();
     if (!user) return res.status(404).json({ error: 'Student profile not found.' });
 
-    const batchFilter = { $in: [batchName, 'General', '', null] };
-    const [modules, pricingDocs, videoModules, quizModules, topicTestModules, mockExamModules, fullMockModules] = await Promise.all([
-      Module.find({ category: courseName, batch: batchFilter }).sort({ name: 1 }).lean(),
-      ModulePricing.find({ category: courseName, batch: batchFilter }).lean(),
-      Video.distinct('module', { category: courseName, batch: batchFilter }),
-      Quiz.distinct('module', { category: courseName, batch: batchFilter }),
-      TopicTest.distinct('module', { category: courseName, batch: batchFilter }),
-      MockExam.distinct('module', { category: courseName, batch: batchFilter }),
-      FullMockTest.distinct('module', { category: courseName, batch: batchFilter })
-    ]);
+    const { mergedModuleNames, pricingDocs } = await fetchBatchModuleCatalogAndPricing(courseName, batchName);
     const pricingMap = new Map(
       pricingDocs.map((entry) => [`${normalizeBatchName(entry.batch)}::${normalizeModuleName(entry.moduleName)}`, entry])
     );
 
-    const contentModuleNames = [
-      ...videoModules,
-      ...quizModules,
-      ...topicTestModules,
-      ...mockExamModules,
-      ...fullMockModules
-    ].map((entry) => normalizeModuleName(entry)).filter(Boolean);
-    const pricedModuleNames = pricingDocs.map((entry) => normalizeModuleName(entry.moduleName)).filter(Boolean);
-
-    const moduleNames = Array.from(new Set([
-      ...modules.map((entry) => normalizeModuleName(entry.name)),
-      ...pricedModuleNames,
-      ...contentModuleNames
-    ].filter((moduleName) => moduleName && moduleName !== ALL_MODULES)));
-    const moduleCards = moduleNames.map((moduleName) => {
+    const moduleCards = mergedModuleNames.map((moduleName) => {
       const pricing = pricingMap.get(`${batchName}::${moduleName}`)
         || pricingMap.get(`General::${moduleName}`)
         || null;
@@ -1179,35 +1157,10 @@ router.get('/admin/pricing/:course/modules', authenticateToken('admin'), async (
       return res.status(400).json({ error: 'Unsupported course category.' });
     }
 
-    const batchFilter = { $in: [batch, 'General', '', null] };
-    const [modules, pricingDocs, videoModules, quizModules, topicTestModules, mockExamModules, fullMockModules] = await Promise.all([
-      Module.find({ category, batch: batchFilter }).sort({ name: 1 }).lean(),
-      ModulePricing.find({ category, batch: batchFilter }).sort({ moduleName: 1 }).lean(),
-      Video.distinct('module', { category, batch: batchFilter }),
-      Quiz.distinct('module', { category, batch: batchFilter }),
-      TopicTest.distinct('module', { category, batch: batchFilter }),
-      MockExam.distinct('module', { category, batch: batchFilter }),
-      FullMockTest.distinct('module', { category, batch: batchFilter })
-    ]);
-
+    const { mergedModuleNames, pricingDocs } = await fetchBatchModuleCatalogAndPricing(category, batch);
     const pricingMap = buildBatchModulePricingMap(pricingDocs);
-    const contentModuleNames = [
-      ...videoModules,
-      ...quizModules,
-      ...topicTestModules,
-      ...mockExamModules,
-      ...fullMockModules
-    ].map((entry) => normalizeModuleName(entry)).filter(Boolean);
-    const pricedModuleNames = pricingDocs
-      .map((entry) => normalizeModuleName(entry?.moduleName))
-      .filter((moduleName) => moduleName && moduleName !== ALL_MODULES);
 
-    const moduleNames = Array.from(new Set([
-      ALL_MODULES,
-      ...modules.map((entry) => normalizeModuleName(entry.name)),
-      ...contentModuleNames,
-      ...pricedModuleNames
-    ]));
+    const moduleNames = Array.from(new Set([ALL_MODULES, ...mergedModuleNames]));
 
     return res.json({
       category,

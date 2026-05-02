@@ -473,6 +473,14 @@ export function updateCourseBatchAdmin(courseName, batchName, payload = {}) {
   });
 }
 
+/** Merge Module rows + content + ModulePricing into Course batch.moduleNames (same union as student catalog). */
+export function rebuildCourseBatchModuleCatalogAdmin(courseName, batchName) {
+  return requestJson(
+    `/courses/admin/${encodeURIComponent(courseName)}/batches/${encodeURIComponent(batchName)}/module-catalog/rebuild`,
+    { method: 'POST' }
+  );
+}
+
 export function migrateContentToBatchAdmin(courseName, targetBatch, options = {}) {
   return requestJson(`/courses/admin/${encodeURIComponent(courseName)}/migrate-content`, {
     method: 'POST',

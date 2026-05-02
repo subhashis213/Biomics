@@ -10,6 +10,7 @@ const FullMockTest = require('../models/FullMockTest');
 const ModulePricing = require('../models/ModulePricing');
 const { authenticateToken } = require('../middleware/auth');
 const { normalizeValue, withOptionalBatch, sameBatchStored } = require('../utils/adminBatchScope');
+const { appendModuleNameToCourseBatch, removeModuleNameFromCourseBatch } = require('../utils/batchModuleCatalog');
 
 async function sweepByBatchHint(Model, baseFilter, batchHint) {
   const docs = await Model.find(baseFilter).select('_id batch').lean();
@@ -144,6 +145,11 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
   try {
     const existingModule = await Module.findOne({ category, name, batch }).lean();
     if (existingModule) {
+      try {
+        await appendModuleNameToCourseBatch(category, batch, name);
+      } catch (e) {
+        console.error('[modules] appendModuleNameToCourseBatch', e?.message || e);
+      }
       return res.json({ module: existingModule, alreadyExists: true });
     }
 
@@ -154,10 +160,21 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       createdBy: req.user?.username || ''
     });
 
+    try {
+      await appendModuleNameToCourseBatch(category, batch, name);
+    } catch (e) {
+      console.error('[modules] appendModuleNameToCourseBatch', e?.message || e);
+    }
+
     return res.status(201).json({ module: createdModule.toObject() });
   } catch (err) {
     if (err?.code === 11000) {
       const moduleDoc = await Module.findOne({ category, name }).lean();
+      try {
+        await appendModuleNameToCourseBatch(category, batch, name);
+      } catch (e) {
+        console.error('[modules] appendModuleNameToCourseBatch', e?.message || e);
+      }
       return res.json({ module: moduleDoc, alreadyExists: true });
     }
     return res.status(500).json({ error: 'Failed to create module' });
@@ -204,6 +221,14 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
       extraTopicTests = await sweepByBatchHint(TopicTest, { category, module: name }, batch);
       extraModules = await sweepByBatchHint(Module, { category, name }, batch);
       extraPricing = await sweepByBatchHint(ModulePricing, { category, moduleName: name }, batch);
+    }
+
+    if (hasBatchFilter) {
+      try {
+        await removeModuleNameFromCourseBatch(category, batch, name);
+      } catch (e) {
+        console.error('[modules] removeModuleNameFromCourseBatch', e?.message || e);
+      }
     }
 
     return res.json({
