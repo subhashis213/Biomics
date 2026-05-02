@@ -31,11 +31,30 @@ function getCourseProgressPercent(courseName, progressByCourse) {
   return Math.max(0, Math.min(100, Number(progress.completionPercent || 0)));
 }
 
-function formatPurchasedModuleLabel(item) {
+function formatTotalModulesPill(item) {
+  const n = Math.max(0, Number(item?.moduleCount || 0));
+  return `${n} module${n === 1 ? '' : 's'} in course`;
+}
+
+/** Batch / purchase line for the second badge (first badge is total modules only). */
+function formatBatchPurchasePill(item) {
+  if (item?.hasBundlePurchase) {
+    const batches = Array.isArray(item?.purchaseBatchLabels) ? item.purchaseBatchLabels.filter(Boolean) : [];
+    if (batches.length) return `Full bundle · ${batches.join(', ')}`;
+    return 'Full course bundle';
+  }
+  const batches = Array.isArray(item?.purchaseBatchLabels) ? item.purchaseBatchLabels.filter(Boolean) : [];
+  if (batches.length) return `Batch · ${batches.join(', ')}`;
   const purchasedCount = Math.max(0, Number(item?.purchasedModuleCount || 0));
-  if (item?.hasBundlePurchase) return 'Full bundle purchased';
-  if (purchasedCount <= 0) return 'No module purchase yet';
-  return `${purchasedCount} module${purchasedCount === 1 ? '' : 's'} purchased`;
+  if (purchasedCount <= 0) return item?.unlocked ? 'Access active' : 'No module purchase yet';
+  return `${purchasedCount} module${purchasedCount === 1 ? '' : 's'} unlocked`;
+}
+
+function formatQuizProgressLabel(item) {
+  const total = Math.max(0, Number(item?.totalQuizzes || 0));
+  const done = Math.max(0, Number(item?.quizzesAttempted || 0));
+  if (total > 0) return `${done}/${total} quizzes tried`;
+  return 'No quizzes yet';
 }
 
 export default function StudentMyCoursesPage() {
@@ -138,6 +157,7 @@ export default function StudentMyCoursesPage() {
               const progressLabel = Number(progressEntry.totalVideos || 0) > 0
                 ? `${progressEntry.completedVideos}/${progressEntry.totalVideos} videos done`
                 : 'No videos published yet';
+              const quizLabel = formatQuizProgressLabel(item);
               return (
                 <article key={item.courseName} className="student-my-course-card" style={{ '--enter-index': index }}>
                   <div className="student-my-course-media-wrap">
@@ -154,14 +174,15 @@ export default function StudentMyCoursesPage() {
                     <div className="student-my-course-copy">
                       <div className="student-my-course-meta-row">
                         <p className="eyebrow">{formatAccessLabel(item)}</p>
-                        <span className="student-my-course-badge">{item.moduleCount || 0} modules</span>
-                        <span className="student-my-course-badge">{formatPurchasedModuleLabel(item)}</span>
+                        <span className="student-my-course-badge">{formatTotalModulesPill(item)}</span>
+                        <span className="student-my-course-badge">{formatBatchPurchasePill(item)}</span>
                       </div>
                       <h4>{meta.displayName || item.courseName}</h4>
                       <p>{meta.blurb || 'Premium course access is active for this learning track.'}</p>
                     </div>
                     <div className="student-my-course-inline-stats">
                       <span>{progressLabel}</span>
+                      <span>{quizLabel}</span>
                       <span>{item.unlocked ? 'Premium Unlocked' : 'Starter Access'}</span>
                       <span>{item.isEnrolledCourse ? 'Primary Track' : 'Purchased Track'}</span>
                     </div>

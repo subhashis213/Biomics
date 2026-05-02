@@ -15,6 +15,7 @@ const Module = require('../models/Module');
 const Course = require('../models/Course');
 const Video = require('../models/Video');
 const Quiz = require('../models/Quiz');
+const QuizAttempt = require('../models/QuizAttempt');
 const TopicTest = require('../models/TopicTest');
 const MockExam = require('../models/MockExam');
 const FullMockTest = require('../models/FullMockTest');
@@ -399,6 +400,35 @@ router.get('/my-course', authenticateToken('user'), async (req, res) => {
   }
 });
 
+/**
+ * Unique batch names from purchases (excluding "General"), for My Courses badges.
+ * Includes batch-only rows where `moduleName` matches a course batch name.
+ */
+function collectPurchaseBatchLabels(activePurchasesForCourse = [], courseBatchNameKeysLower = new Set()) {
+  const out = [];
+  const seen = new Set();
+  const add = (raw) => {
+    const str = String(raw || '').trim();
+    if (!str) return;
+    const norm = normalizeBatchName(str);
+    if (!norm || norm === 'General') return;
+    const key = norm.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(str.replace(/\s+/g, ' '));
+  };
+
+  for (const entry of activePurchasesForCourse) {
+    add(entry?.batch);
+    const mod = normalizeModuleName(entry?.moduleName);
+    if (mod && mod !== ALL_MODULES) {
+      const modKey = normalizeBatchName(mod).toLowerCase();
+      if (courseBatchNameKeysLower.has(modKey)) add(mod);
+    }
+  }
+  return out;
+}
+
 router.get('/catalog', authenticateToken('user'), async (req, res) => {
   try {
     const user = await User.findOne({ username: req.user.username }).lean();
@@ -465,6 +495,19 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
       const totalModuleCount = Number(moduleCountMap.get(courseName) || 0);
       const purchasedModuleCount = hasBundlePurchase ? totalModuleCount : activeModulePurchases.length;
       const hasActivePurchase = hasBundlePurchase || activeModulePurchases.length > 0;
+      const courseBatchNameKeysLower = new Set(
+        (Array.isArray(courseDoc?.batches) ? courseDoc.batches : [])
+          .filter((batch) => batch?.active !== false)
+          .map((batch) => normalizeBatchName(batch?.name).toLowerCase())
+          .filter(Boolean)
+      );
+      const purchaseBatchLabels = collectPurchaseBatchLabels(activePurchasesForCourse, courseBatchNameKeysLower);
+      const [totalQuizzes, attemptedQuizIds] = await Promise.all([
+        Quiz.countDocuments({ category: courseName }),
+        QuizAttempt.distinct('quizId', { username: user.username, category: courseName })
+      ]);
+      const quizzesAttempted = Array.isArray(attemptedQuizIds) ? attemptedQuizIds.length : 0;
+
       const plans = Object.values(MEMBERSHIP_PLANS)
         .map((plan) => buildCatalogPlanSummary(pricing, plan))
         .filter((plan) => plan.saleAmountInPaise > 0 || plan.mrpAmountInPaise > 0);
@@ -482,6 +525,9 @@ router.get('/catalog', authenticateToken('user'), async (req, res) => {
             .filter((batch) => Boolean(batch.name))
           : [],
         moduleCount: Number(moduleCountMap.get(courseName) || 0),
+        totalQuizzes: Number(totalQuizzes || 0),
+        quizzesAttempted: Number(quizzesAttempted || 0),
+        purchaseBatchLabels,
         thumbnailUrl: String(pricing?.thumbnailUrl || '').trim(),
         thumbnailName: String(pricing?.thumbnailName || '').trim(),
         isEnrolledCourse: normalizeCourseName(user?.class) === courseName,

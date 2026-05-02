@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchModuleTopics } from '../api';
+import { fetchModuleQuiz, fetchModuleTopics } from '../api';
 import { useCourseData } from '../hooks/useCourseData';
 
 function normalizeText(value) {
@@ -47,6 +47,8 @@ export default function StudentModuleDetailsPage() {
 
   const [catalogTopics, setCatalogTopics] = useState([]);
   const [topicsLoadedFromCatalog, setTopicsLoadedFromCatalog] = useState(false);
+  /** Full module quiz list from GET /quizzes/my-course/:module (matches lectures; avoids per-quiz batch stripping). */
+  const [moduleHubQuizzes, setModuleHubQuizzes] = useState([]);
 
   const moduleAccessMap = access?.moduleAccess || {};
 
@@ -87,6 +89,25 @@ export default function StudentModuleDetailsPage() {
     };
   }, [scopeCourseLabel, decodedModuleName]);
 
+  useEffect(() => {
+    if (moduleLocked || !scopeCourseLabel || !decodedModuleName) {
+      setModuleHubQuizzes([]);
+      return;
+    }
+    let cancelled = false;
+    fetchModuleQuiz(decodedModuleName, scopeCourseLabel)
+      .then((data) => {
+        if (cancelled) return;
+        setModuleHubQuizzes(Array.isArray(data?.quizzes) ? data.quizzes : []);
+      })
+      .catch(() => {
+        if (!cancelled) setModuleHubQuizzes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [moduleLocked, scopeCourseLabel, decodedModuleName]);
+
   const moduleVideos = useMemo(() => {
     return videos.filter((video) => {
       const sameCourse = normalizeText(video?.category || '').toLowerCase() === courseKey;
@@ -121,6 +142,11 @@ export default function StudentModuleDetailsPage() {
 
   const latestAttempt = moduleAttempts[0] || null;
 
+  const quizzesForMetrics = useMemo(
+    () => (moduleHubQuizzes.length ? moduleHubQuizzes : moduleQuizzes),
+    [moduleHubQuizzes, moduleQuizzes]
+  );
+
   const topicCount = useMemo(() => {
     if (topicsLoadedFromCatalog) {
       return Array.from(new Set(catalogTopics.map((topic) => normalizeText(topic)).filter(Boolean))).length;
@@ -128,10 +154,10 @@ export default function StudentModuleDetailsPage() {
     return new Set(
       [
         ...moduleVideos.map((video) => normalizeText(video?.topic || 'General')),
-        ...moduleQuizzes.map((quiz) => normalizeText(quiz?.topic || 'General'))
+        ...quizzesForMetrics.map((quiz) => normalizeText(quiz?.topic || 'General'))
       ].filter(Boolean)
     ).size;
-  }, [moduleVideos, moduleQuizzes, catalogTopics, topicsLoadedFromCatalog]);
+  }, [moduleVideos, quizzesForMetrics, catalogTopics, topicsLoadedFromCatalog]);
 
   function handleBack() {
     navigate(`/student/course/${encodeURIComponent(scopeCourseLabel)}/modules`);
@@ -176,7 +202,7 @@ export default function StudentModuleDetailsPage() {
         </article>
         <article className="module-detail-stat-card">
           <span>Quizzes</span>
-          <strong>{moduleQuizzes.length}</strong>
+          <strong>{quizzesForMetrics.length}</strong>
         </article>
         <article className="module-detail-stat-card">
           <span>Progress</span>
