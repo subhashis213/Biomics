@@ -1536,6 +1536,131 @@ router.get('/performance/student', authenticateToken('user'), async (req, res) =
   }
 });
 
+// GET /test-series/leaderboard/student?type=topic|mock&course=&module=
+// Best single-attempt percentage per learner for the resolved course (topic tests can filter by module).
+router.get('/leaderboard/student', authenticateToken('user'), async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1 }).lean();
+    if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
+
+    const supportedCourses = await getSupportedCourses();
+    const typeRaw = String(req.query?.type || 'topic').toLowerCase();
+    const type = typeRaw === 'mock' ? 'mock' : 'topic';
+    const moduleFilter = String(req.query?.module || '').trim();
+    const requestedCourseRaw = String(req.query?.course || '').trim();
+
+    const selectedCourse = requestedCourseRaw && requestedCourseRaw !== 'all'
+      ? await resolveTargetCourseForStudent(req.user.username, requestedCourseRaw, supportedCourses)
+      : await resolveTargetCourseForStudent(req.user.username, user.class, supportedCourses);
+
+    if (!selectedCourse) {
+      return res.json({
+        course: null,
+        type,
+        moduleFilter: moduleFilter || null,
+        modules: [],
+        leaderboard: []
+      });
+    }
+
+    const match = { category: selectedCourse };
+    if (type === 'topic' && moduleFilter) {
+      match.module = moduleFilter;
+    }
+
+    const addPct = {
+      $addFields: {
+        percentage: {
+          $cond: [
+            { $gt: ['$total', 0] },
+            { $multiply: [{ $divide: ['$score', '$total'] }, 100] },
+            0
+          ]
+        }
+      }
+    };
+
+    if (type === 'topic') {
+      const leaderboardRaw = await TopicTestAttempt.aggregate([
+        { $match: match },
+        addPct,
+        { $sort: { percentage: -1, score: -1, submittedAt: -1 } },
+        {
+          $group: {
+            _id: '$username',
+            bestAttempt: { $first: '$$ROOT' }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            username: '$_id',
+            score: '$bestAttempt.score',
+            total: '$bestAttempt.total',
+            percentage: { $round: ['$bestAttempt.percentage', 2] },
+            submittedAt: '$bestAttempt.submittedAt',
+            module: '$bestAttempt.module',
+            topic: '$bestAttempt.topic',
+            title: '$bestAttempt.title'
+          }
+        },
+        { $sort: { percentage: -1, score: -1, username: 1 } },
+        { $limit: 50 }
+      ]);
+
+      const modules = await TopicTestAttempt.distinct('module', { category: selectedCourse });
+      const sortedModules = modules
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+
+      return res.json({
+        course: selectedCourse,
+        type: 'topic',
+        moduleFilter: moduleFilter || null,
+        modules: sortedModules,
+        leaderboard: leaderboardRaw.map((entry, index) => ({ ...entry, rank: index + 1 }))
+      });
+    }
+
+    const leaderboardRaw = await FullMockAttempt.aggregate([
+      { $match: match },
+      addPct,
+      { $sort: { percentage: -1, score: -1, submittedAt: -1 } },
+      {
+        $group: {
+          _id: '$username',
+          bestAttempt: { $first: '$$ROOT' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          username: '$_id',
+          score: '$bestAttempt.score',
+          total: '$bestAttempt.total',
+          percentage: { $round: ['$bestAttempt.percentage', 2] },
+          submittedAt: '$bestAttempt.submittedAt',
+          title: '$bestAttempt.title'
+        }
+      },
+      { $sort: { percentage: -1, score: -1, username: 1 } },
+      { $limit: 50 }
+    ]);
+
+    return res.json({
+      course: selectedCourse,
+      type: 'mock',
+      moduleFilter: null,
+      modules: [],
+      leaderboard: leaderboardRaw.map((entry, index) => ({ ...entry, rank: index + 1 }))
+    });
+  } catch (err) {
+    console.error('[test-series/leaderboard/student]', err?.message || err);
+    return res.status(500).json({ error: 'Failed to fetch test series leaderboard.' });
+  }
+});
+
 // ─── Payment: Preview ────────────────────────────────────────────────────────
 
 // GET /test-series/payment/preview?seriesType=topic_test|full_mock

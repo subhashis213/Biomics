@@ -273,18 +273,6 @@ export default function StudentTestSeriesPurchasePage() {
       )}
     >
       <main className="admin-workspace-page ts-purchase-page">
-        <section className="card ts-purchase-hero">
-          <div>
-            <p className="eyebrow">Course-wise Purchase</p>
-            <h2>{pageTitle}</h2>
-            <p className="subtitle">{pageSubtitle}</p>
-          </div>
-          <div className="ts-catalog-head-badges">
-            <span>{planFromQuery === 'full_mock' ? 'Mock Only' : 'Topic + Mock'}</span>
-            <span>2 Months Access</span>
-          </div>
-        </section>
-
         {banner && (
           <div className={`ts-top-banner ts-top-banner-${banner.type}`}>{banner.text}</div>
         )}

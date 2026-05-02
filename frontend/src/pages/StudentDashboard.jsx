@@ -9,7 +9,6 @@ import {
   fetchMyMockExams,
   previewCourseOrder,
   previewTestSeriesVoucher,
-  fetchQuizLeaderboard,
   getApiBase,
   requestJson,
   verifyCoursePayment
@@ -58,12 +57,6 @@ export default function StudentDashboard() {
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [banner, setBanner] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState({});
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [leaderboardModules, setLeaderboardModules] = useState([]);
-  const [leaderboardModuleFilter, setLeaderboardModuleFilter] = useState('all');
-  const [leaderboardTopicFilter, setLeaderboardTopicFilter] = useState('all');
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
-  const [leaderboardError, setLeaderboardError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileClosing, setProfileClosing] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -228,7 +221,6 @@ export default function StudentDashboard() {
   const hasAnyUnlockedModule = allModulesUnlocked || unlockedModuleSet.size > 0;
   const activeMembership = access?.activeMembership || null;
 
-  const shouldShowLeaderboard = hasAnyUnlockedModule && !selectedModule;
   const safeVideoTotal = Math.max(0, Number(videos?.length || 0));
   const completedVideoCount = completedIds instanceof Set
     ? completedIds.size
@@ -1531,42 +1523,6 @@ export default function StudentDashboard() {
     })
     : [];
 
-  const quizTopicMetadata = useMemo(() => {
-    const topics = new Set();
-    const moduleTopicsByKey = {};
-    const moduleTopicsByName = {};
-    const activeModuleKeySet = new Set(visibleModules);
-
-    function addTopic(categoryName, moduleName, topicName) {
-      const normalizedCategory = normalizeCourseName(categoryName || course || 'General');
-      if (activeCourseFilter && normalizedCategory !== activeCourseFilter) return;
-
-      const normalizedModule = normalizeModuleName(moduleName || 'General');
-      const normalizedTopic = normalizeModuleName(topicName || 'General');
-      if (!normalizedModule || !normalizedTopic) return;
-
-      const moduleKey = resolveModuleKey(normalizedCategory, normalizedModule);
-      if (activeModuleKeySet.size > 0 && !activeModuleKeySet.has(moduleKey)) return;
-      if (!moduleTopicsByKey[moduleKey]) moduleTopicsByKey[moduleKey] = new Set();
-      moduleTopicsByKey[moduleKey].add(normalizedTopic);
-
-      const moduleNameKey = normalizedModule.toLowerCase();
-      if (!moduleTopicsByName[moduleNameKey]) moduleTopicsByName[moduleNameKey] = new Set();
-      moduleTopicsByName[moduleNameKey].add(normalizedTopic);
-
-      topics.add(normalizedTopic);
-    }
-
-    quizzes.forEach((quiz) => {
-      addTopic(quiz?.category, quiz?.module, quiz?.topic);
-    });
-
-    const options = Array.from(topics).sort((a, b) => a.localeCompare(b));
-    return { options, moduleTopicsByKey, moduleTopicsByName };
-  }, [quizzes, visibleModules, activeCourseFilter, course]);
-
-  const quizTopicOptions = quizTopicMetadata.options;
-
   useEffect(() => {
     let cancelled = false;
     requestJson('/test-series/performance/student')
@@ -1581,24 +1537,6 @@ export default function StudentDashboard() {
       cancelled = true;
     };
   }, []);
-
-  const fallbackLeaderboardModules = Array.from(new Set(
-    visibleModules.map((moduleKey) => moduleMetaByKey[moduleKey]?.module).filter(Boolean)
-  )).sort((a, b) => a.localeCompare(b));
-
-  const leaderboardModuleOptions = Array.from(new Set([
-    ...leaderboardModules,
-    ...fallbackLeaderboardModules
-  ])).sort((a, b) => a.localeCompare(b));
-
-  const filteredLeaderboard = leaderboard.filter((entry) => {
-    if (leaderboardTopicFilter === 'all') return true;
-    const moduleNameKey = normalizeModuleName(entry?.module || 'General').toLowerCase();
-    const topicSet = quizTopicMetadata.moduleTopicsByName[moduleNameKey];
-    return Boolean(topicSet && topicSet.has(leaderboardTopicFilter));
-  });
-
-  const leaderboardChampion = filteredLeaderboard[0] || null;
 
   useEffect(() => {
     if (selectedCourseFilter === 'all') return;
@@ -1630,12 +1568,6 @@ export default function StudentDashboard() {
       cleanup();
     };
   }, []);
-
-  useEffect(() => {
-    if (leaderboardTopicFilter !== 'all' && !quizTopicOptions.includes(leaderboardTopicFilter)) {
-      setLeaderboardTopicFilter('all');
-    }
-  }, [leaderboardTopicFilter, quizTopicOptions]);
 
   useEffect(() => {
     if (!loadError) return;
@@ -1752,34 +1684,6 @@ export default function StudentDashboard() {
 
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state, location.pathname, navigate, course]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLeaderboardLoading(true);
-    setLeaderboardError('');
-
-    const activeModuleFilter = leaderboardModuleFilter === 'all' ? '' : leaderboardModuleFilter;
-
-    fetchQuizLeaderboard(activeModuleFilter)
-      .then((data) => {
-        if (cancelled) return;
-        setLeaderboard(data?.leaderboard || []);
-        setLeaderboardModules(data?.modules || []);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setLeaderboardError(error?.message || 'Failed to load leaderboard.');
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLeaderboardLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [leaderboardModuleFilter, quizAttempts.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2208,7 +2112,6 @@ export default function StudentDashboard() {
         icon: '💬'
       },
       { id: 'route-student-quiz-performance', label: 'Quiz Performance', icon: '📊' },
-      { id: 'section-leaderboard', label: 'Leaderboard', icon: '🏆' },
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
       { id: 'section-test-series', label: 'Test Series', icon: '📝' },
       { id: 'route-student-test-series-performance', label: 'Series Performance', icon: '🎯' },
@@ -2963,94 +2866,6 @@ export default function StudentDashboard() {
             </div>
           </section>
         </div>
-      ) : null}
-
-      {shouldShowLeaderboard ? (
-        <section id="section-leaderboard" className="card quiz-leaderboard-panel">
-          <div className="section-header compact">
-            <div>
-              <p className="eyebrow">Quiz Leaderboard</p>
-              <h2>Top Performers</h2>
-            </div>
-            <div className="quiz-leaderboard-controls" />
-          </div>
-
-          <div className="quiz-filter-bar" role="group" aria-label="Quiz leaderboard filters">
-            <span className="quiz-filter-icon" aria-hidden="true">🏅</span>
-            <label className="quiz-filter-field">
-              Module
-              <select
-                value={leaderboardModuleFilter}
-                onChange={(event) => setLeaderboardModuleFilter(event.target.value)}
-              >
-                <option value="all">All Modules</option>
-                {leaderboardModuleOptions.map((moduleName) => (
-                  <option key={moduleName} value={moduleName}>{moduleName}</option>
-                ))}
-              </select>
-            </label>
-            <label className="quiz-filter-field">
-              Topic
-              <select
-                value={leaderboardTopicFilter}
-                onChange={(event) => setLeaderboardTopicFilter(event.target.value)}
-              >
-                <option value="all">All Topics</option>
-                {quizTopicOptions.map((topic) => (
-                  <option key={`leader-topic-${topic}`} value={topic}>{topic}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {leaderboardLoading ? <p className="empty-note">Loading leaderboard...</p> : null}
-          {!leaderboardLoading && leaderboardError ? <p className="inline-message error">{leaderboardError}</p> : null}
-
-          {!leaderboardLoading && !leaderboardError ? (
-            filteredLeaderboard.length ? (
-              <>
-                {leaderboardChampion ? (
-                  <article className="leaderboard-champion-card">
-                    <span className="leaderboard-crown" aria-hidden="true">👑</span>
-                    <div>
-                      <p className="leaderboard-champion-label">Highest Candidate</p>
-                      <h3>{leaderboardChampion.username}</h3>
-                      <p className="leaderboard-champion-meta">
-                        {leaderboardChampion.module || 'General'} • {leaderboardChampion.score || 0}/{leaderboardChampion.total || 0} ({safePercent(leaderboardChampion.percentage)}%)
-                      </p>
-                    </div>
-                  </article>
-                ) : null}
-                <div className="leaderboard-table-wrap">
-                  <table className="leaderboard-table">
-                    <thead>
-                      <tr>
-                        <th>Rank</th>
-                        <th>Candidate</th>
-                        <th>Module</th>
-                        <th>Best Score</th>
-                        <th>Attempts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredLeaderboard.map((entry, index) => (
-                        <tr key={`${entry.username || 'candidate'}-${entry.module || 'General'}-${entry.rank || index + 1}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
-                          <td>#{entry.rank || index + 1}</td>
-                          <td>{entry.username || 'Anonymous'}</td>
-                          <td>{entry.module || 'General'}</td>
-                          <td>{entry.score || 0}/{entry.total || 0} ({safePercent(entry.percentage)}%)</td>
-                          <td>{entry.attemptsCount || 0}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            ) : (
-              <p className="empty-note">No leaderboard data found for this topic filter. Try a different topic or select All.</p>
-            )
-          ) : null}
-        </section>
       ) : null}
 
       {!selectedModule ? (

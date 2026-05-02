@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
-import { fetchTestSeriesPerformanceStudent } from '../api';
+import { fetchTestSeriesLeaderboardStudent, fetchTestSeriesPerformanceStudent } from '../api';
 import { useSessionStore } from '../stores/sessionStore';
 
 function normalizeText(value) {
@@ -29,6 +29,11 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function safePct(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? Math.round(num) : 0;
+}
+
 export default function StudentTestSeriesPerformancePage() {
   const navigate = useNavigate();
   const { session } = useSessionStore();
@@ -41,6 +46,11 @@ export default function StudentTestSeriesPerformancePage() {
   const [moduleFilter, setModuleFilter] = useState('all');
   const [topicFilter, setTopicFilter] = useState('all');
   const [fullMockFilter, setFullMockFilter] = useState('all');
+
+  const [tsLbTopicRows, setTsLbTopicRows] = useState([]);
+  const [tsLbMockRows, setTsLbMockRows] = useState([]);
+  const [tsLbLoading, setTsLbLoading] = useState(false);
+  const [tsLbError, setTsLbError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -319,8 +329,35 @@ export default function StudentTestSeriesPerformancePage() {
     Number(summary.topicTests?.attempts || 0) + Number(summary.fullMocks?.attempts || 0)
   ), [summary.fullMocks?.attempts, summary.topicTests?.attempts]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const courseQ = courseFilter === 'all' ? '' : courseFilter;
+    const moduleQ = moduleFilter === 'all' ? '' : moduleFilter;
+    setTsLbLoading(true);
+    setTsLbError('');
+    Promise.all([
+      fetchTestSeriesLeaderboardStudent({ course: courseQ, type: 'topic', module: moduleQ }),
+      fetchTestSeriesLeaderboardStudent({ course: courseQ, type: 'mock' })
+    ])
+      .then(([topicRes, mockRes]) => {
+        if (cancelled) return;
+        setTsLbTopicRows(Array.isArray(topicRes?.leaderboard) ? topicRes.leaderboard : []);
+        setTsLbMockRows(Array.isArray(mockRes?.leaderboard) ? mockRes.leaderboard : []);
+      })
+      .catch((err) => {
+        if (!cancelled) setTsLbError(err?.message || 'Failed to load leaderboards.');
+      })
+      .finally(() => {
+        if (!cancelled) setTsLbLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courseFilter, moduleFilter]);
+
   const navItems = [
     { id: 'series-performance-overview', label: 'Overview', icon: '✨' },
+    { id: 'series-performance-leaderboards', label: 'Leaderboards', icon: '🏆' },
     { id: 'series-performance-topic-tests', label: 'Topic Tests', icon: '🧪' },
     { id: 'series-performance-full-mocks', label: 'Full Mocks', icon: '🏁' },
     { id: 'series-performance-recent', label: 'Recent', icon: '🕒' }
@@ -480,6 +517,110 @@ export default function StudentTestSeriesPerformancePage() {
             <h3>{summary.fullMocks.attempts || 0} attempts</h3>
             <p className="subtitle">Best full mock score: {summary.fullMocks.bestScore || 0}%</p>
           </article>
+        </section>
+
+        <section id="series-performance-leaderboards" className="card performance-leaderboard-integrated performance-ts-leaderboard-integrated">
+          <div className="performance-leaderboard-integrated-head">
+            <div>
+              <p className="eyebrow">Test series leaderboards</p>
+              <h3>Peer rankings for your course</h3>
+              <p className="subtitle">
+                Topic board respects the <strong>Module</strong> filter above (when not “All”). Course scope follows the overview <strong>Course</strong> filter; when set to “All courses”, your enrolled course is used.
+              </p>
+            </div>
+          </div>
+          {tsLbLoading ? <p className="empty-note">Loading leaderboards…</p> : null}
+          {!tsLbLoading && tsLbError ? <p className="inline-message error">{tsLbError}</p> : null}
+          {!tsLbLoading && !tsLbError ? (
+            <div className="performance-dual-leaderboard-grid">
+              <div className="performance-dual-leaderboard-col">
+                <h4 className="performance-dual-lb-title">Topic test series</h4>
+                {tsLbTopicRows.length ? (
+                  <>
+                    {tsLbTopicRows[0] ? (
+                      <article className="leaderboard-champion-card leaderboard-champion-card--compact">
+                        <span className="leaderboard-crown" aria-hidden="true">👑</span>
+                        <div>
+                          <p className="leaderboard-champion-label">Leading (topic tests)</p>
+                          <h3>{tsLbTopicRows[0].username}</h3>
+                          <p className="leaderboard-champion-meta">
+                            {tsLbTopicRows[0].module || 'General'} • {tsLbTopicRows[0].topic || 'General'} • {tsLbTopicRows[0].score}/{tsLbTopicRows[0].total} ({safePct(tsLbTopicRows[0].percentage)}%)
+                          </p>
+                        </div>
+                      </article>
+                    ) : null}
+                    <div className="leaderboard-table-wrap">
+                      <table className="leaderboard-table">
+                        <thead>
+                          <tr>
+                            <th>Rank</th>
+                            <th>Learner</th>
+                            <th>Module / topic</th>
+                            <th>Best</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tsLbTopicRows.map((entry, index) => (
+                            <tr key={`ts-t-${entry.username}-${index}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
+                              <td>#{entry.rank || index + 1}</td>
+                              <td>{entry.username || '—'}</td>
+                              <td>{entry.module || 'General'} · {entry.topic || 'General'}</td>
+                              <td>{entry.score}/{entry.total} ({safePct(entry.percentage)}%)</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty-note">No topic-test leaderboard data yet for this scope.</p>
+                )}
+              </div>
+              <div className="performance-dual-leaderboard-col">
+                <h4 className="performance-dual-lb-title">Full mock series</h4>
+                {tsLbMockRows.length ? (
+                  <>
+                    {tsLbMockRows[0] ? (
+                      <article className="leaderboard-champion-card leaderboard-champion-card--compact">
+                        <span className="leaderboard-crown" aria-hidden="true">👑</span>
+                        <div>
+                          <p className="leaderboard-champion-label">Leading (full mocks)</p>
+                          <h3>{tsLbMockRows[0].username}</h3>
+                          <p className="leaderboard-champion-meta">
+                            {tsLbMockRows[0].title || 'Mock'} • {tsLbMockRows[0].score}/{tsLbMockRows[0].total} ({safePct(tsLbMockRows[0].percentage)}%)
+                          </p>
+                        </div>
+                      </article>
+                    ) : null}
+                    <div className="leaderboard-table-wrap">
+                      <table className="leaderboard-table">
+                        <thead>
+                          <tr>
+                            <th>Rank</th>
+                            <th>Learner</th>
+                            <th>Mock</th>
+                            <th>Best</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tsLbMockRows.map((entry, index) => (
+                            <tr key={`ts-m-${entry.username}-${index}`} className={entry.rank === 1 ? 'leaderboard-row-top' : ''}>
+                              <td>#{entry.rank || index + 1}</td>
+                              <td>{entry.username || '—'}</td>
+                              <td>{entry.title || '—'}</td>
+                              <td>{entry.score}/{entry.total} ({safePct(entry.percentage)}%)</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty-note">No full-mock leaderboard data yet for this scope.</p>
+                )}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section id="series-performance-topic-tests" className="performance-module-grid">

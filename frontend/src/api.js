@@ -1027,6 +1027,15 @@ export function fetchTestSeriesPerformanceStudent() {
   return requestJson('/test-series/performance/student');
 }
 
+export function fetchTestSeriesLeaderboardStudent({ course = '', type = 'topic', module = '' } = {}) {
+  const params = new URLSearchParams();
+  if (course) params.set('course', course);
+  if (type) params.set('type', type);
+  if (module) params.set('module', module);
+  const q = params.toString() ? `?${params.toString()}` : '';
+  return requestJson(`/test-series/leaderboard/student${q}`);
+}
+
 export function submitTestSeriesAttemptFeedback(payload) {
   return requestJson('/test-series/attempt-feedback', {
     method: 'POST',

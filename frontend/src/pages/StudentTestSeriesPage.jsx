@@ -933,13 +933,8 @@ export default function StudentTestSeriesPage() {
   const hasTopicTest  = Boolean(accessData?.access?.hasTopicTest);
   const hasFullMock   = Boolean(accessData?.access?.hasFullMock);
   const hasExpiredAccess = Boolean(accessData?.access?.anyExpired);
-  const pricing       = accessData?.pricing || {};
-  const topicValidityDays = Number(pricing.topicTestValidityDays || 60);
-  const mockValidityDays = Number(pricing.fullMockValidityDays || 60);
   const course        = accessData?.course || '';
   const hasAnyAccess  = hasTopicTest || hasFullMock;
-  const topicIsFree   = !(pricing.topicTestPriceInPaise > 0);
-  const mockIsFree    = !(pricing.fullMockPriceInPaise > 0);
   const filteredTopicTests = requestedTopic
     ? topicTests.filter((test) => matchesRequestedTopic(test, requestedTopic))
     : topicTests;
@@ -1626,7 +1621,7 @@ export default function StudentTestSeriesPage() {
   return (
     <AppShell
       title="Test Series"
-      subtitle="Topic-wise tests and full-length mock exams — each subscription is valid for 2 months"
+      subtitle="Pick a course, then start topic-wise tests or full mock exams"
       roleLabel="Student" showThemeSwitch
       actions={
         <>
@@ -1635,20 +1630,7 @@ export default function StudentTestSeriesPage() {
         </>
       }
     >
-      <main className="admin-workspace-page">
-
-        {/* Hero */}
-        <section className="workspace-hero workspace-hero-testseries">
-          <div className="ts-hero-content">
-            <p className="eyebrow">Test Series</p>
-            <h2>Sharpen your exam preparation</h2>
-            <p className="subtitle">
-              {hasAnyAccess
-                ? 'You have active access. Start a test below.'
-                : 'Choose a plan to unlock high-quality tests for your exam.'}
-            </p>
-          </div>
-        </section>
+      <main className="admin-workspace-page ts-hub-main">
 
         {banner && (
           <div className={'ts-top-banner ts-top-banner-' + banner.type}>{banner.text}</div>
@@ -1661,151 +1643,210 @@ export default function StudentTestSeriesPage() {
           </div>
         ) : (
           <>
-            {/* ─── PURCHASE OPTIONS: show only plans not yet purchased ─── */}
+            {/* ─── Course cards: topic + mock per course (no intermediate marketing step) ─── */}
             {(!hasTopicTest || !hasFullMock) && (
-              <section className="ts-paywall-section">
-                <div className="ts-paywall-intro">
-                  <span className="ts-lock-icon">🔒</span>
-                  <div>
-                    <h2 className="ts-paywall-title">Unlock Test Series Subscription</h2>
-                    <p className="ts-paywall-desc">
-                      {hasExpiredAccess
-                        ? 'Your subscription has ended. Renew now to continue topic tests and full mocks.'
-                        : hasAnyAccess
-                          ? 'Upgrade your access with the remaining test series plan.'
-                          : 'Test Series is a premium add-on, separate from your regular learning plan. Pick the option that matches your preparation level.'}
-                    </p>
-                    <p className="ts-paywall-desc">Click the plan button below to open the dedicated course-wise purchase page.</p>
+              <section className="card ts-catalog-section ts-hub-catalog" id="ts-course-catalog">
+                <div className="ts-hub-catalog-head">
+                  <h2 className="ts-hub-catalog-title">
+                    {hasExpiredAccess
+                      ? 'Renew or add test series access'
+                      : hasAnyAccess
+                        ? 'Unlock the remaining plan for any course'
+                        : 'Choose a course — topic tests & full mocks'}
+                  </h2>
+                  <p className="subtitle ts-hub-catalog-sub">
+                    Topic Test Series includes full-length mocks as a bonus. Full Mock Series is mock-only.
+                    Use the cart or buy a course row below.
+                  </p>
+                  <div className="ts-hub-syllabus-row">
+                    <button
+                      type="button"
+                      className="secondary-btn ts-hub-syllabus-btn"
+                      onClick={() => openSyllabus('topic')}
+                      disabled={loadingSyllabus}
+                    >
+                      {loadingSyllabus ? '…' : '📋 Topic test syllabus'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-btn ts-hub-syllabus-btn"
+                      onClick={() => openSyllabus('mock')}
+                      disabled={loadingSyllabus}
+                    >
+                      {loadingSyllabus ? '…' : '📋 Full mock syllabus'}
+                    </button>
                   </div>
                 </div>
 
-                <div className="ts-plan-banners">
+                {catalogCourses.length ? (
+                  <div className="ts-catalog-grid ts-catalog-grid-dual">
+                    {[...catalogCourses]
+                      .sort((left, right) => Number(Boolean(right?.isEnrolledCourse)) - Number(Boolean(left?.isEnrolledCourse)))
+                      .map((courseEntry, index) => {
+                        const cardCourse = String(courseEntry?.courseName || '').trim();
+                        const cardPricing = courseEntry?.pricing || {};
+                        const cardAccess = courseEntry?.access || {};
+                        const cardThumb = resolveApiAssetUrl(courseEntry?.thumbnailUrl || '');
+                        const sameCourseAsProfile = String(cardCourse).trim().toLowerCase()
+                          === String(course || '').trim().toLowerCase();
 
-                  {/* ── Banner 1: Topic Test Series (Recommended) ── */}
-                  {!hasTopicTest && (
-                  <article className="ts-plan-banner ts-plan-topic">
-                    <div className="ts-plan-banner-badge">⭐ RECOMMENDED</div>
-                    <div className="ts-plan-banner-inner">
-                      <div className="ts-plan-banner-iconside">
-                        <div className="ts-plan-banner-icon-circle topic-circle">📖</div>
-                        <div className="ts-plan-price-box">
-                          <span className="ts-plan-price-val">Course-wise pricing</span>
-                          <span className="ts-plan-price-period">open course chooser to pick course · valid for {topicValidityDays} days</span>
-                        </div>
-                      </div>
-                      <div className="ts-plan-banner-details">
-                        <h3 className="ts-plan-banner-name">Topic Test Series</h3>
-                        <p className="ts-plan-banner-tagline">
-                          Chapter &amp; topic-wise tests to build strong conceptual foundations —
-                          perfect for systematic, step-by-step preparation.
-                        </p>
-                        <div className="ts-plan-feat-grid">
-                          <div className="ts-plan-feat-col">
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> All module &amp; topic-wise tests</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Instant result with detailed answer key</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Easy, Medium &amp; Hard difficulty levels</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Question navigator with mark-for-review</div>
-                          </div>
-                          <div className="ts-plan-feat-col">
-                            <div className="ts-plan-feat ts-plan-feat-bonus">
-                              <span className="ts-feat-check bonus-check">✓</span>
-                              <strong>Full Mock Tests included free</strong> — bonus
+                        const topicPrice = Number(cardPricing.topicTestPriceInPaise || 0);
+                        const topicMrp = Number(cardPricing.topicTestMrpInPaise || 0);
+                        const topicValidity = Number(cardPricing.topicTestValidityDays) || 60;
+                        const topicDiscount = topicMrp > topicPrice && topicMrp > 0
+                          ? Math.round(((topicMrp - topicPrice) / topicMrp) * 100)
+                          : 0;
+                        const canBuyTopic = !cardAccess?.hasTopicTest;
+                        const topicExpired = Boolean(cardAccess?.topicExpired);
+                        const inCartTopic = hasCartEntry(cardCourse, 'topic_test');
+
+                        const mockPrice = Number(cardPricing.fullMockPriceInPaise || 0);
+                        const mockMrp = Number(cardPricing.fullMockMrpInPaise || 0);
+                        const mockValidity = Number(cardPricing.fullMockValidityDays) || 60;
+                        const mockDiscount = mockMrp > mockPrice && mockMrp > 0
+                          ? Math.round(((mockMrp - mockPrice) / mockMrp) * 100)
+                          : 0;
+                        const canBuyMock = !cardAccess?.hasFullMock;
+                        const mockExpired = Boolean(cardAccess?.fullMockExpired);
+                        const inCartMock = hasCartEntry(cardCourse, 'full_mock');
+
+                        return (
+                          <article key={cardCourse} className="card ts-catalog-card ts-catalog-card-dual" style={{ '--ts-enter-index': index }}>
+                            <div className="ts-catalog-card-media">
+                              {cardThumb ? (
+                                <img src={cardThumb} alt={cardCourse} className="ts-catalog-thumb" />
+                              ) : (
+                                <div className="ts-catalog-thumb ts-catalog-thumb-fallback">{cardCourse.slice(0, 2)}</div>
+                              )}
                             </div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Score breakdown: correct, wrong, skipped</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Explanation for every question</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Validity: {topicValidityDays} days from purchase date</div>
-                          </div>
-                        </div>
-                        <div className="ts-plan-cta-row">
-                          <div className="ts-cta-buttons">
-                            <button
-                              type="button"
-                              className="primary-btn ts-plan-cta-btn"
-                              onClick={() => navigate('/student/test-series/purchase?plan=topic_test')}
-                            >
-                              Choose Course & Buy Topic Test Series
-                            </button>
-                            <button type="button" className="secondary-btn ts-plan-syllabus-btn"
-                              onClick={() => openSyllabus('topic')}
-                              disabled={loadingSyllabus}>
-                              {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
-                            </button>
-                            <p className="ts-plan-upsell-note">
-                              This opens a dedicated purchase page for topic-test plans.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                  )}
+                            <div className="ts-catalog-card-body">
+                              <div className="ts-catalog-title-row">
+                                <h4>{cardCourse}</h4>
+                                {courseEntry?.isEnrolledCourse ? <span className="ts-catalog-pill">Enrolled</span> : null}
+                              </div>
+                              <div className="ts-catalog-plans ts-catalog-plans-dual">
+                                <div className="ts-catalog-plan-row tone-topic">
+                                  <div>
+                                    <strong>Topic Test Series</strong>
+                                    <p>
+                                      {topicPrice > 0 ? rupees(topicPrice) : 'Free'}
+                                      {topicMrp > topicPrice && topicPrice > 0 ? (
+                                        <small style={{ marginLeft: 8, opacity: 0.65, textDecoration: 'line-through' }}>{rupees(topicMrp)}</small>
+                                      ) : null}
+                                      {topicDiscount > 0 ? <span style={{ marginLeft: 8 }}>{topicDiscount}% OFF</span> : null}
+                                    </p>
+                                    <small className="ts-catalog-plan-note">
+                                      Includes full mocks as bonus access · Valid for {topicValidity} days
+                                    </small>
+                                  </div>
+                                  {canBuyTopic ? (
+                                    <div className="ts-catalog-plan-actions">
+                                      <button
+                                        type="button"
+                                        className="primary-btn ts-catalog-plan-buy-btn"
+                                        onClick={() => handlePurchase(
+                                          'topic_test',
+                                          sameCourseAsProfile ? voucherPreviews.topic_test?.voucherCode : undefined,
+                                          cardCourse
+                                        )}
+                                        disabled={Boolean(purchasingType)}
+                                      >
+                                        {purchasingType === 'topic_test' ? 'Processing…' : `${topicExpired ? 'Renew' : 'Buy Now'}`}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="secondary-btn ts-catalog-plan-add-btn"
+                                        onClick={() => {
+                                          if (inCartTopic) {
+                                            navigate('/student?cart=open', { state: { openCart: true } });
+                                            return;
+                                          }
+                                          handleAddToCart('topic_test', cardCourse);
+                                        }}
+                                        disabled={Boolean(purchasingType)}
+                                      >
+                                        {inCartTopic ? 'Go To Cart' : 'Add To Cart'}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="ts-catalog-plan-actions">
+                                      <span className="ts-access-badge ts-badge-topic">Unlocked</span>
+                                      <button
+                                        type="button"
+                                        className="primary-btn ts-catalog-plan-buy-btn"
+                                        onClick={() => navigate(`/student/test-series/topic-tests/modules?course=${encodeURIComponent(cardCourse)}`)}
+                                      >
+                                        Open topic tests
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
 
-                  {!hasTopicTest && !hasFullMock && (
-                    <div className="ts-plan-banners-or">
-                      <span className="ts-or-text">OR, if you only need mock tests</span>
-                    </div>
-                  )}
-
-                  {/* ── Banner 2: Full Mock Series ── */}
-                  {!hasFullMock && (
-                  <article className="ts-plan-banner ts-plan-mock">
-                    <div className="ts-plan-banner-badge ts-mock-badge">MOCK ONLY</div>
-                    <div className="ts-plan-banner-inner">
-                      <div className="ts-plan-banner-iconside">
-                        <div className="ts-plan-banner-icon-circle mock-circle">{'\uD83D\uDDD2\uFE0F'}</div>
-                        <div className="ts-plan-price-box">
-                          <span className="ts-plan-price-val ts-mock-price-val">Course-wise pricing</span>
-                          <span className="ts-plan-price-period">open course chooser to pick course · valid for {mockValidityDays} days</span>
-                        </div>
-                      </div>
-                      <div className="ts-plan-banner-details">
-                        <h3 className="ts-plan-banner-name">
-                          Full Mock Series <span className="ts-mock-only-tag">Mock Only</span>
-                        </h3>
-                        <p className="ts-plan-banner-tagline">
-                          Simulate the real exam with full-length timed tests —
-                          ideal for final-stage revision and self-assessment.
-                        </p>
-                        <div className="ts-plan-feat-grid">
-                          <div className="ts-plan-feat-col">
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Full-length timed exam simulations</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Detailed answer review after submission</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Question navigator with mark-for-review</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Validity: {mockValidityDays} days from purchase date</div>
-                          </div>
-                          <div className="ts-plan-feat-col">
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Score breakdown with percentage grade</div>
-                            <div className="ts-plan-feat"><span className="ts-feat-check">✓</span> Explanation for every answer</div>
-                            <div className="ts-plan-feat ts-feat-cross"><span className="ts-feat-x">✗</span> Topic-wise tests not included</div>
-                            <div className="ts-plan-feat ts-feat-cross"><span className="ts-feat-x">✗</span> Module-level tests not included</div>
-                          </div>
-                        </div>
-                        <div className="ts-plan-cta-row">
-                          <div className="ts-cta-buttons">
-                            <button
-                              type="button"
-                              className="secondary-btn ts-plan-cta-btn ts-mock-cta-btn"
-                              onClick={() => navigate('/student/test-series/purchase?plan=full_mock')}
-                            >
-                              Choose Course & Buy Full Mock Series
-                            </button>
-                            <button type="button" className="secondary-btn ts-plan-syllabus-btn"
-                              onClick={() => openSyllabus('mock')}
-                              disabled={loadingSyllabus}>
-                              {loadingSyllabus ? '…' : '📋 View Full Syllabus'}
-                            </button>
-                            <p className="ts-plan-upsell-note">
-                              💡 The <strong>Topic Test Series</strong> above includes Full Mocks{' '}
-                              as a free bonus.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                  )}
-
-                </div>{/* /ts-plan-banners */}
+                                <div className="ts-catalog-plan-row tone-mock">
+                                  <div>
+                                    <strong>Full Mock Series</strong>
+                                    <p>
+                                      {mockPrice > 0 ? rupees(mockPrice) : 'Free'}
+                                      {mockMrp > mockPrice && mockPrice > 0 ? (
+                                        <small style={{ marginLeft: 8, opacity: 0.65, textDecoration: 'line-through' }}>{rupees(mockMrp)}</small>
+                                      ) : null}
+                                      {mockDiscount > 0 ? <span style={{ marginLeft: 8 }}>{mockDiscount}% OFF</span> : null}
+                                    </p>
+                                    <small className="ts-catalog-plan-note">
+                                      Mock-only (no topic-wise tests) · Valid for {mockValidity} days
+                                    </small>
+                                  </div>
+                                  {canBuyMock ? (
+                                    <div className="ts-catalog-plan-actions">
+                                      <button
+                                        type="button"
+                                        className="secondary-btn ts-catalog-plan-buy-btn"
+                                        onClick={() => handlePurchase(
+                                          'full_mock',
+                                          sameCourseAsProfile ? voucherPreviews.full_mock?.voucherCode : undefined,
+                                          cardCourse
+                                        )}
+                                        disabled={Boolean(purchasingType)}
+                                      >
+                                        {purchasingType === 'full_mock' ? 'Processing…' : `${mockExpired ? 'Renew' : 'Buy Now'}`}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="secondary-btn ts-catalog-plan-add-btn"
+                                        onClick={() => {
+                                          if (inCartMock) {
+                                            navigate('/student?cart=open', { state: { openCart: true } });
+                                            return;
+                                          }
+                                          handleAddToCart('full_mock', cardCourse);
+                                        }}
+                                        disabled={Boolean(purchasingType)}
+                                      >
+                                        {inCartMock ? 'Go To Cart' : 'Add To Cart'}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="ts-catalog-plan-actions">
+                                      <span className="ts-access-badge ts-badge-mock">Unlocked</span>
+                                      <button
+                                        type="button"
+                                        className="primary-btn ts-catalog-plan-buy-btn"
+                                        onClick={() => navigate(`/student/test-series?tab=mock&course=${encodeURIComponent(cardCourse)}`)}
+                                      >
+                                        Open full mocks
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="empty-note">No courses available for test series yet.</p>
+                )}
               </section>
             )}
 

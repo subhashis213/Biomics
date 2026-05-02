@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import { fetchQuizLeaderboard } from '../api';
 import { useCourseData } from '../hooks/useCourseData';
 import { useSessionStore } from '../stores/sessionStore';
 
@@ -42,6 +43,11 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function safePercent(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? Math.round(num) : 0;
+}
+
 export default function StudentQuizPerformancePage() {
   const navigate = useNavigate();
   const { session } = useSessionStore();
@@ -51,6 +57,13 @@ export default function StudentQuizPerformancePage() {
   const [batchFilter, setBatchFilter] = useState('all');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [topicFilter, setTopicFilter] = useState('all');
+
+  const [lbModuleFilter, setLbModuleFilter] = useState('all');
+  const [lbTopicFilter, setLbTopicFilter] = useState('all');
+  const [lbRows, setLbRows] = useState([]);
+  const [lbApiModules, setLbApiModules] = useState([]);
+  const [lbLoading, setLbLoading] = useState(false);
+  const [lbError, setLbError] = useState('');
 
   const courseOptions = useMemo(() => {
     const courses = new Set();
@@ -287,8 +300,73 @@ export default function StudentQuizPerformancePage() {
 
   const bestModule = moduleGroups[0] || null;
 
+  const quizTopicMeta = useMemo(() => {
+    const moduleTopicsByName = {};
+    const topics = new Set();
+    const add = (moduleName, topicName) => {
+      const mk = normalizeText(moduleName || 'General').toLowerCase();
+      const tk = normalizeText(topicName || 'General');
+      if (!moduleTopicsByName[mk]) moduleTopicsByName[mk] = new Set();
+      moduleTopicsByName[mk].add(tk);
+      topics.add(tk);
+    };
+    quizzes.forEach((q) => add(q?.module, q?.topic));
+    quizAttempts.forEach((a) => add(a?.module, a?.topic));
+    return {
+      moduleTopicsByName,
+      topicOptions: Array.from(topics).sort((a, b) => a.localeCompare(b))
+    };
+  }, [quizzes, quizAttempts]);
+
+  const lbModuleOptions = useMemo(() => {
+    const set = new Set([...lbApiModules]);
+    quizzes.forEach((q) => set.add(normalizeText(q?.module || 'General')));
+    quizAttempts.forEach((a) => set.add(normalizeText(a?.module || 'General')));
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [lbApiModules, quizzes, quizAttempts]);
+
+  const filteredLb = useMemo(() => (
+    lbRows.filter((entry) => {
+      if (lbTopicFilter === 'all') return true;
+      const mk = normalizeText(entry?.module || 'General').toLowerCase();
+      const topicSet = quizTopicMeta.moduleTopicsByName[mk];
+      return Boolean(topicSet && topicSet.has(lbTopicFilter));
+    })
+  ), [lbRows, lbTopicFilter, quizTopicMeta.moduleTopicsByName]);
+
+  const lbChampion = filteredLb[0] || null;
+
+  useEffect(() => {
+    let cancelled = false;
+    const activeModule = lbModuleFilter === 'all' ? '' : lbModuleFilter;
+    setLbLoading(true);
+    setLbError('');
+    fetchQuizLeaderboard(activeModule)
+      .then((data) => {
+        if (cancelled) return;
+        setLbRows(Array.isArray(data?.leaderboard) ? data.leaderboard : []);
+        setLbApiModules(Array.isArray(data?.modules) ? data.modules : []);
+      })
+      .catch((error) => {
+        if (!cancelled) setLbError(error?.message || 'Failed to load leaderboard.');
+      })
+      .finally(() => {
+        if (!cancelled) setLbLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lbModuleFilter, quizAttempts.length]);
+
+  useEffect(() => {
+    if (lbTopicFilter !== 'all' && !quizTopicMeta.topicOptions.includes(lbTopicFilter)) {
+      setLbTopicFilter('all');
+    }
+  }, [lbTopicFilter, quizTopicMeta.topicOptions]);
+
   const navItems = [
     { id: 'quiz-performance-overview', label: 'Overview', icon: '✨' },
+    { id: 'quiz-performance-leaderboard', label: 'Leaderboard', icon: '🏆' },
     { id: 'quiz-performance-modules', label: 'Modules', icon: '📚' },
     { id: 'quiz-performance-recent', label: 'Recent', icon: '🕒' }
   ];
@@ -434,6 +512,92 @@ export default function StudentQuizPerformancePage() {
             <h3>{summary.lastAttemptAt ? formatDateTime(summary.lastAttemptAt) : 'No recent attempts'}</h3>
             <p className="subtitle">Your most recent quiz submission timestamp in this board.</p>
           </article>
+        </section>
+
+        <section id="quiz-performance-leaderboard" className="card performance-leaderboard-integrated">
+          <div className="performance-leaderboard-integrated-head">
+            <div>
+              <p className="eyebrow">Course quiz leaderboard</p>
+              <h3>How you rank among peers</h3>
+              <p className="subtitle">Based on each learner’s best quiz attempt in your enrolled course. Filter by module or topic to narrow the board.</p>
+            </div>
+          </div>
+          <div className="performance-leaderboard-filters quiz-filter-bar" role="group" aria-label="Quiz leaderboard filters">
+            <span className="quiz-filter-icon" aria-hidden="true">🏅</span>
+            <label className="quiz-filter-field">
+              Module
+              <select
+                value={lbModuleFilter}
+                onChange={(event) => setLbModuleFilter(event.target.value)}
+              >
+                <option value="all">All modules</option>
+                {lbModuleOptions.map((moduleName) => (
+                  <option key={`lb-mod-${moduleName}`} value={moduleName}>{moduleName}</option>
+                ))}
+              </select>
+            </label>
+            <label className="quiz-filter-field">
+              Topic
+              <select
+                value={lbTopicFilter}
+                onChange={(event) => setLbTopicFilter(event.target.value)}
+              >
+                <option value="all">All topics</option>
+                {quizTopicMeta.topicOptions.map((topic) => (
+                  <option key={`lb-topic-${topic}`} value={topic}>{topic}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {lbLoading ? <p className="empty-note">Loading leaderboard…</p> : null}
+          {!lbLoading && lbError ? <p className="inline-message error">{lbError}</p> : null}
+          {!lbLoading && !lbError ? (
+            filteredLb.length ? (
+              <div className="performance-leaderboard-body">
+                {lbChampion ? (
+                  <article className="leaderboard-champion-card">
+                    <span className="leaderboard-crown" aria-hidden="true">👑</span>
+                    <div>
+                      <p className="leaderboard-champion-label">Top score (this view)</p>
+                      <h3>{lbChampion.username}</h3>
+                      <p className="leaderboard-champion-meta">
+                        {lbChampion.module || 'General'} • {lbChampion.score || 0}/{lbChampion.total || 0} ({safePercent(lbChampion.percentage)}%)
+                      </p>
+                    </div>
+                  </article>
+                ) : null}
+                <div className="leaderboard-table-wrap">
+                  <table className="leaderboard-table">
+                    <thead>
+                      <tr>
+                        <th>Rank</th>
+                        <th>Learner</th>
+                        <th>Module</th>
+                        <th>Best score</th>
+                        <th>Attempts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLb.map((entry, index) => (
+                        <tr
+                          key={`${entry.username || 'u'}-${entry.module || 'm'}-${entry.rank || index + 1}`}
+                          className={entry.rank === 1 ? 'leaderboard-row-top' : ''}
+                        >
+                          <td>#{entry.rank || index + 1}</td>
+                          <td>{entry.username || '—'}</td>
+                          <td>{entry.module || 'General'}</td>
+                          <td>{entry.score || 0}/{entry.total || 0} ({safePercent(entry.percentage)}%)</td>
+                          <td>{entry.attemptsCount ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="empty-note">No leaderboard rows for this filter. Try All modules / All topics.</p>
+            )
+          ) : null}
         </section>
 
         <section id="quiz-performance-modules" className="performance-module-grid">

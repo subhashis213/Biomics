@@ -6233,6 +6233,47 @@ html[data-theme='dark'] .course-manager-card .course-tile {
     linear-gradient(154deg, color-mix(in srgb, var(--bg-card) 97%, transparent), color-mix(in srgb, var(--bg-card-soft) 94%, transparent));
 }
 
+.ts-hub-main {
+  padding-top: 4px;
+}
+
+.ts-hub-catalog .ts-hub-catalog-head {
+  padding: 18px 18px 4px;
+}
+
+.ts-hub-catalog-title {
+  margin: 0 0 8px;
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ts-hub-catalog-sub {
+  margin: 0 0 14px;
+  max-width: 62ch;
+}
+
+.ts-hub-syllabus-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ts-hub-syllabus-btn {
+  font-size: 0.86rem;
+}
+
+.ts-catalog-plans-dual {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ts-catalog-grid-dual {
+  padding: 12px 14px 18px;
+}
+
 .ts-purchase-page {
   display: grid;
   gap: 14px;
@@ -16401,6 +16442,7 @@ html[data-theme='light'] .student-performance-page .card {
 
 .student-performance-page h2,
 .student-performance-page h3,
+.student-performance-page h4,
 .student-performance-page strong {
   color: var(--perf-text-main);
 }
@@ -17841,6 +17883,138 @@ html[data-theme='light'] .student-performance-page .card {
 
 .leaderboard-row-top {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* Quiz / Test Series performance — integrated leaderboard blocks */
+.student-performance-page .performance-leaderboard-integrated {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 14px;
+  border-color: color-mix(in srgb, var(--perf-accent) 38%, var(--perf-border));
+  background:
+    radial-gradient(560px 220px at -6% -8%, color-mix(in srgb, var(--perf-accent) 18%, transparent), transparent 55%),
+    radial-gradient(480px 200px at 108% 0%, color-mix(in srgb, var(--perf-accent-soft) 12%, transparent), transparent 60%),
+    linear-gradient(158deg, color-mix(in srgb, var(--perf-surface) 97%, transparent), color-mix(in srgb, var(--perf-bg-soft) 93%, transparent));
+}
+
+.student-performance-page .performance-ts-leaderboard-integrated::after {
+  content: '🏆';
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  font-size: 1.15rem;
+  opacity: 0.85;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 12px color-mix(in srgb, var(--perf-accent) 35%, transparent));
+}
+
+.performance-leaderboard-integrated-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 2.5rem;
+}
+
+.student-performance-page .performance-ts-leaderboard-integrated .performance-leaderboard-integrated-head {
+  padding-right: 2.75rem;
+}
+
+.performance-leaderboard-integrated-head h3 {
+  margin: 6px 0 0;
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+.student-performance-page .performance-leaderboard-filters {
+  margin-top: 2px;
+}
+
+.performance-leaderboard-body {
+  display: grid;
+  gap: 12px;
+}
+
+.performance-dual-leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.performance-dual-leaderboard-col {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.performance-dual-lb-title {
+  margin: 0;
+  padding-bottom: 2px;
+  border-bottom: 1px solid color-mix(in srgb, var(--perf-border) 70%, transparent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--perf-text-soft);
+}
+
+.student-performance-page .performance-dual-lb-title {
+  border-bottom-color: color-mix(in srgb, var(--perf-border) 65%, var(--perf-accent-soft) 20%);
+}
+
+.performance-dual-leaderboard-col .leaderboard-table-wrap {
+  max-height: 320px;
+}
+
+.performance-dual-leaderboard-col .leaderboard-table {
+  min-width: min(100%, 520px);
+}
+
+.leaderboard-champion-card.leaderboard-champion-card--compact {
+  padding: 10px 12px;
+  border-radius: 12px;
+  gap: 8px;
+}
+
+.leaderboard-champion-card--compact .leaderboard-crown {
+  font-size: 1.28rem;
+}
+
+.leaderboard-champion-card--compact h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.leaderboard-champion-card--compact .leaderboard-champion-meta {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 900px) {
+  .performance-dual-leaderboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-performance-page .performance-ts-leaderboard-integrated::after {
+    top: 10px;
+    right: 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .performance-leaderboard-integrated-head {
+    padding-right: 0;
+  }
+
+  .student-performance-page .performance-ts-leaderboard-integrated .performance-leaderboard-integrated-head {
+    padding-right: 0;
+  }
+
+  .student-performance-page .performance-ts-leaderboard-integrated::after {
+    display: none;
+  }
 }
 
 .quiz-form {
