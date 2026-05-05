@@ -94,7 +94,7 @@ function normalizeBatch(value) {
 
 async function getSupportedCourses() {
   const docs = await Course.find({}).sort({ name: 1 }).lean();
-  const names = docs
+  const activeNames = docs
     .filter((entry) => (
       entry
       && entry.archived !== true
@@ -105,8 +105,22 @@ async function getSupportedCourses() {
     .map((entry) => normalizeCourse(entry?.name))
     .filter(Boolean);
 
-  if (names.length) return names;
-  return docs.length ? [] : LEGACY_SUPPORTED_COURSES;
+  if (activeNames.length) return [...new Set(activeNames)];
+
+  // Fallback: when Course flags are strict/misaligned, still allow configured courses.
+  const courseDocNames = docs
+    .filter((entry) => entry && entry.isDeleted !== true && !entry.deletedAt)
+    .map((entry) => normalizeCourse(entry?.name))
+    .filter(Boolean);
+  if (courseDocNames.length) return [...new Set(courseDocNames)];
+
+  // Last dynamic fallback: infer from pricing rows already configured by admin.
+  const pricedCourses = (await TestSeriesPricing.find({}).select({ category: 1, _id: 0 }).lean())
+    .map((entry) => normalizeCourse(entry?.category))
+    .filter(Boolean);
+  if (pricedCourses.length) return [...new Set(pricedCourses)];
+
+  return LEGACY_SUPPORTED_COURSES;
 }
 
 function getRazorpayConfig() {
