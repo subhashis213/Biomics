@@ -9,6 +9,7 @@ const Course = require('../models/Course');
 const Quiz = require('../models/Quiz');
 const User = require('../models/User');
 const { resolveStudentCourseFromRequest } = require('../utils/resolveStudentCourse');
+const { pickCanonicalCourseName } = require('../utils/resolveStudentCourse');
 const { withOptionalBatch } = require('../utils/adminBatchScope');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken } = require('../middleware/auth');
@@ -28,13 +29,13 @@ const {
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-async function isAllowedCourseCategory(courseName) {
+async function resolveAllowedCourseCategory(courseName) {
   const normalized = normalizeCourseName(courseName);
-  if (!normalized) return false;
-  const count = await Course.countDocuments({ active: true });
-  if (count === 0) return true;
-  const exists = await Course.findOne({ name: normalized, active: true }).select({ _id: 1 }).lean();
-  return Boolean(exists);
+  if (!normalized) return '';
+  const activeCourses = await Course.find({ active: true }).select({ name: 1 }).lean();
+  if (!activeCourses.length) return normalized;
+  const names = activeCourses.map((entry) => normalizeCourseName(entry?.name)).filter(Boolean);
+  return pickCanonicalCourseName(normalized, normalized, names) || '';
 }
 
 const storage = multer.diskStorage({
@@ -54,6 +55,12 @@ const upload = multer({
     else cb(new Error('Only PDF files are allowed'));
   }
 });
+
+function isLegacyModuleDuplicateIndexError(error) {
+  const code = Number(error?.code || 0);
+  const message = String(error?.message || '');
+  return code === 11000 && message.includes('modules index: category_1_name_1');
+}
 
 function sanitizeIdList(items = []) {
   return items.map((item) => String(item));
@@ -271,7 +278,8 @@ router.post('/:id/progress', authenticateToken('user'), async (req, res) => {
 router.post('/', authenticateToken('admin'), async (req, res) => {
   const { title, description, url, category, batch, module, topic } = req.body;
   if (!title || !url) return res.status(400).json({ error: 'Title and URL required' });
-  if (!category || !(await isAllowedCourseCategory(category))) {
+  const resolvedCategory = await resolveAllowedCourseCategory(category);
+  if (!resolvedCategory) {
     return res.status(400).json({ error: 'Valid course category is required' });
   }
   try {
@@ -282,17 +290,25 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       title,
       description,
       url,
-      category,
+      category: resolvedCategory,
       batch: normalizedBatch,
       module: normalizedModule,
       topic: normalizedTopic
     });
     await video.save();
-    await Module.findOneAndUpdate(
-      { category, name: normalizedModule, batch: normalizedBatch || 'General' },
-      { $setOnInsert: { category, name: normalizedModule, batch: normalizedBatch || 'General', createdBy: req.user?.username || '' } },
-      { upsert: true }
-    );
+    try {
+      await Module.findOneAndUpdate(
+        { category: resolvedCategory, name: normalizedModule, batch: normalizedBatch || 'General' },
+        { $setOnInsert: { category: resolvedCategory, name: normalizedModule, batch: normalizedBatch || 'General', createdBy: req.user?.username || '' } },
+        { upsert: true }
+      );
+    } catch (moduleErr) {
+      // Legacy databases can still have a unique index on { category, name } only.
+      // In that case, module metadata insert is non-critical; keep the video upload successful.
+      if (!isLegacyModuleDuplicateIndexError(moduleErr)) {
+        throw moduleErr;
+      }
+    }
     await logAdminAction(req, {
       action: 'video.create',
       targetType: 'video',
@@ -307,7 +323,8 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     });
     res.status(201).json(video);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to upload video' });
+    console.error('[video-upload] failed', err?.message || err);
+    res.status(500).json({ error: err?.message || 'Failed to upload video' });
   }
 });
 
