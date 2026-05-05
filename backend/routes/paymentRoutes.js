@@ -265,8 +265,8 @@ function isVoucherApplicable(voucher, course) {
 
   const hasTestSeriesScope = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0;
   const hasCourseScope = Array.isArray(voucher.applicableCourses) && voucher.applicableCourses.length > 0;
-  // Test-series-only vouchers must not apply to course/module checkout
-  if (hasTestSeriesScope && !hasCourseScope) {
+  // Any voucher with test-series scope must not apply to course/module checkout.
+  if (hasTestSeriesScope) {
     return false;
   }
 
@@ -1473,9 +1473,8 @@ router.get('/vouchers/student', authenticateToken('user'), async (req, res) => {
         const notExpired = !voucher.validUntil || new Date(voucher.validUntil).getTime() >= now;
         const started = !voucher.validFrom || new Date(voucher.validFrom).getTime() <= now;
         const underLimit = !Number.isFinite(voucher.usageLimit) || voucher.usageLimit <= 0 || voucher.usedCount < voucher.usageLimit;
-        const testSeriesOnly = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0
-          && (!Array.isArray(voucher.applicableCourses) || voucher.applicableCourses.length === 0);
-        if (testSeriesOnly) return false;
+        const hasTestSeriesScope = Array.isArray(voucher.applicableTestSeries) && voucher.applicableTestSeries.length > 0;
+        if (hasTestSeriesScope) return false;
         const courseAllowed = !Array.isArray(voucher.applicableCourses)
           || voucher.applicableCourses.length === 0
           || voucher.applicableCourses.some((entry) => normalizeCourseName(entry) === targetCourse);
@@ -1555,6 +1554,11 @@ router.post('/admin/vouchers', authenticateToken('admin'), async (req, res) => {
     const applicableCourses = Array.isArray(req.body?.applicableCourses)
       ? req.body.applicableCourses.map((entry) => normalizeCourseName(entry)).filter(Boolean)
       : [];
+    const applicableTestSeries = Array.isArray(req.body?.applicableTestSeries)
+      ? req.body.applicableTestSeries
+        .map((entry) => String(entry || '').trim().toLowerCase())
+        .filter((entry) => entry === 'topic_test' || entry === 'full_mock')
+      : [];
 
     const supportedCourses = await getSupportedCourses();
     if (applicableCourses.some((course) => !supportedCourses.includes(normalizeCourseName(course)))) {
@@ -1576,6 +1580,7 @@ router.post('/admin/vouchers', authenticateToken('admin'), async (req, res) => {
         ? Math.floor(Number(req.body.usageLimit))
         : null,
       applicableCourses,
+      applicableTestSeries: [...new Set(applicableTestSeries)],
       createdBy: req.user.username
     });
 
@@ -1612,6 +1617,14 @@ router.patch('/admin/vouchers/:id', authenticateToken('admin'), async (req, res)
       }
       updates.applicableCourses = applicableCourses;
     }
+    if (req.body?.applicableTestSeries !== undefined) {
+      const applicableTestSeries = Array.isArray(req.body.applicableTestSeries)
+        ? req.body.applicableTestSeries
+          .map((entry) => String(entry || '').trim().toLowerCase())
+          .filter((entry) => entry === 'topic_test' || entry === 'full_mock')
+        : [];
+      updates.applicableTestSeries = [...new Set(applicableTestSeries)];
+    }
 
     const voucher = await Voucher.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true }).lean();
     if (!voucher) return res.status(404).json({ error: 'Voucher not found.' });
@@ -1645,6 +1658,7 @@ router.delete('/admin/vouchers/:id', authenticateToken('admin'), async (req, res
           usageLimit: voucher.usageLimit,
           usedCount: voucher.usedCount,
           applicableCourses: Array.isArray(voucher.applicableCourses) ? voucher.applicableCourses : [],
+          applicableTestSeries: Array.isArray(voucher.applicableTestSeries) ? voucher.applicableTestSeries : [],
           createdBy: voucher.createdBy
         }
       }
