@@ -23,7 +23,6 @@ function rupees(paise) {
   return '\u20b9' + n.toLocaleString('en-IN', { minimumFractionDigits: 0 });
 }
 
-const DIFFICULTY_COLOR = { easy: '#16a34a', hard: '#dc2626', medium: '#d97706' };
 const ACTIVE_TEST_SESSION_STORAGE_KEY = 'ts_active_exam_session_v1';
 
 function getTsCartItemKey(item = {}) {
@@ -375,9 +374,6 @@ export default function StudentTestSeriesPage() {
   const [renewPromptDismissed, setRenewPromptDismissed] = useState(false);
   const [testSession, setTestSession]       = useState(null);
   const [showReview, setShowReview]         = useState(false);
-  // syllabusView: null | { type:'topic'|'mock', items:[], hasAccess:bool, course:string }
-  const [syllabusView, setSyllabusView]     = useState(null);
-  const [loadingSyllabus, setLoadingSyllabus] = useState(false);
   const [resultFeedbackSaving, setResultFeedbackSaving] = useState(false);
 
   // Voucher state — keyed by seriesType: 'topic_test' | 'full_mock'
@@ -548,31 +544,6 @@ export default function StudentTestSeriesPage() {
     window.addEventListener('ts-access-refresh', onRefresh);
     return () => window.removeEventListener('ts-access-refresh', onRefresh);
   }, []);
-
-  // ── Syllabus preview ─────────────────────────────────────────────────────
-
-  async function openSyllabus(type) {
-    setLoadingSyllabus(true);
-    setSyllabusView({ type, items: [], hasAccess: false, course: '', loading: true });
-    try {
-      const endpoint = type === 'topic'
-        ? '/test-series/topic-tests/syllabus'
-        : '/test-series/full-mocks/syllabus';
-      const res = await requestJson(endpoint);
-      setSyllabusView({
-        type,
-        items:     res.items     || [],
-        hasAccess: type === 'topic' ? Boolean(res.hasTopicTest) : Boolean(res.hasFullMock),
-        course:    res.course    || '',
-        loading:   false
-      });
-    } catch (e) {
-      setBanner({ type: 'error', text: e.message || 'Failed to load syllabus.' });
-      setSyllabusView(null);
-    } finally {
-      setLoadingSyllabus(false);
-    }
-  }
 
   // ── Voucher ───────────────────────────────────────────────────────────────
 
@@ -1441,181 +1412,6 @@ export default function StudentTestSeriesPage() {
   }
 
   // ══════════════════════════════════════════════════════════
-  // RENDER: Syllabus preview page
-  // ══════════════════════════════════════════════════════════
-  if (syllabusView) {
-    const { type, items, hasAccess, course: svCourse, loading: svLoading } = syllabusView;
-    const isTopicType = type === 'topic';
-    const typeLabel   = isTopicType ? 'Topic Tests' : 'Full Mock Tests';
-    const typeIcon    = isTopicType ? '📖' : '🗒️';
-
-    return (
-      <AppShell
-        title={typeLabel + ' — Syllabus'}
-        subtitle={svCourse ? svCourse + ' course content' : 'Course content overview'}
-        roleLabel="Student"
-        showThemeSwitch
-        actions={(
-          <button type="button" className="secondary-btn" onClick={() => setSyllabusView(null)}>
-            ← Back
-          </button>
-        )}
-      >
-        <main className="admin-workspace-page">
-
-          {/* Syllabus Hero */}
-          <section className={'workspace-hero ' + (isTopicType ? 'workspace-hero-testseries' : 'workspace-hero-fullmock')}>
-            <div className="ts-hero-content">
-              <p className="eyebrow ts-hero-eyebrow">{typeIcon} {typeLabel}</p>
-              <h2 className="ts-hero-heading">
-                {isTopicType ? 'Complete Topic-wise Test Catalog' : 'Full-Length Mock Exam Catalog'}
-              </h2>
-              <p className="subtitle ts-hero-subtitle">
-                {hasAccess
-                  ? '✅ Purchased — all tests below are unlocked.'
-                  : '🔒 Locked — purchase to unlock all tests and start practicing.'}
-              </p>
-            </div>
-            <div className="ts-hero-stats-row">
-              <div className="ts-hero-stat-box ts-hero-stat-box-hero">
-                <span className="ts-hero-stat-val-hero">{items.length}</span>
-                <span className="ts-hero-stat-key-hero">{typeLabel}</span>
-              </div>
-              {isTopicType && (
-                <div className="ts-hero-stat-box ts-hero-stat-box-hero">
-                  <span className="ts-hero-stat-val-hero">
-                    {[...new Set(items.map((t) => t.module))].length}
-                  </span>
-                  <span className="ts-hero-stat-key-hero">Modules</span>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* lock / unlock notice */}
-          {!hasAccess && (
-            <div className="ts-syllabus-lock-notice">
-              <span className="ts-sln-icon">🔒</span>
-              <div className="ts-sln-text">
-                <strong>These tests are locked.</strong>{' '}
-                Purchase the{' '}
-                {isTopicType
-                  ? <strong>Topic Test Series</strong>
-                  : <strong>Full Mock Series</strong>}{' '}
-                to unlock all {items.length} tests and start practising.
-              </div>
-              <button
-                type="button"
-                className="primary-btn ts-sln-buy-btn"
-                onClick={() => { const st = isTopicType ? 'topic_test' : 'full_mock'; setSyllabusView(null); handlePurchase(st, voucherPreviews[st]?.voucherCode || undefined, syllabusView?.course || course); }}
-              >
-                {isTopicType ? 'Buy Topic Test Series' : 'Buy Full Mock Series'}
-              </button>
-            </div>
-          )}
-
-          {svLoading ? (
-            <div className="ts-loading-state">
-              <div className="ts-loading-spinner" />
-              <p>Loading syllabus…</p>
-            </div>
-          ) : items.length === 0 ? (
-            <div className="ts-empty-state">
-              <span className="ts-empty-icon">{typeIcon}</span>
-              <p>No {typeLabel.toLowerCase()} have been added yet.</p>
-              <p className="subtitle">Check back soon.</p>
-            </div>
-          ) : (
-            <div className="ts-syllabus-grid">
-              {items.map((item, idx) => (
-                <article
-                  key={item._id || idx}
-                  className={'ts-syllabus-card card' + (hasAccess ? ' ts-syllabus-unlocked' : ' ts-syllabus-locked')}
-                >
-                  {/* lock overlay */}
-                  {!hasAccess && (
-                    <div className="ts-syllabus-lock-overlay">
-                      <span className="ts-syllabus-lock-icon">🔒</span>
-                      <span className="ts-syllabus-lock-label">Locked</span>
-                    </div>
-                  )}
-
-                  <div className="ts-syllabus-card-head">
-                    {isTopicType ? (
-                      <span className="ts-module-chip">{item.module}</span>
-                    ) : (
-                      <span className="ts-module-chip ts-mock-chip">Full Mock</span>
-                    )}
-                    {isTopicType && item.difficulty && (
-                      <span
-                        className="ts-difficulty-chip"
-                        style={{ color: DIFFICULTY_COLOR[item.difficulty] || '#d97706' }}
-                      >
-                        {item.difficulty}
-                      </span>
-                    )}
-                  </div>
-
-                  <h4 className={'ts-test-title' + (hasAccess ? '' : ' ts-title-blurred')}>
-                    {item.title}
-                  </h4>
-
-                  {isTopicType && item.topic && item.topic !== 'General' && (
-                    <p className={'ts-test-topic' + (hasAccess ? '' : ' ts-blurred')}>
-                      {item.topic}
-                    </p>
-                  )}
-                  {!isTopicType && item.description && (
-                    <p className={'ts-test-topic' + (hasAccess ? '' : ' ts-blurred')}>
-                      {item.description}
-                    </p>
-                  )}
-
-                  <div className="ts-test-meta">
-                    <span className="ts-meta-chip">📝 {item.questionCount} Qs</span>
-                    <span className="ts-meta-chip">⏱ {item.durationMinutes} min</span>
-                  </div>
-
-                  {hasAccess ? (
-                    <button
-                      type="button"
-                      className="primary-btn ts-start-btn"
-                      onClick={() => { setSyllabusView(null); startTest(item._id, type); }}
-                    >
-                      Start Test →
-                    </button>
-                  ) : (
-                    <div className="ts-syllabus-locked-cta">
-                      <span className="ts-locked-cta-text">🔒 Purchase to unlock</span>
-                    </div>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-
-          {/* Bottom CTA for locked state */}
-          {!hasAccess && !svLoading && items.length > 0 && (
-            <div className="ts-syllabus-bottom-cta">
-              <p>Ready to unlock all {items.length} {typeLabel.toLowerCase()}?</p>
-              <button
-                type="button"
-                className="primary-btn ts-sln-buy-btn ts-bottom-buy-btn"
-                onClick={() => { const st = isTopicType ? 'topic_test' : 'full_mock'; setSyllabusView(null); handlePurchase(st, voucherPreviews[st]?.voucherCode || undefined, syllabusView?.course || course); }}
-              >
-                {isTopicType
-                  ? `Buy Topic Test Series — Unlock ${items.length} Tests + Full Mocks`
-                  : `Buy Full Mock Series — Unlock ${items.length} Mocks`}
-              </button>
-            </div>
-          )}
-
-        </main>
-      </AppShell>
-    );
-  }
-
-  // ══════════════════════════════════════════════════════════
   // RENDER: Hub / Paywall / Test list
   // ══════════════════════════════════════════════════════════
   return (
@@ -1655,27 +1451,9 @@ export default function StudentTestSeriesPage() {
                         : 'Choose a course — topic tests & full mocks'}
                   </h2>
                   <p className="subtitle ts-hub-catalog-sub">
-                    Topic Test Series includes full-length mocks as a bonus. Full Mock Series is mock-only.
-                    Use the cart or buy a course row below.
+                    Free and paid plans are shown per course below. Topic Test Series includes full-length mocks as a bonus,
+                    while Full Mock Series is mock-only.
                   </p>
-                  <div className="ts-hub-syllabus-row">
-                    <button
-                      type="button"
-                      className="secondary-btn ts-hub-syllabus-btn"
-                      onClick={() => openSyllabus('topic')}
-                      disabled={loadingSyllabus}
-                    >
-                      {loadingSyllabus ? '…' : '📋 Topic test syllabus'}
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-btn ts-hub-syllabus-btn"
-                      onClick={() => openSyllabus('mock')}
-                      disabled={loadingSyllabus}
-                    >
-                      {loadingSyllabus ? '…' : '📋 Full mock syllabus'}
-                    </button>
-                  </div>
                 </div>
 
                 {catalogCourses.length ? (
@@ -1727,7 +1505,7 @@ export default function StudentTestSeriesPage() {
                               <div className="ts-catalog-plans ts-catalog-plans-dual">
                                 <div className="ts-catalog-plan-row tone-topic">
                                   <div>
-                                    <strong>Topic Test Series</strong>
+                                    <strong>Topic Test Series {topicPrice > 0 ? '(Paid)' : '(Free)'}</strong>
                                     <p>
                                       {topicPrice > 0 ? rupees(topicPrice) : 'Free'}
                                       {topicMrp > topicPrice && topicPrice > 0 ? (
@@ -1784,7 +1562,7 @@ export default function StudentTestSeriesPage() {
 
                                 <div className="ts-catalog-plan-row tone-mock">
                                   <div>
-                                    <strong>Full Mock Series</strong>
+                                    <strong>Full Mock Series {mockPrice > 0 ? '(Paid)' : '(Free)'}</strong>
                                     <p>
                                       {mockPrice > 0 ? rupees(mockPrice) : 'Free'}
                                       {mockMrp > mockPrice && mockPrice > 0 ? (
