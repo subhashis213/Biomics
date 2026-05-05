@@ -475,16 +475,53 @@ export default function StudentTestSeriesPage() {
     setLoadingAccess(true);
     try {
       const selectedCourse = String(new URLSearchParams(location.search).get('course') || '').trim();
-      const pricingEndpoint = selectedCourse
-        ? `/test-series/pricing/student?course=${encodeURIComponent(selectedCourse)}`
-        : '/test-series/pricing/student';
-      const [res, catalogRes] = await Promise.all([
-        requestJson(pricingEndpoint),
-        requestJson('/test-series/catalog/student')
-      ]);
-      setAccessData(res || null);
+      const catalogRes = await requestJson('/test-series/catalog/student');
       const courses = Array.isArray(catalogRes?.courses) ? catalogRes.courses : [];
       setCatalogCourses(courses);
+
+      const preferredCourse =
+        selectedCourse
+        || courses.find((entry) => entry?.isEnrolledCourse)?.courseName
+        || courses[0]?.courseName
+        || '';
+
+      const pricingEndpoint = preferredCourse
+        ? `/test-series/pricing/student?course=${encodeURIComponent(preferredCourse)}`
+        : '/test-series/pricing/student';
+
+      let res = null;
+      try {
+        res = await requestJson(pricingEndpoint);
+      } catch {
+        // Keep catalog visible even when pricing resolution fails for the profile.
+        const fallbackCourse = courses.find(
+          (entry) => String(entry?.courseName || '').trim().toLowerCase()
+            === String(preferredCourse || '').trim().toLowerCase()
+        ) || courses[0];
+        if (fallbackCourse) {
+          res = {
+            course: fallbackCourse.courseName,
+            pricing: fallbackCourse.pricing || {
+              topicTestPriceInPaise: 0,
+              topicTestMrpInPaise: 0,
+              topicTestValidityDays: 60,
+              fullMockPriceInPaise: 0,
+              fullMockMrpInPaise: 0,
+              fullMockValidityDays: 60,
+              currency: 'INR'
+            },
+            access: fallbackCourse.access || {
+              hasTopicTest: false,
+              hasFullMock: false,
+              topicExpired: false,
+              fullMockExpired: false,
+              anyExpired: false
+            }
+          };
+        }
+      }
+
+      setAccessData(res || null);
 
       const accessKeySet = new Set();
       courses.forEach((courseEntry) => {
