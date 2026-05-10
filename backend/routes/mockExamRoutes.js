@@ -5,6 +5,7 @@ const MockExamAttempt = require('../models/MockExamAttempt');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 const { hasCourseAccess } = require('../utils/courseAccess');
+const { formatAppDateTime } = require('../utils/dateFormat');
 
 const router = express.Router();
 
@@ -391,7 +392,7 @@ router.get('/my-course/:id', authenticateToken('user'), async (req, res) => {
 
     const examStartsAt = new Date(exam.examDate).getTime();
     if (Number.isFinite(examStartsAt) && Date.now() < examStartsAt) {
-      return res.status(403).json({ error: `Exam will start on ${new Date(exam.examDate).toLocaleString()}.` });
+      return res.status(403).json({ error: `Exam will start on ${formatAppDateTime(exam.examDate)} (IST).` });
     }
 
     const attempt = await MockExamAttempt.findOne({ examId: exam._id, username: req.user.username }, { _id: 1 }).lean();
@@ -549,7 +550,7 @@ router.post('/:id/submit', authenticateToken('user'), async (req, res) => {
 
     const examStartsAt = new Date(exam.examDate).getTime();
     if (Number.isFinite(examStartsAt) && Date.now() < examStartsAt) {
-      return res.status(403).json({ error: `Exam will start on ${new Date(exam.examDate).toLocaleString()}.` });
+      return res.status(403).json({ error: `Exam will start on ${formatAppDateTime(exam.examDate)} (IST).` });
     }
 
     const examWindowEndAt = exam.examWindowEndAt ? new Date(exam.examWindowEndAt).getTime() : null;
@@ -658,7 +659,7 @@ router.get('/:id/result/pdf', authenticateToken('user'), async (req, res) => {
     const durationMinutes = Number.isFinite(Number(attempt.durationSeconds))
       ? Math.max(1, Math.round(Number(attempt.durationSeconds) / 60))
       : null;
-    const submittedAt = new Date(attempt.submittedAt).toLocaleString();
+    const submittedAt = formatAppDateTime(attempt.submittedAt);
 
     const normalizeLine = (value, maxChars) => {
       const text = String(value || '').replace(/\s+/g, ' ').trim();

@@ -63,17 +63,12 @@ function listPreview(values = [], maxItems = 6) {
   return normalized.length > maxItems ? `${items.join(', ')} +${normalized.length - maxItems} more` : items.join(', ');
 }
 
+const { formatAppDateTime } = require('../utils/dateFormat');
+
 function formatDateLabel(value) {
   if (!value) return 'date not set';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'date not set';
-  return parsed.toLocaleString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
+  const formatted = formatAppDateTime(value);
+  return formatted ? `${formatted} IST` : 'date not set';
 }
 
 function formatAccessStatus(hasAccess) {
