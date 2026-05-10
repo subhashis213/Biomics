@@ -14,6 +14,7 @@ import PdfMcqExtractor from '../components/PdfMcqExtractor';
 import QuestionClipboardModal from '../components/QuestionClipboardModal';
 import StatCard from '../components/StatCard';
 import { copyQuestionsToClipboard, readClipboard } from '../utils/questionClipboard';
+import { fromDateTimeLocalInputValue, toDateTimeLocalInputValue } from '../utils/dateTime';
 
 // courses are loaded dynamically from server
 
@@ -158,8 +159,8 @@ export default function AdminMockExamPage() {
     setMockExamCategory(exam.category || DEFAULT_COURSE);
     setMockExamTitle(exam.title || '');
     setMockExamDescription(exam.description || '');
-    setMockExamDate(exam.examDate ? new Date(exam.examDate).toISOString().slice(0, 16) : '');
-    setMockExamWindowEndAt(exam.examWindowEndAt ? new Date(exam.examWindowEndAt).toISOString().slice(0, 16) : '');
+    setMockExamDate(toDateTimeLocalInputValue(exam.examDate));
+    setMockExamWindowEndAt(toDateTimeLocalInputValue(exam.examWindowEndAt));
     setMockExamDurationMinutes(exam.durationMinutes || 60);
     setMockExamNoticeEnabled(exam.noticeEnabled !== false);
     setMockExamQuestions((exam.questions || []).map((item) => ({
@@ -237,8 +238,8 @@ export default function AdminMockExamPage() {
         category: mockExamCategory,
         title: mockExamTitle.trim(),
         description: mockExamDescription.trim(),
-        examDate: new Date(mockExamDate).toISOString(),
-        examWindowEndAt: mockExamWindowEndAt ? new Date(mockExamWindowEndAt).toISOString() : null,
+        examDate: fromDateTimeLocalInputValue(mockExamDate),
+        examWindowEndAt: fromDateTimeLocalInputValue(mockExamWindowEndAt),
         durationMinutes: Number(mockExamDurationMinutes || 60),
         noticeEnabled: mockExamNoticeEnabled,
         questions: mockExamQuestions.map((item) => ({

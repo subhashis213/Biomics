@@ -36,6 +36,7 @@ import {
   uploadMaterial
 } from '../api';
 import { MAX_MATERIAL_MB } from '../constants';
+import { fromDateTimeLocalInputValue, toDateTimeLocalInputValue } from '../utils/dateTime';
 import { clearSession, getSession, setSession } from '../session';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
@@ -1916,8 +1917,8 @@ export default function AdminDashboard() {
     setMockExamCategory(exam.category || COURSE_CATEGORIES[0]);
     setMockExamTitle(exam.title || '');
     setMockExamDescription(exam.description || '');
-    setMockExamDate(exam.examDate ? new Date(exam.examDate).toISOString().slice(0, 16) : '');
-    setMockExamWindowEndAt(exam.examWindowEndAt ? new Date(exam.examWindowEndAt).toISOString().slice(0, 16) : '');
+    setMockExamDate(toDateTimeLocalInputValue(exam.examDate));
+    setMockExamWindowEndAt(toDateTimeLocalInputValue(exam.examWindowEndAt));
     setMockExamDurationMinutes(exam.durationMinutes || 60);
     setMockExamNoticeEnabled(exam.noticeEnabled !== false);
     setMockExamQuestions((exam.questions || []).map((item) => ({
@@ -1957,8 +1958,8 @@ export default function AdminDashboard() {
         category: mockExamCategory,
         title: mockExamTitle.trim(),
         description: mockExamDescription.trim(),
-        examDate: new Date(mockExamDate).toISOString(),
-        examWindowEndAt: mockExamWindowEndAt ? new Date(mockExamWindowEndAt).toISOString() : null,
+        examDate: fromDateTimeLocalInputValue(mockExamDate),
+        examWindowEndAt: fromDateTimeLocalInputValue(mockExamWindowEndAt),
         durationMinutes: Number(mockExamDurationMinutes || 60),
         noticeEnabled: mockExamNoticeEnabled,
         questions: mockExamQuestions.map((item) => ({
