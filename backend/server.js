@@ -144,16 +144,40 @@ function buildCorsOriginResolver(rawValue) {
 }
 
 const corsOrigin = buildCorsOriginResolver(rawCorsOrigin);
+
+// Trust the first reverse proxy (Render/Vercel/Nginx) so req.ip reflects the
+// real client IP. Without this, express-rate-limit keys every request to the
+// proxy's single IP and a handful of users can lock out the whole site.
+app.set('trust proxy', 1);
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 120,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many auth requests. Try again later.' }
 });
 
+// Only rate-limit endpoints that actually validate credentials / send OTPs.
+// Innocuous calls like /auth/me, /auth/admin/me, /auth/users, /auth/me/avatar,
+// /auth/activity/session etc. were tripping the limiter on normal page loads.
+const RATE_LIMITED_AUTH_PATHS = new Set([
+  '/login',
+  '/admin-login',
+  '/register',
+  '/forgot-password',
+  '/send-otp',
+  '/verify-otp',
+  '/send-email-otp',
+  '/verify-email-otp',
+  '/google-login',
+  '/google-complete-profile',
+  '/check-username',
+  '/check-admin-username'
+]);
+
 function authLimiterMiddleware(req, res, next) {
-  if (req.path.startsWith('/activity/session')) {
+  if (!RATE_LIMITED_AUTH_PATHS.has(req.path)) {
     return next();
   }
   return authLimiter(req, res, next);
