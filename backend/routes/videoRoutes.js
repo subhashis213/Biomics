@@ -479,7 +479,7 @@ router.delete('/:id/materials/:filename', authenticateToken('admin'), async (req
       targetId: String(video._id),
       details: { name: mat.name, filename: mat.filename }
     });
-    res.json({ message: 'Material removed' });
+    res.json({ message: 'Material removed', materials: video.materials });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to remove material' });
   }

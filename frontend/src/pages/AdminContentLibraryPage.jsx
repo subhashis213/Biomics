@@ -215,14 +215,12 @@ export default function AdminContentLibraryPage() {
     }
   }
 
-  async function handleRemoveMaterial(videoId, material) {
-    const filename = material?.filename;
+  async function handleRemoveMaterial(videoId, filename) {
     if (!filename) return;
-    setPendingDelete({ type: 'material', videoId, label: material?.name || filename, material });
+    setPendingDelete({ type: 'material', videoId, label: filename, material: filename });
   }
 
-  async function executeRemoveMaterial(videoId, material) {
-    const filename = material?.filename;
+  async function executeRemoveMaterial(videoId, filename) {
     if (!filename) return;
     try {
       const response = await requestJson(
