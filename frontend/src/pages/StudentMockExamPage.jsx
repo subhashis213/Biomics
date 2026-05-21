@@ -74,7 +74,14 @@ export default function StudentMockExamPage() {
         setAnswers(Array(normalizedQuestions.length).fill(-1));
         setReviewMarks({});
         setActiveIndex(0);
-        setSecondsLeft((nextExam.durationMinutes || 60) * 60);
+        let initialSeconds = (nextExam.durationMinutes || 60) * 60;
+        if (nextExam.windowEndAt) {
+          const windowEndMs = new Date(nextExam.windowEndAt).getTime();
+          const nowMs = Date.now();
+          const secondsUntilClose = Math.max(0, Math.floor((windowEndMs - nowMs) / 1000));
+          initialSeconds = Math.min(initialSeconds, secondsUntilClose);
+        }
+        setSecondsLeft(initialSeconds);
         setStartedAt(null);
         setHasStartedExam(false);
         setHasAcceptedRules(false);
@@ -179,6 +186,16 @@ export default function StudentMockExamPage() {
 
   function handleStartExam() {
     if (!exam || !hasAcceptedRules || result || exam.attempted) return;
+    
+    let allowedSeconds = (exam.durationMinutes || 60) * 60;
+    if (exam.windowEndAt) {
+      const windowEndMs = new Date(exam.windowEndAt).getTime();
+      const nowMs = Date.now();
+      const secondsUntilClose = Math.max(0, Math.floor((windowEndMs - nowMs) / 1000));
+      allowedSeconds = Math.min(allowedSeconds, secondsUntilClose);
+    }
+    
+    setSecondsLeft(allowedSeconds);
     setStartedAt(Date.now());
     setHasStartedExam(true);
     setSubmitMessage('');
@@ -263,6 +280,11 @@ export default function StudentMockExamPage() {
             <p>
               This mock test contains <strong>{totalQuestions}</strong> questions and the total duration is{' '}
               <strong>{exam.durationMinutes || 60} minutes</strong>.
+              {secondsLeft < (exam.durationMinutes || 60) * 60 && (
+                <span className="quiz-timer-warning" style={{ display: 'block', marginTop: '8px' }}>
+                  <strong>Note:</strong> The exam window closes soon! You only have <strong>{Math.floor(secondsLeft / 60)} minutes</strong> available to complete it.
+                </span>
+              )}
             </p>
           </div>
 
@@ -272,8 +294,8 @@ export default function StudentMockExamPage() {
               <strong>{totalQuestions}</strong>
             </article>
             <article className="quiz-instruction-stat">
-              <span>Total Time</span>
-              <strong>{exam.durationMinutes || 60} min</strong>
+              <span>Time Available</span>
+              <strong>{Math.floor(secondsLeft / 60)} min</strong>
             </article>
             <article className="quiz-instruction-stat">
               <span>Attempts</span>
