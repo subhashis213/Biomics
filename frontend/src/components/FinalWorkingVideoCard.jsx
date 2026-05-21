@@ -82,7 +82,8 @@ export default function FinalWorkingVideoCard({
   isFavorite = false,
   onToggleCompleted,
   isCompleted = false,
-  disableDangerActions = false
+  disableDangerActions = false,
+  onDownloadMaterial
 }) {
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [savedProgressSec, setSavedProgressSec] = useState(0);
@@ -1314,7 +1315,7 @@ export default function FinalWorkingVideoCard({
                           onClick={() => onDownloadMaterial({ ...material, _videoId: video._id })}
                         >
                           <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 9h-4V3H9v6h4l7 7 7-7z"/>
+                            <path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/>
                           </svg>
                         </button>
                       </div>

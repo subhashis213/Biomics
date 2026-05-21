@@ -2112,6 +2112,7 @@ export default function StudentDashboard() {
         icon: '💬'
       },
       { id: 'route-student-quiz-performance', label: 'Quiz Performance', icon: '📊' },
+      { id: 'route-student-study-materials', label: 'Study Materials', icon: '📚' },
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
       { id: 'section-test-series', label: 'Test Series', icon: '📝' },
       { id: 'route-student-test-series-performance', label: 'Series Performance', icon: '🎯' },
@@ -2124,6 +2125,11 @@ export default function StudentDashboard() {
   function handleStudentNavClick(id) {
     if (id === 'route-student-insights') {
       navigate('/student/insights');
+      return;
+    }
+
+    if (id === 'route-student-study-materials') {
+      navigate('/student/study-materials');
       return;
     }
 

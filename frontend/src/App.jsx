@@ -49,7 +49,7 @@ const StudentCourseBatchesPage = lazy(() => import('./pages/StudentCourseBatches
 const StudentInsightsPage = lazy(() => import('./pages/StudentInsightsPage'));
 const StudentQuizPerformancePage = lazy(() => import('./pages/StudentQuizPerformancePage'));
 const StudentTestSeriesPerformancePage = lazy(() => import('./pages/StudentTestSeriesPerformancePage'));
-
+const StudentStudyMaterialsPage = lazy(() => import('./pages/StudentStudyMaterialsPage'));
 function ScrollToTop() {
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
@@ -495,6 +495,16 @@ export default function App() {
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading test series performance...</div>}>
               <StudentTestSeriesPerformancePage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/study-materials"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading study materials...</div>}>
+              <StudentStudyMaterialsPage />
             </Suspense>
           </ProtectedRoute>
         )}

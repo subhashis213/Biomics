@@ -305,9 +305,11 @@ async function ensureAdminAccount() {
   }
 }
 
-mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 5000 })
+const mongoUri = String(process.env.MONGO_URI || 'mongodb://localhost:27017/biomicshub').trim();
+
+mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 })
   .then(async () => {
-    console.log('✓ Connected to MongoDB');
+    console.log(`✓ Connected to MongoDB (${mongoUri})`);
     await migrateVideos();
     await migrateQuizIndexes();
     await ensureAdminAccount();

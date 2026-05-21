@@ -438,8 +438,8 @@ router.get('/:id/materials/:filename/download', authenticateToken('user'), async
     if (!filename) return res.status(400).json({ error: 'Material filename is required.' });
 
     const [video, user] = await Promise.all([
-      Video.findById(req.params.id, { category: 1, materials: 1 }).lean(),
-      User.findOne({ username: req.user.username }, { class: 1, purchasedCourses: 1 }).lean()
+      Video.findById(req.params.id, { category: 1, module: 1, batch: 1, materials: 1 }).lean(),
+      User.findOne({ username: req.user.username }, { class: 1, batch: 1, purchasedCourses: 1 }).lean()
     ]);
 
     if (!video) return res.status(404).json({ error: 'Video not found.' });

@@ -574,6 +574,10 @@ router.put('/admin/:courseName/batches/:batchName/rename', authenticateToken('ad
         { category: courseName, batchName },
         { $set: { batchName: nextBatchName } }
       ),
+      ModulePricing.updateMany(
+        { category: courseName, batch: batchName },
+        { $set: { batch: nextBatchName } }
+      ),
       Module.updateMany(
         { category: courseName, batch: batchName },
         { $set: { batch: nextBatchName } }
@@ -597,6 +601,23 @@ router.put('/admin/:courseName/batches/:batchName/rename', authenticateToken('ad
       FullMockTest.updateMany(
         { category: courseName, batch: batchName },
         { $set: { batch: nextBatchName } }
+      ),
+      Payment.updateMany(
+        { course: courseName, batch: batchName },
+        { $set: { batch: nextBatchName } }
+      ),
+      LiveClass.updateMany(
+        { course: courseName, batch: batchName },
+        { $set: { batch: nextBatchName } }
+      ),
+      LiveClassCalendarBlock.updateMany(
+        { course: courseName, batch: batchName },
+        { $set: { batch: nextBatchName } }
+      ),
+      User.updateMany(
+        { 'purchasedCourses.course': courseName, 'purchasedCourses.batch': batchName },
+        { $set: { 'purchasedCourses.$[entry].batch': nextBatchName } },
+        { arrayFilters: [{ 'entry.course': courseName, 'entry.batch': batchName }] }
       )
     ]);
 

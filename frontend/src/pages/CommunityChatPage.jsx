@@ -43,8 +43,19 @@ export default function CommunityChatPage() {
         await streamClient.connectUser(data.user, data.token);
 
         const nextChannel = streamClient.channel(data.channel.type, data.channel.id);
-        await nextChannel.watch();
+        await nextChannel.watch({
+          state: true,
+          presence: true,
+          members: { limit: 500 },
+          watchers: { limit: 100 },
+        });
         await nextChannel.markRead().catch(() => {});
+
+        const actualMemberCount = Object.keys(nextChannel.state.members || {}).length;
+        nextChannel.data = {
+          ...nextChannel.data,
+          member_count: actualMemberCount,
+        };
 
         if (!mounted) return;
         setClient(streamClient);

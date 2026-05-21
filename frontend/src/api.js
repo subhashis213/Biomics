@@ -259,40 +259,54 @@ export function uploadMaterial(videoId, file, onProgress) {
   });
 }
 
-export function downloadMaterial(videoId, filename, displayName, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', buildUrl(`/videos/${encodeURIComponent(videoId)}/materials/${encodeURIComponent(filename)}/download`), true);
-    xhr.responseType = 'blob';
-    const token = getToken();
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+export async function fetchMaterialBlobUrl(videoId, filename, onProgress) {
+  const token = getToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    xhr.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress?.(Math.round((event.loaded / event.total) * 100));
-      }
-    };
+  const url = buildUrl(`/videos/${encodeURIComponent(videoId)}/materials/${encodeURIComponent(filename)}/download`);
+  const response = await fetch(url, { headers });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Download failed with status ${response.status}`);
+  }
 
-    xhr.onload = () => {
-      if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error('Download failed'));
-        return;
-      }
+  const contentLength = response.headers.get('content-length');
+  const total = contentLength ? parseInt(contentLength, 10) : 0;
+  let loaded = 0;
 
-      const objectUrl = URL.createObjectURL(xhr.response);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = displayName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
-      resolve();
-    };
+  const reader = response.body.getReader();
+  const chunks = [];
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    if (total && onProgress) {
+      onProgress(Math.round((loaded / total) * 100));
+    }
+  }
 
-    xhr.onerror = () => reject(new Error('Network error during download'));
-    xhr.send();
-  });
+  const blob = new Blob(chunks, { type: response.headers.get('content-type') || 'application/pdf' });
+  return URL.createObjectURL(blob);
+}
+
+export async function downloadMaterial(videoId, filename, displayName, onProgress) {
+  try {
+    const objectUrl = await fetchMaterialBlobUrl(videoId, filename, onProgress);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = displayName || filename || 'download.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch (error) {
+    console.error('downloadMaterial error:', error);
+    throw error;
+  }
 }
 
 export function toggleFavorite(videoId) {
@@ -911,7 +925,7 @@ export function downloadMockExamResultPdf(examId) {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(objectUrl);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       resolve();
     };
 

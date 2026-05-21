@@ -1,0 +1,35 @@
+
+/* Toast Banner Notifications */
+.banner {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  padding: 16px 24px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 500;
+  font-size: 1rem;
+  z-index: 10000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  animation: slideInUp 0.3s ease-out forwards;
+  max-width: 400px;
+}
+
+.banner.success {
+  background: var(--success-color, #10b981);
+}
+
+.banner.error {
+  background: var(--danger-color, #ef4444);
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

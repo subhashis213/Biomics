@@ -118,6 +118,7 @@ export default function AdminDashboard() {
   const isLightTheme = theme === 'light';
   const [videos, setVideos] = useState([]);
   const [students, setStudents] = useState([]);
+  const [totalStudentCount, setTotalStudentCount] = useState(0);
   const [feedback, setFeedback] = useState([]);
   const [videoForm, setVideoForm] = useState({ title: '', description: '', url: '' });
   const [adminCourseCatalog, setAdminCourseCatalog] = useState([]);
@@ -341,6 +342,7 @@ export default function AdminDashboard() {
 
       if (studentResult.status === 'fulfilled') {
         setStudents(studentResult.value?.users || []);
+        setTotalStudentCount(Number(studentResult.value?.total || studentResult.value?.users?.length || 0));
       }
 
       if (feedbackResult.status === 'fulfilled') {
@@ -2584,7 +2586,7 @@ export default function AdminDashboard() {
                   <h2>Open Registered Learners</h2>
                   <p className="subtitle">Use the dedicated learner page for cleaner formatting, search, pagination and a readable admin table.</p>
                 </div>
-                <StatCard label="Total Students" value={students.length} />
+                <StatCard label="Total Students" value={totalStudentCount} />
               </div>
               <div className="workspace-quick-chips" aria-label="Learner quick insights">
                 <span className="workspace-quick-chip">Dedicated learner directory</span>

@@ -223,9 +223,21 @@ export default function StudentLecturePage() {
           setDownloadProgress((current) => ({ ...current, [material.filename]: percent }));
         }
       );
-      setBanner({ type: 'success', text: `Downloaded ${material.name}.` });
+      setDownloadProgress((current) => {
+        const next = { ...current };
+        delete next[material.filename];
+        return next;
+      });
+      setBanner({ type: 'success', text: `Successfully downloaded ${material.name}.` });
+      setTimeout(() => setBanner(null), 3000);
     } catch (error) {
+      setDownloadProgress((current) => {
+        const next = { ...current };
+        delete next[material.filename];
+        return next;
+      });
       setBanner({ type: 'error', text: error.message || 'Download failed.' });
+      setTimeout(() => setBanner(null), 3000);
     }
   }
 
@@ -243,6 +255,7 @@ export default function StudentLecturePage() {
           <button type="button" className="secondary-btn" onClick={handleBack} disabled={isExiting}>
             {selectedTopicFolder ? '← Back to Chapter Folders' : '← Back to Module Sections'}
           </button>
+
           {hasTopicFolders && !selectedTopicFolder ? (
             <span className="lecture-total-chip">{visibleTopicFolders.length} chapter folder{visibleTopicFolders.length === 1 ? '' : 's'}</span>
           ) : (
