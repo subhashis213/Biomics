@@ -1,33 +1,50 @@
 // Firebase Cloud Messaging (FCM) push sender.
 //
-// This module is *graceful*: if Firebase credentials are not configured the rest
-// of the app keeps working (announcements are still saved) and push sends become
-// no-ops that report `{ configured: false }`.
-//
-// To enable real pushes, set ONE of:
-//   - FIREBASE_SERVICE_ACCOUNT      : the full service-account JSON as a string
-//   - FIREBASE_SERVICE_ACCOUNT_PATH : path to the service-account JSON file
-//
-// Get the file from Firebase Console → Project Settings → Service accounts →
-// "Generate new private key".
+// Set ONE of:
+//   FIREBASE_SERVICE_ACCOUNT      — full service-account JSON (Render env var)
+//   FIREBASE_SERVICE_ACCOUNT_PATH — path to JSON file (local dev)
 
 let admin = null;
 let initialized = false;
 let initError = '';
 
-function loadServiceAccount() {
-  const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT || '').trim();
-  if (raw) {
+function parseServiceAccountJson(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return null;
+
+  const attempts = [
+    () => JSON.parse(trimmed),
+    () => JSON.parse(trimmed.replace(/\\n/g, '\n'))
+  ];
+
+  for (const attempt of attempts) {
     try {
-      return JSON.parse(raw);
-    } catch (err) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON.');
+      const account = attempt();
+      if (account?.private_key) {
+        account.private_key = String(account.private_key).replace(/\\n/g, '\n');
+      }
+      if (account?.client_email && account?.private_key && account?.project_id) {
+        return account;
+      }
+    } catch {
+      // try next parse strategy
     }
   }
+  throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON.');
+}
+
+function loadServiceAccount() {
+  const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT || '').trim();
+  if (raw) return parseServiceAccountJson(raw);
+
   const filePath = String(process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '').trim();
   if (filePath) {
     // eslint-disable-next-line global-require, import/no-dynamic-require
-    return require(require('path').resolve(filePath));
+    const account = require(require('path').resolve(filePath));
+    if (account?.private_key) {
+      account.private_key = String(account.private_key).replace(/\\n/g, '\n');
+    }
+    return account;
   }
   return null;
 }
@@ -46,6 +63,7 @@ function ensureInitialized() {
     if (!admin.apps.length) {
       admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     }
+    initError = '';
     return true;
   } catch (err) {
     admin = null;
@@ -58,54 +76,72 @@ function isConfigured() {
   return ensureInitialized();
 }
 
+function getInitError() {
+  ensureInitialized();
+  return initError;
+}
+
 /**
  * Send a notification to many device tokens.
- * Returns { configured, successCount, failureCount, invalidTokens }.
+ * Returns { configured, successCount, failureCount, invalidTokens, errors }.
  */
 async function sendToTokens(tokens, { title, body, data } = {}) {
   const cleanTokens = Array.from(
     new Set((Array.isArray(tokens) ? tokens : []).map((t) => String(t || '').trim()).filter(Boolean))
   );
   if (!ensureInitialized()) {
-    return { configured: false, reason: initError, successCount: 0, failureCount: 0, invalidTokens: [] };
+    return {
+      configured: false,
+      reason: initError,
+      successCount: 0,
+      failureCount: 0,
+      invalidTokens: [],
+      errors: initError ? [{ code: 'init', message: initError }] : []
+    };
   }
   if (!cleanTokens.length) {
-    return { configured: true, successCount: 0, failureCount: 0, invalidTokens: [] };
+    return { configured: true, successCount: 0, failureCount: 0, invalidTokens: [], errors: [] };
   }
 
+  const safeTitle = String(title || 'BiomicsHub').trim() || 'BiomicsHub';
+  const safeBody = String(body || '').trim();
+
   const message = {
-    notification: { title: String(title || ''), body: String(body || '') },
+    notification: {
+      title: safeTitle,
+      body: safeBody
+    },
     data: Object.fromEntries(
-      Object.entries(data || {}).map(([k, v]) => [String(k), String(v)])
+      Object.entries({ type: 'announcement', ...(data || {}) }).map(([k, v]) => [String(k), String(v)])
     ),
     android: {
       priority: 'high',
-      ttl: 86400000,
       notification: {
         channelId: 'default',
         sound: 'default',
-        priority: 'max',
+        priority: 'high',
         visibility: 'public',
         defaultSound: true,
-        defaultVibrateTimings: true,
-        notificationCount: 1
+        defaultVibrateTimings: true
       }
     },
     apns: {
+      headers: { 'apns-priority': '10' },
       payload: {
         aps: {
+          alert: { title: safeTitle, body: safeBody },
           sound: 'default',
-          contentAvailable: true
+          'content-available': 1
         }
       }
     }
   };
 
   const invalidTokens = [];
+  const errors = [];
   let successCount = 0;
   let failureCount = 0;
 
-  // Chunk to FCM's 500-token limit per multicast.
   for (let i = 0; i < cleanTokens.length; i += 500) {
     const batch = cleanTokens.slice(i, i + 500);
     try {
@@ -113,19 +149,31 @@ async function sendToTokens(tokens, { title, body, data } = {}) {
       successCount += res.successCount;
       failureCount += res.failureCount;
       res.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          const code = resp.error && resp.error.code ? resp.error.code : '';
-          if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
-            invalidTokens.push(batch[idx]);
-          }
+        if (resp.success) return;
+        const code = resp.error?.code ? String(resp.error.code) : 'unknown';
+        const msg = resp.error?.message ? String(resp.error.message) : 'Send failed';
+        if (errors.length < 8) {
+          errors.push({ code, message: msg });
+        }
+        if (
+          code === 'messaging/registration-token-not-registered'
+          || code === 'messaging/invalid-registration-token'
+        ) {
+          invalidTokens.push(batch[idx]);
         }
       });
     } catch (err) {
       failureCount += batch.length;
+      if (errors.length < 8) {
+        errors.push({
+          code: 'batch_error',
+          message: err && err.message ? err.message : 'FCM batch send failed.'
+        });
+      }
     }
   }
 
-  return { configured: true, successCount, failureCount, invalidTokens };
+  return { configured: true, successCount, failureCount, invalidTokens, errors };
 }
 
-module.exports = { isConfigured, sendToTokens };
+module.exports = { isConfigured, getInitError, sendToTokens };

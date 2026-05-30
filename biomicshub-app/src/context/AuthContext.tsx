@@ -11,8 +11,7 @@ import {
   loginStudent,
   StudentUser
 } from '@/src/api/auth';
-import { unregisterDevice } from '@/src/api/notifications';
-import { getDevicePushToken, syncPushRegistration, watchPushRegistration } from '@/src/utils/push';
+import { syncPushRegistration, watchPushRegistration } from '@/src/utils/push';
 
 type AuthContextValue = {
   token: string;
@@ -88,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole('user');
     setStudent(result.user);
     setAdmin(null);
+    await syncPushRegistration(result.token);
   }, []);
 
   const loginAsAdmin = useCallback(async (username: string, password: string) => {
@@ -96,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole('admin');
     setAdmin(result.admin);
     setStudent(null);
+    await syncPushRegistration(result.token);
   }, []);
 
   const doLoginAuto = useCallback(async (username: string, password: string) => {
@@ -109,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setStudent(result.student || null);
       setAdmin(null);
     }
+    await syncPushRegistration(result.token);
     return result.role;
   }, []);
 
@@ -128,18 +130,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token, role]);
 
   const logout = useCallback(async () => {
-    try {
-      const deviceToken = await getDevicePushToken();
-      if (deviceToken && token) await unregisterDevice(token, deviceToken);
-    } catch {
-      // ignore
-    }
+    // Keep the FCM token on the server — role/username refresh on next login.
     await clearStoredAuth();
     setToken('');
     setStudent(null);
     setAdmin(null);
     setRole('user');
-  }, [token]);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({

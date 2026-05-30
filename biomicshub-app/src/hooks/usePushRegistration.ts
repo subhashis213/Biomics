@@ -8,7 +8,16 @@ export function usePushRegistration() {
 
   useEffect(() => {
     if (!token) return;
+
     syncPushRegistration(token);
-    return watchPushRegistration(token);
+    const retry1 = setTimeout(() => syncPushRegistration(token), 2500);
+    const retry2 = setTimeout(() => syncPushRegistration(token), 6000);
+    const unwatch = watchPushRegistration(token);
+
+    return () => {
+      clearTimeout(retry1);
+      clearTimeout(retry2);
+      unwatch();
+    };
   }, [token]);
 }

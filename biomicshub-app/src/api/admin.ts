@@ -46,24 +46,32 @@ export function sendNotification(
   return requestJson<{
     message: string;
     announcement?: { _id?: string };
-    push?: { configured: boolean; successCount: number; failureCount: number; targeted: number };
-  }>('/announcements', {
+    push?: {
+      configured: boolean;
+      reason?: string;
+      successCount: number;
+      failureCount: number;
+      targeted: number;
+      errors?: Array<{ code: string; message: string }>;
+    };
+  }>('/notifications/admin/send', {
     method: 'POST',
     token,
     body: JSON.stringify({
       title: payload.title,
       message: payload.message,
-      isActive: true,
       audience: payload.audience || 'students'
     })
   });
 }
 
 export function fetchPushStatus(token: string) {
-  return requestJson<{ pushConfigured: boolean; studentDevices: number; adminDevices: number }>(
-    '/notifications/admin/status',
-    { token }
-  );
+  return requestJson<{
+    pushConfigured: boolean;
+    pushInitError?: string | null;
+    studentDevices: number;
+    adminDevices: number;
+  }>('/notifications/admin/status', { token });
 }
 
 export function fetchLearners(token: string, page = 1, search = '') {

@@ -6,6 +6,11 @@ import { registerDevice } from '@/src/api/notifications';
 
 export const PUSH_CHANNEL_ID = 'default';
 
+export type PushRegistrationResult = {
+  ok: boolean;
+  reason?: 'simulator' | 'permission_denied' | 'no_token' | 'register_failed' | 'expo_go';
+};
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -15,6 +20,11 @@ Notifications.setNotificationHandler({
     shouldShowList: true
   })
 });
+
+/** Call once when the app starts so lock-screen notifications use the right channel. */
+export async function initPushNotifications() {
+  await ensureAndroidChannel();
+}
 
 async function requestAndroidPostNotifications(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
@@ -37,7 +47,8 @@ export async function ensureAndroidChannel() {
     sound: 'default',
     enableVibrate: true,
     enableLights: true,
-    showBadge: true
+    showBadge: true,
+    bypassDnd: false
   });
 }
 
@@ -61,42 +72,54 @@ export async function getDevicePushToken(): Promise<string> {
   }
   if (settings.status !== 'granted') return '';
 
-  // Expo Go cannot receive remote FCM pushes.
   if (Constants.appOwnership === 'expo') return '';
 
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       const tokenResponse = await Notifications.getDevicePushTokenAsync();
       const token = String(tokenResponse?.data || '').trim();
-      if (token) return token;
+      if (token.length > 20) return token;
     } catch {
       // FCM can be slow right after install or cold start.
     }
-    if (attempt < 3) {
-      await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
+    if (attempt < 4) {
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
     }
   }
   return '';
 }
 
 /** Request permission, fetch FCM token, and register with backend (with retries). */
-export async function syncPushRegistration(authToken: string): Promise<boolean> {
-  if (!authToken) return false;
+export async function syncPushRegistration(authToken: string): Promise<PushRegistrationResult> {
+  if (!authToken) return { ok: false, reason: 'register_failed' };
+  if (!Device.isDevice) return { ok: false, reason: 'simulator' };
+  if (Constants.appOwnership === 'expo') return { ok: false, reason: 'expo_go' };
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  await ensureAndroidChannel();
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       const deviceToken = await getDevicePushToken();
       if (!deviceToken) {
-        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1500));
-        continue;
+        const perm = await Notifications.getPermissionsAsync();
+        if (perm.status !== 'granted') {
+          return { ok: false, reason: 'permission_denied' };
+        }
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          continue;
+        }
+        return { ok: false, reason: 'no_token' };
       }
       await registerDevice(authToken, deviceToken, Platform.OS);
-      return true;
+      return { ok: true };
     } catch {
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
     }
   }
-  return false;
+  return { ok: false, reason: 'register_failed' };
 }
 
 export function addNotificationListeners(onReceive?: () => void) {

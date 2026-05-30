@@ -2,7 +2,7 @@ const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
 const DeviceToken = require('../models/DeviceToken');
 const Announcement = require('../models/Announcement');
-const { isConfigured, sendToTokens } = require('../utils/pushNotifications');
+const { isConfigured, getInitError, sendToTokens } = require('../utils/pushNotifications');
 
 const router = express.Router();
 
@@ -26,7 +26,7 @@ router.post('/register', authenticateAny, async (req, res) => {
       {
         $set: {
           token,
-          username: req.user.username,
+          username: req.user?.username || '',
           role,
           platform,
           lastSeenAt: new Date()
@@ -34,6 +34,8 @@ router.post('/register', authenticateAny, async (req, res) => {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+
+    console.log(`[push] registered device role=${role} user=${req.user?.username || 'unknown'} platform=${platform}`);
 
     return res.json({
       message: 'Device registered.',
@@ -104,15 +106,23 @@ router.post('/admin/send', authenticateToken('admin'), async (req, res) => {
     }
 
     return res.status(201).json({
-      message: result.configured
-        ? `Notification sent to ${result.successCount} device(s).`
-        : 'Saved as announcement. Push not sent — Firebase is not configured yet.',
+      message: !tokens.length
+        ? audience === 'students'
+          ? 'Saved. No student phones registered — students must log in and allow notifications.'
+          : 'Saved. No phones registered yet.'
+        : !result.configured
+          ? `Saved. Push not sent — ${result.reason || getInitError() || 'Firebase not configured'}.`
+          : result.successCount
+            ? `Notification sent to ${result.successCount} of ${tokens.length} device(s).`
+            : `Saved. Push failed for all ${tokens.length} device(s).`,
       announcement,
       push: {
         configured: result.configured,
+        reason: result.reason || (result.configured ? '' : getInitError()),
         successCount: result.successCount,
         failureCount: result.failureCount,
-        targeted: tokens.length
+        targeted: tokens.length,
+        errors: result.errors || []
       }
     });
   } catch (err) {
@@ -129,6 +139,7 @@ router.get('/admin/status', authenticateToken('admin'), async (req, res) => {
     ]);
     return res.json({
       pushConfigured: isConfigured(),
+      pushInitError: getInitError() || null,
       studentDevices,
       adminDevices
     });

@@ -10,7 +10,7 @@ import 'react-native-reanimated';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext';
 import { CartProvider } from '@/src/context/CartContext';
 import { ThemeProvider, useTheme } from '@/src/theme/ThemeContext';
-import { addNotificationListeners } from '@/src/utils/push';
+import { addNotificationListeners, initPushNotifications } from '@/src/utils/push';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -24,6 +24,7 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
+    initPushNotifications();
     const remove = addNotificationListeners();
     return remove;
   }, []);

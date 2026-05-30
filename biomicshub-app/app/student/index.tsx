@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, Linking } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
@@ -11,6 +11,7 @@ import { fetchHomeBanners, fetchStudentVoices, HomeBanner, StudentVoice } from '
 import { fetchNotifications, NotificationItem } from '@/src/api/notifications';
 import { fetchStudentLiveWorkspace, LiveClass } from '@/src/api/live';
 import { isVisibleLiveClass } from '@/src/utils/liveClass';
+import { syncPushRegistration } from '@/src/utils/push';
 import CartButton from '@/src/components/CartButton';
 import HomeBannerCarousel from '@/src/components/home/HomeBannerCarousel';
 import SocialConnectSection from '@/src/components/home/SocialConnectSection';
@@ -45,6 +46,7 @@ export default function StudentHome() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [pushHint, setPushHint] = useState('');
 
   const load = useCallback(async (isRefresh = false) => {
     if (!token) return;
@@ -76,6 +78,15 @@ export default function StudentHome() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!token) return;
+      syncPushRegistration(token).then((result) => {
+        setPushHint(result.reason === 'permission_denied' ? 'Turn on notifications in Settings to get alerts on your lock screen.' : '');
+      });
+    }, [token])
+  );
+
   useEffect(() => {
     const timer = setInterval(() => { load(true); }, LIVE_REFRESH_MS);
     return () => clearInterval(timer);
@@ -106,6 +117,14 @@ export default function StudentHome() {
         </View>
 
         <ErrorBanner message={error} />
+
+        {pushHint ? (
+          <Pressable onPress={() => Linking.openSettings()} style={styles.pushHint}>
+            <Ionicons name="notifications-off-outline" size={18} color={colors.warn} />
+            <Text style={styles.pushHintText}>{pushHint}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+          </Pressable>
+        ) : null}
 
         <HomeBannerCarousel banners={homeBanners} />
 
@@ -202,6 +221,18 @@ function Screen({ children, colors }: { children: React.ReactNode; colors: Theme
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
     scroll: { padding: 16, paddingBottom: 32 },
+    pushHint: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: c.badgeWarnBg,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.warn,
+      padding: 12,
+      marginBottom: 12
+    },
+    pushHintText: { color: c.text, flex: 1, fontSize: 13, lineHeight: 18 },
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
     headerActions: { flexDirection: 'row', gap: 10 },
     bell: { width: 42, height: 42, borderRadius: 12, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card },
