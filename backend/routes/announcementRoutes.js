@@ -32,7 +32,7 @@ router.get('/admin', authenticateToken('admin'), async (req, res) => {
   }
 });
 
-// Admin: create announcement.
+// Admin: create announcement (also attempts FCM push when configured).
 router.post('/', authenticateToken('admin'), async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
@@ -49,9 +49,38 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       createdBy: req.user?.username || ''
     });
 
+    let push = { configured: false, successCount: 0, failureCount: 0, targeted: 0 };
+    try {
+      const DeviceToken = require('../models/DeviceToken');
+      const { isConfigured, sendToTokens } = require('../utils/pushNotifications');
+      const audience = String(req.body?.audience || 'students').trim().toLowerCase();
+      const roleFilter = audience === 'all' ? {} : { role: 'user' };
+      const devices = await DeviceToken.find(roleFilter, { token: 1, _id: 0 }).lean();
+      const tokens = devices.map((d) => d.token).filter(Boolean);
+      const result = await sendToTokens(tokens, {
+        title,
+        body: message,
+        data: { type: 'announcement', announcementId: String(announcement._id) }
+      });
+      if (Array.isArray(result.invalidTokens) && result.invalidTokens.length) {
+        await DeviceToken.deleteMany({ token: { $in: result.invalidTokens } });
+      }
+      push = {
+        configured: Boolean(result.configured),
+        successCount: Number(result.successCount || 0),
+        failureCount: Number(result.failureCount || 0),
+        targeted: tokens.length
+      };
+    } catch {
+      // Push is optional; announcement is still saved.
+    }
+
     return res.status(201).json({
-      message: 'Announcement published.',
-      announcement
+      message: push.configured
+        ? `Announcement published and sent to ${push.successCount} device(s).`
+        : 'Announcement published.',
+      announcement,
+      push
     });
   } catch {
     return res.status(500).json({ error: 'Failed to create announcement.' });

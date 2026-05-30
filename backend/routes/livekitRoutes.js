@@ -279,6 +279,8 @@ async function canUserAccessClass(user, classDoc, role = 'user') {
 
   const targetCourse = normalizeCourseName(classDoc?.course);
   const targetBatch = normalizeBatchName(classDoc?.batch);
+  const enrolledCourse = normalizeCourseName(user?.class);
+  if (targetCourse && enrolledCourse && enrolledCourse === targetCourse) return true;
   if (!targetCourse || targetBatch === GENERAL_BATCH) return true;
 
   const batchMembership = getActiveModuleMembership(user, targetCourse, targetBatch)
@@ -296,11 +298,28 @@ function isUserRemovedFromClass(user, classDoc) {
 }
 
 function isClassCurrentlyLive(classDoc) {
-  return Boolean(classDoc?.isActive) || String(classDoc?.status || '').trim().toLowerCase() === 'live';
+  const status = String(classDoc?.status || '').trim().toLowerCase();
+  if (status === 'cancelled' || status === 'ended') return false;
+  return Boolean(classDoc?.isActive) || status === 'live';
 }
 
 function isClassScheduledForStudents(classDoc) {
-  return Boolean(classDoc?.isScheduled) && !isClassCurrentlyLive(classDoc);
+  const status = String(classDoc?.status || '').trim().toLowerCase();
+  if (status === 'cancelled' || status === 'ended') return false;
+  if (isClassCurrentlyLive(classDoc)) return false;
+  if (!classDoc?.isScheduled && status !== 'scheduled') return false;
+
+  const now = Date.now();
+  const scheduledAtMs = classDoc?.scheduledAt ? new Date(classDoc.scheduledAt).getTime() : NaN;
+  const scheduledEndAtMs = classDoc?.scheduledEndAt ? new Date(classDoc.scheduledEndAt).getTime() : NaN;
+  if (Number.isFinite(scheduledEndAtMs) && scheduledEndAtMs < now) return false;
+  if (Number.isFinite(scheduledAtMs) && scheduledAtMs < now - 30 * 60 * 1000) return false;
+
+  return true;
+}
+
+function isVisibleStudentLiveClass(classDoc) {
+  return isClassCurrentlyLive(classDoc) || isClassScheduledForStudents(classDoc);
 }
 
 function serializeLiveClass(classDoc, user, role = 'user', accessState = {}) {
@@ -405,7 +424,9 @@ function buildCalendarEntries(user, classes = [], accessibleCourseNames = []) {
     ...accessibleCourseNames.map((courseName) => normalizeCourseName(courseName)).filter(Boolean)
   ]);
 
-  const classEntries = classes.map((classDoc) => ({
+  const classEntries = classes
+    .filter((classDoc) => isVisibleStudentLiveClass(classDoc))
+    .map((classDoc) => ({
     id: String(classDoc?._id || ''),
     title: String(classDoc?.title || '').trim(),
     description: String(classDoc?.description || '').trim(),
@@ -668,10 +689,15 @@ router.get('/student/workspace', authenticateToken('user'), async (req, res) => 
     }
 
     const classes = await LiveClass.find({
+      status: { $nin: ['cancelled', 'ended'] },
       $or: [
         { isActive: true },
         { status: 'live' },
-        { isScheduled: true, scheduledAt: { $gte: new Date(Date.now() - 6 * 60 * 60 * 1000) } }
+        {
+          isScheduled: true,
+          status: 'scheduled',
+          scheduledAt: { $gte: new Date(Date.now() - 30 * 60 * 1000) }
+        }
       ]
     }).sort({ scheduledAt: 1, startedAt: -1 }).lean();
 
@@ -682,7 +708,9 @@ router.get('/student/workspace', authenticateToken('user'), async (req, res) => 
       canAccess: await canUserAccessClass(currentUser, item, 'user')
     })));
     const hasAnyAccessibleClass = classAccessStates.some((entry) => entry.canAccess);
-    const accessibleClasses = classAccessStates.filter((entry) => entry.canAccess).map((entry) => entry.item);
+    const accessibleClasses = classAccessStates
+      .filter((entry) => entry.canAccess && isVisibleStudentLiveClass(entry.item))
+      .map((entry) => entry.item);
     const activeClass = accessibleClasses.find((item) => isClassCurrentlyLive(item)) || null;
     const upcomingClasses = accessibleClasses.filter((item) => isClassScheduledForStudents(item));
 

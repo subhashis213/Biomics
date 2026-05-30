@@ -25,6 +25,7 @@ const MockExamAttempt = require('../models/MockExamAttempt');
 const MockExam = require('../models/MockExam');
 const UserActivitySession = require('../models/UserActivitySession');
 const Voucher = require('../models/Voucher');
+const Course = require('../models/Course');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken, JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -891,6 +892,33 @@ router.post('/check-admin-username', async (req, res) => {
     res.json({ exists: !!admin });
   } catch (err) {
     res.status(500).json({ error: 'Check failed' });
+  }
+});
+
+router.get('/register/courses', async (req, res) => {
+  try {
+    const courses = await Course.find({
+      active: { $ne: false },
+      archived: { $ne: true }
+    })
+      .sort({ name: 1 })
+      .select({ name: 1, displayName: 1, batches: 1 })
+      .lean();
+    return res.json({
+      courses: courses
+        .filter((course) => {
+          const batches = Array.isArray(course?.batches) ? course.batches : [];
+          if (!batches.length) return true;
+          return batches.some((batch) => batch?.active !== false);
+        })
+        .map((course) => ({
+          name: String(course?.name || '').trim(),
+          displayName: String(course?.displayName || course?.name || '').trim()
+        }))
+        .filter((course) => course.name)
+    });
+  } catch {
+    return res.status(500).json({ error: 'Failed to load courses.' });
   }
 });
 

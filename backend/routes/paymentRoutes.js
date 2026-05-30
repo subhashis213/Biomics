@@ -589,7 +589,7 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
 
     return res.json({
       courseName,
-      batches: batches.map((name) => {
+      batches: await Promise.all(batches.map(async (name) => {
         const normalizedBatch = normalizeBatchName(name);
         const now = Date.now();
         const memberships = (Array.isArray(user?.purchasedCourses) ? user.purchasedCourses : []).filter((entry) => {
@@ -607,6 +607,7 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
         const hasEliteAccess = memberships.some((entry) => String(entry?.planType || '').trim().toLowerCase() === 'elite');
         const hasProAccess = hasEliteAccess || memberships.some((entry) => String(entry?.planType || '').trim().toLowerCase() === 'pro');
         const pricing = pricingMap.get(String(name || '').trim().toLowerCase()) || {};
+        const { mergedModuleNames } = await fetchBatchModuleCatalogAndPricing(courseName, name);
         return {
           batchName: name,
           description: String(courseBatchDescriptionByName.get(String(name || '').trim().toLowerCase()) || '').trim(),
@@ -616,11 +617,12 @@ router.get('/catalog/:course/batches', authenticateToken('user'), async (req, re
           eliteMrpInPaise: Number(pricing.eliteMrpInPaise || 0),
           thumbnailUrl: String(pricing.thumbnailUrl || '').trim(),
           thumbnailName: String(pricing.thumbnailName || '').trim(),
+          moduleCount: mergedModuleNames.length,
           active: pricing ? pricing.active !== false : true,
           hasProAccess,
           hasEliteAccess
         };
-      })
+      }))
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch batch catalog.' });
