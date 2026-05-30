@@ -7,10 +7,14 @@ import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { fetchCourseCatalog, CourseCatalogItem } from '@/src/api/courses';
+import { fetchHomeBanners, fetchStudentVoices, HomeBanner, StudentVoice } from '@/src/api/landing';
 import { fetchNotifications, NotificationItem } from '@/src/api/notifications';
 import { fetchStudentLiveWorkspace, LiveClass } from '@/src/api/live';
 import { isVisibleLiveClass } from '@/src/utils/liveClass';
 import CartButton from '@/src/components/CartButton';
+import HomeBannerCarousel from '@/src/components/home/HomeBannerCarousel';
+import SocialConnectSection from '@/src/components/home/SocialConnectSection';
+import StudentVoiceCarousel from '@/src/components/home/StudentVoiceCarousel';
 import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, PrimaryButton, Subtitle, Title } from '@/src/components/ui';
 
 type TileDef = {
@@ -34,6 +38,8 @@ export default function StudentHome() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [courses, setCourses] = useState<CourseCatalogItem[]>([]);
+  const [homeBanners, setHomeBanners] = useState<HomeBanner[]>([]);
+  const [studentVoices, setStudentVoices] = useState<StudentVoice[]>([]);
   const [latestNote, setLatestNote] = useState<NotificationItem | null>(null);
   const [liveClass, setLiveClass] = useState<LiveClass | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,12 +51,16 @@ export default function StudentHome() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [cat, notes, live] = await Promise.all([
+      const [cat, notes, live, banners, voices] = await Promise.all([
         fetchCourseCatalog(token),
         fetchNotifications(token).catch(() => ({ notifications: [] as NotificationItem[] })),
-        fetchStudentLiveWorkspace(token).catch(() => ({ activeClass: null }))
+        fetchStudentLiveWorkspace(token).catch(() => ({ activeClass: null })),
+        fetchHomeBanners().catch(() => ({ banners: [] as HomeBanner[] })),
+        fetchStudentVoices().catch(() => ({ voices: [] as StudentVoice[] }))
       ]);
       setCourses(cat.courses || []);
+      setHomeBanners(banners.banners || []);
+      setStudentVoices(voices.voices || []);
       setLatestNote((notes.notifications || [])[0] || null);
       setLiveClass((live as { activeClass: LiveClass | null }).activeClass && isVisibleLiveClass((live as { activeClass: LiveClass | null }).activeClass)
         ? (live as { activeClass: LiveClass | null }).activeClass
@@ -96,6 +106,8 @@ export default function StudentHome() {
         </View>
 
         <ErrorBanner message={error} />
+
+        <HomeBannerCarousel banners={homeBanners} />
 
         <View style={styles.tiles}>
           {TILES.map((tile, i) => (
@@ -156,6 +168,10 @@ export default function StudentHome() {
             ))}
           </Card>
         ) : null}
+
+        <StudentVoiceCarousel voices={studentVoices} />
+
+        <SocialConnectSection />
 
         {!loading ? (
           <Card>

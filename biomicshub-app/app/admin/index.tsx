@@ -14,6 +14,7 @@ import { formatInrFromPaise } from '@/src/utils/format';
 
 const ACTIONS = [
   { icon: 'videocam-outline', label: 'Conduct & schedule live classes', route: '/admin/live' },
+  { icon: 'images-outline', label: 'Manage home banners', route: '/admin/banners' },
   { icon: 'notifications-outline', label: 'Send a push notification', route: '/admin/notify' },
   { icon: 'people-outline', label: 'View registered learners', route: '/admin/learners' },
   { icon: 'film-outline', label: 'Manage content & test series', route: '/admin/content' },

@@ -25,6 +25,7 @@ const testSeriesRoutes = require('./routes/testSeriesRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const debugRoutes = require('./routes/debugRoutes');
 const studentVoiceRoutes = require('./routes/studentVoiceRoutes');
+const homeBannerRoutes = require('./routes/homeBannerRoutes');
 
 const app = express();
 const livekitPublicUrl = String(process.env.LIVEKIT_URL || '').trim();
@@ -228,6 +229,7 @@ app.use('/test-series', testSeriesRoutes);
 app.use('/courses', courseRoutes);
 app.use('/debug', debugRoutes);
 app.use('/landing', studentVoiceRoutes);
+app.use('/landing', homeBannerRoutes);
 
 // Health check — used by keep-alive ping and uptime monitors
 app.get('/health', (req, res) => res.json({ status: 'ok', version: SERVER_VERSION, ts: Date.now() }));

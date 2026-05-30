@@ -27,6 +27,7 @@ export default function AdminTabsLayout() {
       <Tabs.Screen name="notify" options={{ title: 'Notify', tabBarIcon: icon('notifications-outline') }} />
       <Tabs.Screen name="learners" options={{ title: 'Learners', tabBarIcon: icon('people-outline') }} />
       <Tabs.Screen name="content" options={{ title: 'Content', tabBarIcon: icon('film-outline') }} />
+      <Tabs.Screen name="banners" options={{ href: null, title: 'Home banners' }} />
       <Tabs.Screen name="revenue" options={{ href: null, title: 'Revenue' }} />
     </Tabs>
   );
