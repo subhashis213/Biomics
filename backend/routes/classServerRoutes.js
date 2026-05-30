@@ -5,6 +5,10 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 const AWS_REGION = String(process.env.AWS_REGION || 'ap-south-1').trim() || 'ap-south-1';
+const AWS_REGION_PATTERN = /^[a-z]{2}(?:-gov|-iso|-isob|-isob)?-[a-z0-9-]+-\d+$/;
+if (!AWS_REGION_PATTERN.test(AWS_REGION)) {
+  throw new Error(`Invalid AWS_REGION value: ${AWS_REGION}`);
+}
 const EC2_ENDPOINT = `https://ec2.${AWS_REGION}.amazonaws.com`;
 
 function requireAwsConfig() {

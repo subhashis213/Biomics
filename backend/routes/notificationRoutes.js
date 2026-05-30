@@ -35,7 +35,12 @@ router.post('/register', authenticateAny, async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    return res.json({ message: 'Device registered.', pushConfigured: isConfigured() });
+    return res.json({
+      message: 'Device registered.',
+      registered: true,
+      role,
+      pushConfigured: isConfigured()
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to register device.' });
   }

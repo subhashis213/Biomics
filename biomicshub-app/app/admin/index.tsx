@@ -128,7 +128,9 @@ export default function AdminDashboard() {
           </View>
           <Text style={styles.hint}>
             {pushConfigured
-              ? `${studentDevices} student device(s) registered.`
+              ? studentDevices > 0
+                ? `${studentDevices} student phone(s) ready to receive alerts (lock screen & banner).`
+                : 'FCM is live but no student phones registered yet. Students must install the app, allow notifications, and log in as student.'
               : 'Add Firebase credentials on the backend to enable real pushes (see README).'}
           </Text>
         </Card>

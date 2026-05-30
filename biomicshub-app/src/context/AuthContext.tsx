@@ -11,8 +11,8 @@ import {
   loginStudent,
   StudentUser
 } from '@/src/api/auth';
-import { registerDevice, unregisterDevice } from '@/src/api/notifications';
-import { getDevicePushToken } from '@/src/utils/push';
+import { unregisterDevice } from '@/src/api/notifications';
+import { getDevicePushToken, syncPushRegistration, watchPushRegistration } from '@/src/utils/push';
 
 type AuthContextValue = {
   token: string;
@@ -38,12 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const registerPush = useCallback(async (authToken: string) => {
-    try {
-      const deviceToken = await getDevicePushToken();
-      if (deviceToken) await registerDevice(authToken, deviceToken);
-    } catch {
-      // Push is optional; never block the session.
-    }
+    await syncPushRegistration(authToken);
   }, []);
 
   useEffect(() => {
@@ -65,7 +60,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRole('user');
           setStudent(profile);
         }
-        registerPush(stored.token);
       } catch {
         await clearStoredAuth();
         if (!cancelled) {
@@ -80,7 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [registerPush]);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    registerPush(token);
+    return watchPushRegistration(token);
+  }, [token, registerPush]);
 
   const loginAsStudent = useCallback(async (username: string, password: string) => {
     const result = await loginStudent(username, password);
@@ -88,8 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole('user');
     setStudent(result.user);
     setAdmin(null);
-    registerPush(result.token);
-  }, [registerPush]);
+  }, []);
 
   const loginAsAdmin = useCallback(async (username: string, password: string) => {
     const result = await loginAdmin(username, password);
@@ -97,8 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole('admin');
     setAdmin(result.admin);
     setStudent(null);
-    registerPush(result.token);
-  }, [registerPush]);
+  }, []);
 
   const doLoginAuto = useCallback(async (username: string, password: string) => {
     const result = await loginAuto(username, password);
@@ -111,9 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setStudent(result.student || null);
       setAdmin(null);
     }
-    registerPush(result.token);
     return result.role;
-  }, [registerPush]);
+  }, []);
 
   const refreshProfile = useCallback(async () => {
     if (!token) return;

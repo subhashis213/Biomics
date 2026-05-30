@@ -80,7 +80,24 @@ async function sendToTokens(tokens, { title, body, data } = {}) {
     ),
     android: {
       priority: 'high',
-      notification: { channelId: 'default', sound: 'default' }
+      ttl: 86400000,
+      notification: {
+        channelId: 'default',
+        sound: 'default',
+        priority: 'max',
+        visibility: 'public',
+        defaultSound: true,
+        defaultVibrateTimings: true,
+        notificationCount: 1
+      }
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: 'default',
+          contentAvailable: true
+        }
+      }
     }
   };
 

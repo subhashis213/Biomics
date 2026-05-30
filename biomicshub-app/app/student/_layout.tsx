@@ -2,9 +2,11 @@ import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import { useTheme } from '@/src/theme/ThemeContext';
+import { usePushRegistration } from '@/src/hooks/usePushRegistration';
 
 export default function StudentTabsLayout() {
   const { colors } = useTheme();
+  usePushRegistration();
   const icon = (name: React.ComponentProps<typeof Ionicons>['name']) =>
     ({ color, size }: { color: string; size: number }) => <Ionicons name={name} size={size ?? 22} color={color} />;
 

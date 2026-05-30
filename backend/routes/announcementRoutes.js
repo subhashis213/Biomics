@@ -76,9 +76,11 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     }
 
     return res.status(201).json({
-      message: push.configured
-        ? `Announcement published and sent to ${push.successCount} device(s).`
-        : 'Announcement published.',
+      message: !push.targeted
+        ? 'Announcement saved. No student phones registered yet — students must open the app, allow notifications, and log in.'
+        : push.configured
+          ? `Announcement published and sent to ${push.successCount} of ${push.targeted} device(s).`
+          : 'Announcement published.',
       announcement,
       push
     });
