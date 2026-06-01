@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { registerDevice } from '@/src/api/notifications';
+import { ensureNotifeeChannel } from '@/src/utils/richPush';
 
 export const PUSH_CHANNEL_ID = 'default';
 
@@ -24,6 +25,7 @@ Notifications.setNotificationHandler({
 /** Call once when the app starts so lock-screen notifications use the right channel. */
 export async function initPushNotifications() {
   await ensureAndroidChannel();
+  await ensureNotifeeChannel();
 }
 
 async function requestAndroidPostNotifications(): Promise<boolean> {

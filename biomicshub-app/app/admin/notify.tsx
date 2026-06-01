@@ -20,7 +20,8 @@ import { ThemeColors } from '@/src/theme/theme';
 import { fetchPushStatus, sendNotification } from '@/src/api/admin';
 import { uploadHomeBannerImage } from '@/src/api/landing';
 import { resolveApiAssetUrl } from '@/src/api/client';
-import RichNotificationText, { stripRichMarkup, wrapRichTag } from '@/src/components/RichNotificationText';
+import RichNotificationText from '@/src/components/RichNotificationText';
+import { stripRichMarkup, wrapRichTag } from '@/src/utils/notificationFormat';
 import { Card, ErrorBanner, Eyebrow, Field, PrimaryButton, Screen, Subtitle, SuccessBanner, Title } from '@/src/components/ui';
 
 type RichTag = 'b' | 'red' | 'big' | 'h' | 'accent' | 'blue' | 'green';
@@ -163,7 +164,7 @@ export default function AdminNotify() {
         >
           <Eyebrow>Push notification</Eyebrow>
           <Title>Send rich alert</Title>
-          <Subtitle>Poster image on lock screen (Unacademy style) + bold/colored message in-app.</Subtitle>
+          <Subtitle>Poster + bold/colored text appear on the phone notification (Android).</Subtitle>
           <View style={{ height: 12 }} />
 
           <Card style={styles.statusCard}>

@@ -38,7 +38,7 @@ const { resolveMessageFields, stripRichMarkup, toAbsoluteAssetUrl } = require('.
 router.post('/', authenticateToken('admin'), async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
-    const { message, messageRich } = resolveMessageFields(req.body);
+    const { message, messageRich, messageHtml } = resolveMessageFields(req.body);
     const imageUrl = String(req.body?.imageUrl || '').trim();
 
     if (!title || !message) {
@@ -72,6 +72,8 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
           announcementId: String(announcement._id),
           imageUrl: absoluteImage,
           messageRich: messageRich || message,
+          messageHtml: messageHtml || '',
+          message: pushBody,
           title
         }
       });

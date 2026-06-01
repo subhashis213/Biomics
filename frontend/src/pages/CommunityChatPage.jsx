@@ -2,14 +2,15 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StreamChat } from 'stream-chat';
 import {
+  AttachmentSelector,
   Channel,
-  ChannelHeader,
   Chat,
   Window
 } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
 import { fetchCommunityChatToken, fetchCommunityChatUnreadCount } from '../api';
 import AppShell from '../components/AppShell';
+import CommunityChatChannelHeader from '../components/CommunityChatChannelHeader';
 
 const CommunityChatMessagePane = lazy(() => import('../components/CommunityChatMessagePane'));
 const CommunityChatThreadPane = lazy(() => import('../components/CommunityChatThreadPane'));
@@ -18,6 +19,7 @@ export default function CommunityChatPage() {
   const navigate = useNavigate();
   const [client, setClient] = useState(null);
   const [channel, setChannel] = useState(null);
+  const [registeredMemberCount, setRegisteredMemberCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
@@ -38,8 +40,16 @@ export default function CommunityChatPage() {
           throw new Error('Community chat configuration is incomplete. Please re-login and try again.');
         }
 
-        // Use a fresh client instance to avoid stale singleton key/token mismatches.
         streamClient = new StreamChat(data.apiKey);
+        streamClient.setMessageComposerSetupFunction(({ composer }) => {
+          composer.updateConfig({
+            attachments: {
+              maxNumberOfFilesPerMessage: 5,
+              acceptedFiles: ['image/*', 'application/pdf']
+            }
+          });
+        });
+
         await streamClient.connectUser(data.user, data.token);
 
         const nextChannel = streamClient.channel(data.channel.type, data.channel.id);
@@ -47,17 +57,19 @@ export default function CommunityChatPage() {
           state: true,
           presence: true,
           members: { limit: 500 },
-          watchers: { limit: 100 },
+          watchers: { limit: 100 }
         });
         await nextChannel.markRead().catch(() => {});
 
-        const actualMemberCount = Object.keys(nextChannel.state.members || {}).length;
+        const memberCount = Math.max(0, Number(data.registeredMemberCount || 0));
         nextChannel.data = {
           ...nextChannel.data,
-          member_count: actualMemberCount,
+          name: data.channel?.name || 'Biomics Community',
+          registered_member_count: memberCount
         };
 
         if (!mounted) return;
+        setRegisteredMemberCount(memberCount);
         setClient(streamClient);
         setChannel(nextChannel);
       } catch (error) {
@@ -151,9 +163,9 @@ export default function CommunityChatPage() {
 
             <div className="community-chat-frame">
               <Chat client={client} theme="str-chat__theme-light">
-                <Channel channel={channel}>
+                <Channel channel={channel} AttachmentSelector={AttachmentSelector}>
                   <Window>
-                    <ChannelHeader />
+                    <CommunityChatChannelHeader registeredMemberCount={registeredMemberCount} />
                     <Suspense fallback={<div className="empty-note">Loading chat messages...</div>}>
                       <CommunityChatMessagePane />
                     </Suspense>

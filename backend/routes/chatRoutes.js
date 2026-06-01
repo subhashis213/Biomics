@@ -1,9 +1,13 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const { StreamChat } = require('stream-chat');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const ChatHistory = require('../models/ChatHistory');
 const User = require('../models/User');
+const Admin = require('../models/Admin');
 const Module = require('../models/Module');
 const Topic = require('../models/Topic');
 const Video = require('../models/Video');
@@ -23,7 +27,37 @@ const CONTEXT_WINDOW = 20; // how many recent messages to send as context
 const DEFAULT_MAX_OUTPUT_TOKENS = 1200;
 const STREAM_CHANNEL_TYPE = 'messaging';
 const STREAM_CHANNEL_ID = 'community-general';
+const COMMUNITY_MEMBER_SYNC_MS = 10 * 60 * 1000;
 const WEBAPP_CONTEXT_CACHE_MS = 10 * 1000;
+
+const communityUploadsDir = path.join(__dirname, '..', 'uploads', 'community');
+if (!fs.existsSync(communityUploadsDir)) {
+  fs.mkdirSync(communityUploadsDir, { recursive: true });
+}
+
+const communityAttachmentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, communityUploadsDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      const safeBase = path.basename(file.originalname || 'attachment', ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48);
+      cb(null, `community-${Date.now()}-${safeBase}${ext || '.bin'}`);
+    }
+  }),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const mime = String(file.mimetype || '').toLowerCase();
+    const allowed = mime.startsWith('image/') || mime === 'application/pdf';
+    if (allowed) return cb(null, true);
+    return cb(new Error('Only images and PDF files are allowed.'));
+  }
+});
+
+const communitySyncState = {
+  running: false,
+  lastAt: 0,
+  streamConfigured: false
+};
 
 const webappContextCache = {
   snapshot: null,
@@ -870,6 +904,151 @@ function toStreamSafeUserId(role, username) {
   return `${role}-${suffix}`.slice(0, 80);
 }
 
+async function getRegisteredCommunityMemberCount() {
+  const [students, admins] = await Promise.all([
+    User.countDocuments({}),
+    Admin.countDocuments({})
+  ]);
+  return students + admins;
+}
+
+async function listCommunityStreamProfiles() {
+  const [users, admins] = await Promise.all([
+    User.find({}, { username: 1 }).lean(),
+    Admin.find({}, { username: 1 }).lean()
+  ]);
+
+  const profiles = [];
+  for (const user of users) {
+    const username = String(user?.username || '').trim();
+    if (!username) continue;
+    profiles.push({
+      id: toStreamSafeUserId('user', username),
+      name: username,
+      biomicsRole: 'user'
+    });
+  }
+  for (const admin of admins) {
+    const username = String(admin?.username || '').trim();
+    if (!username) continue;
+    profiles.push({
+      id: toStreamSafeUserId('admin', username),
+      name: `Admin · ${username}`,
+      biomicsRole: 'admin'
+    });
+  }
+
+  const seen = new Set();
+  return profiles.filter((profile) => {
+    if (seen.has(profile.id)) return false;
+    seen.add(profile.id);
+    return true;
+  });
+}
+
+async function ensureStreamCommunityChatConfig(streamClient) {
+  if (communitySyncState.streamConfigured) return;
+  try {
+    let existingGrants = {};
+    try {
+      const channelType = await streamClient.getChannelType(STREAM_CHANNEL_TYPE);
+      existingGrants = channelType?.grants || {};
+    } catch {
+      existingGrants = {};
+    }
+
+    const mergeGrants = (role, required) => Array.from(new Set([...(existingGrants[role] || []), ...required]));
+
+    await streamClient.updateChannelType(STREAM_CHANNEL_TYPE, {
+      name: 'Messaging',
+      uploads: true,
+      max_message_length: 5000,
+      commands: [],
+      grants: {
+        ...existingGrants,
+        user: mergeGrants('user', [
+          'read-channel',
+          'send-message',
+          'upload-attachment',
+          'create-attachment',
+          'send-reaction'
+        ]),
+        admin: mergeGrants('admin', [
+          'read-channel',
+          'send-message',
+          'upload-attachment',
+          'create-attachment',
+          'delete-any-message',
+          'send-reaction'
+        ])
+      }
+    });
+    communitySyncState.streamConfigured = true;
+  } catch (error) {
+    console.warn('[community-chat] Stream upload config sync skipped:', error?.message || error);
+  }
+}
+
+async function syncCommunityChannelMembers(streamClient) {
+  const profiles = await listCommunityStreamProfiles();
+  if (!profiles.length) return profiles.length;
+
+  const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
+    name: 'Biomics Community',
+    created_by_id: profiles[0].id
+  });
+
+  try {
+    await channel.create();
+  } catch (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (!message.includes('already exists')) {
+      throw error;
+    }
+  }
+
+  for (let i = 0; i < profiles.length; i += 100) {
+    await streamClient.upsertUsers(profiles.slice(i, i + 100));
+  }
+
+  const memberIds = profiles.map((profile) => profile.id);
+  for (let i = 0; i < memberIds.length; i += 100) {
+    try {
+      await channel.addMembers(memberIds.slice(i, i + 100));
+    } catch (error) {
+      const message = String(error?.message || '').toLowerCase();
+      if (!message.includes('already') && !message.includes('member')) {
+        throw error;
+      }
+    }
+  }
+
+  await channel.update({
+    registered_member_count: profiles.length,
+    name: 'Biomics Community'
+  }).catch(() => {});
+
+  return profiles.length;
+}
+
+function scheduleCommunityMemberSync(streamClient) {
+  const now = Date.now();
+  if (communitySyncState.running || now - communitySyncState.lastAt < COMMUNITY_MEMBER_SYNC_MS) {
+    return;
+  }
+  communitySyncState.running = true;
+  communitySyncState.lastAt = now;
+  Promise.resolve()
+    .then(() => ensureStreamCommunityChatConfig(streamClient))
+    .then(() => syncCommunityChannelMembers(streamClient))
+    .catch((error) => {
+      console.warn('[community-chat] member sync failed:', error?.message || error);
+    })
+    .finally(() => {
+      communitySyncState.running = false;
+    });
+}
+
 async function ensureCommunityChannelMembership(streamClient, streamUserId) {
   const channel = streamClient.channel(STREAM_CHANNEL_TYPE, STREAM_CHANNEL_ID, {
     name: 'Biomics Community',
@@ -898,6 +1077,14 @@ async function ensureCommunityChannelMembership(streamClient, streamUserId) {
   return channel;
 }
 
+function resolvePublicApiBase(req) {
+  const configured = String(process.env.PUBLIC_API_BASE || process.env.API_PUBLIC_URL || '').trim();
+  if (configured) return configured.replace(/\/$/, '');
+  const host = req.get('host');
+  if (host) return `${req.protocol}://${host}`;
+  return 'https://biomicshub-backend.onrender.com';
+}
+
 // POST /chat/community/token — issue Stream user token for real-time community chat
 router.post('/community/token', authenticateToken(), async (req, res) => {
   try {
@@ -923,12 +1110,17 @@ router.post('/community/token', authenticateToken(), async (req, res) => {
       biomicsRole: role
     });
 
+    await ensureStreamCommunityChatConfig(streamClient);
     const channel = await ensureCommunityChannelMembership(streamClient, streamUserId);
+    const registeredMemberCount = await getRegisteredCommunityMemberCount();
+    scheduleCommunityMemberSync(streamClient);
 
     const token = streamClient.createToken(streamUserId);
     return res.json({
       apiKey,
       token,
+      apiBase: resolvePublicApiBase(req),
+      registeredMemberCount,
       user: {
         id: streamUserId,
         name: displayName,
@@ -936,12 +1128,48 @@ router.post('/community/token', authenticateToken(), async (req, res) => {
       },
       channel: {
         type: STREAM_CHANNEL_TYPE,
-        id: STREAM_CHANNEL_ID
+        id: STREAM_CHANNEL_ID,
+        name: channel?.data?.name || 'Biomics Community'
       }
     });
   } catch (error) {
     return res.status(500).json({ error: error?.message || 'Failed to initialize community chat.' });
   }
+});
+
+// GET /chat/community/stats — registered member count for community chat header
+router.get('/community/stats', authenticateToken(), async (req, res) => {
+  try {
+    const registeredMemberCount = await getRegisteredCommunityMemberCount();
+    return res.json({ registeredMemberCount });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'Failed to fetch community chat stats.' });
+  }
+});
+
+// POST /chat/community/attachments — upload image/PDF for community chat (mobile + fallback)
+router.post('/community/attachments', authenticateToken(), (req, res) => {
+  communityAttachmentUpload.single('attachment')(req, res, async (uploadError) => {
+    if (uploadError instanceof multer.MulterError && uploadError.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'Attachment exceeds 15MB limit.' });
+    }
+    if (uploadError) {
+      return res.status(400).json({ error: uploadError.message || 'Attachment upload failed.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No attachment file provided.' });
+    }
+
+    const mime = String(req.file.mimetype || '').toLowerCase();
+    const url = `/uploads/community/${req.file.filename}`;
+    return res.json({
+      url,
+      absoluteUrl: `${resolvePublicApiBase(req)}${url}`,
+      mime,
+      name: req.file.originalname || req.file.filename,
+      type: mime.startsWith('image/') ? 'image' : 'file'
+    });
+  });
 });
 
 // GET /chat/community/unread — unread count for current user in community channel

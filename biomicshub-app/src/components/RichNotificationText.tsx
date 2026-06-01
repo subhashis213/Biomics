@@ -70,14 +70,4 @@ const styles = StyleSheet.create({
   base: { fontSize: 15, lineHeight: 22 }
 });
 
-/** Plain text for previews / collapsed notification UI. */
-export function stripRichMarkup(text?: string) {
-  return String(text || '')
-    .replace(/\[(\/)?(b|red|big|h|accent|blue|green)\]/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function wrapRichTag(tag: TagName, sample = 'your text') {
-  return `[${tag}]${sample}[/${tag}]`;
-}
+export { stripRichMarkup, wrapRichTag } from '@/src/utils/notificationFormat';

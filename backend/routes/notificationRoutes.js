@@ -79,7 +79,7 @@ router.post('/admin/send', authenticateToken('admin'), async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
     const audience = String(req.body?.audience || 'students').trim().toLowerCase();
-    const { message, messageRich } = resolveMessageFields(req.body);
+    const { message, messageRich, messageHtml } = resolveMessageFields(req.body);
     const imageUrl = String(req.body?.imageUrl || '').trim();
 
     if (!title || !message) {
@@ -110,6 +110,8 @@ router.post('/admin/send', authenticateToken('admin'), async (req, res) => {
         announcementId: String(announcement._id),
         imageUrl: absoluteImage,
         messageRich: messageRich || message,
+        messageHtml: messageHtml || '',
+        message: pushBody,
         title
       }
     });

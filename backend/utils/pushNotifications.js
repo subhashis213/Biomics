@@ -1,8 +1,4 @@
-// Firebase Cloud Messaging (FCM) push sender.
-//
-// Set ONE of:
-//   FIREBASE_SERVICE_ACCOUNT      — full service-account JSON (Render env var)
-//   FIREBASE_SERVICE_ACCOUNT_PATH — path to JSON file (local dev)
+// Firebase Cloud Messaging (FCM) — data-only pushes rendered on-device via Notifee (HTML bold/color + poster).
 
 let admin = null;
 let initialized = false;
@@ -82,8 +78,7 @@ function getInitError() {
 }
 
 /**
- * Send a notification to many device tokens.
- * Returns { configured, successCount, failureCount, invalidTokens, errors }.
+ * Send a data-only FCM message. The mobile app renders styled notifications via Notifee.
  */
 async function sendToTokens(tokens, { title, body, data } = {}) {
   const cleanTokens = Array.from(
@@ -104,45 +99,29 @@ async function sendToTokens(tokens, { title, body, data } = {}) {
   }
 
   const safeTitle = String(title || 'BiomicsHub').trim() || 'BiomicsHub';
-  const safeBody = String(body || '').trim();
-  const imageUrl = String(data?.imageUrl || '').trim();
+  const payloadData = Object.fromEntries(
+    Object.entries({ type: 'announcement', title: safeTitle, ...(data || {}) }).map(([k, v]) => [
+      String(k),
+      String(v ?? '')
+    ])
+  );
 
-  const notification = {
-    title: safeTitle,
-    body: safeBody
-  };
-  if (imageUrl) notification.imageUrl = imageUrl;
-
-  const androidNotification = {
-    channelId: 'default',
-    sound: 'default',
-    priority: 'high',
-    visibility: 'public',
-    defaultSound: true,
-    defaultVibrateTimings: true
-  };
-  if (imageUrl) androidNotification.imageUrl = imageUrl;
-
+  // Data-only: avoids plain system notification; app shows HTML-styled Notifee alert.
   const message = {
-    notification,
-    data: Object.fromEntries(
-      Object.entries({ type: 'announcement', ...(data || {}) }).map(([k, v]) => [String(k), String(v ?? '')])
-    ),
+    data: payloadData,
     android: {
       priority: 'high',
-      notification: androidNotification
+      ttl: 86400000
     },
     apns: {
       headers: { 'apns-priority': '10' },
       payload: {
         aps: {
-          alert: { title: safeTitle, body: safeBody },
+          alert: { title: safeTitle, body: String(body || payloadData.message || '').trim() },
           sound: 'default',
-          'content-available': 1,
-          'mutable-content': imageUrl ? 1 : 0
+          'content-available': 1
         }
-      },
-      ...(imageUrl ? { fcmOptions: { imageUrl } } : {})
+      }
     }
   };
 

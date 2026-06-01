@@ -973,6 +973,10 @@ export function fetchCommunityChatUnreadCount() {
   return requestJson('/chat/community/unread');
 }
 
+export function fetchCommunityChatStats() {
+  return requestJson('/chat/community/stats');
+}
+
 export function clearCommunityChatAdmin() {
   return requestJson('/chat/community/messages', {
     method: 'DELETE'

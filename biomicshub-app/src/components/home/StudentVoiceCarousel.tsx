@@ -26,13 +26,17 @@ type Props = {
 function Stars({ rating, color }: { rating: number; color: string }) {
   const filled = Math.max(0, Math.min(5, Math.round(rating || 5)));
   return (
-    <View style={{ flexDirection: 'row', gap: 3 }}>
+    <View style={stylesStars.row}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <Ionicons key={i} name={i < filled ? 'star' : 'star-outline'} size={14} color={color} />
+        <Ionicons key={i} name={i < filled ? 'star' : 'star-outline'} size={13} color={color} />
       ))}
     </View>
   );
 }
+
+const stylesStars = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 2 }
+});
 
 export default function StudentVoiceCarousel({ voices }: Props) {
   const { colors } = useTheme();
@@ -62,13 +66,15 @@ export default function StudentVoiceCarousel({ voices }: Props) {
 
   return (
     <View style={styles.section}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.eyebrow}>Student voices</Text>
-          <Text style={styles.heading}>What our students say</Text>
-        </View>
-        <View style={styles.badge}>
-          <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.accent} />
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleWrap}>
+          <View style={styles.sectionIcon}>
+            <Ionicons name="people" size={18} color={colors.accentText} />
+          </View>
+          <View>
+            <Text style={styles.eyebrow}>Student voices</Text>
+            <Text style={styles.heading}>Real stories from learners</Text>
+          </View>
         </View>
       </View>
 
@@ -89,29 +95,52 @@ export default function StudentVoiceCarousel({ voices }: Props) {
         }}
         renderItem={({ item }) => (
           <View style={[styles.slide, { width: slideWidth }]}>
-            <View style={styles.card}>
-              <View style={styles.cardTop}>
-                <Ionicons name="format-quote" size={26} color={colors.accent} />
-                <Stars rating={item.rating || 5} color={colors.warn} />
+            <View style={styles.poster}>
+              {/* Poster header band */}
+              <View style={styles.posterHeader}>
+                <View style={styles.posterHeaderGlow} />
+                <Text style={styles.posterLabel}>STUDENT VOICE</Text>
+                <Stars rating={item.rating || 5} color="#fde68a" />
               </View>
 
-              <View style={styles.cardBody}>
+              {/* Decorative quote — text, not a missing icon */}
+              <Text style={styles.quoteMark} accessibilityElementsHidden importantForAccessibility="no">
+                “
+              </Text>
+
+              <View style={styles.posterBody}>
                 <Text style={styles.message}>{item.message}</Text>
 
-                <View style={styles.profileRow}>
+                <View style={styles.profileCard}>
                   {item.avatarUrl ? (
-                    <Image source={{ uri: resolveApiAssetUrl(item.avatarUrl) }} style={styles.avatarImage} />
+                    <Image
+                      source={{ uri: resolveApiAssetUrl(item.avatarUrl) }}
+                      style={styles.avatar}
+                    />
                   ) : (
                     <View style={styles.avatarFallback}>
-                      <Text style={styles.avatarLetter}>{String(item.name || 'S').charAt(0).toUpperCase()}</Text>
+                      <Text style={styles.avatarLetter}>
+                        {String(item.name || 'S').charAt(0).toUpperCase()}
+                      </Text>
                     </View>
                   )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.name}>{item.name}</Text>
-                    {item.role ? <Text style={styles.role}>{item.role}</Text> : null}
+                  <View style={styles.profileMeta}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
+                    </View>
+                    {item.role ? (
+                      <Text style={styles.role} numberOfLines={1}>{item.role}</Text>
+                    ) : (
+                      <Text style={styles.role}>BiomicsHub student</Text>
+                    )}
                   </View>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
                 </View>
+              </View>
+
+              <View style={styles.posterFooter}>
+                <Ionicons name="school-outline" size={14} color={colors.accent} />
+                <Text style={styles.footerText}>Verified learner feedback</Text>
               </View>
             </View>
           </View>
@@ -132,70 +161,125 @@ export default function StudentVoiceCarousel({ voices }: Props) {
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
     section: { marginBottom: 22 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-    eyebrow: { color: c.accent, fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
-    heading: { color: c.text, fontSize: 18, fontWeight: '800', marginTop: 2 },
-    badge: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: c.accentSoft,
+    sectionHeader: { marginBottom: 12 },
+    sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    sectionIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 14,
+      backgroundColor: c.accent,
       alignItems: 'center',
       justifyContent: 'center'
     },
+    eyebrow: {
+      color: c.accent,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 1,
+      textTransform: 'uppercase'
+    },
+    heading: { color: c.text, fontSize: 18, fontWeight: '800', marginTop: 2 },
     slide: { paddingRight: 0 },
-    card: {
-      borderRadius: 18,
+    poster: {
+      borderRadius: 20,
       overflow: 'hidden',
       backgroundColor: c.card,
       borderWidth: 1,
       borderColor: c.border,
       shadowColor: '#000',
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 3
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4
     },
-    cardTop: {
+    posterHeader: {
+      backgroundColor: c.accent,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: c.accentSoft,
-      borderBottomWidth: 1,
-      borderBottomColor: c.border
+      overflow: 'hidden'
     },
-    cardBody: { padding: 16, paddingTop: 14 },
+    posterHeaderGlow: {
+      position: 'absolute',
+      right: -20,
+      top: -20,
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255,255,255,0.15)'
+    },
+    posterLabel: {
+      color: c.accentText,
+      fontSize: 11,
+      fontWeight: '900',
+      letterSpacing: 1.2
+    },
+    quoteMark: {
+      position: 'absolute',
+      top: 52,
+      right: 14,
+      fontSize: 72,
+      lineHeight: 72,
+      color: c.accentSoft,
+      fontWeight: '900',
+      opacity: 0.55
+    },
+    posterBody: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12 },
     message: {
       color: c.text,
       fontSize: 15,
-      lineHeight: 23,
+      lineHeight: 24,
       fontWeight: '500',
-      marginBottom: 16
+      minHeight: 72,
+      paddingRight: 36
     },
-    profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    avatarImage: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+    profileCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 16,
+      padding: 12,
+      borderRadius: 14,
       backgroundColor: c.cardAlt,
+      borderWidth: 1,
+      borderColor: c.border
+    },
+    avatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: c.card,
       borderWidth: 2,
-      borderColor: c.accentSoft
+      borderColor: c.accent
     },
     avatarFallback: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
       backgroundColor: c.accentSoft,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 2,
       borderColor: c.accent
     },
-    avatarLetter: { color: c.accent, fontWeight: '800', fontSize: 18 },
-    name: { color: c.text, fontWeight: '800', fontSize: 15 },
-    role: { color: c.muted, fontSize: 13, marginTop: 2 },
+    avatarLetter: { color: c.accent, fontWeight: '900', fontSize: 20 },
+    profileMeta: { flex: 1 },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    name: { color: c.text, fontWeight: '800', fontSize: 15, flexShrink: 1 },
+    role: { color: c.muted, fontSize: 12, marginTop: 3, fontWeight: '600' },
+    posterFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+      backgroundColor: c.cardAlt
+    },
+    footerText: { color: c.muted, fontSize: 11, fontWeight: '700' },
     dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 12 },
     dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.border },
     dotActive: { width: 18, backgroundColor: c.accent }

@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/src/context/AuthContext';
 import { CartProvider } from '@/src/context/CartContext';
 import { ThemeProvider, useTheme } from '@/src/theme/ThemeContext';
 import { addNotificationListeners, initPushNotifications } from '@/src/utils/push';
+import { initForegroundPushHandler } from '@/src/utils/pushMessaging';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -25,8 +26,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     initPushNotifications();
-    const remove = addNotificationListeners();
-    return remove;
+    const removeListeners = addNotificationListeners();
+    const removeForegroundPush = initForegroundPushHandler();
+    return () => {
+      removeListeners();
+      removeForegroundPush();
+    };
   }, []);
 
   if (!fontsLoaded) return null;
