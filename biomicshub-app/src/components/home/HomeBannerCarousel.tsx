@@ -18,17 +18,55 @@ import { ThemeColors } from '@/src/theme/theme';
 
 const SLIDE_INTERVAL_MS = 4500;
 const HORIZONTAL_PADDING = 16;
+const MIN_SLIDE_HEIGHT = 140;
+const MAX_SLIDE_HEIGHT_RATIO = 0.62;
 
 type Props = {
   banners: HomeBanner[];
 };
+
+function measureBannerHeight(uri: string, slideWidth: number): Promise<number> {
+  return new Promise((resolve) => {
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (width > 0 && height > 0) {
+          resolve(Math.max(MIN_SLIDE_HEIGHT, slideWidth * (height / width)));
+          return;
+        }
+        resolve(MIN_SLIDE_HEIGHT);
+      },
+      () => resolve(MIN_SLIDE_HEIGHT)
+    );
+  });
+}
 
 export default function HomeBannerCarousel({ banners }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const listRef = useRef<FlatList<HomeBanner>>(null);
   const [index, setIndex] = useState(0);
-  const width = Dimensions.get('window').width - HORIZONTAL_PADDING * 2;
+  const [slideHeight, setSlideHeight] = useState(MIN_SLIDE_HEIGHT);
+  const slideWidth = Dimensions.get('window').width - HORIZONTAL_PADDING * 2;
+  const maxSlideHeight = Dimensions.get('window').height * MAX_SLIDE_HEIGHT_RATIO;
+
+  useEffect(() => {
+    if (!banners.length) return;
+    let cancelled = false;
+
+    (async () => {
+      const heights = await Promise.all(
+        banners.map((banner) => measureBannerHeight(resolveApiAssetUrl(banner.imageUrl), slideWidth))
+      );
+      if (cancelled) return;
+      const tallest = Math.min(Math.max(...heights, MIN_SLIDE_HEIGHT), maxSlideHeight);
+      setSlideHeight(tallest);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [banners, slideWidth, maxSlideHeight]);
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -66,17 +104,21 @@ export default function HomeBannerCarousel({ banners }: Props) {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 60 }}
         onScrollToIndexFailed={() => {}}
-        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        getItemLayout={(_, i) => ({ length: slideWidth, offset: slideWidth * i, index: i })}
         onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-          const next = Math.round(event.nativeEvent.contentOffset.x / width);
+          const next = Math.round(event.nativeEvent.contentOffset.x / slideWidth);
           if (Number.isFinite(next)) setIndex(next);
         }}
         renderItem={({ item }) => (
-          <Pressable style={[styles.slide, { width }]} onPress={() => openBanner(item)}>
+          <Pressable
+            style={[styles.slide, { width: slideWidth, height: slideHeight }]}
+            onPress={() => openBanner(item)}
+          >
             <Image
               source={{ uri: resolveApiAssetUrl(item.imageUrl) }}
               style={styles.image}
-              resizeMode="cover"
+              resizeMode="contain"
+              accessibilityRole="image"
             />
           </Pressable>
         )}
@@ -96,12 +138,13 @@ function createStyles(c: ThemeColors) {
   return StyleSheet.create({
     wrap: { marginBottom: 18 },
     slide: {
-      height: 168,
       borderRadius: 16,
       overflow: 'hidden',
       backgroundColor: c.cardAlt,
       borderWidth: 1,
-      borderColor: c.border
+      borderColor: c.border,
+      alignItems: 'center',
+      justifyContent: 'center'
     },
     image: { width: '100%', height: '100%' },
     dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },

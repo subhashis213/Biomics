@@ -17,6 +17,19 @@ import {
 import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, PriceRow, PrimaryButton, Screen, Subtitle, SuccessBanner, Title } from '@/src/components/ui';
 import { addTestSeriesCartItem, makeTestSeriesCartKey } from '@/src/utils/testSeriesCart';
 
+const DEFAULT_TEST_SERIES_COURSE = 'CSIR-NET Life Science';
+
+function pickDefaultTestSeriesCourse(courses: TestSeriesCourseCatalog[], studentClass?: string) {
+  const exact = courses.find((c) => c.courseName === DEFAULT_TEST_SERIES_COURSE);
+  if (exact) return exact.courseName;
+  const csir = courses.find(
+    (c) => /csir/i.test(c.courseName) && /life\s*science/i.test(c.courseName)
+  );
+  if (csir) return csir.courseName;
+  if (studentClass && courses.some((c) => c.courseName === studentClass)) return studentClass;
+  return courses[0]?.courseName || '';
+}
+
 type BrowseLevel = 'modules' | 'topics' | 'tests';
 
 function norm(s: string) {
@@ -101,7 +114,7 @@ export default function TestsTab() {
       const res = await fetchTestSeriesCatalog(token);
       const list = res.courses || [];
       setCourses(list);
-      const initial = selectedCourse || student?.class || list[0]?.courseName || '';
+      const initial = selectedCourse || pickDefaultTestSeriesCourse(list, student?.class);
       setSelectedCourse(initial);
       if (initial) await loadCourseTests(initial, list);
       setError('');
@@ -155,6 +168,16 @@ export default function TestsTab() {
   const seriesLabel = tab === 'topic' ? 'Topic test series' : 'Full mock series';
 
   const moduleGroups = useMemo(() => groupTopicTests(items), [items]);
+  const sortedCourses = useMemo(() => {
+    const list = [...courses];
+    list.sort((a, b) => {
+      const aDefault = a.courseName === DEFAULT_TEST_SERIES_COURSE ? -1 : 0;
+      const bDefault = b.courseName === DEFAULT_TEST_SERIES_COURSE ? -1 : 0;
+      if (aDefault !== bDefault) return aDefault - bDefault;
+      return a.courseName.localeCompare(b.courseName);
+    });
+    return list;
+  }, [courses]);
   const activeModule = useMemo(
     () => moduleGroups.find((m) => m.module === selectedModule) || null,
     [moduleGroups, selectedModule]
@@ -305,7 +328,7 @@ export default function TestsTab() {
         <SuccessBanner message={cartSuccess} />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips} contentContainerStyle={styles.chipsContent}>
-          {courses.map((c) => (
+          {sortedCourses.map((c) => (
             <Pressable
               key={c.courseName}
               onPress={() => selectCourse(c.courseName)}
