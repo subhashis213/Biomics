@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
+import { useCart } from '@/src/context/CartContext';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import {
@@ -59,6 +60,7 @@ function groupTopicTests(items: SyllabusItem[]) {
 
 export default function TestsTab() {
   const { token, student, username } = useAuth();
+  const { refreshTestSeriesCart } = useCart();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [courses, setCourses] = useState<TestSeriesCourseCatalog[]>([]);
@@ -198,6 +200,7 @@ export default function TestsTab() {
       priceInPaise: salePaise,
       validityDays: tab === 'topic' ? pricing?.topicTestValidityDays || 60 : pricing?.fullMockValidityDays || 60
     });
+    await refreshTestSeriesCart();
     setCartSuccess('Added to cart. Open Profile → Cart to checkout.');
     setTimeout(() => setCartSuccess(''), 3000);
   }

@@ -41,7 +41,13 @@ export type AdminVideo = {
 
 export function sendNotification(
   token: string,
-  payload: { title: string; message: string; audience?: 'students' | 'all' }
+  payload: {
+    title: string;
+    message: string;
+    messageRich?: string;
+    imageUrl?: string;
+    audience?: 'students' | 'all';
+  }
 ) {
   return requestJson<{
     message: string;
@@ -60,6 +66,8 @@ export function sendNotification(
     body: JSON.stringify({
       title: payload.title,
       message: payload.message,
+      messageRich: payload.messageRich || payload.message,
+      imageUrl: payload.imageUrl || '',
       audience: payload.audience || 'students'
     })
   });

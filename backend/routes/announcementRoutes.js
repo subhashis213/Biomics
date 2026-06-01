@@ -32,11 +32,14 @@ router.get('/admin', authenticateToken('admin'), async (req, res) => {
   }
 });
 
+const { resolveMessageFields, stripRichMarkup, toAbsoluteAssetUrl } = require('../utils/notificationFormat');
+
 // Admin: create announcement (also attempts FCM push when configured).
 router.post('/', authenticateToken('admin'), async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
-    const message = String(req.body?.message || '').trim();
+    const { message, messageRich } = resolveMessageFields(req.body);
+    const imageUrl = String(req.body?.imageUrl || '').trim();
 
     if (!title || !message) {
       return res.status(400).json({ error: 'Title and message are required.' });
@@ -45,6 +48,8 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
     const announcement = await Announcement.create({
       title,
       message,
+      messageRich: messageRich || message,
+      imageUrl,
       isActive: req.body?.isActive !== false,
       createdBy: req.user?.username || ''
     });
@@ -57,10 +62,18 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       const roleFilter = audience === 'all' ? {} : { role: 'user' };
       const devices = await DeviceToken.find(roleFilter, { token: 1, _id: 0 }).lean();
       const tokens = devices.map((d) => d.token).filter(Boolean);
+      const absoluteImage = toAbsoluteAssetUrl(imageUrl);
+      const pushBody = stripRichMarkup(messageRich || message) || message;
       const result = await sendToTokens(tokens, {
         title,
-        body: message,
-        data: { type: 'announcement', announcementId: String(announcement._id) }
+        body: pushBody,
+        data: {
+          type: 'announcement',
+          announcementId: String(announcement._id),
+          imageUrl: absoluteImage,
+          messageRich: messageRich || message,
+          title
+        }
       });
       if (Array.isArray(result.invalidTokens) && result.invalidTokens.length) {
         await DeviceToken.deleteMany({ token: { $in: result.invalidTokens } });

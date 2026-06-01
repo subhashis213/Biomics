@@ -9,6 +9,12 @@ export type TestSeriesCartItem = {
   label: string;
   priceInPaise: number;
   validityDays: number;
+  voucherCode?: string;
+  appliedPricing?: {
+    originalAmountInPaise: number;
+    discountInPaise: number;
+    finalAmountInPaise: number;
+  };
 };
 
 function storageKey(username: string) {
@@ -45,4 +51,11 @@ export async function removeTestSeriesCartItem(username: string, key: string) {
   const items = (await readTestSeriesCart(username)).filter((i) => i.key !== key);
   await writeTestSeriesCart(username, items);
   return items;
+}
+
+export async function updateTestSeriesCartItem(username: string, key: string, patch: Partial<TestSeriesCartItem>) {
+  const items = await readTestSeriesCart(username);
+  const next = items.map((i) => (i.key === key ? { ...i, ...patch } : i));
+  await writeTestSeriesCart(username, next);
+  return next;
 }

@@ -27,18 +27,18 @@ export default function CartButton({ bordered = false }: { bordered?: boolean })
 }
 
 const styles = StyleSheet.create({
-  btn: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  btn: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, overflow: 'visible' },
   badge: {
     position: 'absolute',
-    top: -2,
-    right: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3
+    paddingHorizontal: 4
   },
-  badgeText: { color: '#fff', fontSize: 9, fontWeight: '900' }
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '900' }
 });

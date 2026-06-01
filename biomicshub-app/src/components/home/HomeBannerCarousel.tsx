@@ -136,7 +136,7 @@ export default function HomeBannerCarousel({ banners }: Props) {
 
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
-    wrap: { marginBottom: 18 },
+    wrap: { marginBottom: 14 },
     slide: {
       borderRadius: 16,
       overflow: 'hidden',

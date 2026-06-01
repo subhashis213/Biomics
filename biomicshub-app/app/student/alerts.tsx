@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
+import { resolveApiAssetUrl } from '@/src/api/client';
 import { fetchNotifications, NotificationItem } from '@/src/api/notifications';
+import RichNotificationText from '@/src/components/RichNotificationText';
 import { Card, ErrorBanner, Eyebrow, LoadingBlock, Screen, Subtitle, Title } from '@/src/components/ui';
 
 function formatDate(value?: string) {
@@ -54,20 +56,29 @@ export default function AlertsTab() {
       >
         <Eyebrow>Notifications</Eyebrow>
         <Title>Announcements</Title>
-        <Subtitle>Push alerts from your institute appear here.</Subtitle>
+        <Subtitle>Push alerts from your institute appear here with posters and styled text.</Subtitle>
         <View style={{ height: 12 }} />
         <ErrorBanner message={error} />
         {loading ? <LoadingBlock /> : null}
-        {!loading && items.map((n, i) => (
-          <Card key={n?._id ? String(n._id) : `note-${i}`}>
-            <View style={styles.head}>
-              <Ionicons name="megaphone-outline" size={18} color={colors.accent} />
-              <Text style={styles.title}>{n?.title || 'Announcement'}</Text>
-            </View>
-            {n?.message ? <Text style={styles.msg}>{n.message}</Text> : null}
-            {n?.createdAt ? <Text style={styles.date}>{formatDate(n.createdAt)}</Text> : null}
-          </Card>
-        ))}
+        {!loading && items.map((n, i) => {
+          const poster = n.imageUrl ? resolveApiAssetUrl(n.imageUrl) : '';
+          const rich = n.messageRich || n.message;
+          return (
+            <Card key={n?._id ? String(n._id) : `note-${i}`} style={styles.card}>
+              {poster ? (
+                <Image source={{ uri: poster }} style={styles.poster} resizeMode="cover" />
+              ) : null}
+              <View style={styles.cardBody}>
+                <View style={styles.head}>
+                  <Ionicons name="megaphone-outline" size={18} color={colors.accent} />
+                  <Text style={styles.title}>{n?.title || 'Announcement'}</Text>
+                </View>
+                {rich ? <RichNotificationText text={rich} style={styles.msg} /> : null}
+                {n?.createdAt ? <Text style={styles.date}>{formatDate(n.createdAt)}</Text> : null}
+              </View>
+            </Card>
+          );
+        })}
         {!loading && !items.length ? <Text style={styles.empty}>No notifications yet.</Text> : null}
       </ScrollView>
     </Screen>
@@ -77,10 +88,13 @@ export default function AlertsTab() {
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
     scroll: { padding: 16, paddingBottom: 32 },
+    card: { padding: 0, overflow: 'hidden' },
+    poster: { width: '100%', height: 160, backgroundColor: c.cardAlt },
+    cardBody: { padding: 14 },
     head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    title: { color: c.text, fontWeight: '700', fontSize: 16, flex: 1 },
-    msg: { color: c.muted, marginTop: 8, lineHeight: 20 },
-    date: { color: c.accent, marginTop: 8, fontSize: 12 },
+    title: { color: c.text, fontWeight: '800', fontSize: 16, flex: 1 },
+    msg: { color: c.text, marginTop: 8 },
+    date: { color: c.accent, marginTop: 10, fontSize: 12 },
     empty: { color: c.muted }
   });
 }

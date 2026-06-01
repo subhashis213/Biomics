@@ -4,6 +4,8 @@ export type NotificationItem = {
   _id: string;
   title: string;
   message: string;
+  messageRich?: string;
+  imageUrl?: string;
   createdAt?: string;
   createdBy?: string;
 };

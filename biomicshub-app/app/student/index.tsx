@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, Linking } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, Linking, Image } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
@@ -9,14 +9,17 @@ import { ThemeColors } from '@/src/theme/theme';
 import { fetchCourseCatalog, CourseCatalogItem } from '@/src/api/courses';
 import { fetchHomeBanners, fetchStudentVoices, HomeBanner, StudentVoice } from '@/src/api/landing';
 import { fetchNotifications, NotificationItem } from '@/src/api/notifications';
+import { resolveApiAssetUrl } from '@/src/api/client';
 import { fetchStudentLiveWorkspace, LiveClass } from '@/src/api/live';
 import { isVisibleLiveClass } from '@/src/utils/liveClass';
 import { syncPushRegistration } from '@/src/utils/push';
+import { getTimeGreeting } from '@/src/utils/greeting';
 import CartButton from '@/src/components/CartButton';
 import HomeBannerCarousel from '@/src/components/home/HomeBannerCarousel';
 import SocialConnectSection from '@/src/components/home/SocialConnectSection';
 import StudentVoiceCarousel from '@/src/components/home/StudentVoiceCarousel';
-import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, PrimaryButton, Subtitle, Title } from '@/src/components/ui';
+import RichNotificationText from '@/src/components/RichNotificationText';
+import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, PrimaryButton, Title } from '@/src/components/ui';
 
 type TileDef = {
   key: string;
@@ -93,6 +96,7 @@ export default function StudentHome() {
   }, [load]);
 
   const myCourses = courses.filter((c) => c.unlocked || c.isEnrolledCourse);
+  const greeting = useMemo(() => getTimeGreeting(), []);
 
   return (
     <Screen colors={colors}>
@@ -102,15 +106,12 @@ export default function StudentHome() {
       >
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Eyebrow>Welcome back</Eyebrow>
+            <Eyebrow>{greeting}</Eyebrow>
             <Title>{student?.username || 'Student'}</Title>
-            {student?.class ? <Subtitle>Enrolled course: {student.class}</Subtitle> : null}
           </View>
           <View style={styles.headerActions}>
-            <View style={styles.bell}>
-              <CartButton />
-            </View>
-            <Pressable onPress={() => router.push('/student/alerts')} style={styles.bell}>
+            <CartButton bordered />
+            <Pressable onPress={() => router.push('/student/alerts')} style={styles.iconBtn}>
               <Ionicons name="notifications-outline" size={22} color={colors.text} />
             </Pressable>
           </View>
@@ -158,13 +159,22 @@ export default function StudentHome() {
 
         {latestNote ? (
           <Pressable onPress={() => router.push('/student/alerts')}>
-            <Card>
-              <View style={styles.noteHead}>
-                <Ionicons name="megaphone-outline" size={16} color={colors.accent} />
-                <Text style={styles.noteEyebrow}>Latest notification</Text>
+            <Card style={styles.noteCard}>
+              {latestNote.imageUrl ? (
+                <Image source={{ uri: resolveApiAssetUrl(latestNote.imageUrl) }} style={styles.notePoster} resizeMode="cover" />
+              ) : null}
+              <View style={styles.noteBody}>
+                <View style={styles.noteHead}>
+                  <Ionicons name="megaphone-outline" size={16} color={colors.accent} />
+                  <Text style={styles.noteEyebrow}>Latest notification</Text>
+                </View>
+                <Text style={styles.noteTitle}>{latestNote.title}</Text>
+                <RichNotificationText
+                  text={latestNote.messageRich || latestNote.message}
+                  style={styles.noteMsg}
+                  numberOfLines={3}
+                />
               </View>
-              <Text style={styles.noteTitle}>{latestNote.title}</Text>
-              <Text style={styles.noteMsg} numberOfLines={2}>{latestNote.message}</Text>
             </Card>
           </Pressable>
         ) : null}
@@ -233,10 +243,20 @@ function createStyles(c: ThemeColors) {
       marginBottom: 12
     },
     pushHintText: { color: c.text, flex: 1, fontSize: 13, lineHeight: 18 },
-    headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
-    headerActions: { flexDirection: 'row', gap: 10 },
-    bell: { width: 42, height: 42, borderRadius: 12, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card },
-    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    headerActions: { flexDirection: 'row', gap: 10, overflow: 'visible' },
+    iconBtn: {
+      width: 42,
+      height: 42,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.card,
+      overflow: 'visible'
+    },
+    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4, marginBottom: 16 },
     tileWrap: { width: '47%' },
     tile: {
       backgroundColor: c.card,
@@ -263,8 +283,11 @@ function createStyles(c: ThemeColors) {
     liveTitle: { color: c.text, fontSize: 17, fontWeight: '800' },
     noteHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
     noteEyebrow: { color: c.accent, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-    noteTitle: { color: c.text, fontWeight: '700', marginTop: 2 },
-    noteMsg: { color: c.muted, marginTop: 4 },
+    noteCard: { padding: 0, overflow: 'hidden', marginBottom: 16 },
+    notePoster: { width: '100%', height: 130, backgroundColor: c.cardAlt },
+    noteBody: { padding: 14 },
+    noteTitle: { color: c.text, fontWeight: '800', marginTop: 2, fontSize: 16 },
+    noteMsg: { color: c.muted, marginTop: 6 },
     courseRow: {
       flexDirection: 'row',
       alignItems: 'center',

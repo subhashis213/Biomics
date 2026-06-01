@@ -8,27 +8,26 @@ import { useCart } from '@/src/context/CartContext';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { PlanType, previewOrder } from '@/src/api/payments';
+import { previewTestSeriesVoucher } from '@/src/api/testSeries';
 import { ErrorBanner, Eyebrow, Screen, Subtitle, SuccessBanner, Title } from '@/src/components/ui';
 import { formatInrFromPaise } from '@/src/utils/format';
-import { readTestSeriesCart, removeTestSeriesCartItem, TestSeriesCartItem } from '@/src/utils/testSeriesCart';
+import { removeTestSeriesCartItem, TestSeriesCartItem, updateTestSeriesCartItem } from '@/src/utils/testSeriesCart';
+
+function tsItemPrice(item: TestSeriesCartItem) {
+  return item.appliedPricing?.finalAmountInPaise ?? item.priceInPaise;
+}
 
 export default function CartScreen() {
   const { token, username } = useAuth();
-  const { items, removeItem, setPlan, setVoucher, clearVoucher, subtotalInPaise, itemPrice } = useCart();
+  const { items, testSeriesItems, removeItem, setPlan, setVoucher, clearVoucher, subtotalInPaise, itemPrice, refreshTestSeriesCart } = useCart();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [draftCodes, setDraftCodes] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState<string | null>(null);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
-  const [tsItems, setTsItems] = useState<TestSeriesCartItem[]>([]);
 
-  const loadTsCart = useCallback(async () => {
-    if (!username) return;
-    setTsItems(await readTestSeriesCart(username));
-  }, [username]);
-
-  useFocusEffect(useCallback(() => { loadTsCart(); }, [loadTsCart]));
+  useFocusEffect(useCallback(() => { refreshTestSeriesCart(); }, [refreshTestSeriesCart]));
 
   function priceFor(planType: PlanType, pro: number, elite: number) {
     return planType === 'elite' ? elite : pro;
@@ -77,6 +76,44 @@ export default function CartScreen() {
     }
   }
 
+  async function applyTestSeriesCoupon(item: TestSeriesCartItem) {
+    if (!token || !username) return;
+    const code = String(draftCodes[item.key] || '').trim().toUpperCase();
+    if (!code) {
+      setCouponError('Enter a coupon code.');
+      return;
+    }
+    setApplying(item.key);
+    setCouponError('');
+    setCouponSuccess('');
+    try {
+      const res = await previewTestSeriesVoucher(token, {
+        course: item.course,
+        seriesType: item.seriesType,
+        voucherCode: code
+      });
+      if (res.discountInPaise <= 0 && res.finalAmountInPaise >= res.originalAmountInPaise) {
+        throw new Error('This coupon is not valid for this item.');
+      }
+      await updateTestSeriesCartItem(username, item.key, {
+        voucherCode: res.voucherCode || code,
+        appliedPricing: {
+          originalAmountInPaise: res.originalAmountInPaise,
+          discountInPaise: res.discountInPaise,
+          finalAmountInPaise: res.finalAmountInPaise
+        }
+      });
+      await refreshTestSeriesCart();
+      setCouponSuccess(`Coupon ${code} applied — saved ${formatInrFromPaise(res.discountInPaise)}`);
+    } catch (err) {
+      await updateTestSeriesCartItem(username, item.key, { voucherCode: undefined, appliedPricing: undefined });
+      await refreshTestSeriesCart();
+      setCouponError(err instanceof Error ? err.message : 'Could not apply coupon.');
+    } finally {
+      setApplying(null);
+    }
+  }
+
   function buyTestSeries(item: TestSeriesCartItem) {
     router.push({
       pathname: '/test-series-checkout',
@@ -84,17 +121,24 @@ export default function CartScreen() {
         course: item.course,
         seriesType: item.seriesType,
         title: item.label,
-        cartKey: item.key
+        cartKey: item.key,
+        ...(item.voucherCode ? { voucherCode: item.voucherCode } : {})
       }
     });
   }
 
   async function removeTsItem(key: string) {
     if (!username) return;
-    setTsItems(await removeTestSeriesCartItem(username, key));
+    await removeTestSeriesCartItem(username, key);
+    await refreshTestSeriesCart();
   }
 
-  const hasAny = items.length > 0 || tsItems.length > 0;
+  const tsSubtotal = useMemo(
+    () => testSeriesItems.reduce((sum, item) => sum + tsItemPrice(item), 0),
+    [testSeriesItems]
+  );
+
+  const hasAny = items.length > 0 || testSeriesItems.length > 0;
 
   function buy(
     key: string,
@@ -127,7 +171,7 @@ export default function CartScreen() {
         <Title>Your selections</Title>
         <Subtitle>
           {hasAny
-            ? `${items.length + tsItems.length} item${items.length + tsItems.length > 1 ? 's' : ''} ready to purchase`
+            ? `${items.length + testSeriesItems.length} item${items.length + testSeriesItems.length > 1 ? 's' : ''} ready to purchase`
             : 'Your cart is empty'}
         </Subtitle>
         <View style={{ height: 12 }} />
@@ -144,10 +188,13 @@ export default function CartScreen() {
           </Animated.View>
         ) : null}
 
-        {tsItems.length ? (
+        {testSeriesItems.length ? (
           <>
             <Text style={styles.sectionTitle}>Test series</Text>
-            {tsItems.map((item, i) => (
+            {testSeriesItems.map((item, i) => {
+              const final = tsItemPrice(item);
+              const hasDiscount = Boolean(item.appliedPricing && item.appliedPricing.discountInPaise > 0);
+              return (
               <Animated.View key={item.key} entering={FadeInDown.delay(i * 60)} layout={Layout} style={styles.card}>
                 <View style={styles.cardTop}>
                   <View style={{ flex: 1 }}>
@@ -159,15 +206,58 @@ export default function CartScreen() {
                     <Ionicons name="trash-outline" size={20} color={colors.danger} />
                   </Pressable>
                 </View>
+
+                <View style={styles.couponBox}>
+                  <Ionicons name="pricetag-outline" size={16} color={colors.accent} />
+                  <TextInput
+                    value={draftCodes[item.key] ?? item.voucherCode ?? ''}
+                    onChangeText={(v) => setDraftCodes((prev) => ({ ...prev, [item.key]: v.toUpperCase() }))}
+                    placeholder="Coupon code"
+                    placeholderTextColor={colors.muted}
+                    autoCapitalize="characters"
+                    style={styles.couponInput}
+                  />
+                  <Pressable style={styles.applyBtn} onPress={() => applyTestSeriesCoupon(item)} disabled={applying === item.key}>
+                    {applying === item.key ? (
+                      <ActivityIndicator size="small" color={colors.accentText} />
+                    ) : (
+                      <Text style={styles.applyText}>Apply</Text>
+                    )}
+                  </Pressable>
+                </View>
+                {item.voucherCode ? (
+                  <View style={styles.appliedRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                    <Text style={styles.appliedText}>{item.voucherCode} applied</Text>
+                    <Pressable
+                      onPress={async () => {
+                        if (!username) return;
+                        await updateTestSeriesCartItem(username, item.key, { voucherCode: undefined, appliedPricing: undefined });
+                        await refreshTestSeriesCart();
+                        setDraftCodes((p) => ({ ...p, [item.key]: '' }));
+                      }}
+                    >
+                      <Text style={styles.removeCoupon}>Remove</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
                 <View style={styles.cardBottom}>
-                  <Text style={styles.price}>{formatInrFromPaise(item.priceInPaise)}</Text>
+                  <View>
+                    {hasDiscount ? <Text style={styles.mrp}>{formatInrFromPaise(item.priceInPaise)}</Text> : null}
+                    <Text style={styles.price}>{formatInrFromPaise(final)}</Text>
+                    {hasDiscount ? (
+                      <Text style={styles.saved}>You save {formatInrFromPaise(item.appliedPricing!.discountInPaise)}</Text>
+                    ) : null}
+                  </View>
                   <Pressable style={styles.buyBtn} onPress={() => buyTestSeries(item)}>
                     <Ionicons name="flash" size={16} color={colors.accentText} />
                     <Text style={styles.buyText}>Buy now</Text>
                   </Pressable>
                 </View>
               </Animated.View>
-            ))}
+            );
+            })}
           </>
         ) : null}
 
@@ -252,13 +342,13 @@ export default function CartScreen() {
           );
         })}
 
-        {items.length ? (
+        {(items.length || testSeriesItems.length) ? (
           <Animated.View entering={FadeInDown} style={styles.summary}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>{formatInrFromPaise(subtotalInPaise)}</Text>
+              <Text style={styles.summaryValue}>{formatInrFromPaise(subtotalInPaise + tsSubtotal)}</Text>
             </View>
-            <Text style={styles.note}>Coupons are validated against your course. Each item checks out separately via Razorpay.</Text>
+            <Text style={styles.note}>Coupons apply per item. Each item checks out separately via Razorpay.</Text>
           </Animated.View>
         ) : null}
       </ScrollView>

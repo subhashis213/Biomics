@@ -179,3 +179,21 @@ export function verifyTestSeriesPayment(
     body: JSON.stringify(payload)
   });
 }
+
+export function previewTestSeriesVoucher(
+  token: string,
+  payload: { course: string; seriesType: 'topic_test' | 'full_mock'; voucherCode: string }
+) {
+  return requestJson<{
+    valid?: boolean;
+    originalAmountInPaise: number;
+    discountInPaise: number;
+    finalAmountInPaise: number;
+    voucherCode: string;
+    description?: string;
+  }>('/test-series/payment/preview-voucher', {
+    method: 'POST',
+    token,
+    body: JSON.stringify(payload)
+  });
+}

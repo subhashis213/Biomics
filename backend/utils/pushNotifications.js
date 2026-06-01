@@ -105,25 +105,32 @@ async function sendToTokens(tokens, { title, body, data } = {}) {
 
   const safeTitle = String(title || 'BiomicsHub').trim() || 'BiomicsHub';
   const safeBody = String(body || '').trim();
+  const imageUrl = String(data?.imageUrl || '').trim();
+
+  const notification = {
+    title: safeTitle,
+    body: safeBody
+  };
+  if (imageUrl) notification.imageUrl = imageUrl;
+
+  const androidNotification = {
+    channelId: 'default',
+    sound: 'default',
+    priority: 'high',
+    visibility: 'public',
+    defaultSound: true,
+    defaultVibrateTimings: true
+  };
+  if (imageUrl) androidNotification.imageUrl = imageUrl;
 
   const message = {
-    notification: {
-      title: safeTitle,
-      body: safeBody
-    },
+    notification,
     data: Object.fromEntries(
-      Object.entries({ type: 'announcement', ...(data || {}) }).map(([k, v]) => [String(k), String(v)])
+      Object.entries({ type: 'announcement', ...(data || {}) }).map(([k, v]) => [String(k), String(v ?? '')])
     ),
     android: {
       priority: 'high',
-      notification: {
-        channelId: 'default',
-        sound: 'default',
-        priority: 'high',
-        visibility: 'public',
-        defaultSound: true,
-        defaultVibrateTimings: true
-      }
+      notification: androidNotification
     },
     apns: {
       headers: { 'apns-priority': '10' },
@@ -131,9 +138,11 @@ async function sendToTokens(tokens, { title, body, data } = {}) {
         aps: {
           alert: { title: safeTitle, body: safeBody },
           sound: 'default',
-          'content-available': 1
+          'content-available': 1,
+          'mutable-content': imageUrl ? 1 : 0
         }
-      }
+      },
+      ...(imageUrl ? { fcmOptions: { imageUrl } } : {})
     }
   };
 

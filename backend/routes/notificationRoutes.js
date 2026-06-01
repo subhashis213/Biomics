@@ -3,6 +3,7 @@ const { authenticateToken } = require('../middleware/auth');
 const DeviceToken = require('../models/DeviceToken');
 const Announcement = require('../models/Announcement');
 const { isConfigured, getInitError, sendToTokens } = require('../utils/pushNotifications');
+const { resolveMessageFields, stripRichMarkup, toAbsoluteAssetUrl } = require('../utils/notificationFormat');
 
 const router = express.Router();
 
@@ -77,8 +78,10 @@ router.get('/', authenticateAny, async (req, res) => {
 router.post('/admin/send', authenticateToken('admin'), async (req, res) => {
   try {
     const title = String(req.body?.title || '').trim();
-    const message = String(req.body?.message || '').trim();
     const audience = String(req.body?.audience || 'students').trim().toLowerCase();
+    const { message, messageRich } = resolveMessageFields(req.body);
+    const imageUrl = String(req.body?.imageUrl || '').trim();
+
     if (!title || !message) {
       return res.status(400).json({ error: 'Title and message are required.' });
     }
@@ -86,6 +89,8 @@ router.post('/admin/send', authenticateToken('admin'), async (req, res) => {
     const announcement = await Announcement.create({
       title,
       message,
+      messageRich: messageRich || message,
+      imageUrl,
       isActive: true,
       createdBy: req.user?.username || ''
     });
@@ -94,10 +99,19 @@ router.post('/admin/send', authenticateToken('admin'), async (req, res) => {
     const devices = await DeviceToken.find(roleFilter, { token: 1, _id: 0 }).lean();
     const tokens = devices.map((d) => d.token).filter(Boolean);
 
+    const absoluteImage = toAbsoluteAssetUrl(imageUrl);
+    const pushBody = stripRichMarkup(messageRich || message) || message;
+
     const result = await sendToTokens(tokens, {
       title,
-      body: message,
-      data: { type: 'announcement', announcementId: String(announcement._id) }
+      body: pushBody,
+      data: {
+        type: 'announcement',
+        announcementId: String(announcement._id),
+        imageUrl: absoluteImage,
+        messageRich: messageRich || message,
+        title
+      }
     });
 
     // Prune tokens FCM reports as permanently invalid.

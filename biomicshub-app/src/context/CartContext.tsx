@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { PlanType } from '@/src/api/payments';
+import { readTestSeriesCart, TestSeriesCartItem } from '@/src/utils/testSeriesCart';
 import { useAuth } from './AuthContext';
 
 export type CartItem = {
@@ -23,6 +24,7 @@ export type CartItem = {
 
 type CartContextValue = {
   items: CartItem[];
+  testSeriesItems: TestSeriesCartItem[];
   count: number;
   addItem: (item: CartItem) => void;
   removeItem: (key: string) => void;
@@ -33,6 +35,7 @@ type CartContextValue = {
   clear: () => void;
   subtotalInPaise: number;
   itemPrice: (item: CartItem) => number;
+  refreshTestSeriesCart: () => Promise<void>;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -49,7 +52,20 @@ export function makeCartKey(course: string, batch: string, moduleName: string) {
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { username } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
+  const [testSeriesItems, setTestSeriesItems] = useState<TestSeriesCartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
+
+  const refreshTestSeriesCart = useCallback(async () => {
+    if (!username) {
+      setTestSeriesItems([]);
+      return;
+    }
+    setTestSeriesItems(await readTestSeriesCart(username));
+  }, [username]);
+
+  useEffect(() => {
+    refreshTestSeriesCart();
+  }, [refreshTestSeriesCart]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,9 +123,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const subtotalInPaise = useMemo(() => items.reduce((sum, i) => sum + itemPrice(i), 0), [items, itemPrice]);
 
+  const count = items.length + testSeriesItems.length;
+
   const value = useMemo<CartContextValue>(
-    () => ({ items, count: items.length, addItem, removeItem, setPlan, setVoucher, clearVoucher, has, clear, subtotalInPaise, itemPrice }),
-    [items, addItem, removeItem, setPlan, setVoucher, clearVoucher, has, clear, subtotalInPaise, itemPrice]
+    () => ({
+      items,
+      testSeriesItems,
+      count,
+      addItem,
+      removeItem,
+      setPlan,
+      setVoucher,
+      clearVoucher,
+      has,
+      clear,
+      subtotalInPaise,
+      itemPrice,
+      refreshTestSeriesCart
+    }),
+    [items, testSeriesItems, count, addItem, removeItem, setPlan, setVoucher, clearVoucher, has, clear, subtotalInPaise, itemPrice, refreshTestSeriesCart]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

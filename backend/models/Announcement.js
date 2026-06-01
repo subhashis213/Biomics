@@ -13,6 +13,17 @@ const announcementSchema = new mongoose.Schema({
     trim: true,
     maxlength: 1200
   },
+  messageRich: {
+    type: String,
+    trim: true,
+    maxlength: 2400,
+    default: ''
+  },
+  imageUrl: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   isActive: {
     type: Boolean,
     default: true
