@@ -8,6 +8,7 @@ import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { fetchCourseCatalog, CourseCatalogItem } from '@/src/api/courses';
 import { fetchHomeBanners, fetchStudentVoices, HomeBanner, StudentVoice } from '@/src/api/landing';
+import { fetchFreeStudyHomePreview, FreeStudyCourseGroup } from '@/src/api/freeStudyResources';
 import { fetchNotifications, NotificationItem } from '@/src/api/notifications';
 import { resolveApiAssetUrl } from '@/src/api/client';
 import { fetchStudentLiveWorkspace, LiveClass } from '@/src/api/live';
@@ -16,6 +17,7 @@ import { syncPushRegistration } from '@/src/utils/push';
 import { getTimeGreeting } from '@/src/utils/greeting';
 import CartButton from '@/src/components/CartButton';
 import HomeBannerCarousel from '@/src/components/home/HomeBannerCarousel';
+import FreeStudyLibrarySection from '@/src/components/home/FreeStudyLibrarySection';
 import SocialConnectSection from '@/src/components/home/SocialConnectSection';
 import StudentVoiceCarousel from '@/src/components/home/StudentVoiceCarousel';
 import RichNotificationText from '@/src/components/RichNotificationText';
@@ -44,6 +46,8 @@ export default function StudentHome() {
   const [courses, setCourses] = useState<CourseCatalogItem[]>([]);
   const [homeBanners, setHomeBanners] = useState<HomeBanner[]>([]);
   const [studentVoices, setStudentVoices] = useState<StudentVoice[]>([]);
+  const [freeLibrary, setFreeLibrary] = useState<FreeStudyCourseGroup[]>([]);
+  const [freeLibraryCount, setFreeLibraryCount] = useState(0);
   const [latestNote, setLatestNote] = useState<NotificationItem | null>(null);
   const [liveClass, setLiveClass] = useState<LiveClass | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,16 +60,19 @@ export default function StudentHome() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [cat, notes, live, banners, voices] = await Promise.all([
+      const [cat, notes, live, banners, voices, library] = await Promise.all([
         fetchCourseCatalog(token),
         fetchNotifications(token).catch(() => ({ notifications: [] as NotificationItem[] })),
         fetchStudentLiveWorkspace(token).catch(() => ({ activeClass: null })),
         fetchHomeBanners().catch(() => ({ banners: [] as HomeBanner[] })),
-        fetchStudentVoices().catch(() => ({ voices: [] as StudentVoice[] }))
+        fetchStudentVoices().catch(() => ({ voices: [] as StudentVoice[] })),
+        fetchFreeStudyHomePreview(token).catch(() => ({ courses: [] as FreeStudyCourseGroup[], totalCount: 0 }))
       ]);
       setCourses(cat.courses || []);
       setHomeBanners(banners.banners || []);
       setStudentVoices(voices.voices || []);
+      setFreeLibrary(library.courses || []);
+      setFreeLibraryCount(library.totalCount || 0);
       setLatestNote((notes.notifications || [])[0] || null);
       setLiveClass((live as { activeClass: LiveClass | null }).activeClass && isVisibleLiveClass((live as { activeClass: LiveClass | null }).activeClass)
         ? (live as { activeClass: LiveClass | null }).activeClass
@@ -128,6 +135,8 @@ export default function StudentHome() {
         ) : null}
 
         <HomeBannerCarousel banners={homeBanners} />
+
+        <FreeStudyLibrarySection courses={freeLibrary} totalCount={freeLibraryCount} />
 
         <View style={styles.tiles}>
           {TILES.map((tile, i) => (

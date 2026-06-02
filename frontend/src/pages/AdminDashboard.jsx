@@ -2488,6 +2488,25 @@ export default function AdminDashboard() {
           </div>
         </section>
 
+        <section id="section-free-library" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card">
+          <div className="section-header compact quiz-builder-heading-row">
+            <div>
+              <p className="eyebrow">Free library</p>
+              <h2>Upload books & study materials</h2>
+              <p className="subtitle">Course-wise PDFs, books, and job notes — free for every registered student.</p>
+            </div>
+            <div className="quiz-count-cards">
+              <StatCard label="Access" value="Free" />
+              <StatCard label="Scope" value="All" />
+            </div>
+          </div>
+          <div className="workspace-link-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/admin/free-library')}>
+              Manage Free Library
+            </button>
+          </div>
+        </section>
+
         <section id="section-community-chat" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card community-link-card">
           <div className="section-header compact quiz-builder-heading-row">
             <div>

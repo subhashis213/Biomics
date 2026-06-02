@@ -50,6 +50,8 @@ const StudentInsightsPage = lazy(() => import('./pages/StudentInsightsPage'));
 const StudentQuizPerformancePage = lazy(() => import('./pages/StudentQuizPerformancePage'));
 const StudentTestSeriesPerformancePage = lazy(() => import('./pages/StudentTestSeriesPerformancePage'));
 const StudentStudyMaterialsPage = lazy(() => import('./pages/StudentStudyMaterialsPage'));
+const StudentFreeLibraryPage = lazy(() => import('./pages/StudentFreeLibraryPage'));
+const AdminFreeLibraryPage = lazy(() => import('./pages/AdminFreeLibraryPage'));
 function ScrollToTop() {
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
@@ -505,6 +507,26 @@ export default function App() {
           <ProtectedRoute role="user">
             <Suspense fallback={<div style={{ padding: 24 }}>Loading study materials...</div>}>
               <StudentStudyMaterialsPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/student/free-library"
+        element={(
+          <ProtectedRoute role="user">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading free library...</div>}>
+              <StudentFreeLibraryPage />
+            </Suspense>
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/free-library"
+        element={(
+          <ProtectedRoute role="admin">
+            <Suspense fallback={<div style={{ padding: 24 }}>Loading free library admin...</div>}>
+              <AdminFreeLibraryPage />
             </Suspense>
           </ProtectedRoute>
         )}

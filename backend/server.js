@@ -26,6 +26,7 @@ const courseRoutes = require('./routes/courseRoutes');
 const debugRoutes = require('./routes/debugRoutes');
 const studentVoiceRoutes = require('./routes/studentVoiceRoutes');
 const homeBannerRoutes = require('./routes/homeBannerRoutes');
+const freeStudyResourceRoutes = require('./routes/freeStudyResourceRoutes');
 
 const app = express();
 const livekitPublicUrl = String(process.env.LIVEKIT_URL || '').trim();
@@ -230,6 +231,7 @@ app.use('/courses', courseRoutes);
 app.use('/debug', debugRoutes);
 app.use('/landing', studentVoiceRoutes);
 app.use('/landing', homeBannerRoutes);
+app.use('/free-study-resources', freeStudyResourceRoutes);
 
 // Health check — used by keep-alive ping and uptime monitors
 app.get('/health', (req, res) => res.json({ status: 'ok', version: SERVER_VERSION, ts: Date.now() }));
@@ -239,7 +241,7 @@ if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/api/class') || req.path.startsWith('/api/livekit') || req.path.startsWith('/modules') || req.path.startsWith('/mock-exams') || req.path.startsWith('/announcements') || req.path.startsWith('/notifications') || req.path.startsWith('/chat') || req.path.startsWith('/payments') || req.path.startsWith('/test-series') || req.path.startsWith('/courses')) {
+    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/api/class') || req.path.startsWith('/api/livekit') || req.path.startsWith('/modules') || req.path.startsWith('/mock-exams') || req.path.startsWith('/announcements') || req.path.startsWith('/notifications') || req.path.startsWith('/chat') || req.path.startsWith('/payments') || req.path.startsWith('/test-series') || req.path.startsWith('/courses') || req.path.startsWith('/free-study-resources')) {
       return next();
     }
     return res.sendFile(path.join(frontendDistPath, 'index.html'));

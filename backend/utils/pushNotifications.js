@@ -78,7 +78,8 @@ function getInitError() {
 }
 
 /**
- * Send a data-only FCM message. The mobile app renders styled notifications via Notifee.
+ * Send FCM push. Poster alerts use a native Android notification payload (big picture on lock screen).
+ * Text-only alerts stay data-only and render styled HTML via Notifee on-device.
  */
 async function sendToTokens(tokens, { title, body, data } = {}) {
   const cleanTokens = Array.from(
@@ -99,29 +100,55 @@ async function sendToTokens(tokens, { title, body, data } = {}) {
   }
 
   const safeTitle = String(title || 'BiomicsHub').trim() || 'BiomicsHub';
+  const pushBody = String(body || data?.message || '').trim();
+  const posterUrl = String(data?.imageUrl || '').trim();
   const payloadData = Object.fromEntries(
-    Object.entries({ type: 'announcement', title: safeTitle, ...(data || {}) }).map(([k, v]) => [
-      String(k),
-      String(v ?? '')
-    ])
+    Object.entries({
+      type: 'announcement',
+      title: safeTitle,
+      message: pushBody,
+      ...(data || {})
+    }).map(([k, v]) => [String(k), String(v ?? '')])
   );
 
-  // Data-only: avoids plain system notification; app shows HTML-styled Notifee alert.
+  if (posterUrl) {
+    payloadData.nativePoster = '1';
+  }
+
+  const android = {
+    priority: 'high',
+    ttl: 86400000
+  };
+
+  if (posterUrl) {
+    android.notification = {
+      channelId: 'biomicshub_alerts_v2',
+      title: safeTitle,
+      body: pushBody || safeTitle,
+      imageUrl: posterUrl,
+      icon: 'notification_icon',
+      color: '#3dd6c6',
+      defaultSound: true,
+      defaultVibrateTimings: true,
+      visibility: 'PUBLIC',
+      notificationCount: 1
+    };
+  }
+
   const message = {
     data: payloadData,
-    android: {
-      priority: 'high',
-      ttl: 86400000
-    },
+    android,
     apns: {
       headers: { 'apns-priority': '10' },
       payload: {
         aps: {
-          alert: { title: safeTitle, body: String(body || payloadData.message || '').trim() },
+          alert: { title: safeTitle, body: pushBody },
           sound: 'default',
-          'content-available': 1
+          'content-available': 1,
+          ...(posterUrl ? { 'mutable-content': 1 } : {})
         }
-      }
+      },
+      ...(posterUrl ? { fcmOptions: { imageUrl: posterUrl } } : {})
     }
   };
 

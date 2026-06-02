@@ -2113,6 +2113,7 @@ export default function StudentDashboard() {
       },
       { id: 'route-student-quiz-performance', label: 'Quiz Performance', icon: '📊' },
       { id: 'route-student-study-materials', label: 'Study Materials', icon: '📚' },
+      { id: 'route-student-free-library', label: 'Free Books & Notes', icon: '🆓' },
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
       { id: 'section-test-series', label: 'Test Series', icon: '📝' },
       { id: 'route-student-test-series-performance', label: 'Series Performance', icon: '🎯' },
@@ -2130,6 +2131,11 @@ export default function StudentDashboard() {
 
     if (id === 'route-student-study-materials') {
       navigate('/student/study-materials');
+      return;
+    }
+
+    if (id === 'route-student-free-library') {
+      navigate('/student/free-library');
       return;
     }
 
@@ -2752,6 +2758,23 @@ export default function StudentDashboard() {
       ) : (
         <p className="empty-state">No courses available yet.</p>
       )}
+
+      {!selectedModule ? (
+        <section id="section-free-library" className="card student-community-launch-card premium-sync-card">
+          <div className="section-header compact">
+            <div>
+              <p className="eyebrow">Free library</p>
+              <h2>Books & study materials for every course</h2>
+              <p className="subtitle">Download job notes, books, and PDFs uploaded by admin — 100% free for all students.</p>
+            </div>
+          </div>
+          <div className="workspace-link-actions">
+            <button type="button" className="primary-btn" onClick={() => navigate('/student/free-library')}>
+              Open Free Library
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {!selectedModule ? (
         <section id="section-community-chat" className="card student-community-launch-card premium-sync-card">

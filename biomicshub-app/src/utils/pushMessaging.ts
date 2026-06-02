@@ -7,14 +7,18 @@ function shouldDisplay(data?: Record<string, string>) {
   return data.type === 'announcement' || Boolean(data.title);
 }
 
+/** System already shows poster pushes when FCM includes a notification payload. */
+function isNativePosterPush(data?: Record<string, string>) {
+  return String(data?.nativePoster || '') === '1';
+}
+
 /** Must be registered before app entry (see index.js) for background/killed state. */
 export function registerBackgroundPushHandler() {
   if (Platform.OS !== 'android') return;
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     const data = remoteMessage.data as Record<string, string> | undefined;
-    if (shouldDisplay(data)) {
-      await displayRichPush(data || {});
-    }
+    if (!shouldDisplay(data) || isNativePosterPush(data)) return;
+    await displayRichPush(data || {});
   });
 }
 

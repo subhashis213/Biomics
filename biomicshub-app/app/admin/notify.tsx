@@ -226,12 +226,15 @@ export default function AdminNotify() {
                 <Ionicons name="notifications" size={14} color={colors.accent} />
                 <Text style={styles.previewAppName}>BiomicsHub · now</Text>
               </View>
-              {previewPoster ? (
-                <Image source={{ uri: previewPoster }} style={styles.previewPoster} resizeMode="cover" />
-              ) : null}
               <View style={styles.previewBody}>
                 <Text style={styles.previewTitle}>{title.trim() || 'Notification title'}</Text>
                 <RichNotificationText text={messageRich.trim() || previewBody} style={styles.previewMessage} numberOfLines={4} />
+              </View>
+              {previewPoster ? (
+                <Image source={{ uri: previewPoster }} style={styles.previewPoster} resizeMode="cover" />
+              ) : null}
+              <View style={styles.previewActions}>
+                <Text style={styles.previewActionText}>Open</Text>
               </View>
             </View>
 
@@ -312,10 +315,12 @@ function createStyles(c: ThemeColors) {
     },
     previewAppBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: c.cardAlt },
     previewAppName: { color: c.muted, fontSize: 12, fontWeight: '700' },
-    previewPoster: { width: '100%', height: 140 },
-    previewBody: { padding: 12 },
+    previewPoster: { width: '100%', height: 180 },
+    previewBody: { padding: 12, paddingBottom: 8 },
     previewTitle: { color: c.text, fontWeight: '800', fontSize: 16, marginBottom: 6 },
     previewMessage: { color: c.muted },
+    previewActions: { borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 12, paddingVertical: 10 },
+    previewActionText: { color: c.accent, fontWeight: '800', fontSize: 13 },
     switch: { flexDirection: 'row', backgroundColor: c.cardAlt, borderRadius: 10, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: c.border },
     switchBtn: { flex: 1, flexDirection: 'row', gap: 6, paddingVertical: 9, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     switchOn: { backgroundColor: c.accent },

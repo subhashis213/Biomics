@@ -102,6 +102,7 @@ function RootNavigator() {
       group !== 'cart' &&
       group !== 'checkout' &&
       group !== 'test-series-checkout' &&
+      group !== 'study-library' &&
       !sharedGroups.includes(group as string)
     ) {
       router.replace('/student');
@@ -129,6 +130,7 @@ function RootNavigator() {
       <Stack.Screen name="checkout" options={{ title: 'Checkout' }} />
       <Stack.Screen name="test-series-checkout" options={{ title: 'Test series checkout' }} />
       <Stack.Screen name="community-chat" options={{ title: 'Community chat' }} />
+      <Stack.Screen name="study-library" options={{ title: 'Free study library' }} />
       <Stack.Screen name="web/[target]" options={{ title: 'BiomicsHub' }} />
     </Stack>
   );

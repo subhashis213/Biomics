@@ -989,6 +989,44 @@ export function clearAiTutorHistoryAdmin() {
   });
 }
 
+export function fetchFreeStudyLibrary() {
+  return requestJson('/free-study-resources');
+}
+
+export function fetchFreeStudyHomePreview() {
+  return requestJson('/free-study-resources/home-preview');
+}
+
+export function freeStudyDownloadUrl(resourceId) {
+  return buildUrl(`/free-study-resources/${encodeURIComponent(resourceId)}/download`);
+}
+
+export function fetchFreeStudyAdminLibrary() {
+  return requestJson('/free-study-resources/admin/list');
+}
+
+export function fetchFreeStudyAdminCourses() {
+  return requestJson('/free-study-resources/admin/courses');
+}
+
+export async function uploadFreeStudyResource(formData) {
+  const token = getToken();
+  const response = await fetch(buildUrl('/free-study-resources/admin'), {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Upload failed.');
+  return data;
+}
+
+export function deleteFreeStudyResource(resourceId) {
+  return requestJson(`/free-study-resources/admin/${encodeURIComponent(resourceId)}`, {
+    method: 'DELETE'
+  });
+}
+
 // ── Test Series ──────────────────────────────────────────────────────────────
 
 export function fetchTestSeriesPricingAdmin() {

@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { registerDevice } from '@/src/api/notifications';
 import { ensureNotifeeChannel } from '@/src/utils/richPush';
 
-export const PUSH_CHANNEL_ID = 'default';
+export const PUSH_CHANNEL_ID = 'biomicshub_alerts_v2';
 
 export type PushRegistrationResult = {
   ok: boolean;
