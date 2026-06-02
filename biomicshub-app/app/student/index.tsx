@@ -21,7 +21,8 @@ import FreeStudyLibrarySection from '@/src/components/home/FreeStudyLibrarySecti
 import SocialConnectSection from '@/src/components/home/SocialConnectSection';
 import StudentVoiceCarousel from '@/src/components/home/StudentVoiceCarousel';
 import RichNotificationText from '@/src/components/RichNotificationText';
-import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, PrimaryButton, Title } from '@/src/components/ui';
+import CourseLearningRow from '@/src/components/learning/CourseLearningRow';
+import { Card, ErrorBanner, Eyebrow, LoadingBlock, PrimaryButton, Title } from '@/src/components/ui';
 
 type TileDef = {
   key: string;
@@ -191,20 +192,31 @@ export default function StudentHome() {
         {loading ? <LoadingBlock /> : null}
 
         {!loading && myCourses.length ? (
-          <Card>
-            <Eyebrow>Continue learning</Eyebrow>
-            {myCourses.map((c) => (
-              <Pressable
-                key={c.courseName}
-                style={styles.courseRow}
-                onPress={() => router.push(`/learn/${encodeURIComponent(c.courseName)}`)}
-              >
-                <Ionicons name="play-circle-outline" size={20} color={colors.accent} />
-                <Text style={styles.courseName}>{c.displayName || c.courseName}</Text>
-                {c.unlocked ? <Badge label="UNLOCKED" tone="success" /> : <Badge label="ENROLLED" tone="warn" />}
+          <View style={styles.continueSection}>
+            <View style={styles.continueHeader}>
+              <Text style={styles.continueTitle}>Continue learning</Text>
+              <Pressable onPress={() => router.push('/student/learn')}>
+                <Text style={styles.continueLink}>See all</Text>
               </Pressable>
+            </View>
+            {myCourses.slice(0, 3).map((c, index) => (
+              <CourseLearningRow
+                key={c.courseName}
+                title={c.displayName || c.courseName}
+                subtitle={
+                  c.batches?.length
+                    ? `${c.batches.length} batch${c.batches.length === 1 ? '' : 'es'} · BiomicsHub`
+                    : 'BiomicsHub'
+                }
+                thumbnailUrl={c.thumbnailUrl}
+                unlocked={c.unlocked}
+                enrolled={c.isEnrolledCourse}
+                onPress={() => router.push(`/course/${encodeURIComponent(c.courseName)}`)}
+                showDivider={index < Math.min(myCourses.length, 3) - 1}
+                style={index === 0 ? styles.continueFirstRow : undefined}
+              />
             ))}
-          </Card>
+          </View>
         ) : null}
 
         <StudentVoiceCarousel voices={studentVoices} />
@@ -306,6 +318,36 @@ function createStyles(c: ThemeColors) {
       borderTopColor: c.border
     },
     courseName: { color: c.text, fontWeight: '600', flex: 1 },
-    exploreHint: { color: c.muted, marginBottom: 4 }
+    exploreHint: { color: c.muted, marginBottom: 4 },
+    continueSection: {
+      backgroundColor: c.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: c.border,
+      overflow: 'hidden',
+      marginBottom: 16
+    },
+    continueHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 4
+    },
+    continueTitle: {
+      color: c.text,
+      fontSize: 17,
+      fontWeight: '800'
+    },
+    continueLink: {
+      color: c.accent,
+      fontSize: 14,
+      fontWeight: '700'
+    },
+    continueFirstRow: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border
+    }
   });
 }

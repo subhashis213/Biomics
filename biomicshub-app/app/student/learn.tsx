@@ -1,24 +1,46 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { fetchCourseCatalog, CourseCatalogItem } from '@/src/api/courses';
-import { resolveApiAssetUrl } from '@/src/api/client';
-import PosterImage from '@/src/components/PosterImage';
-import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, Screen, Subtitle, Title } from '@/src/components/ui';
+import CourseLearningRow from '@/src/components/learning/CourseLearningRow';
+import { ErrorBanner, LoadingBlock, Screen } from '@/src/components/ui';
+
+function courseSubtitle(course: CourseCatalogItem, studentClass?: string) {
+  const batchCount = course.batches?.length || 0;
+  if (course.isEnrolledCourse && studentClass) {
+    return `Your class · ${studentClass}`;
+  }
+  if (batchCount) {
+    return `${batchCount} batch${batchCount === 1 ? '' : 'es'} · BiomicsHub`;
+  }
+  return 'BiomicsHub';
+}
 
 export default function LearnTab() {
   const { token, student } = useAuth();
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.top), [colors, insets.top]);
   const [courses, setCourses] = useState<CourseCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!token) return;
@@ -38,58 +60,214 @@ export default function LearnTab() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const filteredCourses = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return courses;
+    return courses.filter((c) => {
+      const name = (c.displayName || c.courseName).toLowerCase();
+      return name.includes(q);
+    });
+  }, [courses, query]);
+
+  const myCourses = useMemo(
+    () => filteredCourses.filter((c) => c.unlocked || c.isEnrolledCourse),
+    [filteredCourses]
+  );
+  const exploreCourses = useMemo(
+    () => filteredCourses.filter((c) => !c.unlocked && !c.isEnrolledCourse),
+    [filteredCourses]
+  );
+
+  const openCourse = (course: CourseCatalogItem) => {
+    router.push(`/course/${encodeURIComponent(course.courseName)}`);
+  };
+
   return (
-    <Screen>
+    <Screen style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My learning</Text>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => setSearchOpen((v) => !v)}
+            style={styles.iconBtn}
+            accessibilityLabel="Search courses"
+          >
+            <Ionicons name={searchOpen ? 'close-outline' : 'search-outline'} size={22} color={colors.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => load(true)}
+            style={styles.iconBtn}
+            accessibilityLabel="Refresh courses"
+          >
+            <Ionicons name="refresh-outline" size={22} color={colors.text} />
+          </Pressable>
+        </View>
+      </View>
+
+      {searchOpen ? (
+        <View style={styles.searchWrap}>
+          <Ionicons name="search-outline" size={18} color={colors.muted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search your courses"
+            placeholderTextColor={colors.muted}
+            style={styles.searchInput}
+            autoFocus
+            returnKeyType="search"
+          />
+        </View>
+      ) : null}
+
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.accent} />}
+        showsVerticalScrollIndicator={false}
       >
-        <Eyebrow>My learning</Eyebrow>
-        <Title>Courses</Title>
-        <Subtitle>
-          {student?.class ? `Your class: ${student.class}. Tap a course to choose a batch.` : 'Tap a course to choose a batch.'}
-        </Subtitle>
-        <View style={{ height: 12 }} />
         <ErrorBanner message={error} />
         {loading ? <LoadingBlock /> : null}
-        {!loading && courses.map((course, index) => {
-          const thumb = resolveApiAssetUrl(course.thumbnailUrl);
-          const batchCount = course.batches?.length || 0;
-          return (
-            <Animated.View key={course.courseName} entering={FadeInDown.delay(index * 60)}>
-              <Pressable onPress={() => router.push(`/course/${encodeURIComponent(course.courseName)}`)}>
-                <Card style={styles.courseCard}>
-                  <PosterImage uri={thumb || undefined} maxHeight={180} rounded="top" fallbackIcon="book-outline" />
-                  <View style={styles.courseBody}>
-                    <View style={styles.titleRow}>
-                      <Text style={styles.name}>{course.displayName || course.courseName}</Text>
-                      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-                    </View>
-                    <Text style={styles.meta}>{batchCount} batch{batchCount === 1 ? '' : 'es'} available</Text>
-                    <View style={styles.badgeRow}>
-                      {course.unlocked ? <Badge label="OWNED" tone="success" /> : null}
-                      {course.isEnrolledCourse ? <Badge label="YOUR CLASS" tone="warn" /> : null}
-                    </View>
-                  </View>
-                </Card>
-              </Pressable>
-            </Animated.View>
-          );
-        })}
-        {!loading && courses.length === 0 ? <Text style={styles.meta}>No courses available yet.</Text> : null}
+
+        {!loading && myCourses.length ? (
+          <View style={styles.section}>
+            {myCourses.map((course, index) => (
+              <Animated.View key={course.courseName} entering={FadeInDown.delay(index * 50)}>
+                <CourseLearningRow
+                  title={course.displayName || course.courseName}
+                  subtitle={courseSubtitle(course, student?.class)}
+                  thumbnailUrl={course.thumbnailUrl}
+                  unlocked={course.unlocked}
+                  enrolled={course.isEnrolledCourse}
+                  onPress={() => openCourse(course)}
+                  showDivider={index < myCourses.length - 1}
+                />
+              </Animated.View>
+            ))}
+          </View>
+        ) : null}
+
+        {!loading && exploreCourses.length ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Explore courses</Text>
+            {exploreCourses.map((course, index) => (
+              <Animated.View key={course.courseName} entering={FadeInDown.delay((myCourses.length + index) * 50)}>
+                <CourseLearningRow
+                  title={course.displayName || course.courseName}
+                  subtitle={courseSubtitle(course, student?.class)}
+                  thumbnailUrl={course.thumbnailUrl}
+                  onPress={() => openCourse(course)}
+                  showDivider={index < exploreCourses.length - 1}
+                />
+              </Animated.View>
+            ))}
+          </View>
+        ) : null}
+
+        {!loading && filteredCourses.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="library-outline" size={40} color={colors.muted} />
+            <Text style={styles.emptyTitle}>
+              {query.trim() ? 'No courses match your search' : 'No courses available yet'}
+            </Text>
+            <Text style={styles.emptyHint}>
+              {query.trim() ? 'Try a different keyword.' : 'Check back soon for new batches.'}
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
     </Screen>
   );
 }
 
-function createStyles(c: ThemeColors) {
+function createStyles(c: ThemeColors, topInset: number) {
   return StyleSheet.create({
-    scroll: { padding: 16, paddingBottom: 32 },
-    courseCard: { padding: 0, overflow: 'hidden' },
-    courseBody: { padding: 14, gap: 6 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    name: { color: c.text, fontSize: 16, fontWeight: '700', flex: 1 },
-    meta: { color: c.muted, fontSize: 13 },
-    badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }
+    screen: {
+      backgroundColor: c.card
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: topInset + 8,
+      paddingBottom: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+      backgroundColor: c.card
+    },
+    headerTitle: {
+      color: c.text,
+      fontSize: 18,
+      fontWeight: '800',
+      letterSpacing: -0.2
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8
+    },
+    iconBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.cardAlt
+    },
+    searchWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 4,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.bg
+    },
+    searchInput: {
+      flex: 1,
+      color: c.text,
+      fontSize: 15,
+      padding: 0
+    },
+    scroll: {
+      paddingBottom: 32
+    },
+    section: {
+      backgroundColor: c.card,
+      marginBottom: 8
+    },
+    sectionLabel: {
+      color: c.muted,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      paddingHorizontal: 16,
+      paddingTop: 18,
+      paddingBottom: 4
+    },
+    empty: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 56,
+      paddingHorizontal: 24,
+      gap: 8
+    },
+    emptyTitle: {
+      color: c.text,
+      fontSize: 16,
+      fontWeight: '700',
+      textAlign: 'center'
+    },
+    emptyHint: {
+      color: c.muted,
+      fontSize: 14,
+      textAlign: 'center',
+      lineHeight: 20
+    }
   });
 }

@@ -35,6 +35,8 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="biomicshubapp"/>
         <data android:scheme="com.biomicshub.app"/>
+        <data android:scheme="com.biomicshub.app" android:path="/oauthredirect"/>
+        <data android:scheme="biomicshubapp" android:path="/oauthredirect"/>
       </intent-filter>
     </activity>
   </application>

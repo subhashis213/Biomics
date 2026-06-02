@@ -38,6 +38,12 @@ const RECOVERY_RETENTION_DAYS = 15;
 const RECOVERY_RETENTION_MS = RECOVERY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const ACTIVITY_SESSION_MAX_GAP_MS = Math.max(15, Number(process.env.ACTIVITY_SESSION_MAX_GAP_SECONDS || 90)) * 1000;
 const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+const GOOGLE_CLIENT_SECRET = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+const PUBLIC_BACKEND_URL = String(process.env.PUBLIC_BACKEND_URL || 'https://biomicshub-backend.onrender.com')
+  .trim()
+  .replace(/\/$/, '');
+const GOOGLE_MOBILE_REDIRECT_URI = `${PUBLIC_BACKEND_URL}/auth/google-mobile/callback`;
+const MOBILE_APP_RETURN_URL = 'biomicshubapp://google-auth';
 const GOOGLE_PROFILE_COMPLETION_EXPIRES_IN = '15m';
 const uploadsDir = path.join(__dirname, '../uploads');
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
@@ -132,6 +138,141 @@ async function verifyGoogleIdToken(idToken) {
     audience: GOOGLE_CLIENT_ID
   });
   return ticket?.getPayload() || null;
+}
+
+function ensureGoogleMobileOAuthConfig() {
+  ensureGoogleConfig();
+  if (!GOOGLE_CLIENT_SECRET) {
+    const err = new Error(
+      'Google mobile sign-in is not configured on the server. Set GOOGLE_CLIENT_SECRET on the backend ' +
+        `and add ${GOOGLE_MOBILE_REDIRECT_URI} to the Web client authorized redirect URIs in Google Cloud Console.`
+    );
+    err.statusCode = 503;
+    throw err;
+  }
+}
+
+function buildGoogleMobileOAuthClient() {
+  ensureGoogleMobileOAuthConfig();
+  return new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_MOBILE_REDIRECT_URI);
+}
+
+function mobileGoogleAuthRedirect(params) {
+  const query = new URLSearchParams(params);
+  return `${MOBILE_APP_RETURN_URL}?${query.toString()}`;
+}
+
+function verifyGoogleMobileOAuthState(stateToken) {
+  const payload = jwt.verify(String(stateToken || '').trim(), JWT_SECRET);
+  if (String(payload?.purpose || '') !== 'google_mobile_oauth') {
+    const err = new Error('Invalid Google sign-in state.');
+    err.statusCode = 400;
+    throw err;
+  }
+  return payload;
+}
+
+async function resolveGoogleSignIn(googlePayload) {
+  const googleSub = String(googlePayload?.sub || '').trim();
+  const email = String(googlePayload?.email || '').trim().toLowerCase();
+  const emailVerified = Boolean(googlePayload?.email_verified);
+  const name = String(googlePayload?.name || '').trim();
+  const picture = String(googlePayload?.picture || '').trim();
+
+  if (!googleSub) {
+    const err = new Error('Invalid Google account token.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  let user = await User.findOne({ 'googleAuth.sub': googleSub });
+  if (!user && email) {
+    user = await User.findOne({ email: new RegExp(`^${escapeRegex(email)}$`, 'i') });
+  }
+
+  if (user) {
+    const previousGooglePicture = String(user.googleAuth?.picture || '').trim();
+    user.googleAuth = {
+      sub: googleSub,
+      email: email || String(user.googleAuth?.email || '').trim(),
+      picture: picture || String(user.googleAuth?.picture || '').trim(),
+      linkedAt: user.googleAuth?.linkedAt || new Date()
+    };
+    if (!user.email && email) user.email = email;
+    if (!user.avatar?.url && picture) {
+      user.avatar = { ...(user.avatar || {}), url: picture };
+    }
+    if (picture && (picture !== previousGooglePicture || !String(user.avatar?.publicId || '').trim())) {
+      try {
+        await syncGoogleAvatarToCloudinary(user, picture, googleSub);
+      } catch (_) {
+        // Non-fatal: keep Google URL as fallback avatar.
+      }
+    }
+    await user.save();
+
+    const hasPhone = /^\d{10}$/.test(String(user.phone || '').trim());
+    const hasBirthDate = Boolean(normalizeBirthDate(user.security?.birthDate));
+
+    if (!hasPhone || !hasBirthDate) {
+      const completionToken = signGoogleCompletionToken({
+        googleSub,
+        email,
+        name,
+        picture,
+        userId: String(user._id || '')
+      });
+      return {
+        type: 'profile_required',
+        completionToken,
+        profile: {
+          email,
+          name,
+          phone: String(user.phone || '').trim(),
+          birthDate: normalizeBirthDate(user.security?.birthDate)
+        },
+        missingFields: [
+          !hasPhone ? 'phone' : null,
+          !hasBirthDate ? 'birthDate' : null
+        ].filter(Boolean),
+        emailVerified
+      };
+    }
+
+    const token = jwt.sign(buildUserTokenPayload(user), JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    return {
+      type: 'authenticated',
+      token,
+      user: {
+        username: user.username,
+        phone: user.phone,
+        class: user.class,
+        city: user.city,
+        email: user.email
+      }
+    };
+  }
+
+  const completionToken = signGoogleCompletionToken({
+    googleSub,
+    email,
+    name,
+    picture,
+    userId: ''
+  });
+
+  return {
+    type: 'profile_required',
+    completionToken,
+    profile: {
+      email,
+      name,
+      phone: '',
+      birthDate: ''
+    },
+    missingFields: ['phone', 'birthDate'],
+    emailVerified
+  };
 }
 
 function normalizeSimpleUsername(value) {
@@ -2163,105 +2304,93 @@ router.post('/verify-email-otp', validate(verifyEmailOtpSchema), async (req, res
 router.post('/google-login', validate(googleLoginSchema), async (req, res) => {
   try {
     const googlePayload = await verifyGoogleIdToken(req.body.idToken);
-    const googleSub = String(googlePayload?.sub || '').trim();
-    const email = String(googlePayload?.email || '').trim().toLowerCase();
-    const emailVerified = Boolean(googlePayload?.email_verified);
-    const name = String(googlePayload?.name || '').trim();
-    const picture = String(googlePayload?.picture || '').trim();
+    const outcome = await resolveGoogleSignIn(googlePayload);
 
-    if (!googleSub) {
-      return res.status(400).json({ error: 'Invalid Google account token.' });
-    }
-
-    let user = await User.findOne({ 'googleAuth.sub': googleSub });
-    if (!user && email) {
-      user = await User.findOne({ email: new RegExp(`^${escapeRegex(email)}$`, 'i') });
-    }
-
-    if (user) {
-      const previousGooglePicture = String(user.googleAuth?.picture || '').trim();
-      user.googleAuth = {
-        sub: googleSub,
-        email: email || String(user.googleAuth?.email || '').trim(),
-        picture: picture || String(user.googleAuth?.picture || '').trim(),
-        linkedAt: user.googleAuth?.linkedAt || new Date()
-      };
-      if (!user.email && email) user.email = email;
-      if (!user.avatar?.url && picture) {
-        user.avatar = { ...(user.avatar || {}), url: picture };
-      }
-      if (picture && (picture !== previousGooglePicture || !String(user.avatar?.publicId || '').trim())) {
-        try {
-          await syncGoogleAvatarToCloudinary(user, picture, googleSub);
-        } catch (_) {
-          // Non-fatal: keep Google URL as fallback avatar.
-        }
-      }
-      await user.save();
-
-      const hasPhone = /^\d{10}$/.test(String(user.phone || '').trim());
-      const hasBirthDate = Boolean(normalizeBirthDate(user.security?.birthDate));
-
-      if (!hasPhone || !hasBirthDate) {
-        const completionToken = signGoogleCompletionToken({
-          googleSub,
-          email,
-          name,
-          picture,
-          userId: String(user._id || '')
-        });
-        return res.json({
-          requiresProfileCompletion: true,
-          completionToken,
-          profile: {
-            email,
-            name,
-            phone: String(user.phone || '').trim(),
-            birthDate: normalizeBirthDate(user.security?.birthDate)
-          },
-          missingFields: [
-            !hasPhone ? 'phone' : null,
-            !hasBirthDate ? 'birthDate' : null
-          ].filter(Boolean)
-        });
-      }
-
-      const token = jwt.sign(buildUserTokenPayload(user), JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    if (outcome.type === 'profile_required') {
       return res.json({
-        message: 'Google login successful',
-        token,
-        user: {
-          username: user.username,
-          phone: user.phone,
-          class: user.class,
-          city: user.city,
-          email: user.email
-        }
+        requiresProfileCompletion: true,
+        completionToken: outcome.completionToken,
+        profile: outcome.profile,
+        missingFields: outcome.missingFields,
+        emailVerified: outcome.emailVerified
       });
     }
 
-    const completionToken = signGoogleCompletionToken({
-      googleSub,
-      email,
-      name,
-      picture,
-      userId: ''
-    });
-
     return res.json({
-      requiresProfileCompletion: true,
-      completionToken,
-      profile: {
-        email,
-        name,
-        phone: '',
-        birthDate: ''
-      },
-      missingFields: ['phone', 'birthDate'],
-      emailVerified
+      message: 'Google login successful',
+      token: outcome.token,
+      user: outcome.user
     });
   } catch (err) {
     return res.status(err.statusCode || 400).json({ error: err.message || 'Google login failed' });
+  }
+});
+
+// Google Sign-In for mobile — browser OAuth with HTTPS redirect (no Firebase SHA-1 required)
+router.get('/google-mobile/start', (req, res) => {
+  try {
+    const oauth2Client = buildGoogleMobileOAuthClient();
+    const state = jwt.sign(
+      { purpose: 'google_mobile_oauth', nonce: crypto.randomBytes(12).toString('hex') },
+      JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+    const url = oauth2Client.generateAuthUrl({
+      access_type: 'online',
+      scope: ['openid', 'email', 'profile'],
+      state,
+      prompt: 'select_account'
+    });
+    return res.redirect(url);
+  } catch (err) {
+    return res.redirect(
+      mobileGoogleAuthRedirect({ error: String(err.message || 'Google sign-in is unavailable.') })
+    );
+  }
+});
+
+router.get('/google-mobile/callback', async (req, res) => {
+  const oauthError = String(req.query?.error || '').trim();
+  if (oauthError) {
+    return res.redirect(mobileGoogleAuthRedirect({ error: oauthError }));
+  }
+
+  const code = String(req.query?.code || '').trim();
+  const state = String(req.query?.state || '').trim();
+  if (!code) {
+    return res.redirect(mobileGoogleAuthRedirect({ error: 'Missing Google authorization code.' }));
+  }
+
+  try {
+    verifyGoogleMobileOAuthState(state);
+    const oauth2Client = buildGoogleMobileOAuthClient();
+    const { tokens } = await oauth2Client.getToken(code);
+    const idToken = String(tokens?.id_token || '').trim();
+    if (!idToken) {
+      throw new Error('Google did not return a sign-in token.');
+    }
+
+    const googlePayload = await verifyGoogleIdToken(idToken);
+    const outcome = await resolveGoogleSignIn(googlePayload);
+
+    if (outcome.type === 'authenticated') {
+      return res.redirect(mobileGoogleAuthRedirect({ token: outcome.token }));
+    }
+
+    return res.redirect(
+      mobileGoogleAuthRedirect({
+        needs_profile: '1',
+        completionToken: outcome.completionToken,
+        email: outcome.profile.email || '',
+        name: outcome.profile.name || '',
+        phone: outcome.profile.phone || '',
+        birthDate: outcome.profile.birthDate || ''
+      })
+    );
+  } catch (err) {
+    return res.redirect(
+      mobileGoogleAuthRedirect({ error: String(err.message || 'Google sign-in failed.') })
+    );
   }
 });
 

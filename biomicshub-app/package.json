@@ -1,14 +1,20 @@
 {
   "name": "biomicshub-app",
   "main": "index.js",
-  "version": "1.0.20",
+  "version": "1.0.26",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "prebuild:android": "expo prebuild --platform android --clean",
-    "build:apk": "cd android && NODE_ENV=production ./gradlew assembleRelease"
+    "prebuild:android": "expo prebuild --platform android --clean && node scripts/patch-android-for-playstore.mjs && npm run generate:notification-icon",
+    "patch:android": "node scripts/patch-android-for-playstore.mjs",
+    "playstore:keystore": "bash scripts/create-playstore-keystore.sh",
+    "build:apk": "cd android && NODE_ENV=production ./gradlew assembleRelease",
+    "build:aab": "cd android && NODE_ENV=production ./gradlew bundleRelease",
+    "build:playstore": "npm run patch:android && npm run build:aab && node scripts/copy-playstore-aab.mjs",
+    "check:google-oauth": "node scripts/check-google-oauth.mjs",
+    "generate:notification-icon": "node scripts/generate-notification-icon.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "~14.0.4",
@@ -16,10 +22,13 @@
     "@react-native-community/datetimepicker": "8.2.0",
     "@react-native-firebase/app": "^21.14.0",
     "@react-native-firebase/messaging": "^21.14.0",
+    "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-navigation/native": "^7.0.14",
     "expo": "~52.0.49",
     "expo-asset": "~11.0.5",
+    "expo-auth-session": "~6.0.3",
     "expo-constants": "~17.0.8",
+    "expo-crypto": "~14.0.2",
     "expo-device": "~7.0.3",
     "expo-document-picker": "~13.0.3",
     "expo-file-system": "~18.0.12",

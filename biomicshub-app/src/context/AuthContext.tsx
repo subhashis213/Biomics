@@ -6,9 +6,13 @@ import {
   fetchCurrentAdmin,
   fetchCurrentStudent,
   getStoredAuth,
+  googleCompleteProfile,
+  googleLogin,
+  GoogleLoginResult,
   loginAdmin,
   loginAuto,
   loginStudent,
+  setStoredAuth,
   StudentUser
 } from '@/src/api/auth';
 import { syncPushRegistration, watchPushRegistration } from '@/src/utils/push';
@@ -23,6 +27,9 @@ type AuthContextValue = {
   loginAsStudent: (username: string, password: string) => Promise<void>;
   loginAsAdmin: (username: string, password: string) => Promise<void>;
   loginAuto: (username: string, password: string) => Promise<AppRole>;
+  loginWithGoogleIdToken: (idToken: string) => Promise<GoogleLoginResult>;
+  loginWithGoogleResult: (result: GoogleLoginResult) => Promise<GoogleLoginResult>;
+  completeGoogleProfile: (completionToken: string, phone: string, birthDate: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -114,6 +121,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return result.role;
   }, []);
 
+  const loginWithGoogleIdToken = useCallback(async (idToken: string): Promise<GoogleLoginResult> => {
+    const result = await googleLogin(idToken);
+    if (result.status === 'authenticated') {
+      setToken(result.token);
+      setRole('user');
+      setStudent(result.user);
+      setAdmin(null);
+      await syncPushRegistration(result.token);
+    }
+    return result;
+  }, []);
+
+  const loginWithGoogleResult = useCallback(async (result: GoogleLoginResult): Promise<GoogleLoginResult> => {
+    if (result.status === 'authenticated') {
+      await setStoredAuth(result.token, 'user');
+      const profile =
+        result.user.username.trim().length > 0
+          ? result.user
+          : await fetchCurrentStudent(result.token);
+      setToken(result.token);
+      setRole('user');
+      setStudent(profile);
+      setAdmin(null);
+      await syncPushRegistration(result.token);
+      return { status: 'authenticated', token: result.token, user: profile };
+    }
+    return result;
+  }, []);
+
+  const completeGoogleProfile = useCallback(async (completionToken: string, phone: string, birthDate: string) => {
+    const result = await googleCompleteProfile(completionToken, phone, birthDate);
+    setToken(result.token);
+    setRole('user');
+    setStudent(result.user);
+    setAdmin(null);
+    await syncPushRegistration(result.token);
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (!token) return;
     try {
@@ -149,10 +194,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginAsStudent,
       loginAsAdmin,
       loginAuto: doLoginAuto,
+      loginWithGoogleIdToken,
+      loginWithGoogleResult,
+      completeGoogleProfile,
       logout,
       refreshProfile
     }),
-    [token, role, student, admin, isLoading, loginAsStudent, loginAsAdmin, doLoginAuto, logout, refreshProfile]
+    [token, role, student, admin, isLoading, loginAsStudent, loginAsAdmin, doLoginAuto, loginWithGoogleIdToken, loginWithGoogleResult, completeGoogleProfile, logout, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

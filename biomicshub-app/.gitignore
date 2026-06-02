@@ -30,14 +30,20 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # Firebase (keep out of git)
 google-services.json
 *-firebase-adminsdk*.json
 
+# Play Store signing (never commit)
+credentials/
+android/keystore.properties
+
 # Build outputs
 releases/*.apk
+releases/*.aab
 .gradle-home/
 
 # typescript

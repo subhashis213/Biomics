@@ -13,6 +13,7 @@ import {
   fetchBatchModules,
   fetchCourseBatches
 } from '@/src/api/courses';
+import { fetchMyCourseContent, VideoItem } from '@/src/api/learning';
 import { resolveApiAssetUrl } from '@/src/api/client';
 import CartButton from '@/src/components/CartButton';
 import PosterImage from '@/src/components/PosterImage';
@@ -25,6 +26,18 @@ import {
   Screen
 } from '@/src/components/ui';
 import { decodeRouteParam, formatInrFromPaise } from '@/src/utils/format';
+
+function normBatch(value: string) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function batchProgressPercent(videos: VideoItem[], completedIds: string[], batchName: string) {
+  const batchVideos = videos.filter((v) => normBatch(v.batch || 'General') === normBatch(batchName));
+  if (!batchVideos.length) return null;
+  const done = new Set(completedIds.map(String));
+  const completed = batchVideos.filter((v) => done.has(String(v._id))).length;
+  return Math.round((completed / batchVideos.length) * 100);
+}
 
 async function enrichBatchModuleCounts(
   token: string,
@@ -53,6 +66,7 @@ export default function CourseDetailScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [batches, setBatches] = useState<BatchCatalogItem[]>([]);
+  const [batchProgress, setBatchProgress] = useState<Record<string, number>>({});
   const [batchPlans, setBatchPlans] = useState<Record<string, PlanType>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -65,10 +79,29 @@ export default function CourseDetailScreen() {
       setLoading(true);
       setError('');
       try {
-        const batchesRes = await fetchCourseBatches(token, courseName);
+        const [batchesRes, content] = await Promise.all([
+          fetchCourseBatches(token, courseName),
+          fetchMyCourseContent(token, courseName).catch(() => ({
+            videos: [] as VideoItem[],
+            completedVideos: [] as string[]
+          }))
+        ]);
         const active = (batchesRes.batches || []).filter((b) => b.active !== false);
         const enriched = await enrichBatchModuleCounts(token, courseName, active);
-        if (!cancelled) setBatches(enriched);
+        const progressMap = Object.fromEntries(
+          enriched.map((batch) => {
+            const pct = batchProgressPercent(
+              content.videos || [],
+              content.completedVideos || [],
+              batch.batchName
+            );
+            return [batch.batchName, pct ?? 0];
+          })
+        );
+        if (!cancelled) {
+          setBatches(enriched);
+          setBatchProgress(progressMap);
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load course.');
       } finally {
@@ -157,6 +190,28 @@ export default function CourseDetailScreen() {
                       {!owned && price > 0 ? ` · from ${formatInrFromPaise(price)}` : ''}
                     </Text>
 
+                    {owned && typeof batchProgress[batch.batchName] === 'number' ? (
+                      <>
+                        <View style={styles.progressTrack}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              {
+                                width: `${Math.max(batchProgress[batch.batchName], batchProgress[batch.batchName] > 0 ? 4 : 0)}%`
+                              }
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.progressLabel}>
+                          {batchProgress[batch.batchName] >= 100
+                            ? 'Completed'
+                            : batchProgress[batch.batchName] > 0
+                              ? `${batchProgress[batch.batchName]}% complete`
+                              : 'Start learning'}
+                        </Text>
+                      </>
+                    ) : null}
+
                     {owned ? (
                       <PrimaryButton
                         label="Open lectures"
@@ -215,6 +270,22 @@ function createStyles(c: ThemeColors) {
     batchTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     batchName: { color: c.text, fontSize: 18, fontWeight: '800', flex: 1 },
     batchMeta: { color: c.muted, fontSize: 14 },
+    progressTrack: {
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: c.cardAlt,
+      overflow: 'hidden'
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: c.accent
+    },
+    progressLabel: {
+      color: c.muted,
+      fontSize: 13,
+      fontWeight: '600'
+    },
     planToggle: { flexDirection: 'row', gap: 8 },
     planBtn: {
       flex: 1,

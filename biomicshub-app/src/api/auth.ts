@@ -107,6 +107,70 @@ export async function loginAuto(username: string, password: string): Promise<Aut
   }
 }
 
+export type GoogleProfilePayload = {
+  email?: string;
+  name?: string;
+  phone?: string;
+  birthDate?: string;
+};
+
+export type GoogleLoginResponse =
+  | {
+      requiresProfileCompletion: true;
+      completionToken: string;
+      profile?: GoogleProfilePayload;
+      missingFields?: string[];
+    }
+  | {
+      token: string;
+      user: StudentUser;
+      message?: string;
+    };
+
+export type GoogleLoginResult =
+  | { status: 'authenticated'; token: string; user: StudentUser }
+  | {
+      status: 'profile_required';
+      completionToken: string;
+      profile: GoogleProfilePayload;
+    };
+
+export async function googleLogin(idToken: string): Promise<GoogleLoginResult> {
+  const data = await requestJson<GoogleLoginResponse>('/auth/google-login', {
+    method: 'POST',
+    body: JSON.stringify({ idToken })
+  });
+
+  if ('requiresProfileCompletion' in data && data.requiresProfileCompletion) {
+    return {
+      status: 'profile_required',
+      completionToken: String(data.completionToken || '').trim(),
+      profile: data.profile || {}
+    };
+  }
+
+  const token = String((data as { token?: string }).token || '').trim();
+  const user = (data as { user?: StudentUser }).user;
+  if (!token || !user) {
+    throw new Error('Google login failed.');
+  }
+  await setStoredAuth(token, 'user');
+  return { status: 'authenticated', token, user };
+}
+
+export async function googleCompleteProfile(
+  completionToken: string,
+  phone: string,
+  birthDate: string
+) {
+  const data = await requestJson<{ token: string; user: StudentUser }>('/auth/google-complete-profile', {
+    method: 'POST',
+    body: JSON.stringify({ completionToken, phone, birthDate })
+  });
+  await setStoredAuth(data.token, 'user');
+  return data;
+}
+
 export type RegisterPayload = {
   phone: string;
   username: string;
