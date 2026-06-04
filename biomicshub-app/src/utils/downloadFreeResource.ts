@@ -1,8 +1,7 @@
 import * as FileSystem from 'expo-file-system';
-import * as Linking from 'expo-linking';
 import { Platform, Share } from 'react-native';
 import { getApiBase } from '@/src/api/client';
-import { freeStudyDownloadLinkPath } from '@/src/api/freeStudyResources';
+import { freeStudyDownloadPath } from '@/src/api/freeStudyResources';
 
 function pickExtension(filename: string, displayName: string, mimeType?: string) {
   const fromFile = String(filename || '').split('.').pop();
@@ -21,52 +20,58 @@ function safeBaseName(displayName: string, filename: string) {
   return cleaned.replace(/\.[a-z0-9]{2,5}$/i, '') || 'study-material';
 }
 
-async function openDownloadedFile(localUri: string) {
-  if (Platform.OS === 'android') {
-    try {
-      const contentUri = await FileSystem.getContentUriAsync(localUri);
-      await Linking.openURL(contentUri);
-      return;
-    } catch {
-      // fall through to share
-    }
-  }
-  await Share.share({ url: localUri, title: 'Free study material' });
+function mimeTypeForExtension(ext: string, fallback?: string) {
+  const normalized = String(fallback || '').toLowerCase();
+  if (normalized) return normalized;
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'epub') return 'application/epub+zip';
+  return 'application/octet-stream';
 }
 
-async function fetchSignedDownloadUrl(token: string, resourceId: string) {
-  const linkUrl = `${getApiBase()}${freeStudyDownloadLinkPath(resourceId)}`;
-  const response = await fetch(linkUrl, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json'
-    }
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Could not read downloaded file.'));
+    reader.readAsDataURL(blob);
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(String(data.error || data.message || 'Could not download file.'));
-  }
-  const resolved = String(data.url || '').trim();
-  if (!/^https?:\/\//i.test(resolved)) {
-    throw new Error('Download link is unavailable. Please ask admin to re-upload this material.');
-  }
-  return resolved;
 }
 
-async function downloadToFile(url: string, dest: string) {
-  const download = FileSystem.createDownloadResumable(url, dest);
-  const result = await download.downloadAsync();
-  if (!result) {
-    throw new Error('Could not download file.');
-  }
-  if (result.status !== 200) {
-    throw new Error(`Could not download file (HTTP ${result.status}).`);
-  }
-  const info = await FileSystem.getInfoAsync(result.uri);
-  if (!info.exists || !info.size) {
+function validateDownloadedBase64(base64: string, mimeType: string) {
+  if (!base64) {
     throw new Error('Downloaded file is empty. Please ask admin to re-upload this material.');
   }
-  return result.uri;
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime !== 'application/pdf') return;
+
+  try {
+    const binary = atob(base64.slice(0, 12));
+    if (!binary.startsWith('%PDF')) {
+      throw new Error('Downloaded file is not a valid PDF. Please ask admin to delete and re-upload this material.');
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('valid PDF')) throw error;
+    throw new Error('Downloaded file is not a valid PDF. Please ask admin to delete and re-upload this material.');
+  }
+}
+
+async function openDownloadedFile(localUri: string, mimeType: string, title: string) {
+  const contentUri = await FileSystem.getContentUriAsync(localUri);
+  if (Platform.OS === 'android') {
+    await Share.share({
+      title,
+      message: `${title} downloaded. Choose a PDF viewer to open it.`,
+      url: contentUri
+    });
+    return;
+  }
+  await Share.share({ url: contentUri, title });
 }
 
 export async function downloadFreeStudyResource(
@@ -77,20 +82,40 @@ export async function downloadFreeStudyResource(
 ) {
   const ext = pickExtension(options.filename || options.originalName || '', displayName, options.mimeType);
   const baseName = safeBaseName(options.originalName || displayName, options.filename || '');
+  const mimeType = mimeTypeForExtension(ext, options.mimeType);
   const dest = `${FileSystem.documentDirectory}${Date.now()}-${baseName}.${ext}`;
+  const url = `${getApiBase()}${freeStudyDownloadPath(resourceId)}`;
 
-  const signedUrl = await fetchSignedDownloadUrl(token, resourceId);
-
-  try {
-    const localUri = await downloadToFile(signedUrl, dest);
-    await openDownloadedFile(localUri);
-    return;
-  } catch (error) {
-    try {
-      await Linking.openURL(signedUrl);
-      return;
-    } catch {
-      throw error instanceof Error ? error : new Error('Could not download file.');
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: '*/*'
     }
+  });
+
+  if (!response.ok) {
+    let message = 'Could not download file.';
+    try {
+      const data = await response.json();
+      message = String(data.error || data.message || message);
+    } catch {
+      try {
+        const text = await response.text();
+        if (text && !text.startsWith('<')) message = text.slice(0, 180);
+      } catch {
+        // ignore
+      }
+    }
+    throw new Error(message);
   }
+
+  const blob = await response.blob();
+  if (!blob.size) {
+    throw new Error('Downloaded file is empty. Please ask admin to re-upload this material.');
+  }
+
+  const base64 = await blobToBase64(blob);
+  validateDownloadedBase64(base64, mimeType);
+  await FileSystem.writeAsStringAsync(dest, base64, { encoding: FileSystem.EncodingType.Base64 });
+  await openDownloadedFile(dest, mimeType, displayName);
 }

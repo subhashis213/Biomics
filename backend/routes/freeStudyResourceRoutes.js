@@ -88,11 +88,21 @@ function fileFormatFor(resource = {}) {
   return '';
 }
 
+function publicIdHasExtension(publicId = '') {
+  const ext = path.extname(String(publicId || '').trim()).replace(/^\./, '').toLowerCase();
+  return ext.length >= 2 && ext.length <= 6;
+}
+
+function deliveryFormatFor(publicId, resource = {}) {
+  if (publicIdHasExtension(publicId)) return '';
+  return fileFormatFor(resource);
+}
+
 function buildPrivateDownloadUrl(publicId, resource = {}) {
   if (!hasCloudinaryConfig || !publicId) return '';
   const resourceType = cloudinaryResourceType(resource.mimeType);
-  const format = fileFormatFor(resource);
-  if (resourceType === 'raw' && !format) return '';
+  const format = deliveryFormatFor(publicId, resource);
+  if (resourceType === 'raw' && !format && !publicIdHasExtension(publicId)) return '';
 
   try {
     return String(
@@ -102,6 +112,7 @@ function buildPrivateDownloadUrl(publicId, resource = {}) {
         {
           resource_type: resourceType,
           type: 'upload',
+          attachment: true,
           expires_at: Math.floor(Date.now() / 1000) + 7200
         }
       ) || ''
@@ -113,6 +124,24 @@ function buildPrivateDownloadUrl(publicId, resource = {}) {
 
 function encodeDownloadName(value = '') {
   return String(value || 'study-material').replace(/["\r\n]/g, '').trim() || 'study-material';
+}
+
+function originalNameForUpload(file, title) {
+  const rawTitle = String(title || 'study-material').trim();
+  const original = String(file?.originalname || rawTitle).trim();
+  if (/\.[a-z0-9]{2,5}$/i.test(original)) return original;
+  const ext = path.extname(String(file?.originalname || '')).toLowerCase()
+    || (String(file?.mimetype || '').toLowerCase() === 'application/pdf' ? '.pdf' : '');
+  return `${original}${ext || '.pdf'}`;
+}
+
+function validateLocalUpload(filePath, mimeType = '') {
+  try {
+    const buffer = fs.readFileSync(filePath);
+    return isValidFileBuffer(buffer, mimeType);
+  } catch {
+    return false;
+  }
 }
 
 async function uploadFreeStudyToCloudinary(localPath, mimeType = '') {
@@ -140,7 +169,7 @@ async function collectDeliveryUrls(resource = {}) {
   const urls = [];
   const publicId = String(resource.cloudinaryPublicId || '').trim();
   const resourceType = cloudinaryResourceType(resource.mimeType);
-  const format = fileFormatFor(resource);
+  const format = deliveryFormatFor(publicId, resource);
 
   const privateUrl = buildPrivateDownloadUrl(publicId, resource);
   if (privateUrl) urls.push(privateUrl);
@@ -154,14 +183,13 @@ async function collectDeliveryUrls(resource = {}) {
       // ignore lookup failures; fall back to generated URL
     }
 
-    urls.push(
-      cloudinary.url(publicId, {
-        resource_type: resourceType,
-        secure: true,
-        type: 'upload',
-        ...(format ? { format } : {})
-      })
-    );
+    const generatedUrl = cloudinary.url(publicId, {
+      resource_type: resourceType,
+      secure: true,
+      type: 'upload',
+      ...(format ? { format } : {})
+    });
+    if (generatedUrl) urls.push(generatedUrl);
   }
 
   const fileUrl = String(resource.fileUrl || '').trim();
@@ -170,7 +198,7 @@ async function collectDeliveryUrls(resource = {}) {
   return [...new Set(urls.filter((url) => /^https?:\/\//i.test(url)))];
 }
 
-function openRemoteStream(url, redirectsLeft = 5) {
+function fetchRemoteBuffer(url, redirectsLeft = 5) {
   return new Promise((resolve, reject) => {
     let parsed;
     try {
@@ -186,7 +214,7 @@ function openRemoteStream(url, redirectsLeft = 5) {
       if (status >= 300 && status < 400 && response.headers.location && redirectsLeft > 0) {
         response.resume();
         const nextUrl = new URL(response.headers.location, url).href;
-        openRemoteStream(nextUrl, redirectsLeft - 1).then(resolve).catch(reject);
+        fetchRemoteBuffer(nextUrl, redirectsLeft - 1).then(resolve).catch(reject);
         return;
       }
       if (status !== 200) {
@@ -194,28 +222,34 @@ function openRemoteStream(url, redirectsLeft = 5) {
         reject(new Error(`Remote file request failed (${status}).`));
         return;
       }
-      resolve({
-        stream: response,
-        contentType: String(response.headers['content-type'] || 'application/octet-stream'),
-        contentLength: response.headers['content-length'] || null
+
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => {
+        resolve({
+          buffer: Buffer.concat(chunks),
+          contentType: String(response.headers['content-type'] || 'application/octet-stream')
+        });
       });
+      response.on('error', reject);
     });
     request.on('error', reject);
   });
 }
 
-async function pipeRemoteUrlToResponse(remoteUrl, resource, res, downloadName) {
-  const { stream, contentType, contentLength } = await openRemoteStream(remoteUrl);
-  res.setHeader('Content-Type', resource.mimeType || contentType || 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
-  if (contentLength) res.setHeader('Content-Length', String(contentLength));
-
-  await new Promise((resolve, reject) => {
-    stream.on('error', reject);
-    res.on('error', reject);
-    stream.on('end', resolve);
-    stream.pipe(res);
-  });
+function isValidFileBuffer(buffer, mimeType = '') {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 16) return false;
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime === 'application/pdf') {
+    return buffer.slice(0, 4).toString('utf8') === '%PDF';
+  }
+  if (mime.startsWith('image/')) {
+    const hex = buffer.slice(0, 4);
+    if (hex[0] === 0x89 && hex[1] === 0x50 && hex[2] === 0x4e && hex[3] === 0x47) return true;
+    if (hex[0] === 0xff && hex[1] === 0xd8 && hex[2] === 0xff) return true;
+    return buffer.length > 64;
+  }
+  return buffer.length > 64;
 }
 
 async function deleteFreeStudyFromCloudinary(publicId, mimeType = '') {
@@ -296,8 +330,12 @@ async function sendStudyResourceFile(resource, res) {
 
   for (const remoteUrl of deliveryUrls) {
     try {
-      await pipeRemoteUrlToResponse(remoteUrl, resource, res, downloadName);
-      return;
+      const payload = await fetchRemoteBuffer(remoteUrl);
+      if (!isValidFileBuffer(payload.buffer, resource.mimeType)) continue;
+      res.setHeader('Content-Type', resource.mimeType || payload.contentType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+      res.setHeader('Content-Length', String(payload.buffer.length));
+      return res.send(payload.buffer);
     } catch {
       if (res.headersSent) return;
     }
@@ -461,6 +499,10 @@ router.post('/admin', authenticateToken('admin'), (req, res) => {
         safelyRemoveFile(req.file.path);
         return res.status(400).json({ error: 'Title is required.' });
       }
+      if (!validateLocalUpload(req.file.path, req.file.mimetype || 'application/pdf')) {
+        safelyRemoveFile(req.file.path);
+        return res.status(400).json({ error: 'Upload failed: file is empty or not a valid document.' });
+      }
 
       const uploaded = await uploadFreeStudyToCloudinary(
         req.file.path,
@@ -478,7 +520,7 @@ router.post('/admin', authenticateToken('admin'), (req, res) => {
         description,
         resourceType,
         filename: path.basename(req.file.filename),
-        originalName: req.file.originalname || title,
+        originalName: originalNameForUpload(req.file, title),
         fileUrl: uploaded.url,
         cloudinaryPublicId: uploaded.publicId,
         mimeType: req.file.mimetype || 'application/pdf',
@@ -523,6 +565,10 @@ router.post('/admin/:id/file', authenticateToken('admin'), (req, res) => {
         safelyRemoveFile(req.file.path);
         return res.status(404).json({ error: 'Study resource not found.' });
       }
+      if (!validateLocalUpload(req.file.path, req.file.mimetype || resource.mimeType || 'application/pdf')) {
+        safelyRemoveFile(req.file.path);
+        return res.status(400).json({ error: 'Upload failed: file is empty or not a valid document.' });
+      }
 
       const uploaded = await uploadFreeStudyToCloudinary(
         req.file.path,
@@ -538,7 +584,7 @@ router.post('/admin/:id/file', authenticateToken('admin'), (req, res) => {
       const oldFilename = path.basename(String(resource.filename || ''));
 
       resource.filename = path.basename(req.file.filename);
-      resource.originalName = req.file.originalname || resource.title;
+      resource.originalName = originalNameForUpload(req.file, resource.title);
       resource.fileUrl = uploaded.url;
       resource.cloudinaryPublicId = uploaded.publicId;
       resource.mimeType = req.file.mimetype || resource.mimeType || 'application/pdf';
