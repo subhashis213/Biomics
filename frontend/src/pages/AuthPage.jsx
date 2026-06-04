@@ -5,9 +5,11 @@ import { emptyRegisterForm } from '../constants';
 import { getSession } from '../session';
 import { useSessionStore } from '../stores/sessionStore';
 
+import { getGoogleWebClientId } from '../config/google';
+
 export default function AuthPage() {
   const REGISTER_FLIP_BACK_MS = 3000;
-  const GOOGLE_CLIENT_ID = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+  const GOOGLE_CLIENT_ID = getGoogleWebClientId();
   const PUBLIC_APP_URL = String(import.meta.env.VITE_PUBLIC_APP_URL || 'https://biomicshub.com').trim().replace(/\/+$/, '');
   const runtimeHostname = typeof window !== 'undefined' ? String(window.location.hostname || '').trim().toLowerCase() : '';
   const runtimeOrigin = typeof window !== 'undefined' ? String(window.location.origin || '').trim() : '';

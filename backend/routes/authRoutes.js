@@ -41,6 +41,12 @@ const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
 const GOOGLE_CLIENT_SECRET = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
 const FIREBASE_WEB_CLIENT_ID =
   '430984155371-9cgkt3u37sh40bfo0mu82c5f62829o37.apps.googleusercontent.com';
+const BIOMICS_GOOGLE_PROJECT_PREFIX = '430984155371-';
+const BIOMICS_GOOGLE_CLIENT_IDS = [
+  FIREBASE_WEB_CLIENT_ID,
+  '430984155371-0t2frsrbpphp87e102indma50pd7uqlt.apps.googleusercontent.com',
+  '430984155371-k1ogkqhsdnoohvfuqd3nhps005s0mkpn.apps.googleusercontent.com'
+];
 const PUBLIC_BACKEND_URL = String(process.env.PUBLIC_BACKEND_URL || 'https://biomicshub-backend.onrender.com')
   .trim()
   .replace(/\/$/, '');
@@ -55,7 +61,24 @@ function getGoogleClientIds() {
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-  return [...new Set([GOOGLE_CLIENT_ID, ...extras, FIREBASE_WEB_CLIENT_ID].filter(Boolean))];
+  return [...new Set([GOOGLE_CLIENT_ID, ...extras, ...BIOMICS_GOOGLE_CLIENT_IDS].filter(Boolean))];
+}
+
+function decodeGoogleIdTokenPayload(idToken) {
+  try {
+    const segment = String(idToken || '').trim().split('.')[1];
+    if (!segment) return null;
+    const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function isTrustedBiomicsGoogleAudience(audience = '') {
+  const value = String(audience || '').trim();
+  return value.startsWith(BIOMICS_GOOGLE_PROJECT_PREFIX) && value.endsWith('.apps.googleusercontent.com');
 }
 
 const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
@@ -143,25 +166,51 @@ function ensureGoogleConfig() {
 
 async function verifyGoogleIdToken(idToken) {
   const token = String(idToken || '').trim();
+  if (!token) {
+    const err = new Error('Google token is required.');
+    err.statusCode = 400;
+    throw err;
+  }
+
   const audiences = getGoogleClientIds();
   if (!audiences.length) {
     ensureGoogleConfig();
   }
 
-  let lastError = null;
-  for (const audience of audiences) {
-    try {
-      const client = new OAuth2Client(audience);
-      const ticket = await client.verifyIdToken({ idToken: token, audience });
-      return ticket?.getPayload() || null;
-    } catch (err) {
-      lastError = err;
-    }
-  }
+  const decoded = decodeGoogleIdTokenPayload(token);
+  const tokenAud = String(decoded?.aud || '').trim();
+  const verifyAudiences = [...new Set(
+    [...audiences, tokenAud].filter((value) => String(value || '').trim())
+  )];
 
-  const err = new Error(lastError?.message || 'Invalid Google account token.');
-  err.statusCode = 401;
-  throw err;
+  const client = new OAuth2Client();
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: verifyAudiences.length === 1 ? verifyAudiences[0] : verifyAudiences
+    });
+    return ticket?.getPayload() || null;
+  } catch (firstError) {
+    if (isTrustedBiomicsGoogleAudience(tokenAud)) {
+      try {
+        const ticket = await client.verifyIdToken({
+          idToken: token,
+          audience: tokenAud
+        });
+        return ticket?.getPayload() || null;
+      } catch {
+        // fall through to friendly error
+      }
+    }
+
+    const err = new Error(
+      tokenAud
+        ? `Google sign-in client mismatch. Set GOOGLE_CLIENT_ID or GOOGLE_CLIENT_IDS to include ${tokenAud} on the backend.`
+        : (firstError?.message || 'Invalid Google account token.')
+    );
+    err.statusCode = 401;
+    throw err;
+  }
 }
 
 function ensureGoogleMobileOAuthConfig() {
