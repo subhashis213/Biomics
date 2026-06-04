@@ -12,6 +12,7 @@ import {
   fetchFreeStudyAdminLibrary,
   FreeStudyResource,
   FreeStudyResourceType,
+  replaceFreeStudyResourceFile,
   uploadFreeStudyResource
 } from '@/src/api/freeStudyResources';
 import {
@@ -117,6 +118,33 @@ export default function AdminStudyLibrary() {
     }
   }
 
+  async function replaceFile(item: FreeStudyResource) {
+    if (!token) return;
+    const result = await DocumentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: false,
+      type: ['application/pdf', 'application/epub+zip', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setUploading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await replaceFreeStudyResourceFile(token, item._id, {
+        uri: asset.uri,
+        name: asset.name || 'resource.pdf',
+        type: asset.mimeType || 'application/pdf'
+      });
+      setSuccess(res.message || 'File replaced.');
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Replace failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   function confirmDelete(item: FreeStudyResource) {
     Alert.alert('Delete resource', `Remove "${item.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -190,9 +218,15 @@ export default function AdminStudyLibrary() {
               <View key={item._id} style={styles.itemRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemTitle}>{item.title}</Text>
-                  <Text style={styles.itemMeta}>{item.resourceType} · {item.isActive === false ? 'Hidden' : 'Live'}</Text>
+                  <Text style={styles.itemMeta}>
+                    {item.resourceType} · {item.isActive === false ? 'Hidden' : 'Live'}
+                    {item.hasStoredFile === false ? ' · File missing' : ''}
+                  </Text>
                 </View>
-                <Badge label="FREE" tone="success" />
+                {!item.hasStoredFile ? <Badge label="Re-upload" tone="warn" /> : <Badge label="FREE" tone="success" />}
+                <Pressable onPress={() => replaceFile(item)} hitSlop={8} disabled={uploading}>
+                  <Ionicons name="refresh-outline" size={18} color={colors.accent} />
+                </Pressable>
                 <Pressable onPress={() => confirmDelete(item)} hitSlop={8}>
                   <Ionicons name="trash-outline" size={18} color={colors.danger} />
                 </Pressable>

@@ -14,6 +14,7 @@ export type FreeStudyResource = {
   fileSize?: number;
   coverUrl?: string;
   isActive?: boolean;
+  hasStoredFile?: boolean;
   sortOrder?: number;
   createdAt?: string;
 };
@@ -72,6 +73,24 @@ export async function uploadFreeStudyResource(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(String(data.error || data.message || 'Upload failed.'));
+  return data as { message: string; resource: FreeStudyResource };
+}
+
+export async function replaceFreeStudyResourceFile(
+  token: string,
+  resourceId: string,
+  payload: { uri: string; name: string; type: string }
+) {
+  const form = new FormData();
+  form.append('file', { uri: payload.uri, name: payload.name, type: payload.type } as unknown as Blob);
+
+  const res = await fetch(`${getApiBase()}/free-study-resources/admin/${encodeURIComponent(resourceId)}/file`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(String(data.error || data.message || 'Failed to replace file.'));
   return data as { message: string; resource: FreeStudyResource };
 }
 
