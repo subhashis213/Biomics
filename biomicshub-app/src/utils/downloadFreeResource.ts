@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Linking from 'expo-linking';
 import { Platform, Share } from 'react-native';
 import { getApiBase } from '@/src/api/client';
-import { freeStudyDownloadLinkPath, freeStudyDownloadPath } from '@/src/api/freeStudyResources';
+import { freeStudyDownloadLinkPath } from '@/src/api/freeStudyResources';
 
 function pickExtension(filename: string, displayName: string, mimeType?: string) {
   const fromFile = String(filename || '').split('.').pop();
@@ -34,30 +34,7 @@ async function openDownloadedFile(localUri: string) {
   await Share.share({ url: localUri, title: 'Free study material' });
 }
 
-async function downloadToFile(
-  url: string,
-  dest: string,
-  headers: Record<string, string> = {}
-) {
-  const download = FileSystem.createDownloadResumable(url, dest, { headers });
-  const result = await download.downloadAsync();
-  if (!result) {
-    throw new Error('Could not download file.');
-  }
-  if (result.status !== 200) {
-    throw new Error(`Could not download file (HTTP ${result.status}).`);
-  }
-  const info = await FileSystem.getInfoAsync(result.uri);
-  if (!info.exists || !info.size) {
-    throw new Error('Downloaded file is empty. Please ask admin to re-upload this material.');
-  }
-  return result.uri;
-}
-
-async function resolveDirectDownloadUrl(token: string, resourceId: string, fileUrl?: string) {
-  const directUrl = String(fileUrl || '').trim();
-  if (/^https?:\/\//i.test(directUrl)) return directUrl;
-
+async function fetchSignedDownloadUrl(token: string, resourceId: string) {
   const linkUrl = `${getApiBase()}${freeStudyDownloadLinkPath(resourceId)}`;
   const response = await fetch(linkUrl, {
     headers: {
@@ -76,29 +53,44 @@ async function resolveDirectDownloadUrl(token: string, resourceId: string, fileU
   return resolved;
 }
 
+async function downloadToFile(url: string, dest: string) {
+  const download = FileSystem.createDownloadResumable(url, dest);
+  const result = await download.downloadAsync();
+  if (!result) {
+    throw new Error('Could not download file.');
+  }
+  if (result.status !== 200) {
+    throw new Error(`Could not download file (HTTP ${result.status}).`);
+  }
+  const info = await FileSystem.getInfoAsync(result.uri);
+  if (!info.exists || !info.size) {
+    throw new Error('Downloaded file is empty. Please ask admin to re-upload this material.');
+  }
+  return result.uri;
+}
+
 export async function downloadFreeStudyResource(
   token: string,
   resourceId: string,
   displayName: string,
-  options: { originalName?: string; mimeType?: string; filename?: string; fileUrl?: string } = {}
+  options: { originalName?: string; mimeType?: string; filename?: string } = {}
 ) {
   const ext = pickExtension(options.filename || options.originalName || '', displayName, options.mimeType);
   const baseName = safeBaseName(options.originalName || displayName, options.filename || '');
   const dest = `${FileSystem.documentDirectory}${Date.now()}-${baseName}.${ext}`;
 
+  const signedUrl = await fetchSignedDownloadUrl(token, resourceId);
+
   try {
-    const directUrl = await resolveDirectDownloadUrl(token, resourceId, options.fileUrl);
-    const localUri = await downloadToFile(directUrl, dest);
+    const localUri = await downloadToFile(signedUrl, dest);
     await openDownloadedFile(localUri);
     return;
-  } catch {
-    // Fall back to authenticated backend proxy download.
+  } catch (error) {
+    try {
+      await Linking.openURL(signedUrl);
+      return;
+    } catch {
+      throw error instanceof Error ? error : new Error('Could not download file.');
+    }
   }
-
-  const proxyUrl = `${getApiBase()}${freeStudyDownloadPath(resourceId)}`;
-  const localUri = await downloadToFile(proxyUrl, dest, {
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/pdf,application/octet-stream,*/*'
-  });
-  await openDownloadedFile(localUri);
 }

@@ -72,6 +72,45 @@ function cloudinaryResourceType(mimeType = '') {
   return 'raw';
 }
 
+function fileFormatFor(resource = {}) {
+  const original = String(resource.originalName || resource.filename || resource.title || '').trim();
+  const fromName = path.extname(original).replace(/^\./, '').toLowerCase();
+  if (fromName && fromName.length <= 6) return fromName;
+
+  const mime = String(resource.mimeType || '').toLowerCase();
+  if (mime === 'application/pdf') return 'pdf';
+  if (mime.startsWith('image/')) return mime.split('/')[1] || 'jpg';
+  if (mime === 'application/epub+zip') return 'epub';
+  if (mime.includes('wordprocessingml')) return 'docx';
+  if (mime.includes('presentationml')) return 'pptx';
+  if (mime === 'application/msword') return 'doc';
+  if (mime === 'application/vnd.ms-powerpoint') return 'ppt';
+  return '';
+}
+
+function buildPrivateDownloadUrl(publicId, resource = {}) {
+  if (!hasCloudinaryConfig || !publicId) return '';
+  const resourceType = cloudinaryResourceType(resource.mimeType);
+  const format = fileFormatFor(resource);
+  if (resourceType === 'raw' && !format) return '';
+
+  try {
+    return String(
+      cloudinary.utils.private_download_url(
+        publicId,
+        format || undefined,
+        {
+          resource_type: resourceType,
+          type: 'upload',
+          expires_at: Math.floor(Date.now() / 1000) + 7200
+        }
+      ) || ''
+    ).trim();
+  } catch {
+    return '';
+  }
+}
+
 function encodeDownloadName(value = '') {
   return String(value || 'study-material').replace(/["\r\n]/g, '').trim() || 'study-material';
 }
@@ -99,39 +138,34 @@ async function uploadFreeStudyToCloudinary(localPath, mimeType = '') {
 
 async function collectDeliveryUrls(resource = {}) {
   const urls = [];
+  const publicId = String(resource.cloudinaryPublicId || '').trim();
+  const resourceType = cloudinaryResourceType(resource.mimeType);
+  const format = fileFormatFor(resource);
+
+  const privateUrl = buildPrivateDownloadUrl(publicId, resource);
+  if (privateUrl) urls.push(privateUrl);
+
+  if (publicId && hasCloudinaryConfig) {
+    try {
+      const info = await cloudinary.api.resource(publicId, { resource_type: resourceType });
+      const secureUrl = String(info?.secure_url || '').trim();
+      if (secureUrl) urls.push(secureUrl);
+    } catch {
+      // ignore lookup failures; fall back to generated URL
+    }
+
+    urls.push(
+      cloudinary.url(publicId, {
+        resource_type: resourceType,
+        secure: true,
+        type: 'upload',
+        ...(format ? { format } : {})
+      })
+    );
+  }
+
   const fileUrl = String(resource.fileUrl || '').trim();
   if (fileUrl) urls.push(fileUrl);
-
-  const publicId = String(resource.cloudinaryPublicId || '').trim();
-  if (!publicId || !hasCloudinaryConfig) {
-    return [...new Set(urls.filter((url) => /^https?:\/\//i.test(url)))];
-  }
-
-  const resourceType = cloudinaryResourceType(resource.mimeType);
-  try {
-    const info = await cloudinary.api.resource(publicId, { resource_type: resourceType });
-    const secureUrl = String(info?.secure_url || '').trim();
-    if (secureUrl) urls.push(secureUrl);
-  } catch {
-    // ignore lookup failures; fall back to generated URL
-  }
-
-  urls.push(
-    cloudinary.url(publicId, {
-      resource_type: resourceType,
-      secure: true,
-      type: 'upload'
-    })
-  );
-
-  urls.push(
-    cloudinary.url(publicId, {
-      resource_type: resourceType,
-      secure: true,
-      type: 'upload',
-      sign_url: true
-    })
-  );
 
   return [...new Set(urls.filter((url) => /^https?:\/\//i.test(url)))];
 }
@@ -270,7 +304,9 @@ async function sendStudyResourceFile(resource, res) {
   }
 
   if (deliveryUrls.length) {
-    return res.status(502).json({ error: 'Could not fetch stored file from cloud storage. Please try again.' });
+    return res.status(404).json({
+      error: 'Could not fetch stored file from cloud storage. Please ask admin to re-upload this material.'
+    });
   }
 
   const filename = path.basename(String(resource.filename || ''));
