@@ -2,25 +2,30 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const GOOGLE_WEB_CLIENT_ID =
-  String(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '').trim() ||
-  '517522563325-v3mogr6jj1n1s7dbttt4d8ohlslhhd9m.apps.googleusercontent.com';
-
-function readAndroidClientIdFromGoogleServices() {
+function readGoogleServicesJson() {
   try {
     const filePath = path.join(__dirname, 'google-services.json');
-    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    const oauthClients = raw?.client?.[0]?.oauth_client || [];
-    const androidClient = oauthClients.find((entry) => Number(entry.client_type) === 1);
-    return String(androidClient?.client_id || '').trim();
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch {
-    return '';
+    return null;
   }
 }
 
+function readOAuthClientIdFromGoogleServices(clientType) {
+  const oauthClients = readGoogleServicesJson()?.client?.[0]?.oauth_client || [];
+  const match = oauthClients.find((entry) => Number(entry.client_type) === clientType);
+  return String(match?.client_id || '').trim();
+}
+
+// google-services.json wins over .env so a stale EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID cannot break sign-in.
+const GOOGLE_WEB_CLIENT_ID =
+  readOAuthClientIdFromGoogleServices(3) ||
+  String(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '').trim() ||
+  '430984155371-9cgkt3u37sh40bfo0mu82c5f62829o37.apps.googleusercontent.com';
+
 const GOOGLE_ANDROID_CLIENT_ID =
-  String(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '').trim() ||
-  readAndroidClientIdFromGoogleServices();
+  readOAuthClientIdFromGoogleServices(1) ||
+  String(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '').trim();
 
 module.exports = {
   expo: {

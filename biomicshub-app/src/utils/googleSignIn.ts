@@ -1,10 +1,17 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import {
+  GoogleSignin,
+  isCancelledResponse,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes
+} from '@react-native-google-signin/google-signin';
 import { getApiBase } from '@/src/api/client';
 import type { GoogleLoginResult } from '@/src/api/auth';
 import {
+  GOOGLE_ANDROID_CLIENT_ID,
   GOOGLE_WEB_CLIENT_ID,
   hasAndroidOAuthClient,
   isGoogleSignInConfigured
@@ -21,10 +28,19 @@ function ensureNativeConfigured() {
   if (!isGoogleSignInConfigured()) {
     throw new Error('Google sign-in is not configured for this app build.');
   }
+
+  const webProject = GOOGLE_WEB_CLIENT_ID.split('-')[0] || '';
+  const androidProject = GOOGLE_ANDROID_CLIENT_ID.split('-')[0] || '';
+  if (webProject && androidProject && webProject !== androidProject) {
+    throw new Error(
+      'Google sign-in client IDs do not match. Rebuild the app after updating google-services.json.'
+    );
+  }
+
   GoogleSignin.configure({
     webClientId: GOOGLE_WEB_CLIENT_ID,
     offlineAccess: false,
-    scopes: ['email', 'profile']
+    scopes: ['openid', 'email', 'profile']
   });
   nativeConfigured = true;
 }
@@ -36,23 +52,41 @@ async function signInWithGoogleNative(): Promise<string> {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
   }
 
+  let response;
   try {
-    await GoogleSignin.signOut();
-  } catch {
-    // no previous session
+    response = await GoogleSignin.signIn();
+  } catch (err) {
+    if (isErrorWithCode(err)) {
+      if (err.code === statusCodes.SIGN_IN_CANCELLED) {
+        throw new Error('Google sign-in was cancelled.');
+      }
+      if (err.code === statusCodes.IN_PROGRESS) {
+        throw new Error('Google sign-in is already in progress.');
+      }
+      if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        throw new Error('Google Play Services is unavailable on this device.');
+      }
+    }
+    throw err;
   }
 
-  const response = await GoogleSignin.signIn();
-  if (response.type !== 'success') {
+  if (isCancelledResponse(response)) {
     throw new Error('Google sign-in was cancelled.');
   }
 
+  if (!isSuccessResponse(response)) {
+    throw new Error('Google sign-in failed. Check that google-services.json matches this app build.');
+  }
+
+  const idToken = String(response.data?.idToken || '').trim();
+  if (idToken) return idToken;
+
   const tokens = await GoogleSignin.getTokens();
-  const idToken = String(tokens?.idToken || '').trim();
-  if (!idToken) {
+  const fallbackToken = String(tokens?.idToken || '').trim();
+  if (!fallbackToken) {
     throw new Error('Google did not return a valid sign-in token.');
   }
-  return idToken;
+  return fallbackToken;
 }
 
 function parseMobileAuthRedirect(url: string): GoogleLoginResult {
@@ -67,7 +101,7 @@ function parseMobileAuthRedirect(url: string): GoogleLoginResult {
 
   const error = readParam('error');
   if (error) {
-    throw new Error(decodeURIComponent(error));
+    throw new Error(decodeURIComponent(error.replace(/\+/g, ' ')));
   }
 
   if (readParam('needs_profile') === '1') {
@@ -138,6 +172,10 @@ export async function signInWithGoogle(): Promise<GoogleSignInOutcome> {
       const idToken = await signInWithGoogleNative();
       return { mode: 'id_token', idToken };
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err || '');
+      if (message === 'Google sign-in was cancelled.') {
+        throw err;
+      }
       if (!isDeveloperError(err)) {
         throw err;
       }

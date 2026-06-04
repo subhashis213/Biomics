@@ -39,6 +39,8 @@ const RECOVERY_RETENTION_MS = RECOVERY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const ACTIVITY_SESSION_MAX_GAP_MS = Math.max(15, Number(process.env.ACTIVITY_SESSION_MAX_GAP_SECONDS || 90)) * 1000;
 const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
 const GOOGLE_CLIENT_SECRET = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+const FIREBASE_WEB_CLIENT_ID =
+  '430984155371-9cgkt3u37sh40bfo0mu82c5f62829o37.apps.googleusercontent.com';
 const PUBLIC_BACKEND_URL = String(process.env.PUBLIC_BACKEND_URL || 'https://biomicshub-backend.onrender.com')
   .trim()
   .replace(/\/$/, '');
@@ -47,6 +49,14 @@ const MOBILE_APP_RETURN_URL = 'biomicshubapp://google-auth';
 const GOOGLE_PROFILE_COMPLETION_EXPIRES_IN = '15m';
 const uploadsDir = path.join(__dirname, '../uploads');
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+
+function getGoogleClientIds() {
+  const extras = String(process.env.GOOGLE_CLIENT_IDS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return [...new Set([GOOGLE_CLIENT_ID, ...extras, FIREBASE_WEB_CLIENT_ID].filter(Boolean))];
+}
 
 const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
 const cloudinaryApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
@@ -132,12 +142,26 @@ function ensureGoogleConfig() {
 }
 
 async function verifyGoogleIdToken(idToken) {
-  ensureGoogleConfig();
-  const ticket = await googleClient.verifyIdToken({
-    idToken: String(idToken || '').trim(),
-    audience: GOOGLE_CLIENT_ID
-  });
-  return ticket?.getPayload() || null;
+  const token = String(idToken || '').trim();
+  const audiences = getGoogleClientIds();
+  if (!audiences.length) {
+    ensureGoogleConfig();
+  }
+
+  let lastError = null;
+  for (const audience of audiences) {
+    try {
+      const client = new OAuth2Client(audience);
+      const ticket = await client.verifyIdToken({ idToken: token, audience });
+      return ticket?.getPayload() || null;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  const err = new Error(lastError?.message || 'Invalid Google account token.');
+  err.statusCode = 401;
+  throw err;
 }
 
 function ensureGoogleMobileOAuthConfig() {

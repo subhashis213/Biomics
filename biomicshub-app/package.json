@@ -1,7 +1,7 @@
 {
   "name": "biomicshub-app",
   "main": "index.js",
-  "version": "1.0.26",
+  "version": "1.0.28",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -10,7 +10,8 @@
     "prebuild:android": "expo prebuild --platform android --clean && node scripts/patch-android-for-playstore.mjs && npm run generate:notification-icon",
     "patch:android": "node scripts/patch-android-for-playstore.mjs",
     "playstore:keystore": "bash scripts/create-playstore-keystore.sh",
-    "build:apk": "cd android && NODE_ENV=production ./gradlew assembleRelease",
+    "sync:google-services": "cp google-services.json android/app/google-services.json",
+    "build:apk": "npm run sync:google-services && cd android && NODE_ENV=production ./gradlew assembleRelease",
     "build:aab": "cd android && NODE_ENV=production ./gradlew bundleRelease",
     "build:playstore": "npm run patch:android && npm run build:aab && node scripts/copy-playstore-aab.mjs",
     "check:google-oauth": "node scripts/check-google-oauth.mjs",

@@ -1,17 +1,11 @@
 import Constants from 'expo-constants';
 
-/** Web client ID — backend verifies idToken audience against this. */
-export const GOOGLE_WEB_CLIENT_ID = String(
-  Constants.expoConfig?.extra?.googleWebClientId ||
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    ''
-).trim();
+/** Web client ID — baked into the APK via app.config.js + google-services.json. */
+export const GOOGLE_WEB_CLIENT_ID = String(Constants.expoConfig?.extra?.googleWebClientId || '').trim();
 
-/** Android OAuth client ID — allows native + in-app OAuth redirect on mobile. */
+/** Android OAuth client ID — from google-services.json at build time. */
 export const GOOGLE_ANDROID_CLIENT_ID = String(
-  Constants.expoConfig?.extra?.googleAndroidClientId ||
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-    ''
+  Constants.expoConfig?.extra?.googleAndroidClientId || ''
 ).trim();
 
 export function isGoogleSignInConfigured() {
