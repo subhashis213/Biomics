@@ -10,7 +10,6 @@ import {
 import 'stream-chat-react/dist/css/v2/index.css';
 import { fetchCommunityChatToken, fetchCommunityChatUnreadCount } from '../api';
 import AppShell from '../components/AppShell';
-import CommunityChatChannelHeader from '../components/CommunityChatChannelHeader';
 
 const CommunityChatMessagePane = lazy(() => import('../components/CommunityChatMessagePane'));
 const CommunityChatThreadPane = lazy(() => import('../components/CommunityChatThreadPane'));
@@ -132,9 +131,12 @@ export default function CommunityChatPage() {
         {!loading && !errorText && client && channel ? (
           <section className="card community-chat-shell">
             <header className="community-chat-topbar">
-              <div>
-                <p className="community-chat-kicker">Biomics Hub Community</p>
-                <h2>General Discussion Space</h2>
+              <div className="community-chat-topbar-copy">
+                <p className="community-chat-kicker">Live community</p>
+                <h2>Biomics Community</h2>
+                <p className="community-chat-topbar-meta">
+                  {registeredMemberCount} registered member{registeredMemberCount === 1 ? '' : 's'}
+                </p>
               </div>
               <div className="community-chat-presence">
                 <span className="community-chat-dot" aria-hidden="true" />
@@ -165,7 +167,6 @@ export default function CommunityChatPage() {
               <Chat client={client} theme="str-chat__theme-light">
                 <Channel channel={channel} AttachmentSelector={AttachmentSelector}>
                   <Window>
-                    <CommunityChatChannelHeader registeredMemberCount={registeredMemberCount} />
                     <Suspense fallback={<div className="empty-note">Loading chat messages...</div>}>
                       <CommunityChatMessagePane />
                     </Suspense>
