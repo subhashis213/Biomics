@@ -10,6 +10,7 @@ export type FreeStudyResource = {
   resourceType: FreeStudyResourceType;
   filename: string;
   originalName?: string;
+  fileUrl?: string;
   mimeType?: string;
   fileSize?: number;
   coverUrl?: string;
@@ -29,6 +30,10 @@ export type FreeStudyCourseGroup = {
 
 export function freeStudyDownloadPath(resourceId: string) {
   return `/free-study-resources/${encodeURIComponent(resourceId)}/download`;
+}
+
+export function freeStudyDownloadLinkPath(resourceId: string) {
+  return `/free-study-resources/${encodeURIComponent(resourceId)}/download-link`;
 }
 
 export function fetchFreeStudyHomePreview(token: string) {

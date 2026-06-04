@@ -1,5 +1,7 @@
 const express = require('express');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const multer = require('multer');
 const path = require('path');
 const { v2: cloudinary } = require('cloudinary');
@@ -122,18 +124,64 @@ async function collectDeliveryUrls(resource = {}) {
     })
   );
 
+  urls.push(
+    cloudinary.url(publicId, {
+      resource_type: resourceType,
+      secure: true,
+      type: 'upload',
+      sign_url: true
+    })
+  );
+
   return [...new Set(urls.filter((url) => /^https?:\/\//i.test(url)))];
 }
 
-async function fetchRemoteBuffer(url) {
-  const remote = await fetch(url, { redirect: 'follow' });
-  if (!remote.ok) return null;
-  const buffer = Buffer.from(await remote.arrayBuffer());
-  if (!buffer.length) return null;
-  return {
-    buffer,
-    contentType: remote.headers.get('content-type') || 'application/octet-stream'
-  };
+function openRemoteStream(url, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const request = lib.get(url, (response) => {
+      const status = Number(response.statusCode || 0);
+      if (status >= 300 && status < 400 && response.headers.location && redirectsLeft > 0) {
+        response.resume();
+        const nextUrl = new URL(response.headers.location, url).href;
+        openRemoteStream(nextUrl, redirectsLeft - 1).then(resolve).catch(reject);
+        return;
+      }
+      if (status !== 200) {
+        response.resume();
+        reject(new Error(`Remote file request failed (${status}).`));
+        return;
+      }
+      resolve({
+        stream: response,
+        contentType: String(response.headers['content-type'] || 'application/octet-stream'),
+        contentLength: response.headers['content-length'] || null
+      });
+    });
+    request.on('error', reject);
+  });
+}
+
+async function pipeRemoteUrlToResponse(remoteUrl, resource, res, downloadName) {
+  const { stream, contentType, contentLength } = await openRemoteStream(remoteUrl);
+  res.setHeader('Content-Type', resource.mimeType || contentType || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+  if (contentLength) res.setHeader('Content-Length', String(contentLength));
+
+  await new Promise((resolve, reject) => {
+    stream.on('error', reject);
+    res.on('error', reject);
+    stream.on('end', resolve);
+    stream.pipe(res);
+  });
 }
 
 async function deleteFreeStudyFromCloudinary(publicId, mimeType = '') {
@@ -214,20 +262,15 @@ async function sendStudyResourceFile(resource, res) {
 
   for (const remoteUrl of deliveryUrls) {
     try {
-      const payload = await fetchRemoteBuffer(remoteUrl);
-      if (payload) {
-        res.setHeader('Content-Type', resource.mimeType || payload.contentType || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
-        res.setHeader('Content-Length', String(payload.buffer.length));
-        return res.send(payload.buffer);
-      }
+      await pipeRemoteUrlToResponse(remoteUrl, resource, res, downloadName);
+      return;
     } catch {
-      // try next delivery URL
+      if (res.headersSent) return;
     }
   }
 
   if (deliveryUrls.length) {
-    return res.redirect(302, deliveryUrls[0]);
+    return res.status(502).json({ error: 'Could not fetch stored file from cloud storage. Please try again.' });
   }
 
   const filename = path.basename(String(resource.filename || ''));
@@ -306,6 +349,30 @@ router.get('/admin/list', authenticateToken('admin'), async (req, res) => {
   }
 });
 
+// GET /free-study-resources/:id/download-link — direct Cloudinary URL for mobile clients
+router.get('/:id/download-link', authenticateAny, async (req, res) => {
+  try {
+    const resource = await findResourceById(req.params.id);
+    if (!resource || resource.isActive === false) {
+      return res.status(404).json({ error: 'Study resource not found.' });
+    }
+
+    const deliveryUrls = await collectDeliveryUrls(resource);
+    if (!deliveryUrls.length) {
+      return res.status(404).json({ error: 'File missing. Please ask admin to re-upload this material.' });
+    }
+
+    return res.json({
+      url: deliveryUrls[0],
+      title: String(resource.title || '').trim(),
+      originalName: String(resource.originalName || resource.title || 'study-material').trim(),
+      mimeType: String(resource.mimeType || 'application/pdf').trim()
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'Failed to resolve download link.' });
+  }
+});
+
 // GET /free-study-resources/:id/download — free download for any logged-in user
 router.get('/:id/download', authenticateAny, async (req, res) => {
   try {
@@ -315,7 +382,10 @@ router.get('/:id/download', authenticateAny, async (req, res) => {
     }
     return sendStudyResourceFile(resource, res);
   } catch (error) {
-    return res.status(500).json({ error: error?.message || 'Failed to download study resource.' });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: error?.message || 'Failed to download study resource.' });
+    }
+    return undefined;
   }
 });
 

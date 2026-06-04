@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Linking from 'expo-linking';
 import { Platform, Share } from 'react-native';
 import { getApiBase } from '@/src/api/client';
-import { freeStudyDownloadPath } from '@/src/api/freeStudyResources';
+import { freeStudyDownloadLinkPath, freeStudyDownloadPath } from '@/src/api/freeStudyResources';
 
 function pickExtension(filename: string, displayName: string, mimeType?: string) {
   const fromFile = String(filename || '').split('.').pop();
@@ -21,19 +21,6 @@ function safeBaseName(displayName: string, filename: string) {
   return cleaned.replace(/\.[a-z0-9]{2,5}$/i, '') || 'study-material';
 }
 
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '');
-      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('Could not read downloaded file.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 async function openDownloadedFile(localUri: string) {
   if (Platform.OS === 'android') {
     try {
@@ -47,47 +34,71 @@ async function openDownloadedFile(localUri: string) {
   await Share.share({ url: localUri, title: 'Free study material' });
 }
 
+async function downloadToFile(
+  url: string,
+  dest: string,
+  headers: Record<string, string> = {}
+) {
+  const download = FileSystem.createDownloadResumable(url, dest, { headers });
+  const result = await download.downloadAsync();
+  if (!result) {
+    throw new Error('Could not download file.');
+  }
+  if (result.status !== 200) {
+    throw new Error(`Could not download file (HTTP ${result.status}).`);
+  }
+  const info = await FileSystem.getInfoAsync(result.uri);
+  if (!info.exists || !info.size) {
+    throw new Error('Downloaded file is empty. Please ask admin to re-upload this material.');
+  }
+  return result.uri;
+}
+
+async function resolveDirectDownloadUrl(token: string, resourceId: string, fileUrl?: string) {
+  const directUrl = String(fileUrl || '').trim();
+  if (/^https?:\/\//i.test(directUrl)) return directUrl;
+
+  const linkUrl = `${getApiBase()}${freeStudyDownloadLinkPath(resourceId)}`;
+  const response = await fetch(linkUrl, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json'
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(data.error || data.message || 'Could not download file.'));
+  }
+  const resolved = String(data.url || '').trim();
+  if (!/^https?:\/\//i.test(resolved)) {
+    throw new Error('Download link is unavailable. Please ask admin to re-upload this material.');
+  }
+  return resolved;
+}
+
 export async function downloadFreeStudyResource(
   token: string,
   resourceId: string,
   displayName: string,
-  options: { originalName?: string; mimeType?: string; filename?: string } = {}
+  options: { originalName?: string; mimeType?: string; filename?: string; fileUrl?: string } = {}
 ) {
-  const url = `${getApiBase()}${freeStudyDownloadPath(resourceId)}`;
   const ext = pickExtension(options.filename || options.originalName || '', displayName, options.mimeType);
   const baseName = safeBaseName(options.originalName || displayName, options.filename || '');
   const dest = `${FileSystem.documentDirectory}${Date.now()}-${baseName}.${ext}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/pdf,application/octet-stream,*/*'
-    },
-    redirect: 'follow'
+  try {
+    const directUrl = await resolveDirectDownloadUrl(token, resourceId, options.fileUrl);
+    const localUri = await downloadToFile(directUrl, dest);
+    await openDownloadedFile(localUri);
+    return;
+  } catch {
+    // Fall back to authenticated backend proxy download.
+  }
+
+  const proxyUrl = `${getApiBase()}${freeStudyDownloadPath(resourceId)}`;
+  const localUri = await downloadToFile(proxyUrl, dest, {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/pdf,application/octet-stream,*/*'
   });
-
-  if (!response.ok) {
-    let message = 'Could not download file.';
-    try {
-      const data = await response.json();
-      message = String(data.error || data.message || message);
-    } catch {
-      try {
-        const text = await response.text();
-        if (text && !text.startsWith('<')) message = text.slice(0, 180);
-      } catch {
-        // ignore
-      }
-    }
-    throw new Error(message);
-  }
-
-  const blob = await response.blob();
-  if (!blob.size) {
-    throw new Error('Downloaded file is empty. Please ask admin to re-upload this material.');
-  }
-
-  const base64 = await blobToBase64(blob);
-  await FileSystem.writeAsStringAsync(dest, base64, { encoding: FileSystem.EncodingType.Base64 });
-  await openDownloadedFile(dest);
+  await openDownloadedFile(localUri);
 }
