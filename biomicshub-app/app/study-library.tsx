@@ -56,7 +56,10 @@ export default function StudyLibraryScreen() {
     if (!token) return;
     setDownloadingId(item._id);
     try {
-      await downloadFreeStudyResource(token, item._id, item.title);
+      await downloadFreeStudyResource(token, item._id, item.title, {
+        originalName: item.originalName,
+        mimeType: item.mimeType
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Download failed.');
     } finally {

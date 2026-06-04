@@ -2,12 +2,26 @@ const express = require('express');
 const fs = require('fs');
 const multer = require('multer');
 const path = require('path');
+const { v2: cloudinary } = require('cloudinary');
 const FreeStudyResource = require('../models/FreeStudyResource');
 const Course = require('../models/Course');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '../uploads/free-study');
+const cloudinaryCloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+const cloudinaryApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
+const cloudinaryApiSecret = String(process.env.CLOUDINARY_API_SECRET || '').trim();
+const hasCloudinaryConfig = !!(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret);
+
+if (hasCloudinaryConfig) {
+  cloudinary.config({
+    cloud_name: cloudinaryCloudName,
+    api_key: cloudinaryApiKey,
+    api_secret: cloudinaryApiSecret,
+    secure: true
+  });
+}
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -41,6 +55,49 @@ function normalizeCourse(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
+function safelyRemoveFile(filePath) {
+  if (!filePath) return;
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch {
+    // Non-fatal cleanup error.
+  }
+}
+
+function cloudinaryResourceType(mimeType = '') {
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime.startsWith('image/')) return 'image';
+  return 'raw';
+}
+
+async function uploadFreeStudyToCloudinary(localPath, mimeType = '') {
+  if (!hasCloudinaryConfig) return null;
+  if (!localPath) throw new Error('Study file upload path is missing.');
+
+  const uploadResult = await cloudinary.uploader.upload(localPath, {
+    folder: 'biomicshub/free-study',
+    resource_type: cloudinaryResourceType(mimeType),
+    overwrite: true
+  });
+
+  return {
+    url: String(uploadResult?.secure_url || '').trim(),
+    publicId: String(uploadResult?.public_id || '').trim()
+  };
+}
+
+async function deleteFreeStudyFromCloudinary(publicId, mimeType = '') {
+  const normalizedPublicId = String(publicId || '').trim();
+  if (!hasCloudinaryConfig || !normalizedPublicId) return;
+  try {
+    await cloudinary.uploader.destroy(normalizedPublicId, {
+      resource_type: cloudinaryResourceType(mimeType)
+    });
+  } catch {
+    // Non-fatal cleanup error.
+  }
+}
+
 function sanitizeResource(doc = {}) {
   return {
     _id: doc._id,
@@ -50,6 +107,7 @@ function sanitizeResource(doc = {}) {
     resourceType: String(doc.resourceType || 'material'),
     filename: String(doc.filename || '').trim(),
     originalName: String(doc.originalName || '').trim(),
+    fileUrl: String(doc.fileUrl || '').trim(),
     mimeType: String(doc.mimeType || 'application/pdf').trim(),
     fileSize: Number(doc.fileSize || 0),
     coverUrl: String(doc.coverUrl || '').trim(),
@@ -85,6 +143,40 @@ async function listActiveResources() {
 
 function authenticateAny(req, res, next) {
   return authenticateToken()(req, res, next);
+}
+
+function downloadNameFor(resource) {
+  return resource.originalName || resource.title || resource.filename || 'study-material';
+}
+
+async function sendStudyResourceFile(resource, res) {
+  const downloadName = downloadNameFor(resource);
+  const remoteUrl = String(resource.fileUrl || '').trim();
+
+  if (/^https?:\/\//i.test(remoteUrl)) {
+    const remote = await fetch(remoteUrl);
+    if (!remote.ok) {
+      return res.status(404).json({ error: 'File not found on server. Please ask admin to re-upload this material.' });
+    }
+    const buffer = Buffer.from(await remote.arrayBuffer());
+    res.setHeader('Content-Type', remote.headers.get('content-type') || resource.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadName.replace(/"/g, '')}"`);
+    return res.send(buffer);
+  }
+
+  const filename = path.basename(String(resource.filename || ''));
+  if (!filename) {
+    return res.status(404).json({ error: 'File missing. Please ask admin to re-upload this material.' });
+  }
+
+  const filePath = path.join(uploadsDir, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({
+      error: 'File not found on server. Please ask admin to re-upload this material.'
+    });
+  }
+
+  return res.download(filePath, downloadName);
 }
 
 // GET /free-study-resources — grouped free library for logged-in students/admins
@@ -147,15 +239,7 @@ router.get('/:id/download', authenticateAny, async (req, res) => {
     if (!resource || resource.isActive === false) {
       return res.status(404).json({ error: 'Study resource not found.' });
     }
-    const filename = path.basename(String(resource.filename || ''));
-    if (!filename) return res.status(404).json({ error: 'File missing.' });
-
-    const filePath = path.join(uploadsDir, filename);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found on server.' });
-    }
-
-    return res.download(filePath, resource.originalName || resource.title || filename);
+    return sendStudyResourceFile(resource, res);
   } catch (error) {
     return res.status(500).json({ error: error?.message || 'Failed to download study resource.' });
   }
@@ -184,12 +268,28 @@ router.post('/admin', authenticateToken('admin'), (req, res) => {
       const sortOrder = Number(req.body?.sortOrder || 0);
 
       if (!courseName) {
-        fs.unlink(req.file.path, () => {});
+        safelyRemoveFile(req.file.path);
         return res.status(400).json({ error: 'Course is required.' });
       }
       if (!title) {
-        fs.unlink(req.file.path, () => {});
+        safelyRemoveFile(req.file.path);
         return res.status(400).json({ error: 'Title is required.' });
+      }
+
+      let fileUrl = '';
+      let cloudinaryPublicId = '';
+      let storedFilename = req.file.filename;
+
+      if (hasCloudinaryConfig) {
+        const uploaded = await uploadFreeStudyToCloudinary(req.file.path, req.file.mimetype || 'application/pdf');
+        if (!uploaded?.url) {
+          safelyRemoveFile(req.file.path);
+          return res.status(500).json({ error: 'Cloud file upload failed. Check Cloudinary settings on the server.' });
+        }
+        fileUrl = uploaded.url;
+        cloudinaryPublicId = uploaded.publicId;
+        storedFilename = path.basename(req.file.filename);
+        safelyRemoveFile(req.file.path);
       }
 
       const created = await FreeStudyResource.create({
@@ -197,8 +297,10 @@ router.post('/admin', authenticateToken('admin'), (req, res) => {
         title,
         description,
         resourceType,
-        filename: req.file.filename,
+        filename: storedFilename,
         originalName: req.file.originalname || title,
+        fileUrl,
+        cloudinaryPublicId,
         mimeType: req.file.mimetype || 'application/pdf',
         fileSize: Number(req.file.size || 0),
         coverUrl: String(req.body?.coverUrl || '').trim(),
@@ -212,7 +314,7 @@ router.post('/admin', authenticateToken('admin'), (req, res) => {
         resource: sanitizeResource(created.toObject())
       });
     } catch (error) {
-      if (req.file?.path) fs.unlink(req.file.path, () => {});
+      safelyRemoveFile(req.file?.path);
       return res.status(500).json({ error: error?.message || 'Failed to save study resource.' });
     }
   });
@@ -253,6 +355,7 @@ router.delete('/admin/:id', authenticateToken('admin'), async (req, res) => {
       const filePath = path.join(uploadsDir, filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
+    await deleteFreeStudyFromCloudinary(resource.cloudinaryPublicId, resource.mimeType);
 
     await resource.deleteOne();
     return res.json({ message: 'Study resource deleted.' });

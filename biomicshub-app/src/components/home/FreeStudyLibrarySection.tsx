@@ -1,28 +1,24 @@
 import { useMemo } from 'react';
-import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { FreeStudyCourseGroup } from '@/src/api/freeStudyResources';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
-import { Badge, Card, Eyebrow } from '@/src/components/ui';
+import { Card, Eyebrow } from '@/src/components/ui';
 
 type Props = {
   courses: FreeStudyCourseGroup[];
   totalCount: number;
 };
 
-function typeIcon(type: string): ComponentProps<typeof Ionicons>['name'] {
-  if (type === 'book') return 'book-outline';
-  if (type === 'job-notes') return 'briefcase-outline';
-  return 'document-text-outline';
-}
+function buildSummary(courses: FreeStudyCourseGroup[], totalCount: number) {
+  const courseCount = courses.length;
+  if (!courseCount) return `${totalCount} free file${totalCount === 1 ? '' : 's'}`;
 
-function typeLabel(type: string) {
-  if (type === 'book') return 'Book';
-  if (type === 'job-notes') return 'Job notes';
-  return 'Material';
+  const names = courses.slice(0, 2).map((c) => c.courseName);
+  const extra = courseCount > 2 ? ` +${courseCount - 2} more` : '';
+  return `${names.join(', ')}${extra} · ${totalCount} file${totalCount === 1 ? '' : 's'}`;
 }
 
 export default function FreeStudyLibrarySection({ courses, totalCount }: Props) {
@@ -31,75 +27,64 @@ export default function FreeStudyLibrarySection({ courses, totalCount }: Props) 
 
   if (!totalCount) return null;
 
+  const summary = buildSummary(courses, totalCount);
+
   return (
-    <Card style={styles.wrap}>
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
+    <Pressable
+      onPress={() => router.push('/study-library')}
+      style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel="Open free study library"
+    >
+      <Card style={styles.wrap}>
+        <View style={styles.iconWrap}>
+          <Ionicons name="library-outline" size={22} color={colors.accent} />
+        </View>
+        <View style={styles.body}>
           <Eyebrow>Free library</Eyebrow>
           <Text style={styles.title}>Books & study materials</Text>
-          <Text style={styles.sub}>100% free for all students · course-wise</Text>
+          <Text style={styles.sub} numberOfLines={1}>
+            {summary}
+          </Text>
         </View>
-        <Badge label={`${totalCount} files`} tone="success" />
-      </View>
-
-      {courses.slice(0, 3).map((group) => (
-        <View key={group.courseName} style={styles.courseBlock}>
-          <View style={styles.courseHead}>
-            <Ionicons name="school-outline" size={16} color={colors.accent} />
-            <Text style={styles.courseName}>{group.courseName}</Text>
-            <Text style={styles.courseCount}>{group.totalCount ?? group.items?.length ?? 0}</Text>
-          </View>
-          {(group.previewItems || group.items || []).slice(0, 2).map((item) => (
-            <View key={item._id} style={styles.itemRow}>
-              <View style={styles.itemIcon}>
-                <Ionicons name={typeIcon(item.resourceType)} size={16} color={colors.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.itemMeta}>{typeLabel(item.resourceType)} · Free</Text>
-              </View>
-            </View>
-          ))}
+        <View style={styles.chevronWrap}>
+          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
         </View>
-      ))}
-
-      <Pressable style={styles.cta} onPress={() => router.push('/study-library')}>
-        <Text style={styles.ctaText}>Browse all free materials</Text>
-        <Ionicons name="arrow-forward" size={16} color={colors.accentText} />
-      </Pressable>
-    </Card>
+      </Card>
+    </Pressable>
   );
 }
 
 function createStyles(c: ThemeColors) {
   return StyleSheet.create({
-    wrap: { marginBottom: 16, padding: 0, overflow: 'hidden' },
-    header: { flexDirection: 'row', gap: 10, padding: 14, paddingBottom: 10, alignItems: 'flex-start' },
-    title: { color: c.text, fontSize: 18, fontWeight: '800', marginTop: 2 },
-    sub: { color: c.muted, fontSize: 12, marginTop: 4 },
-    courseBlock: { borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 14, paddingVertical: 10 },
-    courseHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-    courseName: { color: c.text, fontWeight: '800', flex: 1, fontSize: 14 },
-    courseCount: { color: c.muted, fontWeight: '700', fontSize: 12 },
-    itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-    itemIcon: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
+    pressable: { marginBottom: 16 },
+    pressed: { opacity: 0.92 },
+    wrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 14,
+      borderColor: c.accentSoft,
+      backgroundColor: c.card
+    },
+    iconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
       backgroundColor: c.accentSoft,
       alignItems: 'center',
       justifyContent: 'center'
     },
-    itemTitle: { color: c.text, fontWeight: '700', fontSize: 13 },
-    itemMeta: { color: c.muted, fontSize: 11, marginTop: 2 },
-    cta: {
-      flexDirection: 'row',
+    body: { flex: 1, minWidth: 0 },
+    title: { color: c.text, fontSize: 16, fontWeight: '800' },
+    sub: { color: c.muted, fontSize: 12, marginTop: 3, fontWeight: '600' },
+    chevronWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: c.cardAlt,
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      backgroundColor: c.accent,
-      paddingVertical: 13
-    },
-    ctaText: { color: c.accentText, fontWeight: '800', fontSize: 14 }
+      justifyContent: 'center'
+    }
   });
 }

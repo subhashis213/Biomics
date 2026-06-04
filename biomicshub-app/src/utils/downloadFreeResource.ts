@@ -4,17 +4,41 @@ import { Platform, Share } from 'react-native';
 import { getApiBase } from '@/src/api/client';
 import { freeStudyDownloadPath } from '@/src/api/freeStudyResources';
 
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '');
-      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('Could not read downloaded file.'));
-    reader.readAsDataURL(blob);
-  });
+function sanitizeFileName(value: string) {
+  return String(value || 'study-material').replace(/[^\w.\-() ]+/g, '_').trim() || 'study-material';
+}
+
+function ensureExtension(name: string, mimeType?: string) {
+  if (/\.[a-z0-9]{2,5}$/i.test(name)) return name;
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime === 'application/pdf') return `${name}.pdf`;
+  if (mime.startsWith('image/')) return `${name}.jpg`;
+  if (mime.includes('word')) return `${name}.docx`;
+  if (mime.includes('presentation')) return `${name}.pptx`;
+  if (mime.includes('epub')) return `${name}.epub`;
+  return `${name}.pdf`;
+}
+
+async function readErrorMessage(response: FileSystem.DownloadResult | Response) {
+  if ('uri' in response) {
+    if (response.status >= 400) {
+      try {
+        const text = await FileSystem.readAsStringAsync(response.uri);
+        const data = JSON.parse(text);
+        return String(data.error || data.message || 'Could not download file.');
+      } catch {
+        return 'Could not download file.';
+      }
+    }
+    return '';
+  }
+
+  try {
+    const data = await response.json();
+    return String(data.error || data.message || 'Could not download file.');
+  } catch {
+    return 'Could not download file.';
+  }
 }
 
 async function openDownloadedFile(localUri: string) {
@@ -30,29 +54,29 @@ async function openDownloadedFile(localUri: string) {
   await Share.share({ url: localUri, title: 'Free study material' });
 }
 
-export async function downloadFreeStudyResource(token: string, resourceId: string, displayName: string) {
+export async function downloadFreeStudyResource(
+  token: string,
+  resourceId: string,
+  displayName: string,
+  options: { originalName?: string; mimeType?: string } = {}
+) {
   const url = `${getApiBase()}${freeStudyDownloadPath(resourceId)}`;
-  const safeName = String(displayName || 'study-material').replace(/[^\w.\-() ]+/g, '_').trim() || 'study-material';
-  const dest = `${FileSystem.documentDirectory}${Date.now()}-${safeName}.pdf`;
+  const fileName = ensureExtension(
+    sanitizeFileName(options.originalName || displayName),
+    options.mimeType
+  );
+  const dest = `${FileSystem.documentDirectory}${Date.now()}-${fileName}`;
 
-  const response = await fetch(url, {
+  const result = await FileSystem.downloadAsync(url, dest, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: '*/*'
     }
   });
 
-  if (!response.ok) {
-    let message = 'Could not download file.';
-    try {
-      const data = await response.json();
-      message = String(data.error || data.message || message);
-    } catch { /* ignore */ }
-    throw new Error(message);
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(await readErrorMessage(result));
   }
 
-  const blob = await response.blob();
-  const base64 = await blobToBase64(blob);
-  await FileSystem.writeAsStringAsync(dest, base64, { encoding: FileSystem.EncodingType.Base64 });
-  await openDownloadedFile(dest);
+  await openDownloadedFile(result.uri);
 }

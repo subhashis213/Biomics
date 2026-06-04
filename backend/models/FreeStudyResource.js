@@ -12,6 +12,8 @@ const freeStudyResourceSchema = new mongoose.Schema({
   },
   filename: { type: String, required: true, trim: true },
   originalName: { type: String, default: '', trim: true },
+  fileUrl: { type: String, default: '', trim: true },
+  cloudinaryPublicId: { type: String, default: '', trim: true },
   mimeType: { type: String, default: 'application/pdf', trim: true },
   fileSize: { type: Number, default: 0 },
   coverUrl: { type: String, default: '', trim: true },
