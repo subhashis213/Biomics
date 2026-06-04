@@ -1,7 +1,17 @@
 import * as FileSystem from 'expo-file-system';
-import { Platform, Share } from 'react-native';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import { getApiBase } from '@/src/api/client';
 import { freeStudyDownloadPath } from '@/src/api/freeStudyResources';
+
+const SAF = FileSystem.StorageAccessFramework;
+
+export type FreeStudyDownloadResult = {
+  fileName: string;
+  savedToDownloads: boolean;
+  opened: boolean;
+};
 
 function pickExtension(filename: string, displayName: string, mimeType?: string) {
   const fromFile = String(filename || '').split('.').pop();
@@ -14,10 +24,11 @@ function pickExtension(filename: string, displayName: string, mimeType?: string)
   return 'pdf';
 }
 
-function safeBaseName(displayName: string, filename: string) {
-  const raw = String(displayName || filename || 'study-material').trim();
-  const cleaned = raw.replace(/[^\w.\-() ]+/g, '_').replace(/\s+/g, ' ').trim();
-  return cleaned.replace(/\.[a-z0-9]{2,5}$/i, '') || 'study-material';
+function buildFileName(displayName: string, originalName: string, filename: string, ext: string) {
+  const raw = String(originalName || displayName || filename || 'study-material').trim();
+  const cleaned = raw.replace(/[^\w.\-() ]+/g, '_').replace(/\s+/g, ' ').trim() || 'study-material';
+  if (/\.[a-z0-9]{2,5}$/i.test(cleaned)) return cleaned;
+  return `${cleaned}.${ext}`;
 }
 
 function mimeTypeForExtension(ext: string, fallback?: string) {
@@ -43,35 +54,58 @@ async function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-function validateDownloadedBase64(base64: string, mimeType: string) {
-  if (!base64) {
-    throw new Error('Downloaded file is empty. Please ask admin to re-upload this material.');
-  }
-  const mime = String(mimeType || '').toLowerCase();
-  if (mime !== 'application/pdf') return;
-
-  try {
-    const binary = atob(base64.slice(0, 12));
-    if (!binary.startsWith('%PDF')) {
-      throw new Error('Downloaded file is not a valid PDF. Please ask admin to delete and re-upload this material.');
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('valid PDF')) throw error;
+async function validatePdfHeader(localUri: string) {
+  const headerBase64 = await FileSystem.readAsStringAsync(localUri, {
+    encoding: FileSystem.EncodingType.Base64,
+    length: 8,
+    position: 0
+  });
+  const binary = atob(headerBase64);
+  if (!binary.startsWith('%PDF')) {
     throw new Error('Downloaded file is not a valid PDF. Please ask admin to delete and re-upload this material.');
   }
 }
 
-async function openDownloadedFile(localUri: string, mimeType: string, title: string) {
-  const contentUri = await FileSystem.getContentUriAsync(localUri);
-  if (Platform.OS === 'android') {
-    await Share.share({
-      title,
-      message: `${title} downloaded. Choose a PDF viewer to open it.`,
-      url: contentUri
+async function saveToAndroidDownloads(localUri: string, fileName: string, mimeType: string) {
+  if (Platform.OS !== 'android' || !SAF) return false;
+
+  try {
+    const permissions = await SAF.requestDirectoryPermissionsAsync(
+      SAF.getUriForDirectoryInRoot('Download')
+    );
+    if (!permissions.granted) return false;
+
+    const baseName = fileName.replace(/\.[a-z0-9]{2,5}$/i, '') || 'study-material';
+    const savedUri = await SAF.createFileAsync(permissions.directoryUri, baseName, mimeType);
+    const base64 = await FileSystem.readAsStringAsync(localUri, {
+      encoding: FileSystem.EncodingType.Base64
     });
-    return;
+    await SAF.writeAsStringAsync(savedUri, base64, {
+      encoding: FileSystem.EncodingType.Base64
+    });
+    return true;
+  } catch {
+    return false;
   }
-  await Share.share({ url: contentUri, title });
+}
+
+async function openDownloadedFile(localUri: string, mimeType: string) {
+  if (Platform.OS === 'android') {
+    const contentUri = await FileSystem.getContentUriAsync(localUri);
+    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      data: contentUri,
+      flags: 1,
+      type: mimeType
+    });
+    return true;
+  }
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Open study material' });
+    return true;
+  }
+
+  return false;
 }
 
 export async function downloadFreeStudyResource(
@@ -79,11 +113,11 @@ export async function downloadFreeStudyResource(
   resourceId: string,
   displayName: string,
   options: { originalName?: string; mimeType?: string; filename?: string } = {}
-) {
+): Promise<FreeStudyDownloadResult> {
   const ext = pickExtension(options.filename || options.originalName || '', displayName, options.mimeType);
-  const baseName = safeBaseName(options.originalName || displayName, options.filename || '');
+  const fileName = buildFileName(displayName, options.originalName || '', options.filename || '', ext);
   const mimeType = mimeTypeForExtension(ext, options.mimeType);
-  const dest = `${FileSystem.documentDirectory}${Date.now()}-${baseName}.${ext}`;
+  const dest = `${FileSystem.cacheDirectory}${Date.now()}-${fileName}`;
   const url = `${getApiBase()}${freeStudyDownloadPath(resourceId)}`;
 
   const response = await fetch(url, {
@@ -115,7 +149,23 @@ export async function downloadFreeStudyResource(
   }
 
   const base64 = await blobToBase64(blob);
-  validateDownloadedBase64(base64, mimeType);
   await FileSystem.writeAsStringAsync(dest, base64, { encoding: FileSystem.EncodingType.Base64 });
-  await openDownloadedFile(dest, mimeType, displayName);
+
+  if (mimeType === 'application/pdf') {
+    await validatePdfHeader(dest);
+  }
+
+  const savedToDownloads = await saveToAndroidDownloads(dest, fileName, mimeType);
+
+  let opened = false;
+  try {
+    opened = await openDownloadedFile(dest, mimeType);
+  } catch {
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(dest, { mimeType, dialogTitle: 'Open study material' });
+      opened = true;
+    }
+  }
+
+  return { fileName, savedToDownloads, opened };
 }

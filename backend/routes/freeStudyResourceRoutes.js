@@ -155,14 +155,62 @@ async function uploadFreeStudyToCloudinary(localPath, mimeType = '') {
     overwrite: true,
     use_filename: true,
     unique_filename: true,
-    access_mode: 'public'
+    access_mode: 'public',
+    type: 'upload'
   });
 
-  return {
-    url: String(uploadResult?.secure_url || '').trim(),
-    publicId: String(uploadResult?.public_id || '').trim(),
-    resourceType
-  };
+  const url = String(uploadResult?.secure_url || '').trim();
+  const publicId = String(uploadResult?.public_id || '').trim();
+  if (!url || !publicId) return null;
+
+  try {
+    const payload = await fetchRemoteBuffer(url);
+    if (!isValidFileBuffer(payload.buffer, mimeType)) {
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+      throw new Error('Uploaded file could not be verified on cloud storage.');
+    }
+  } catch (error) {
+    try {
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    } catch {
+      // ignore cleanup failure
+    }
+    throw error;
+  }
+
+  return { url, publicId, resourceType };
+}
+
+async function resolveStudyFileBuffer(resource = {}) {
+  const publicId = String(resource.cloudinaryPublicId || '').trim();
+  const resourceType = cloudinaryResourceType(resource.mimeType);
+  const mimeType = String(resource.mimeType || 'application/pdf').trim();
+  const urls = [];
+
+  if (publicId && hasCloudinaryConfig) {
+    try {
+      const info = await cloudinary.api.resource(publicId, { resource_type: resourceType });
+      const secureUrl = String(info?.secure_url || '').trim();
+      if (secureUrl) urls.push(secureUrl);
+    } catch {
+      // ignore lookup failures
+    }
+  }
+
+  urls.push(...await collectDeliveryUrls(resource));
+
+  for (const remoteUrl of [...new Set(urls.filter(Boolean))]) {
+    try {
+      const payload = await fetchRemoteBuffer(remoteUrl);
+      if (isValidFileBuffer(payload.buffer, mimeType)) {
+        return payload;
+      }
+    } catch {
+      // try next URL
+    }
+  }
+
+  return null;
 }
 
 async function collectDeliveryUrls(resource = {}) {
@@ -326,24 +374,18 @@ function downloadNameFor(resource) {
 
 async function sendStudyResourceFile(resource, res) {
   const downloadName = encodeDownloadName(downloadNameFor(resource));
-  const deliveryUrls = await collectDeliveryUrls(resource);
+  const payload = await resolveStudyFileBuffer(resource);
 
-  for (const remoteUrl of deliveryUrls) {
-    try {
-      const payload = await fetchRemoteBuffer(remoteUrl);
-      if (!isValidFileBuffer(payload.buffer, resource.mimeType)) continue;
-      res.setHeader('Content-Type', resource.mimeType || payload.contentType || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
-      res.setHeader('Content-Length', String(payload.buffer.length));
-      return res.send(payload.buffer);
-    } catch {
-      if (res.headersSent) return;
-    }
+  if (payload) {
+    res.setHeader('Content-Type', resource.mimeType || payload.contentType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+    res.setHeader('Content-Length', String(payload.buffer.length));
+    return res.send(payload.buffer);
   }
 
-  if (deliveryUrls.length) {
+  if (String(resource.cloudinaryPublicId || resource.fileUrl || '').trim()) {
     return res.status(404).json({
-      error: 'Could not fetch stored file from cloud storage. Please ask admin to re-upload this material.'
+      error: 'Stored file is invalid or missing. Please ask admin to delete and re-upload this material.'
     });
   }
 

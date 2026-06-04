@@ -1,4 +1,5 @@
 import { getApiBase, requestJson } from './client';
+import * as FileSystem from 'expo-file-system';
 
 export type FreeStudyResourceType = 'book' | 'material' | 'job-notes';
 
@@ -52,6 +53,28 @@ export function fetchFreeStudyAdminLibrary(token: string) {
   return requestJson<{ courses: FreeStudyCourseGroup[]; totalCount: number }>('/free-study-resources/admin/list', { token });
 }
 
+async function uploadStudyFile(
+  token: string,
+  endpoint: string,
+  payload: { uri: string; name: string; type: string },
+  parameters: Record<string, string> = {}
+) {
+  const response = await FileSystem.uploadAsync(`${getApiBase()}${endpoint}`, payload.uri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName: 'file',
+    mimeType: payload.type || 'application/pdf',
+    headers: { Authorization: `Bearer ${token}` },
+    parameters
+  });
+
+  const data = JSON.parse(response.body || '{}');
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(String(data.error || data.message || 'Upload failed.'));
+  }
+  return data;
+}
+
 export async function uploadFreeStudyResource(
   token: string,
   payload: {
@@ -64,20 +87,12 @@ export async function uploadFreeStudyResource(
     resourceType: FreeStudyResourceType;
   }
 ) {
-  const form = new FormData();
-  form.append('file', { uri: payload.uri, name: payload.name, type: payload.type } as unknown as Blob);
-  form.append('courseName', payload.courseName);
-  form.append('title', payload.title);
-  if (payload.description) form.append('description', payload.description);
-  form.append('resourceType', payload.resourceType);
-
-  const res = await fetch(`${getApiBase()}/free-study-resources/admin`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form
+  const data = await uploadStudyFile(token, '/free-study-resources/admin', payload, {
+    courseName: payload.courseName,
+    title: payload.title,
+    description: payload.description || '',
+    resourceType: payload.resourceType
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(String(data.error || data.message || 'Upload failed.'));
   return data as { message: string; resource: FreeStudyResource };
 }
 
@@ -86,16 +101,11 @@ export async function replaceFreeStudyResourceFile(
   resourceId: string,
   payload: { uri: string; name: string; type: string }
 ) {
-  const form = new FormData();
-  form.append('file', { uri: payload.uri, name: payload.name, type: payload.type } as unknown as Blob);
-
-  const res = await fetch(`${getApiBase()}/free-study-resources/admin/${encodeURIComponent(resourceId)}/file`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(String(data.error || data.message || 'Failed to replace file.'));
+  const data = await uploadStudyFile(
+    token,
+    `/free-study-resources/admin/${encodeURIComponent(resourceId)}/file`,
+    payload
+  );
   return data as { message: string; resource: FreeStudyResource };
 }
 

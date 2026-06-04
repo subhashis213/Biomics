@@ -8,7 +8,7 @@ import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { fetchFreeStudyLibrary, FreeStudyCourseGroup, FreeStudyResource } from '@/src/api/freeStudyResources';
 import { downloadFreeStudyResource } from '@/src/utils/downloadFreeResource';
-import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, Screen, Subtitle, Title } from '@/src/components/ui';
+import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, Screen, Subtitle, SuccessBanner, Title } from '@/src/components/ui';
 
 function typeIcon(type: string): React.ComponentProps<typeof Ionicons>['name'] {
   if (type === 'book') return 'book-outline';
@@ -31,6 +31,7 @@ export default function StudyLibraryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [downloadingId, setDownloadingId] = useState('');
 
   const load = useCallback(async (isRefresh = false) => {
@@ -55,12 +56,21 @@ export default function StudyLibraryScreen() {
   async function handleDownload(item: FreeStudyResource) {
     if (!token) return;
     setDownloadingId(item._id);
+    setError('');
+    setSuccess('');
     try {
-      await downloadFreeStudyResource(token, item._id, item.title, {
+      const result = await downloadFreeStudyResource(token, item._id, item.title, {
         originalName: item.originalName,
         mimeType: item.mimeType,
         filename: item.filename
       });
+      if (result.savedToDownloads) {
+        setSuccess(`${result.fileName} saved to Downloads. Open Files app to view it.`);
+      } else if (result.opened) {
+        setSuccess(`${result.fileName} downloaded. Choose a PDF app if prompted.`);
+      } else {
+        setSuccess(`${result.fileName} downloaded successfully.`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Download failed.');
     } finally {
@@ -80,6 +90,7 @@ export default function StudyLibraryScreen() {
         <Subtitle>Download course-wise notes, books, and job materials — no payment required.</Subtitle>
         <View style={{ height: 12 }} />
         <ErrorBanner message={error} />
+        <SuccessBanner message={success} />
         {loading ? <LoadingBlock /> : null}
 
         {!loading && totalCount === 0 ? (
