@@ -91,6 +91,11 @@ export default function CommunityChatPage() {
   }, []);
 
   useEffect(() => {
+    document.documentElement.classList.add('community-chat-active');
+    return () => document.documentElement.classList.remove('community-chat-active');
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const syncUnread = async (manual = false) => {
       if (manual) setIsUnreadRefreshing(true);
@@ -115,7 +120,6 @@ export default function CommunityChatPage() {
   return (
     <AppShell
       title="Community Chat"
-      subtitle="Real-time discussion space for admin and all students"
       roleLabel="Live"
       showThemeSwitch
       actions={(
@@ -131,35 +135,33 @@ export default function CommunityChatPage() {
         {!loading && !errorText && client && channel ? (
           <section className="card community-chat-shell">
             <header className="community-chat-topbar">
-              <div className="community-chat-topbar-copy">
-                <p className="community-chat-kicker">Live community</p>
-                <h2>Biomics Community</h2>
-                <p className="community-chat-topbar-meta">
-                  {registeredMemberCount} registered member{registeredMemberCount === 1 ? '' : 's'}
-                </p>
-              </div>
-              <div className="community-chat-presence">
-                <span className="community-chat-dot" aria-hidden="true" />
-                Live
-              </div>
-              <div className="community-chat-meta-actions">
-                <span className="community-chat-unread-pill" aria-label={`${unreadCount} unread messages`}>
-                  Unread: {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-                <button
-                  type="button"
-                  className="secondary-btn community-chat-refresh-btn"
-                  disabled={isUnreadRefreshing}
-                  onClick={() => {
-                    setIsUnreadRefreshing(true);
-                    fetchCommunityChatUnreadCount()
-                      .then((data) => setUnreadCount(Math.max(0, Number(data?.unreadCount || 0))))
-                      .catch(() => setUnreadCount(0))
-                      .finally(() => setIsUnreadRefreshing(false));
-                  }}
-                >
-                  {isUnreadRefreshing ? 'Refreshing...' : 'Refresh'}
-                </button>
+              <p className="community-chat-topbar-meta">
+                {registeredMemberCount} registered member{registeredMemberCount === 1 ? '' : 's'}
+              </p>
+              <div className="community-chat-topbar-tools">
+                <div className="community-chat-presence">
+                  <span className="community-chat-dot" aria-hidden="true" />
+                  Live
+                </div>
+                <div className="community-chat-meta-actions">
+                  <span className="community-chat-unread-pill" aria-label={`${unreadCount} unread messages`}>
+                    Unread: {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-btn community-chat-refresh-btn"
+                    disabled={isUnreadRefreshing}
+                    onClick={() => {
+                      setIsUnreadRefreshing(true);
+                      fetchCommunityChatUnreadCount()
+                        .then((data) => setUnreadCount(Math.max(0, Number(data?.unreadCount || 0))))
+                        .catch(() => setUnreadCount(0))
+                        .finally(() => setIsUnreadRefreshing(false));
+                    }}
+                  >
+                    {isUnreadRefreshing ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
               </div>
             </header>
 
