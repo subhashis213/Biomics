@@ -62,7 +62,8 @@ export async function downloadFreeStudyResource(
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/pdf,application/octet-stream,*/*'
-    }
+    },
+    redirect: 'follow'
   });
 
   if (!response.ok) {
