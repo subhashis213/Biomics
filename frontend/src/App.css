@@ -30939,6 +30939,51 @@ html[data-theme='light'] .lp-legal-footer a {
   color: hsl(166 52% 28%);
 }
 
+.lp-delete-steps-card {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, #ef4444 28%, var(--lp-border));
+  background: color-mix(in srgb, #ef4444 6%, var(--lp-bg-card));
+}
+
+.lp-delete-steps {
+  margin: 0 0 14px;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+  color: var(--lp-text-soft);
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.lp-delete-steps li strong {
+  color: var(--lp-text);
+}
+
+.lp-delete-bullet-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  color: var(--lp-text-soft);
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.lp-legal-section a {
+  color: hsl(194 80% 62%);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lp-legal-section a:hover {
+  text-decoration: underline;
+}
+
+html[data-theme='light'] .lp-legal-section a {
+  color: hsl(166 52% 28%);
+}
+
 /* Dashboard footer polish so it mirrors landing footer quality */
 .student-dashboard-view .lp-footer {
   margin-top: 8px;

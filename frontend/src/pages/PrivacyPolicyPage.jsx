@@ -76,7 +76,7 @@ These providers process data only as needed to perform their services and are su
     body: `Depending on applicable law, you may have the right to:
 
 • Access, update, or correct your profile information from your account settings.
-• Request deletion of your account and associated personal data, subject to legal and operational requirements.
+• Delete your account and associated personal data at https://biomicshub.com/delete-account (in-app self-service or by email request).
 • Opt out of non-essential push notifications through your device or app settings.
 • Withdraw consent where processing is based on consent.
 

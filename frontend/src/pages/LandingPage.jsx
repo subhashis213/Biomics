@@ -858,6 +858,7 @@ export default function LandingPage() {
               <a href="#community" className="lp-footer-link">Community</a>
               <button type="button" className="lp-footer-link" onClick={() => navigate('/auth')}>Log In</button>
               <button type="button" className="lp-footer-link" onClick={() => navigate('/privacy-policy')}>Privacy Policy</button>
+              <button type="button" className="lp-footer-link" onClick={() => navigate('/delete-account')}>Delete Account</button>
             </nav>
           </div>
 
@@ -874,6 +875,7 @@ export default function LandingPage() {
           <p className="lp-footer-copy">© {new Date().getFullYear()} Biomics Hub. All rights reserved.</p>
           <div className="lp-footer-legal">
             <button type="button" className="lp-footer-legal-btn" onClick={() => navigate('/privacy-policy')}>Privacy Policy</button>
+            <button type="button" className="lp-footer-legal-btn" onClick={() => navigate('/delete-account')}>Delete Account</button>
             <button type="button" className="lp-footer-legal-btn">Terms of Service</button>
           </div>
         </div>
