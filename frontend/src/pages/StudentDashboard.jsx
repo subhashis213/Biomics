@@ -3284,7 +3284,7 @@ export default function StudentDashboard() {
         <div className="lp-footer-bottom">
           <p className="lp-footer-copy">© {new Date().getFullYear()} Biomics Hub. All rights reserved.</p>
           <div className="lp-footer-legal">
-            <button type="button" className="lp-footer-legal-btn">Privacy Policy</button>
+            <button type="button" className="lp-footer-legal-btn" onClick={() => navigate('/privacy-policy')}>Privacy Policy</button>
             <button type="button" className="lp-footer-legal-btn">Terms of Service</button>
           </div>
         </div>

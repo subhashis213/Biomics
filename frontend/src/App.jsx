@@ -29,6 +29,7 @@ import SessionActivityTracker from './components/SessionActivityTracker';
 import AuthPage from './pages/AuthPage';
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const CommunityChatPage = lazy(() => import('./pages/CommunityChatPage'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const StudentLiveClassesPage = lazy(() => import('./pages/StudentLiveClassesPage'));
@@ -72,6 +73,7 @@ export default function App() {
     <ScrollToTop />
     <Routes>
       <Route path="/" element={<Suspense fallback={null}><LandingPage /></Suspense>} />
+      <Route path="/privacy-policy" element={<Suspense fallback={null}><PrivacyPolicyPage /></Suspense>} />
       <Route path="/auth" element={<AuthPage />} />
       <Route
         path="/admin"
