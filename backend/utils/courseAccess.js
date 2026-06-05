@@ -32,6 +32,17 @@ function getPlanPriceInPaise(pricing, planType) {
   return Math.max(0, Number(pricing.proPriceInPaise || 0));
 }
 
+/** Admin-configured tenure from ModulePricing / BatchPricing, with plan defaults as fallback. */
+function getPlanDurationMonths(pricing, planType) {
+  const plan = getMembershipPlan(planType);
+  if (!plan) return 1;
+  if (!pricing) return plan.durationMonths;
+  const tenureKey = plan.type === 'elite' ? 'eliteTenureMonths' : 'proTenureMonths';
+  const configured = Math.floor(Number(pricing[tenureKey] || 0));
+  if (Number.isFinite(configured) && configured >= 1) return configured;
+  return plan.durationMonths;
+}
+
 /**
  * Returns active membership for a specific module (or ALL_MODULES bundle).
  * An ALL_MODULES entry also grants access to every individual module.
@@ -267,6 +278,7 @@ module.exports = {
   getModulePricingDoc,
   getMembershipPlan,
   getPlanPriceInPaise,
+  getPlanDurationMonths,
   hasCourseAccess,
   hasModuleAccess,
   pickModulePricingDocForBatch

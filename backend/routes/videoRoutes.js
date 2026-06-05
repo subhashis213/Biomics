@@ -19,6 +19,7 @@ const {
   getActiveModuleMembership,
   getCoursePricingDocs,
   getPlanPriceInPaise,
+  getPlanDurationMonths,
   hasModuleAccess,
   MEMBERSHIP_PLANS,
   normalizeCourseName,
@@ -95,7 +96,7 @@ async function getUserCourseAccessSnapshot(user, snapshotCourse) {
   const buildPlans = (pricing) => Object.values(MEMBERSHIP_PLANS).map((plan) => ({
     type: plan.type,
     label: plan.label,
-    durationMonths: plan.durationMonths,
+    durationMonths: getPlanDurationMonths(pricing, plan.type),
     amountInPaise: getPlanPriceInPaise(pricing, plan.type)
   }));
   const moduleNames = Array.from(new Set([

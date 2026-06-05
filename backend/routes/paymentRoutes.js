@@ -30,10 +30,12 @@ const {
   getModulePricingDoc,
   getMembershipPlan,
   getPlanPriceInPaise,
+  getPlanDurationMonths,
   MEMBERSHIP_PLANS,
   pickModulePricingDocForBatch
 } = require('../utils/courseAccess');
 const { fetchBatchModuleCatalogAndPricing } = require('../utils/batchModuleCatalog');
+const { repairMembershipTenure } = require('../utils/repairMembershipTenure');
 
 const router = express.Router();
 
@@ -160,7 +162,7 @@ function buildPlanPricing(pricing) {
   return Object.values(MEMBERSHIP_PLANS).map((plan) => ({
     type: plan.type,
     label: plan.label,
-    durationMonths: plan.durationMonths,
+    durationMonths: getPlanDurationMonths(pricing, plan.type),
     amountInPaise: getPlanPriceInPaise(pricing, plan.type)
   }));
 }
@@ -206,7 +208,7 @@ function buildCatalogPlanSummary(pricing, plan) {
   return {
     type: plan.type,
     label: plan.label,
-    durationMonths: plan.durationMonths,
+    durationMonths: getPlanDurationMonths(pricing, plan.type),
     saleAmountInPaise,
     mrpAmountInPaise,
     discountPercent
@@ -688,6 +690,7 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
     if (!selectedPlan) {
       return res.status(400).json({ error: 'Please choose a valid membership plan.' });
     }
+    const durationMonths = getPlanDurationMonths(pricing, selectedPlan.type);
 
     const originalAmountInPaise = getPlanPriceInPaise(pricing, selectedPlan.type);
     if (!pricing || originalAmountInPaise <= 0) {
@@ -697,7 +700,7 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
         pricing: {
           moduleName: targetModuleName,
           planType: selectedPlan.type,
-          durationMonths: selectedPlan.durationMonths,
+          durationMonths,
           originalAmountInPaise: 0,
           discountInPaise: 0,
           finalAmountInPaise: 0,
@@ -716,7 +719,7 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
           batch: targetBatch,
           moduleName: targetModuleName,
           planType: selectedPlan.type,
-          durationMonths: selectedPlan.durationMonths,
+          durationMonths,
           originalAmountInPaise,
           discountInPaise: 0,
           finalAmountInPaise: 0,
@@ -740,11 +743,11 @@ router.post('/preview-order', authenticateToken('user'), async (req, res) => {
     return res.json({
       unlocked: false,
       purchaseRequired: true,
-      pricing: {
+        pricing: {
           batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
-        durationMonths: selectedPlan.durationMonths,
+        durationMonths,
         originalAmountInPaise,
         discountInPaise,
         finalAmountInPaise,
@@ -776,18 +779,19 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
     if (!selectedPlan) {
       return res.status(400).json({ error: 'Please choose a valid membership plan.' });
     }
+    const durationMonths = getPlanDurationMonths(pricing, selectedPlan.type);
     const originalAmountInPaise = getPlanPriceInPaise(pricing, selectedPlan.type);
 
     if (!pricing || originalAmountInPaise <= 0) {
       const now = new Date();
-      const expiresAt = addMonths(now, selectedPlan.durationMonths);
+      const expiresAt = addMonths(now, durationMonths);
       const payment = await Payment.create({
         username: req.user.username,
         course: targetCourse,
         batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
-        durationMonths: selectedPlan.durationMonths,
+        durationMonths,
         status: 'paid',
         amountInPaise: 0,
         originalAmountInPaise: 0,
@@ -871,14 +875,14 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
 
     if (amountInPaise <= 0) {
       const now = new Date();
-      const expiresAt = addMonths(now, selectedPlan.durationMonths);
+      const expiresAt = addMonths(now, durationMonths);
       const payment = await Payment.create({
         username: req.user.username,
         course: targetCourse,
         batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
-        durationMonths: selectedPlan.durationMonths,
+        durationMonths,
         status: 'paid',
         amountInPaise: 0,
         originalAmountInPaise,
@@ -952,7 +956,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
       batch: targetBatch,
       moduleName: targetModuleName,
       planType: selectedPlan.type,
-      durationMonths: selectedPlan.durationMonths,
+      durationMonths,
       status: 'created',
       amountInPaise,
       originalAmountInPaise,
@@ -978,7 +982,7 @@ router.post('/create-order', authenticateToken('user'), async (req, res) => {
         batch: targetBatch,
         moduleName: targetModuleName,
         planType: selectedPlan.type,
-        durationMonths: selectedPlan.durationMonths,
+        durationMonths,
         originalAmountInPaise,
         discountInPaise,
         finalAmountInPaise: amountInPaise,
@@ -1050,11 +1054,18 @@ router.post('/verify', authenticateToken('user'), async (req, res) => {
     }
 
     const now = new Date();
-    const expiresAt = addMonths(now, Number(payment.durationMonths || 1));
+    const pricing = await getModulePricingDoc(
+      payment.course,
+      normalizeModuleName(payment.moduleName) || ALL_MODULES,
+      normalizeBatchName(payment.batch || 'General')
+    );
+    const durationMonths = getPlanDurationMonths(pricing, payment.planType);
+    const expiresAt = addMonths(now, durationMonths);
     payment.status = 'paid';
     payment.razorpayPaymentId = razorpayPaymentId;
     payment.razorpaySignature = razorpaySignature;
     payment.paidAt = now;
+    payment.durationMonths = durationMonths;
     payment.expiresAt = expiresAt;
     await payment.save();
 
@@ -1534,6 +1545,22 @@ router.get('/admin/history', authenticateToken('admin'), async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch payment history.' });
+  }
+});
+
+// Admin: extend memberships that were stored with the wrong tenure (e.g. pro plan saved as 1 month instead of 3).
+router.post('/admin/repair-membership-tenure', authenticateToken('admin'), async (req, res) => {
+  try {
+    const username = String(req.body?.username || req.query?.username || '').trim();
+    const result = await repairMembershipTenure(username ? { username } : {});
+    return res.json({
+      message: result.repaired
+        ? `Repaired ${result.repaired} membership record(s).`
+        : 'No membership records needed repair.',
+      ...result
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to repair membership tenure.' });
   }
 });
 
