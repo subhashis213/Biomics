@@ -2,7 +2,7 @@
   "expo": {
     "name": "BiomicsHub",
     "slug": "biomicshub-app",
-    "version": "1.0.34",
+    "version": "1.0.35",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "biomicshubapp",
@@ -25,7 +25,9 @@
     "android": {
       "package": "com.biomicshub.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 32,
+      "versionCode": 33,
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0b1220"
