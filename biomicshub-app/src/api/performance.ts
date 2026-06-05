@@ -9,12 +9,21 @@ export type PerfSummaryBlock = {
   topicsCovered?: number;
 };
 
+export type TopicPerformance = {
+  topic: string;
+  attempts: number;
+  averageScore: number;
+  bestScore: number;
+  lastAttemptAt?: string | null;
+};
+
 export type ModulePerformance = {
   module: string;
   attempts: number;
   averageScore: number;
   bestScore: number;
   lastAttemptAt?: string | null;
+  topics?: TopicPerformance[];
 };
 
 export type FullMockPerformance = {
@@ -27,6 +36,8 @@ export type FullMockPerformance = {
 
 export type TestSeriesPerformance = {
   course: string;
+  selectedCourse?: string;
+  availableCourses?: string[];
   access?: { hasTopicTest?: boolean; hasFullMock?: boolean };
   summary: {
     topicTests: PerfSummaryBlock;
@@ -35,8 +46,30 @@ export type TestSeriesPerformance = {
   };
   modulePerformance: ModulePerformance[];
   fullMockPerformance: FullMockPerformance[];
-  recentTopicAttempts: Array<{ _id: string; title?: string; module?: string; topic?: string; score: number; total: number; percentage: number; submittedAt?: string }>;
-  recentFullMockAttempts: Array<{ _id: string; title?: string; score: number; total: number; percentage: number; submittedAt?: string }>;
+  recentTopicAttempts: Array<{
+    _id: string;
+    title?: string;
+    module?: string;
+    topic?: string;
+    course?: string;
+    category?: string;
+    batch?: string;
+    score: number;
+    total: number;
+    percentage: number;
+    submittedAt?: string;
+  }>;
+  recentFullMockAttempts: Array<{
+    _id: string;
+    title?: string;
+    course?: string;
+    category?: string;
+    batch?: string;
+    score: number;
+    total: number;
+    percentage: number;
+    submittedAt?: string;
+  }>;
 };
 
 export function fetchTestSeriesPerformance(token: string, course?: string) {

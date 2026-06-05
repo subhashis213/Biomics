@@ -15,16 +15,14 @@ import { resolveApiAssetUrl } from '@/src/api/client';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { ErrorBanner, PrimaryButton } from './ui';
+import TestResultView, { TestResultPayload } from './TestResultView';
+import { TestReviewItem } from '@/src/api/testSeries';
 
 const REVIEW_COLOR = '#8b5cf6';
 const REVIEW_SOFT = 'rgba(139, 92, 246, 0.14)';
 
-type Result = {
-  score: number;
-  total: number;
-  percentage: number;
-  review?: Array<{ question: string; isCorrect: boolean; explanation?: string }>;
-  note?: string;
+type Result = TestResultPayload & {
+  review?: TestReviewItem[];
 };
 
 type Props = {
@@ -35,13 +33,6 @@ type Props = {
   mode?: string;
   onSubmit: (answers: number[], durationSeconds: number, autoSubmitted?: boolean) => Promise<Result>;
 };
-
-function gradeFor(p: number, c: ThemeColors) {
-  if (p >= 80) return { label: 'Excellent', color: c.success };
-  if (p >= 60) return { label: 'Good', color: c.accent };
-  if (p >= 40) return { label: 'Average', color: c.warn };
-  return { label: 'Needs work', color: c.danger };
-}
 
 function fmtClock(secs: number) {
   const m = Math.floor(secs / 60);
@@ -76,6 +67,7 @@ export default function TestExamRunner({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Result | null>(null);
+  const [resultDurationSeconds, setResultDurationSeconds] = useState(0);
   const [showGrid, setShowGrid] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
@@ -99,6 +91,7 @@ export default function TestExamRunner({
       const durationSeconds = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
       const res = await onSubmit(answersRef.current, durationSeconds, autoSubmitted);
       if (autoSubmitted && !res.note) res.note = 'Auto-submitted because you left the test.';
+      setResultDurationSeconds(durationSeconds);
       setResult(res);
       setPhase('result');
     } catch (err) {
@@ -195,37 +188,12 @@ export default function TestExamRunner({
   }
 
   if (phase === 'result' && result) {
-    const g = gradeFor(result.percentage, colors);
-    const wrong = result.review ? result.review.filter((r) => !r.isCorrect).length : Math.max(0, result.total - result.score);
     return (
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={[styles.resultHero, { borderColor: g.color }]}>
-          <Ionicons name={result.percentage >= 50 ? 'trophy' : 'analytics-outline'} size={40} color={g.color} />
-          <Text style={styles.score}>{result.score}/{result.total}</Text>
-          <Text style={[styles.pct, { color: g.color }]}>{result.percentage}% · {g.label}</Text>
-        </View>
-        <View style={styles.resultStats}>
-          <Mini label="Correct" value={String(result.score)} color={colors.success} colors={colors} />
-          <Mini label="Wrong" value={String(wrong)} color={colors.danger} colors={colors} />
-          <Mini label="Total" value={String(result.total)} color={colors.text} colors={colors} />
-        </View>
-        {result.note ? (
-          <View style={styles.noteBox}>
-            <Ionicons name="information-circle-outline" size={18} color={colors.warn} />
-            <Text style={styles.noteText}>{result.note}</Text>
-          </View>
-        ) : null}
-        {(result.review || []).map((row, i) => (
-          <View key={`rev-${i}`} style={[styles.card, { borderColor: row.isCorrect ? colors.success : colors.danger }]}>
-            <View style={styles.reviewHead}>
-              <Ionicons name={row.isCorrect ? 'checkmark-circle' : 'close-circle'} size={18} color={row.isCorrect ? colors.success : colors.danger} />
-              <Text style={styles.q}>{i + 1}. {row.question}</Text>
-            </View>
-            {!row.isCorrect && row.explanation ? <Text style={styles.exp}>{row.explanation}</Text> : null}
-          </View>
-        ))}
-        <View style={{ height: 20 }} />
-      </ScrollView>
+      <TestResultView
+        title={title}
+        mode={mode}
+        result={{ ...result, durationSeconds: result.durationSeconds ?? resultDurationSeconds }}
+      />
     );
   }
 
@@ -462,15 +430,6 @@ function Rule({ text, colors, warn }: { text: string; colors: ThemeColors; warn?
   );
 }
 
-function Mini({ label, value, color, colors }: { label: string; value: string; color: string; colors: ThemeColors }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ color, fontWeight: '900', fontSize: 20 }}>{value}</Text>
-      <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>{label}</Text>
-    </View>
-  );
-}
-
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -587,16 +546,6 @@ function createStyles(c: ThemeColors) {
     confirmSecondary: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border, borderRadius: 12, paddingVertical: 13 },
     confirmSecondaryText: { color: c.text, fontWeight: '800' },
     confirmPrimary: { flex: 1.2, alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingVertical: 13, backgroundColor: c.accent },
-    confirmPrimaryText: { color: c.accentText, fontWeight: '800' },
-    resultHero: { alignItems: 'center', borderWidth: 2, borderRadius: 16, padding: 20, marginBottom: 14, backgroundColor: c.card },
-    score: { color: c.text, fontSize: 30, fontWeight: '900', marginTop: 8 },
-    pct: { fontSize: 16, fontWeight: '800', marginTop: 2 },
-    resultStats: { flexDirection: 'row', backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 16, marginBottom: 14 },
-    noteBox: { flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: c.badgeWarnBg, borderRadius: 12, padding: 12, marginBottom: 14 },
-    noteText: { color: c.text, flex: 1, fontSize: 13 },
-    card: { backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 12 },
-    reviewHead: { flexDirection: 'row', gap: 8 },
-    q: { color: c.text, fontWeight: '600', marginBottom: 8, flex: 1 },
-    exp: { color: c.muted, fontSize: 13, marginTop: 6 }
+    confirmPrimaryText: { color: c.accentText, fontWeight: '800' }
   });
 }

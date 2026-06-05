@@ -78,6 +78,18 @@ export function fetchFullMockSyllabus(token: string) {
   );
 }
 
+export type TestReviewItem = {
+  question: string;
+  options?: string[];
+  selectedIndex?: number;
+  correctIndex?: number;
+  correctAnswer?: string;
+  isCorrect: boolean;
+  explanation?: string;
+  imageUrl?: string;
+  imageName?: string;
+};
+
 export type ExamQuestion = {
   question: string;
   options: string[];
@@ -106,7 +118,7 @@ export function submitTopicTest(
     score: number;
     total: number;
     percentage: number;
-    review: Array<{ question: string; isCorrect: boolean; explanation?: string }>;
+    review: TestReviewItem[];
   }>(`/test-series/topic-tests/student/${encodeURIComponent(testId)}/submit`, {
     method: 'POST',
     token,
@@ -136,7 +148,7 @@ export function submitFullMock(
     score: number;
     total: number;
     percentage: number;
-    review: Array<{ question: string; isCorrect: boolean; explanation?: string }>;
+    review: TestReviewItem[];
   }>(`/test-series/full-mocks/student/${encodeURIComponent(mockId)}/submit`, {
     method: 'POST',
     token,

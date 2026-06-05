@@ -226,7 +226,7 @@ export default function StudentHome() {
         {!loading ? (
           <Card>
             <Eyebrow>Explore</Eyebrow>
-            <Text style={styles.exploreHint}>Browse all courses and admin pricing.</Text>
+            <Text style={styles.exploreHint}>Browse all courses.</Text>
             {courses.map((c) => (
               <Pressable
                 key={`exp-${c.courseName}`}

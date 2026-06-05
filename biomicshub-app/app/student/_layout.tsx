@@ -27,6 +27,7 @@ export default function StudentTabsLayout() {
       <Tabs.Screen name="learn" options={{ title: 'Learn', headerShown: false, tabBarIcon: icon('play-circle-outline') }} />
       <Tabs.Screen name="tests" options={{ title: 'Tests', tabBarIcon: icon('document-text-outline') }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('person-circle-outline') }} />
+      <Tabs.Screen name="performance" options={{ href: null, title: 'Performance' }} />
       <Tabs.Screen name="exams" options={{ href: null, title: 'Exams' }} />
       <Tabs.Screen name="alerts" options={{ href: null, title: 'Notifications' }} />
     </Tabs>

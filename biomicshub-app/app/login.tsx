@@ -123,16 +123,10 @@ export default function LoginScreen() {
               <Image source={require('@/assets/images/icon.png')} style={styles.logo} />
             </View>
             <Text style={styles.heroTitle}>Welcome to BiomicsHub</Text>
-            <Text style={styles.heroSubtitle}>
-              Courses, test series, live classes & free study material — all in one place.
-            </Text>
           </View>
 
           <Card style={styles.formCard}>
             <Text style={styles.formTitle}>Sign in</Text>
-            <Text style={styles.formHint}>
-              Use your username and password. We&apos;ll take you to the right dashboard automatically.
-            </Text>
 
             <ErrorBanner message={error} />
 
@@ -250,14 +244,11 @@ function createStyles(topInset: number) {
       letterSpacing: -0.3,
       textAlign: 'center'
     },
-    heroSubtitle: {
-      color: colors.muted,
-      fontSize: 14,
-      lineHeight: 21,
-      textAlign: 'center',
-      marginTop: 8,
-      maxWidth: 320,
-      paddingHorizontal: 8
+    formTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: '800',
+      marginBottom: 14
     },
     formCard: {
       backgroundColor: colors.card,
@@ -270,18 +261,6 @@ function createStyles(topInset: number) {
       shadowOpacity: 1,
       shadowRadius: 10,
       elevation: 2
-    },
-    formTitle: {
-      color: colors.text,
-      fontSize: 20,
-      fontWeight: '800'
-    },
-    formHint: {
-      color: colors.muted,
-      fontSize: 13,
-      lineHeight: 19,
-      marginTop: 4,
-      marginBottom: 14
     },
     forgotWrap: {
       alignSelf: 'flex-end',

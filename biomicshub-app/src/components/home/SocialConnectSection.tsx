@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SOCIAL_LINKS } from '@/src/constants/socialLinks';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
+import { openSocialLink } from '@/src/utils/openSocialLink';
 
 export default function SocialConnectSection() {
   const { colors } = useTheme();
@@ -17,7 +18,7 @@ export default function SocialConnectSection() {
           <Pressable
             key={item.key}
             style={styles.item}
-            onPress={() => Linking.openURL(item.url).catch(() => {})}
+            onPress={() => openSocialLink(item.url, 'telegramInvite' in item ? item.telegramInvite : undefined)}
           >
             <View style={[styles.iconWrap, { backgroundColor: item.color }]}>
               <Ionicons name={item.icon} size={28} color="#FFFFFF" />

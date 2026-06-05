@@ -1,5 +1,5 @@
 import { requestJson } from './client';
-import { ExamQuestion } from './testSeries';
+import { ExamQuestion, TestReviewItem } from './testSeries';
 
 export type Quiz = {
   _id: string;
@@ -43,7 +43,7 @@ export function submitQuiz(token: string, quizId: string, answers: number[], dur
       score: number;
       total: number;
       percentage: number;
-      review: Array<{ question: string; isCorrect: boolean; explanation?: string }>;
+      review: TestReviewItem[];
     };
   }>(`/quizzes/${encodeURIComponent(quizId)}/submit`, {
     method: 'POST',

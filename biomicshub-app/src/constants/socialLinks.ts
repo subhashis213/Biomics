@@ -1,3 +1,7 @@
+/** Official BiomicsHub Telegram community group (same link as website). */
+export const TELEGRAM_GROUP_URL = 'https://t.me/+WVyK_obKmJ8BbxG6';
+export const TELEGRAM_GROUP_INVITE = 'WVyK_obKmJ8BbxG6';
+
 export const SOCIAL_LINKS = [
   {
     key: 'youtube',
@@ -15,8 +19,9 @@ export const SOCIAL_LINKS = [
   },
   {
     key: 'telegram-group',
-    label: 'Group',
-    url: 'https://t.me/+WVyK_obKmJ8BbxG6',
+    label: 'Telegram',
+    url: TELEGRAM_GROUP_URL,
+    telegramInvite: TELEGRAM_GROUP_INVITE,
     icon: 'paper-plane' as const,
     color: '#229ED9'
   },

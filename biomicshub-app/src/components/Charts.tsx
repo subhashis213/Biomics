@@ -1,7 +1,78 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, G, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '@/src/theme/ThemeContext';
+
+export type DonutSegment = { value: number; color: string; label: string };
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
+}
+
+function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
+  const start = polarToCartesian(cx, cy, r, endAngle);
+  const end = polarToCartesian(cx, cy, r, startAngle);
+  const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+}
+
+export function DonutChart({
+  segments,
+  size = 168,
+  strokeWidth = 22,
+  centerLabel,
+  centerCaption
+}: {
+  segments: DonutSegment[];
+  size?: number;
+  strokeWidth?: number;
+  centerLabel?: string;
+  centerCaption?: string;
+}) {
+  const { colors } = useTheme();
+  const total = Math.max(1, segments.reduce((sum, seg) => sum + Math.max(0, seg.value), 0));
+  const radius = (size - strokeWidth) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  let cursor = 0;
+  const arcs = segments
+    .filter((seg) => seg.value > 0)
+    .map((seg) => {
+      const sweep = (seg.value / total) * 360;
+      const start = cursor;
+      const end = cursor + sweep;
+      cursor = end;
+      return { ...seg, start, end, path: describeArc(cx, cy, radius, start, end) };
+    });
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size}>
+        <Circle cx={cx} cy={cy} r={radius} stroke={colors.cardAlt} strokeWidth={strokeWidth} fill="none" />
+        <G>
+          {arcs.map((arc, index) => (
+            <Path
+              key={`${arc.label}-${index}`}
+              d={arc.path}
+              stroke={arc.color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="butt"
+              fill="none"
+            />
+          ))}
+        </G>
+      </Svg>
+      <View style={StyleSheet.absoluteFill}>
+        <View style={styles.ringCenter}>
+          <Text style={[styles.ringValue, { color: colors.text }]}>{centerLabel}</Text>
+          {centerCaption ? <Text style={[styles.ringCaption, { color: colors.muted }]}>{centerCaption}</Text> : null}
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export function RingProgress({
   percentage,
