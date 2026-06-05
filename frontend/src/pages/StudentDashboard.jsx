@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchMockExamLeaderboard,
   createCourseOrder,
+  deleteStudentAccount,
   downloadMaterial,
   fetchCommunityChatUnreadCount,
   fetchMyMockExams,
@@ -66,6 +67,10 @@ export default function StudentDashboard() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarImageFailed, setAvatarImageFailed] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [liveClass, setLiveClass] = useState(null); // { active, title, meetUrl, startedAt }
   const [lockedLiveClass, setLockedLiveClass] = useState(null);
   const [upcomingClass, setUpcomingClass] = useState(null); // { _id, title, scheduledAt, meetUrl }
@@ -1970,6 +1975,40 @@ export default function StudentDashboard() {
     navigate('/', { replace: true });
   }
 
+  function openDeleteAccountDialog() {
+    setDeleteConfirmText('');
+    setDeleteAccountError('');
+    setDeleteAccountOpen(true);
+  }
+
+  function closeDeleteAccountDialog() {
+    if (isDeletingAccount) return;
+    setDeleteAccountOpen(false);
+    setDeleteConfirmText('');
+    setDeleteAccountError('');
+  }
+
+  async function handleConfirmDeleteAccount() {
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
+      setDeleteAccountError('Type DELETE exactly to confirm permanent account removal.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setDeleteAccountError('');
+    try {
+      await deleteStudentAccount();
+      closeDeleteAccountDialog();
+      closeProfileModal();
+      logout();
+      navigate('/', { replace: true });
+    } catch (error) {
+      setDeleteAccountError(error?.message || 'Could not delete account. Please try again.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
   function openProfileModal() {
     if (profileCloseTimerRef.current) {
       window.clearTimeout(profileCloseTimerRef.current);
@@ -3436,11 +3475,101 @@ export default function StudentDashboard() {
                     </button>
                   </div>
                   {profileMessage ? <p className={`inline-message ${profileMessage.type}`}>{profileMessage.text}</p> : null}
+
+                  <section className="profile-danger-zone" aria-labelledby="profile-danger-zone-title">
+                    <div className="profile-danger-zone-head">
+                      <span className="profile-danger-zone-icon" aria-hidden="true">⚠</span>
+                      <div>
+                        <h3 id="profile-danger-zone-title">Danger zone</h3>
+                        <p>Permanently remove your account, subscriptions, progress, and personal data from Biomics Hub.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="profile-delete-account-btn"
+                      onClick={openDeleteAccountDialog}
+                      disabled={isDeletingAccount}
+                    >
+                      Delete Account
+                    </button>
+                  </section>
                 </form>
               </div>
             )}
           </section>
         </div>
+      ) : null}
+
+      {deleteAccountOpen ? createPortal(
+        <div
+          className="account-delete-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeDeleteAccountDialog();
+          }}
+        >
+          <section
+            className="account-delete-modal card"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="account-delete-title"
+            aria-describedby="account-delete-desc"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="account-delete-modal-badge" aria-hidden="true">!</div>
+            <p className="eyebrow account-delete-eyebrow">Permanent action</p>
+            <h2 id="account-delete-title">Delete your account?</h2>
+            <p id="account-delete-desc" className="subtitle account-delete-desc">
+              This will permanently delete your Biomics Hub account and remove:
+            </p>
+            <ul className="account-delete-list">
+              <li>Profile details and login access</li>
+              <li>Course subscriptions and enrollments</li>
+              <li>Test series purchases and unlocks</li>
+              <li>Quiz, mock exam, and progress history</li>
+              <li>Community chat membership and device notifications</li>
+            </ul>
+            <p className="account-delete-warning">
+              This action cannot be undone. You will need to register again to use Biomics Hub.
+            </p>
+            <label className="account-delete-confirm-label">
+              Type <strong>DELETE</strong> to confirm
+              <input
+                type="text"
+                className="account-delete-confirm-input"
+                value={deleteConfirmText}
+                onChange={(event) => {
+                  setDeleteConfirmText(event.target.value);
+                  if (deleteAccountError) setDeleteAccountError('');
+                }}
+                placeholder="DELETE"
+                autoComplete="off"
+                spellCheck={false}
+                disabled={isDeletingAccount}
+              />
+            </label>
+            {deleteAccountError ? <p className="inline-message error">{deleteAccountError}</p> : null}
+            <div className="account-delete-modal-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={closeDeleteAccountDialog}
+                disabled={isDeletingAccount}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={handleConfirmDeleteAccount}
+                disabled={isDeletingAccount || deleteConfirmText.trim().toUpperCase() !== 'DELETE'}
+              >
+                {isDeletingAccount ? 'Deleting account...' : 'Delete my account permanently'}
+              </button>
+            </div>
+          </section>
+        </div>,
+        document.body
       ) : null}
       
       {/* Student Chat Agent */}

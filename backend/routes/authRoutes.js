@@ -24,6 +24,9 @@ const FullMockAttempt = require('../models/FullMockAttempt');
 const MockExamAttempt = require('../models/MockExamAttempt');
 const MockExam = require('../models/MockExam');
 const UserActivitySession = require('../models/UserActivitySession');
+const DeviceToken = require('../models/DeviceToken');
+const Feedback = require('../models/Feedback');
+const ChatHistory = require('../models/ChatHistory');
 const Voucher = require('../models/Voucher');
 const Course = require('../models/Course');
 const { logAdminAction } = require('../utils/auditLog');
@@ -412,6 +415,75 @@ function findAuthenticatedUser(payload, projection) {
   const query = buildAuthenticatedUserQuery(payload);
   if (!query) return null;
   return User.findOne(query, projection);
+}
+
+function toStreamSafeUserId(role, username) {
+  const safeName = String(username || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9@_. -]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[\s.-]+|[\s.-]+$/g, '');
+  const suffix = safeName || 'member';
+  return `${role}-${suffix}`.slice(0, 80);
+}
+
+async function purgeStudentAccount(userDoc) {
+  const username = String(userDoc?.username || '').trim();
+  const phone = String(userDoc?.phone || '').trim();
+  const userId = userDoc?._id;
+  if (!username) {
+    throw new Error('Invalid user account.');
+  }
+
+  const avatarPublicId = userDoc?.avatar?.publicId;
+  const avatarFilename = userDoc?.avatar?.filename;
+
+  await Promise.all([
+    QuizAttempt.deleteMany({ username }),
+    TopicTestAttempt.deleteMany({ username }),
+    MockExamAttempt.deleteMany({ username }),
+    FullMockAttempt.deleteMany({ username }),
+    Payment.deleteMany({ username }),
+    TestSeriesPayment.deleteMany({ username }),
+    Feedback.deleteMany({ username }),
+    ChatHistory.deleteMany({ username }),
+    UserActivitySession.deleteMany({ username }),
+    DeviceToken.deleteMany({ username }),
+    phone ? LoginOtp.deleteMany({ phone }) : Promise.resolve()
+  ]);
+
+  if (userId) {
+    await User.findByIdAndDelete(userId);
+  } else {
+    await User.findOneAndDelete({ username });
+  }
+
+  await deleteAvatarFromCloudinary(avatarPublicId);
+  if (avatarFilename) {
+    safelyRemoveFile(path.join(uploadsDir, path.basename(avatarFilename)));
+  }
+
+  const streamKey = String(process.env.STREAM_API_KEY || '').trim();
+  const streamSecret = String(process.env.STREAM_API_SECRET || '').trim();
+  if (streamKey && streamSecret) {
+    try {
+      const { StreamChat } = require('stream-chat');
+      const streamClient = StreamChat.getInstance(streamKey, streamSecret);
+      const streamUserId = toStreamSafeUserId('user', username);
+      const channel = streamClient.channel('messaging', 'community-general');
+      await channel.removeMembers([streamUserId]).catch(() => {});
+      await streamClient.deleteUser(streamUserId, {
+        mark_messages_deleted: true,
+        delete_conversation_channels: false
+      }).catch(() => {});
+    } catch (error) {
+      console.warn('[account-delete] Stream cleanup skipped:', error?.message || error);
+    }
+  }
+
+  return username;
 }
 
 function formatReadyStateLabel(state) {
@@ -1065,6 +1137,10 @@ const updateProfileSchema = z.object({
   phone: z.string().regex(/^\d{10}$/, 'Phone number must be exactly 10 digits').optional(),
   city: z.string().min(2, 'City must be at least 2 characters').max(50).optional(),
   password: z.string().min(8, 'Password must be at least 8 characters').optional()
+});
+
+const deleteAccountSchema = z.object({
+  confirmation: z.literal('DELETE')
 });
 
 const adminUpdateProfileSchema = z.object({
@@ -2099,22 +2175,38 @@ router.delete('/me/avatar', authenticateToken('user'), async (req, res) => {
   }
 });
 
+router.delete('/me', authenticateToken('user'), validate(deleteAccountSchema), async (req, res) => {
+  try {
+    const user = await findAuthenticatedUser(req.user);
+    if (!user) return res.status(404).json({ error: 'Student profile not found' });
+
+    const deletedUsername = await purgeStudentAccount(user);
+    return res.json({
+      message: 'Your account and associated data have been permanently deleted.',
+      username: deletedUsername
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to delete account.' });
+  }
+});
+
 // Remove a student user — admin only
 router.delete('/users/:username', authenticateToken('admin'), async (req, res) => {
   const username = String(req.params.username || '').trim();
   if (!username) return res.status(400).json({ error: 'Username is required' });
 
   try {
-    const deleted = await User.findOneAndDelete({ username });
-    if (!deleted) return res.status(404).json({ error: 'User not found' });
-    const deletedObj = deleted.toObject();
+    const user = await User.findOne({ username });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const deletedObj = user.toObject();
+    await purgeStudentAccount(user);
     await logAdminAction(req, {
       action: 'user.remove',
       targetType: 'user',
-      targetId: deleted.username,
+      targetId: deletedObj.username,
       details: {
-        class: deleted.class,
-        city: deleted.city,
+        class: deletedObj.class,
+        city: deletedObj.city,
         snapshot: {
           phone: deletedObj.phone,
           username: deletedObj.username,
@@ -2122,7 +2214,6 @@ router.delete('/users/:username', authenticateToken('admin'), async (req, res) =
           city: deletedObj.city,
           security: deletedObj.security,
           avatar: deletedObj.avatar,
-          password: deletedObj.password,
           favorites: deletedObj.favorites || [],
           completedVideos: deletedObj.completedVideos || [],
           purchasedCourses: deletedObj.purchasedCourses || []

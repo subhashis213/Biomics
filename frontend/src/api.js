@@ -691,6 +691,13 @@ export function removeAdminUser(username) {
   });
 }
 
+export function deleteStudentAccount() {
+  return requestJson('/auth/me', {
+    method: 'DELETE',
+    body: JSON.stringify({ confirmation: 'DELETE' })
+  });
+}
+
 export function removeStudentFromLivekitClass(classId, username) {
   return requestJson(`/api/livekit/classes/${encodeURIComponent(classId)}/remove-student`, {
     method: 'POST',
