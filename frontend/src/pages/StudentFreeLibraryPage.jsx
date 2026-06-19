@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { fetchFreeStudyLibrary, freeStudyDownloadUrl } from '../api';
 import { getToken } from '../session';
+import './StudentFreeLibraryPage.css';
 
 function typeLabel(type) {
   if (type === 'book') return 'Book';
@@ -74,7 +75,7 @@ export default function StudentFreeLibraryPage() {
         <button type="button" className="secondary-btn" onClick={() => navigate(-1)}>← Back</button>
       )}
     >
-      <main className="admin-workspace-page">
+      <main className="admin-workspace-page free-library-page">
         {loading ? <p className="empty-note">Loading free library…</p> : null}
         {error ? <p className="banner error">{error}</p> : null}
         {!loading ? (
@@ -82,35 +83,33 @@ export default function StudentFreeLibraryPage() {
         ) : null}
 
         {courses.map((group) => (
-          <section key={group.courseName} className="card" style={{ marginBottom: 16 }}>
+          <section key={group.courseName} className="free-library-course card">
             <div className="section-header compact">
               <div>
                 <p className="eyebrow">Course</p>
                 <h2>{group.courseName}</h2>
               </div>
             </div>
-            <div className="study-materials-grid">
+            <ul className="free-library-list">
               {(group.items || []).map((item) => (
-                <div key={item._id} className="study-material-card card">
-                  <div className="smc-icon">📚</div>
-                  <div className="smc-info">
+                <li key={item._id} className="free-library-item">
+                  <span className="free-library-item-icon" aria-hidden="true">📚</span>
+                  <div className="free-library-item-body">
                     <h4>{item.title}</h4>
-                    <p className="smc-meta">{typeLabel(item.resourceType)} · Free for all</p>
-                    {item.description ? <p className="smc-meta">{item.description}</p> : null}
+                    <p className="free-library-item-meta">{typeLabel(item.resourceType)} · Free for all</p>
+                    {item.description ? <p className="free-library-item-desc">{item.description}</p> : null}
                   </div>
-                  <div className="smc-actions">
-                    <button
-                      type="button"
-                      className="primary-btn"
-                      disabled={downloadingId === item._id}
-                      onClick={() => handleDownload(item)}
-                    >
-                      {downloadingId === item._id ? 'Downloading…' : 'Download'}
-                    </button>
-                  </div>
-                </div>
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    disabled={downloadingId === item._id}
+                    onClick={() => handleDownload(item)}
+                  >
+                    {downloadingId === item._id ? 'Downloading…' : 'Download'}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           </section>
         ))}
 

@@ -1,19 +1,19 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { fetchFreeStudyLibrary, FreeStudyCourseGroup, FreeStudyResource } from '@/src/api/freeStudyResources';
+import { APP_ICONS } from '@/src/constants/appIcons';
 import { downloadFreeStudyResource } from '@/src/utils/downloadFreeResource';
 import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, Screen, Subtitle, SuccessBanner, Title } from '@/src/components/ui';
 
-function typeIcon(type: string): React.ComponentProps<typeof Ionicons>['name'] {
-  if (type === 'book') return 'book-outline';
-  if (type === 'job-notes') return 'briefcase-outline';
-  return 'document-text-outline';
+function typeEmoji(type: string) {
+  if (type === 'book') return APP_ICONS.books.emoji;
+  if (type === 'job-notes') return '💼';
+  return APP_ICONS.tests.emoji;
 }
 
 function typeLabel(type: string) {
@@ -102,14 +102,14 @@ export default function StudyLibraryScreen() {
         {courses.map((group) => (
           <Card key={group.courseName} style={styles.groupCard}>
             <View style={styles.groupHead}>
-              <Ionicons name="school-outline" size={18} color={colors.accent} />
+              <Text style={styles.groupEmoji}>{APP_ICONS.course.emoji}</Text>
               <Text style={styles.groupTitle}>{group.courseName}</Text>
               <Badge label={`${group.items.length}`} tone="success" />
             </View>
             {group.items.map((item) => (
               <View key={item._id} style={styles.itemRow}>
                 <View style={styles.itemIcon}>
-                  <Ionicons name={typeIcon(item.resourceType)} size={18} color={colors.accent} />
+                  <Text style={styles.itemEmoji}>{typeEmoji(item.resourceType)}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemTitle}>{item.title}</Text>
@@ -121,7 +121,7 @@ export default function StudyLibraryScreen() {
                     <ActivityIndicator color={colors.accentText} size="small" />
                   ) : (
                     <>
-                      <Ionicons name="download-outline" size={16} color={colors.accentText} />
+                      <Text style={styles.dlEmoji}>{APP_ICONS.download.emoji}</Text>
                       <Text style={styles.downloadText}>Get</Text>
                     </>
                   )}
@@ -141,9 +141,11 @@ function createStyles(c: ThemeColors) {
     empty: { color: c.muted, textAlign: 'center', paddingVertical: 20 },
     groupCard: { marginBottom: 14, padding: 0, overflow: 'hidden' },
     groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, backgroundColor: c.cardAlt, borderBottomWidth: 1, borderBottomColor: c.border },
+    groupEmoji: { fontSize: 18 },
     groupTitle: { color: c.text, fontWeight: '800', fontSize: 16, flex: 1 },
     itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1, borderTopColor: c.border },
     itemIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' },
+    itemEmoji: { fontSize: 18 },
     itemTitle: { color: c.text, fontWeight: '800', fontSize: 14 },
     itemDesc: { color: c.muted, fontSize: 12, marginTop: 3, lineHeight: 17 },
     itemMeta: { color: c.accent, fontSize: 11, fontWeight: '700', marginTop: 4 },
@@ -158,6 +160,7 @@ function createStyles(c: ThemeColors) {
       minWidth: 64,
       justifyContent: 'center'
     },
-    downloadText: { color: c.accentText, fontWeight: '800', fontSize: 12 }
+    downloadText: { color: c.accentText, fontWeight: '800', fontSize: 12 },
+    dlEmoji: { fontSize: 14 }
   });
 }

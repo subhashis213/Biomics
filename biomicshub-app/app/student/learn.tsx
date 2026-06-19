@@ -17,6 +17,8 @@ import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { fetchCourseCatalog, CourseCatalogItem } from '@/src/api/courses';
 import CourseLearningRow from '@/src/components/learning/CourseLearningRow';
+import EmojiIcon from '@/src/components/ui/EmojiIcon';
+import { APP_ICONS } from '@/src/constants/appIcons';
 import { ErrorBanner, LoadingBlock, Screen } from '@/src/components/ui';
 
 function courseSubtitle(course: CourseCatalogItem, studentClass?: string) {
@@ -85,7 +87,7 @@ export default function LearnTab() {
   return (
     <Screen style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My learning</Text>
+        <Text style={styles.headerTitle}>📚 My learning</Text>
         <View style={styles.headerActions}>
           <Pressable
             onPress={() => setSearchOpen((v) => !v)}
@@ -147,7 +149,7 @@ export default function LearnTab() {
 
         {!loading && exploreCourses.length ? (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Explore courses</Text>
+            <Text style={styles.sectionLabel}>🔍 Explore courses</Text>
             {exploreCourses.map((course, index) => (
               <Animated.View key={course.courseName} entering={FadeInDown.delay((myCourses.length + index) * 50)}>
                 <CourseLearningRow
@@ -164,7 +166,7 @@ export default function LearnTab() {
 
         {!loading && filteredCourses.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="library-outline" size={40} color={colors.muted} />
+            <Text style={styles.emptyEmoji}>{APP_ICONS.library.emoji}</Text>
             <Text style={styles.emptyTitle}>
               {query.trim() ? 'No courses match your search' : 'No courses available yet'}
             </Text>
@@ -257,6 +259,7 @@ function createStyles(c: ThemeColors, topInset: number) {
       paddingHorizontal: 24,
       gap: 8
     },
+    emptyEmoji: { fontSize: 48, marginBottom: 4 },
     emptyTitle: {
       color: c.text,
       fontSize: 16,

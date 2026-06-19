@@ -16,6 +16,7 @@ import {
   TestSeriesCourseCatalog
 } from '@/src/api/testSeries';
 import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, PriceRow, PrimaryButton, Screen, Subtitle, SuccessBanner, Title } from '@/src/components/ui';
+import { APP_ICONS } from '@/src/constants/appIcons';
 import { addTestSeriesCartItem, makeTestSeriesCartKey } from '@/src/utils/testSeriesCart';
 
 const DEFAULT_TEST_SERIES_COURSE = 'CSIR-NET Life Science';
@@ -217,7 +218,7 @@ export default function TestsTab() {
     return (
       <Pressable key={t._id} onPress={() => (tab === 'topic' ? startTopic(t._id) : startMock(t._id))} style={styles.testRow}>
         <View style={styles.testIcon}>
-          <Ionicons name={hasAccess ? 'play' : 'lock-closed'} size={16} color={hasAccess ? colors.accent : colors.muted} />
+          <Text style={styles.testEmoji}>{hasAccess ? APP_ICONS.play.emoji : APP_ICONS.lock.emoji}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.testTitle}>{t.title || t.topic || 'Test'}</Text>
@@ -259,7 +260,7 @@ export default function TestsTab() {
               style={styles.testRow}
             >
               <View style={styles.testIcon}>
-                <Ionicons name="folder-open-outline" size={16} color={colors.accent} />
+                <Text style={styles.testEmoji}>{APP_ICONS.folder.emoji}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.testTitle}>{mod.module}</Text>
@@ -288,7 +289,7 @@ export default function TestsTab() {
               style={styles.testRow}
             >
               <View style={styles.testIcon}>
-                <Ionicons name="book-outline" size={16} color={colors.accent} />
+                <Text style={styles.testEmoji}>{APP_ICONS.topic.emoji}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.testTitle}>{topic.topic}</Text>
@@ -344,11 +345,11 @@ export default function TestsTab() {
 
         <View style={styles.segment}>
           <Pressable onPress={() => switchTab('topic')} style={[styles.segBtn, tab === 'topic' && styles.segOn]}>
-            <Ionicons name="documents-outline" size={16} color={tab === 'topic' ? colors.accentText : colors.muted} />
+            <Text style={styles.segEmoji}>{APP_ICONS.tests.emoji}</Text>
             <Text style={[styles.segText, tab === 'topic' && styles.segTextOn]}>Topic tests</Text>
           </Pressable>
           <Pressable onPress={() => switchTab('mock')} style={[styles.segBtn, tab === 'mock' && styles.segOn]}>
-            <Ionicons name="timer-outline" size={16} color={tab === 'mock' ? colors.accentText : colors.muted} />
+            <Text style={styles.segEmoji}>{APP_ICONS.mock.emoji}</Text>
             <Text style={[styles.segText, tab === 'mock' && styles.segTextOn]}>Full mocks</Text>
           </Pressable>
         </View>
@@ -400,6 +401,7 @@ function createStyles(c: ThemeColors) {
     chipTextOn: { color: c.accent },
     segment: { flexDirection: 'row', backgroundColor: c.cardAlt, borderRadius: 10, padding: 4, marginBottom: 14, borderWidth: 1, borderColor: c.border },
     segBtn: { flex: 1, flexDirection: 'row', gap: 6, paddingVertical: 9, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    segEmoji: { fontSize: 16 },
     segOn: { backgroundColor: c.accent },
     segText: { color: c.muted, fontWeight: '700' },
     segTextOn: { color: c.accentText },
@@ -410,6 +412,7 @@ function createStyles(c: ThemeColors) {
     crumbText: { color: c.accent, fontWeight: '700', fontSize: 13 },
     testRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: c.border },
     testIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' },
+    testEmoji: { fontSize: 16 },
     testTitle: { color: c.text, fontWeight: '600' },
     testMeta: { color: c.muted, fontSize: 12, marginTop: 4 },
     empty: { color: c.muted, fontSize: 13 },

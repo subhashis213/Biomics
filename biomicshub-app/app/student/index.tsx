@@ -6,6 +6,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
+import { HOME_TILES } from '@/src/constants/appIcons';
+import FeatureTile from '@/src/components/home/FeatureTile';
+import EmojiIcon from '@/src/components/ui/EmojiIcon';
 import { fetchCourseCatalog, CourseCatalogItem } from '@/src/api/courses';
 import { fetchHomeBanners, fetchStudentVoices, HomeBanner, StudentVoice } from '@/src/api/landing';
 import { fetchFreeStudyHomePreview, FreeStudyCourseGroup } from '@/src/api/freeStudyResources';
@@ -23,20 +26,6 @@ import StudentVoiceCarousel from '@/src/components/home/StudentVoiceCarousel';
 import RichNotificationText from '@/src/components/RichNotificationText';
 import CourseLearningRow from '@/src/components/learning/CourseLearningRow';
 import { Card, ErrorBanner, Eyebrow, LoadingBlock, PrimaryButton, Title } from '@/src/components/ui';
-
-type TileDef = {
-  key: string;
-  label: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  route: string;
-};
-
-const TILES: TileDef[] = [
-  { key: 'courses', label: 'Courses', icon: 'library-outline', route: '/student/learn' },
-  { key: 'live', label: 'Live Class', icon: 'videocam-outline', route: '/student/live' },
-  { key: 'tests', label: 'Test Series', icon: 'document-text-outline', route: '/student/tests' },
-  { key: 'exams', label: 'Mock & Monthly', icon: 'trophy-outline', route: '/student/exams' }
-];
 
 const LIVE_REFRESH_MS = 15000;
 
@@ -120,7 +109,7 @@ export default function StudentHome() {
           <View style={styles.headerActions}>
             <CartButton bordered />
             <Pressable onPress={() => router.push('/student/alerts')} style={styles.iconBtn}>
-              <Ionicons name="notifications-outline" size={22} color={colors.text} />
+              <EmojiIcon name="notifications" size="sm" />
             </Pressable>
           </View>
         </View>
@@ -140,14 +129,13 @@ export default function StudentHome() {
         <FreeStudyLibrarySection courses={freeLibrary} totalCount={freeLibraryCount} />
 
         <View style={styles.tiles}>
-          {TILES.map((tile, i) => (
+          {HOME_TILES.map((tile, i) => (
             <Animated.View key={tile.key} entering={FadeInDown.delay(i * 70)} style={styles.tileWrap}>
-              <Pressable style={styles.tile} onPress={() => router.push(tile.route as never)}>
-                <View style={styles.tileIconWrap}>
-                  <Ionicons name={tile.icon} size={26} color={colors.accent} />
-                </View>
-                <Text style={styles.tileLabel}>{tile.label}</Text>
-              </Pressable>
+              <FeatureTile
+                label={tile.label}
+                icon={tile.icon}
+                onPress={() => router.push(tile.route as never)}
+              />
             </Animated.View>
           ))}
         </View>
@@ -175,7 +163,7 @@ export default function StudentHome() {
               ) : null}
               <View style={styles.noteBody}>
                 <View style={styles.noteHead}>
-                  <Ionicons name="megaphone-outline" size={16} color={colors.accent} />
+                  <Text style={styles.noteEmoji}>📢</Text>
                   <Text style={styles.noteEyebrow}>Latest notification</Text>
                 </View>
                 <Text style={styles.noteTitle}>{latestNote.title}</Text>
@@ -233,7 +221,7 @@ export default function StudentHome() {
                 style={styles.courseRow}
                 onPress={() => router.push(`/course/${encodeURIComponent(c.courseName)}`)}
               >
-                <Ionicons name="school-outline" size={20} color={colors.muted} />
+                <Text style={styles.courseEmoji}>🎓</Text>
                 <Text style={styles.courseName}>{c.displayName || c.courseName}</Text>
                 <Ionicons name="chevron-forward" size={18} color={colors.muted} />
               </Pressable>
@@ -279,30 +267,13 @@ function createStyles(c: ThemeColors) {
     },
     tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4, marginBottom: 16 },
     tileWrap: { width: '47%' },
-    tile: {
-      backgroundColor: c.card,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: c.border,
-      paddingVertical: 20,
-      alignItems: 'center'
-    },
-    tileIconWrap: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: c.accentSoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 10
-    },
-    tileLabel: { color: c.text, fontWeight: '700' },
     liveBanner: { backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.danger, padding: 16, marginBottom: 16 },
     liveRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
     liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: c.danger },
     liveNow: { color: c.danger, fontWeight: '800', letterSpacing: 1, fontSize: 12 },
     liveTitle: { color: c.text, fontSize: 17, fontWeight: '800' },
     noteHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+    noteEmoji: { fontSize: 16 },
     noteEyebrow: { color: c.accent, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
     noteCard: { padding: 0, overflow: 'hidden', marginBottom: 16 },
     notePoster: { width: '100%', height: 130, backgroundColor: c.cardAlt },
@@ -317,6 +288,7 @@ function createStyles(c: ThemeColors) {
       borderTopWidth: 1,
       borderTopColor: c.border
     },
+    courseEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
     courseName: { color: c.text, fontWeight: '600', flex: 1 },
     exploreHint: { color: c.muted, marginBottom: 4 },
     continueSection: {

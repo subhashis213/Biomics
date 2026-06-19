@@ -70,7 +70,7 @@ export default function ExamsTab() {
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.accent} />}
       >
-        <Eyebrow>Mock & monthly exams</Eyebrow>
+        <Eyebrow>🏆 Mock & monthly exams</Eyebrow>
         <Title>Exams</Title>
         <Subtitle>Scheduled mock & monthly exams for your course. Results release after admin review.</Subtitle>
         <View style={{ height: 12 }} />

@@ -56,8 +56,7 @@ export default function DeleteAccountPage() {
                 <li>Sign in to <strong>biomicshub.com</strong> with your student account.</li>
                 <li>Open your <strong>Student Dashboard</strong>.</li>
                 <li>Click your <strong>Profile</strong> icon (top area) to open <strong>Profile Settings</strong>.</li>
-                <li>Scroll to the <strong>Danger zone</strong> section at the bottom.</li>
-                <li>Click <strong>Delete Account</strong>.</li>
+                <li>Scroll to the bottom of the form and click <strong>Delete account</strong>.</li>
                 <li>Read the warning, type <strong>DELETE</strong> in the confirmation box, and click <strong>Delete my account permanently</strong>.</li>
               </ol>
               <p>

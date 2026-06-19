@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useCart } from '@/src/context/CartContext';
+import EmojiIcon from '@/src/components/ui/EmojiIcon';
 import { useTheme } from '@/src/theme/ThemeContext';
 
 export default function CartButton({ bordered = false }: { bordered?: boolean }) {
@@ -16,7 +16,7 @@ export default function CartButton({ bordered = false }: { bordered?: boolean })
         bordered && { width: 42, height: 42, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }
       ]}
     >
-      <Ionicons name="cart-outline" size={22} color={colors.text} />
+      <EmojiIcon name="cart" size="sm" />
       {count > 0 ? (
         <View style={[styles.badge, { backgroundColor: colors.danger, borderColor: colors.bg }]}>
           <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>

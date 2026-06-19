@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCourseData } from '../hooks/useCourseData';
+import './StudentCourseModulesPage.css';
 
 function normalizeText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -16,6 +17,27 @@ function safeDecode(value) {
 
 function normalizeId(value) {
   return String(value || '');
+}
+
+const MODULE_TONES = ['violet', 'blue', 'teal', 'green', 'orange', 'rose', 'indigo', 'cyan'];
+
+function getModuleEmoji(moduleName) {
+  const name = String(moduleName || '').toLowerCase();
+  if (name.includes('bioch')) return '🧪';
+  if (name.includes('cell')) return '🔬';
+  if (name.includes('genetic') || name.includes('molecular')) return '🧬';
+  if (name.includes('ecolog')) return '🌿';
+  if (name.includes('evolution')) return '🦎';
+  if (name.includes('micro')) return '🦠';
+  if (name.includes('plant')) return '🌱';
+  if (name.includes('animal') || name.includes('zool')) return '🐾';
+  if (name.includes('physio')) return '❤️‍🔥';
+  if (name.includes('immun')) return '🛡️';
+  if (name.includes('biophy')) return '⚛️';
+  if (name.includes('develop')) return '🐣';
+  if (name.includes('biostat') || name.includes('stat')) return '📊';
+  if (name.includes('technique') || name.includes('method')) return '🔭';
+  return '📚';
 }
 
 export default function StudentCourseModulesPage() {
@@ -167,7 +189,7 @@ export default function StudentCourseModulesPage() {
     <main className="lecture-page course-modules-page lecture-enter">
       <header className="lecture-page-hero lecture-enter-stage-1">
         <div className="lecture-page-hero-left">
-          <p className="eyebrow">Course Workspace</p>
+          <p className="eyebrow">📘 Course Workspace</p>
           <h1>{scopeCourseLabel}</h1>
           <p className="lecture-page-subtitle">
             {sortedModuleKeys.length} module{sortedModuleKeys.length === 1 ? '' : 's'} •{' '}
@@ -184,7 +206,7 @@ export default function StudentCourseModulesPage() {
             ← Back to Dashboard
           </button>
           <span className="lecture-total-chip">
-            {sortedModuleKeys.length} Module{sortedModuleKeys.length === 1 ? '' : 's'}
+            📂 {sortedModuleKeys.length} Module{sortedModuleKeys.length === 1 ? '' : 's'}
           </span>
         </div>
       </header>
@@ -248,7 +270,7 @@ export default function StudentCourseModulesPage() {
         </p>
       ) : (
         <div className="modules-grid-student lecture-enter-stage-3">
-          {sortedModuleKeys.map((moduleKey) => {
+          {sortedModuleKeys.map((moduleKey, index) => {
             const meta = moduleMetaByKey[moduleKey];
             const modName = meta.module;
             const moduleAccess = getModuleAccess(modName);
@@ -262,10 +284,13 @@ export default function StudentCourseModulesPage() {
               ? Math.round((completedCount / moduleVideos.length) * 100)
               : 0;
             const latestAttempt = latestAttemptByModule[moduleKey];
+            const moduleEmoji = getModuleEmoji(modName);
+            const moduleTone = MODULE_TONES[index % MODULE_TONES.length];
 
             return (
               <article
                 key={moduleKey}
+                data-tone={moduleTone}
                 className={`module-card-btn${isLocked ? ' module-card-btn-locked' : ''}`}
                 onClick={() =>
                   navigate(
@@ -274,7 +299,7 @@ export default function StudentCourseModulesPage() {
                 }
               >
                 <div className="module-card-header">
-                  <span className="module-card-icon">📚</span>
+                  <span className="module-card-icon" aria-hidden="true">{moduleEmoji}</span>
                   <span className="module-card-count">{moduleVideos.length}</span>
                 </div>
                 <div className="module-card-body">
@@ -282,19 +307,33 @@ export default function StudentCourseModulesPage() {
                   <p className="module-card-subtitle">
                     {moduleVideos.length} lecture{moduleVideos.length === 1 ? '' : 's'}
                     {moduleQuizCount
-                      ? ` • ${moduleQuizCount} quiz${moduleQuizCount === 1 ? '' : 'zes'}`
+                      ? ` · ${moduleQuizCount} quiz${moduleQuizCount === 1 ? '' : 'zes'}`
                       : ''}
-                  </p>
-                  <p className="module-card-progress">
-                    {isLocked ? '🔒 Locked — click to view details' : `Progress: ${progress}%`}
                   </p>
                   {latestAttempt ? (
                     <p className="module-card-quiz-score">
-                      Quiz best: {latestAttempt.score}/{latestAttempt.total}
+                      🎯 Quiz best: {latestAttempt.score}/{latestAttempt.total}
                     </p>
                   ) : null}
                 </div>
-                <span className="module-card-arrow">{isLocked ? '🔒' : '→'}</span>
+                <div className="module-card-footer">
+                  {isLocked ? (
+                    <p className="module-card-status">🔒 Locked — tap to view options</p>
+                  ) : (
+                    <div className="module-card-progress-row">
+                      <div className="module-card-progress-track">
+                        <div
+                          className="module-card-progress-fill"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="module-card-progress-pct">{progress}%</span>
+                    </div>
+                  )}
+                  <span className="module-card-arrow" aria-hidden="true">
+                    {isLocked ? '🔒' : '→'}
+                  </span>
+                </div>
               </article>
             );
           })}

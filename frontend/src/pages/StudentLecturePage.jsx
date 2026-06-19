@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import FinalWorkingVideoCard from '../components/FinalWorkingVideoCard';
 import { downloadMaterial, fetchModuleTopics } from '../api';
 import { useCourseData } from '../hooks/useCourseData';
+import './StudentLecturePage.css';
 
 function normalizeText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
@@ -242,10 +243,10 @@ export default function StudentLecturePage() {
   }
 
   return (
-    <main className={`lecture-page lecture-enter page-exit-transition${isExiting ? ' is-exiting' : ''}`}>
+    <main className={`lecture-page lecture-workspace-page lecture-enter page-exit-transition${isExiting ? ' is-exiting' : ''}`}>
       <header className="lecture-page-hero lecture-enter-stage-1">
         <div className="lecture-page-hero-left">
-          <p className="eyebrow">Lecture Workspace</p>
+          <p className="eyebrow">🎬 Lecture Workspace</p>
           <h1>{decodedModuleName}</h1>
           <p className="lecture-page-subtitle">
             {scopeCourseLabel} • {hasTopicFolders && !selectedTopicFolder ? 'Chapter Folders' : 'Video Library'}
@@ -257,9 +258,9 @@ export default function StudentLecturePage() {
           </button>
 
           {hasTopicFolders && !selectedTopicFolder ? (
-            <span className="lecture-total-chip">{visibleTopicFolders.length} chapter folder{visibleTopicFolders.length === 1 ? '' : 's'}</span>
+            <span className="lecture-total-chip">📁 {visibleTopicFolders.length} chapter folder{visibleTopicFolders.length === 1 ? '' : 's'}</span>
           ) : (
-            <span className="lecture-total-chip">{filteredVideos.length} lecture{filteredVideos.length === 1 ? '' : 's'}</span>
+            <span className="lecture-total-chip">🎥 {filteredVideos.length} lecture{filteredVideos.length === 1 ? '' : 's'}</span>
           )}
         </div>
       </header>
@@ -361,7 +362,11 @@ export default function StudentLecturePage() {
             </div>
           ) : (!hasTopicFolders || selectedTopicFolder) && filteredVideos.length ? (
             <section className="lecture-video-stage lecture-enter-stage-3">
-              <div className="compact-premium-video-grid">
+              <div
+                className={`compact-premium-video-grid${
+                  filteredVideos.length === 1 ? ' compact-premium-video-grid--single' : ''
+                }`}
+              >
                 {filteredVideos.map((video) => (
                   <FinalWorkingVideoCard
                     key={video._id}

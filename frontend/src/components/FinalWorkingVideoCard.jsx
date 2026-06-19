@@ -3,6 +3,13 @@ import { del as idbDel, get as idbGet, set as idbSet } from 'idb-keyval';
 import MaterialManager from './MaterialManager';
 import ProgressBar from './ProgressBar';
 import VideoThumbnail from './VideoThumbnail';
+import {
+  getYouTubePlayerSize,
+  getYouTubePlayerVars,
+  resolveYouTubeVideoId,
+  syncYouTubePlayerSize,
+  YOUTUBE_NO_COOKIE_HOST
+} from '../utils/youtubePlayer';
 
 let ytApiPromise = null;
 
@@ -29,30 +36,8 @@ function loadYouTubeApi() {
   return ytApiPromise;
 }
 
-function resolveYouTubeVideoId(rawUrl) {
-  try {
-    const parsed = new URL(rawUrl);
-    const host = parsed.hostname.toLowerCase();
-    let videoId = '';
-
-    if (host === 'youtu.be') {
-      videoId = parsed.pathname.slice(1);
-    } else if (host.includes('youtube.com')) {
-      if (parsed.pathname.startsWith('/watch')) {
-        videoId = parsed.searchParams.get('v') || '';
-      } else if (parsed.pathname.startsWith('/embed/')) {
-        videoId = parsed.pathname.split('/embed/')[1] || '';
-      } else if (parsed.pathname.startsWith('/shorts/')) {
-        videoId = parsed.pathname.split('/shorts/')[1] || '';
-      }
-    }
-
-    const safeId = String(videoId).split(/[?&#/]/)[0].trim();
-    if (!safeId) return '';
-    return safeId;
-  } catch {
-    return '';
-  }
+function resolveYouTubeVideoIdFromUrl(rawUrl) {
+  return resolveYouTubeVideoId(rawUrl);
 }
 
 function formatDuration(seconds) {
@@ -121,20 +106,27 @@ export default function FinalWorkingVideoCard({
   const volPopupRef = useRef(null);
   const volHideTimeoutRef = useRef(null);
 
-  const videoId = useMemo(() => resolveYouTubeVideoId(video?.url), [video?.url]);
+  const videoId = useMemo(() => resolveYouTubeVideoIdFromUrl(video?.url), [video?.url]);
   const canPlayInline = !adminMode && Boolean(videoId);
   const storageKey = useMemo(() => `biomics:video-progress:${String(video?._id || '')}`, [video?._id]);
   const qualityOptions = useMemo(() => {
     const normalized = Array.from(new Set((availableQualities || []).filter(Boolean)));
-    // Sort highest quality first, keep 'default' (Auto) at end
+    const QUALITY_ORDER = ['highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'];
     return [
-      ...normalized.filter((q) => q !== 'default').sort((a, b) => {
-        const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny'];
-        return QUALITY_ORDER.indexOf(a) - QUALITY_ORDER.indexOf(b);
-      }),
-      'default'
+      'default',
+      ...normalized
+        .filter((q) => q !== 'default')
+        .sort((a, b) => QUALITY_ORDER.indexOf(a) - QUALITY_ORDER.indexOf(b))
     ];
   }, [availableQualities]);
+
+  function ensureFullAudio(player = playerRef.current) {
+    if (!player) return;
+    try { player.unMute(); } catch { /* ignore */ }
+    try { player.setVolume(100); } catch { /* ignore */ }
+    setIsMuted(false);
+    setVolume(100);
+  }
 
   function clearSaveInterval() {
     if (saveIntervalRef.current) {
@@ -195,140 +187,96 @@ export default function FinalWorkingVideoCard({
       .then((YT) => {
         if (cancelled || !YT?.Player || !playerFrameWrapRef.current) return;
 
-        console.log('Creating YouTube player for video:', videoId);
+        requestAnimationFrame(() => {
+          if (cancelled || !playerFrameWrapRef.current) return;
 
-        // Create a fresh div for YouTube to replace with its iframe.
-        // This keeps the mount point outside React's virtual DOM so React's
-        // reconciler never encounters the replaced node (avoiding insertBefore errors).
-        const ytDiv = document.createElement('div');
-        ytDiv.style.cssText = 'width:100%;height:100%;';
-        playerFrameWrapRef.current.appendChild(ytDiv);
+          const ytDiv = document.createElement('div');
+          ytDiv.style.cssText = 'width:100%;height:100%;';
+          playerFrameWrapRef.current.appendChild(ytDiv);
 
-        playerRef.current = new YT.Player(ytDiv, {
-          videoId,
-          width: '100%',
-          height: '100%',
-          playerVars: { 
-            rel: 0, 
-            modestbranding: 1, 
-            autoplay: 0,
-            controls: 0,
-            disablekb: 1,
-            enablejsapi: 1,
-            iv_load_policy: 3,
-            showinfo: 0,
-            fs: 0,
-            cc_load_policy: 0,
-            mute: 0,
-            playsinline: 1,
-            origin: typeof window !== 'undefined' ? window.location.origin : ''
-          },
-          events: {
-            onReady: (event) => {
-              if (cancelled) return;
-              console.log('YouTube player ready for video:', videoId);
-              setIsPlayerLoading(false);
-              setIsPlayerReady(true);
-              setDuration(event.target.getDuration());
-              let detectedQualities = [];
-              try {
-                const qualities = event.target.getAvailableQualityLevels?.();
-                if (Array.isArray(qualities) && qualities.length) {
-                  setAvailableQualities(qualities);
-                  detectedQualities = qualities;
-                }
-              } catch { /* ignore */ }
-              try {
-                // Auto-set highest available quality
-                const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny'];
-                const best = QUALITY_ORDER.find((q) => detectedQualities.includes(q));
-                if (best) {
-                  event.target.setPlaybackQuality(best);
-                  if (typeof event.target.setPlaybackQualityRange === 'function') {
-                    event.target.setPlaybackQualityRange(best, best);
-                  }
-                  setCurrentQuality(best);
-                } else {
-                  setCurrentQuality(event.target.getPlaybackQuality?.() || 'default');
-                }
-              } catch { /* ignore */ }
-              try {
-                setPlaybackSpeed(event.target.getPlaybackRate?.() || 1);
-              } catch { /* ignore */ }
+          const { width, height } = getYouTubePlayerSize(playerFrameWrapRef.current);
 
-              // Explicitly unmute and set volume — required for async-initiated playback
-              try { event.target.unMute(); } catch { /* ignore */ }
-              try { event.target.setVolume(volume); } catch { /* ignore */ }
-              
-              if (pendingSeekRef.current !== null) {
-                const sec = pendingSeekRef.current;
-                pendingSeekRef.current = null;
+          playerRef.current = new YT.Player(ytDiv, {
+            host: YOUTUBE_NO_COOKIE_HOST,
+            videoId,
+            width,
+            height,
+            playerVars: getYouTubePlayerVars({ autoplay: 0 }),
+            events: {
+              onReady: (event) => {
+                if (cancelled) return;
+                setIsPlayerLoading(false);
+                setIsPlayerReady(true);
+                setDuration(event.target.getDuration());
                 try {
-                  playerRef.current?.seekTo(sec, true);
-                  playerRef.current?.playVideo();
-                  try { playerRef.current?.unMute(); } catch { /* ignore */ }
-                } catch { /* ignore */ }
-              }
-            },
-            onStateChange: (event) => {
-              if (cancelled) return;
-              const state = event?.data;
-              const YTState = window.YT?.PlayerState || {};
-
-              console.log('YouTube state change:', { state, stateName: getStateName(state) });
-
-              if (state === YTState.PLAYING) {
-                setIsPlaying(true);
-                setIsVideoEnded(false);
-                clearSaveInterval();
-                saveIntervalRef.current = setInterval(persistCurrentPlayback, 1000);
-                hideControlsDelayed();
-                // Re-enforce highest quality each time playback starts (YT may reset it)
-                try {
-                  const qualities = playerRef.current?.getAvailableQualityLevels?.() || [];
-                  const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny'];
-                  const best = QUALITY_ORDER.find((q) => qualities.includes(q));
-                  if (best) {
-                    playerRef.current?.setPlaybackQuality(best);
-                    if (typeof playerRef.current?.setPlaybackQualityRange === 'function') {
-                      playerRef.current.setPlaybackQualityRange(best, best);
-                    }
+                  const qualities = event.target.getAvailableQualityLevels?.();
+                  if (Array.isArray(qualities) && qualities.length) {
                     setAvailableQualities(qualities);
-                    setCurrentQuality(best);
                   }
                 } catch { /* ignore */ }
-              }
+                try {
+                  setCurrentQuality(event.target.getPlaybackQuality?.() || 'default');
+                } catch { /* ignore */ }
+                try {
+                  setPlaybackSpeed(event.target.getPlaybackRate?.() || 1);
+                } catch { /* ignore */ }
 
-              if (state === YTState.PAUSED || state === YTState.BUFFERING) {
-                setIsPlaying(false);
-                persistCurrentPlayback();
-                setShowControls(true);
-              }
+                syncYouTubePlayerSize(event.target, playerFrameWrapRef.current);
+                ensureFullAudio(event.target);
 
-              if (state === YTState.ENDED) {
-                setIsPlaying(false);
-                setIsVideoEnded(true);
-                clearSaveInterval();
-                idbDel(storageKey).catch(() => {});
-                setSavedProgressSec(0);
-                setCurrentTime(0);
-                setShowControls(true);
+                if (pendingSeekRef.current !== null) {
+                  const sec = pendingSeekRef.current;
+                  pendingSeekRef.current = null;
+                  try {
+                    event.target.seekTo(sec, true);
+                    ensureFullAudio(event.target);
+                    event.target.playVideo();
+                  } catch { /* ignore */ }
+                }
+              },
+              onStateChange: (event) => {
+                if (cancelled) return;
+                const state = event?.data;
+                const YTState = window.YT?.PlayerState || {};
+
+                if (state === YTState.PLAYING) {
+                  setIsPlaying(true);
+                  setIsVideoEnded(false);
+                  clearSaveInterval();
+                  saveIntervalRef.current = setInterval(persistCurrentPlayback, 1000);
+                  hideControlsDelayed();
+                  syncYouTubePlayerSize(playerRef.current, playerFrameWrapRef.current);
+                }
+
+                if (state === YTState.PAUSED || state === YTState.BUFFERING) {
+                  setIsPlaying(false);
+                  persistCurrentPlayback();
+                  setShowControls(true);
+                }
+
+                if (state === YTState.ENDED) {
+                  setIsPlaying(false);
+                  setIsVideoEnded(true);
+                  clearSaveInterval();
+                  idbDel(storageKey).catch(() => {});
+                  setSavedProgressSec(0);
+                  setCurrentTime(0);
+                  setShowControls(true);
+                }
+              },
+              onError: () => {
+                setIsPlayerLoading(false);
+                setPlayerError('Video failed to load. Please reload video.');
+              },
+              onPlaybackQualityChange: (event) => {
+                if (cancelled) return;
+                setCurrentQuality(event.data || 'default');
               }
-            },
-            onError: (event) => {
-              console.error('YouTube player error:', event);
-              setIsPlayerLoading(false);
-              setPlayerError('Video failed to load. Please reload video.');
-            },
-            onPlaybackQualityChange: (event) => {
-              if (cancelled) return;
-              setCurrentQuality(event.data || 'default');
             }
-          }
+          });
         });
       })
-      .catch((error) => {
-        console.error('Failed to load YouTube API:', error);
+      .catch(() => {
         if (!cancelled) setIsPlayerLoading(false);
       });
 
@@ -354,6 +302,20 @@ export default function FinalWorkingVideoCard({
       setActiveMenu(null);
     };
   }, [canPlayInline, videoId, isPlayerOpen, playerInstanceKey]);
+
+  useEffect(() => {
+    if (!isPlayerReady || !isPlayerOpen) return undefined;
+    const container = playerFrameWrapRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return undefined;
+
+    const observer = new ResizeObserver(() => {
+      syncYouTubePlayerSize(playerRef.current, container);
+    });
+    observer.observe(container);
+    syncYouTubePlayerSize(playerRef.current, container);
+
+    return () => observer.disconnect();
+  }, [isPlayerReady, isPlayerOpen, isFullscreen]);
 
   useEffect(() => {
     return () => {
@@ -392,7 +354,7 @@ export default function FinalWorkingVideoCard({
         case 'K':
           e.preventDefault();
           if (isPlaying) { try { playerRef.current?.pauseVideo(); } catch {} }
-          else { try { playerRef.current?.playVideo(); } catch {} }
+          else { ensureFullAudio(); try { playerRef.current?.playVideo(); } catch {} }
           break;
         case 'ArrowLeft':
           e.preventDefault();
@@ -454,18 +416,6 @@ export default function FinalWorkingVideoCard({
     }
   }, [activeMenu]);
 
-  function getStateName(state) {
-    const YTState = window.YT?.PlayerState || {};
-    switch (state) {
-      case YTState.UNSTARTED: return 'UNSTARTED';
-      case YTState.ENDED: return 'ENDED';
-      case YTState.PLAYING: return 'PLAYING';
-      case YTState.PAUSED: return 'PAUSED';
-      case YTState.BUFFERING: return 'BUFFERING';
-      case YTState.CUED: return 'CUED';
-      default: return `UNKNOWN(${state})`;
-    }
-  }
 
   function playFrom(sec) {
     if (!isPlayerReady || !playerRef.current) {
@@ -474,6 +424,7 @@ export default function FinalWorkingVideoCard({
     }
     try {
       playerRef.current.seekTo(sec, true);
+      ensureFullAudio(playerRef.current);
       playerRef.current.playVideo();
     } catch { /* ignore */ }
   }
@@ -521,6 +472,7 @@ export default function FinalWorkingVideoCard({
     if (isPlaying) {
       playerRef.current.pauseVideo();
     } else {
+      ensureFullAudio(playerRef.current);
       playerRef.current.playVideo();
     }
   }
@@ -620,8 +572,8 @@ export default function FinalWorkingVideoCard({
     }
   }
 
-  const QUALITY_ORDER = ['highres','hd2160','hd1440','hd1080','hd720','large','medium','small','tiny','default'];
-  const QUALITY_LABELS = { highres: '4K', hd2160: '4K', hd1440: '1440p', hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p', tiny: '144p', default: 'Auto' };
+  const QUALITY_LABELS = { highres: '4K', hd2160: '4K', hd1440: '1440p', hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p', tiny: '144p', default: 'Auto HD' };
+  const bestQualityOption = qualityOptions.find((q) => q !== 'default');
 
   function handleSkip(secs) {
     if (!isPlayerReady || !playerRef.current) return;
@@ -642,9 +594,6 @@ export default function FinalWorkingVideoCard({
     if (!isPlayerReady || !playerRef.current) return;
     try {
       playerRef.current.setPlaybackQuality(quality);
-      if (typeof playerRef.current.setPlaybackQualityRange === 'function') {
-        playerRef.current.setPlaybackQualityRange(quality, quality);
-      }
     } catch { /* ignore */ }
     setCurrentQuality(quality);
   }
@@ -711,11 +660,26 @@ export default function FinalWorkingVideoCard({
             </div>
           )}
           
-          {/* YouTube player container — stable wrapper; YT mounts inside programmatically */}
+          {/* YouTube player — iframe clicks blocked; custom controls only */}
           <div
             ref={playerFrameWrapRef}
             className="compact-premium-player-frame"
           />
+          <div className="vp-brand-mask-top" aria-hidden="true" />
+          <div className="vp-brand-mask-bottom" aria-hidden="true" />
+
+          {isPlayerReady && !isVideoEnded ? (
+            <button
+              type="button"
+              className="vp-click-shield"
+              onClick={handlePlayPause}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                toggleFullscreen();
+              }}
+              aria-label={isPlaying ? 'Pause video' : 'Play video'}
+            />
+          ) : null}
 
           {/* End-screen overlay — hides YT suggestions, provides replay */}
           {isVideoEnded && (
@@ -911,7 +875,7 @@ export default function FinalWorkingVideoCard({
                       {activeMenu === 'quality' && (
                         <div className="vp-popup" role="menu" aria-label="Select quality" ref={qualityPopupRef}>
                           <div className="vp-popup-head">Quality</div>
-                          {qualityOptions.map((q, i) => (
+                          {qualityOptions.map((q) => (
                             <button
                               key={q}
                               type="button"
@@ -921,7 +885,7 @@ export default function FinalWorkingVideoCard({
                             >
                               <span className="vp-popup-item-label">
                                 {QUALITY_LABELS[q] || q}
-                                {i === 0 && q !== 'default' && (
+                                {bestQualityOption === q && (
                                   <span className="vp-quality-best">Best</span>
                                 )}
                               </span>
@@ -1083,19 +1047,18 @@ export default function FinalWorkingVideoCard({
                 )}
               </button>
             ) : (
-              <a
+              <button
+                type="button"
                 className="compact-premium-btn compact-premium-btn-primary compact-premium-btn--icon-only compact-premium-mini-tool has-tooltip"
-                href={video.url}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open video"
-                title="Open Video"
-                data-tooltip="Open Video"
+                disabled
+                aria-label="Video unavailable"
+                title="Video unavailable"
+                data-tooltip="Video unavailable"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 19H5V5h7V3H5c-1.11 0-1.99.9-1.99 2H4c-1.1 0-2 .9-2 2h16c1.1 0 2-.9 2-2v-7h-2V7h2V3z"/>
+                  <path d="M8 5v14l11-7z"/>
                 </svg>
-              </a>
+              </button>
             )}
 
             <button
@@ -1208,12 +1171,12 @@ export default function FinalWorkingVideoCard({
                 </button>
               </>
             ) : (
-              <a className="compact-premium-btn compact-premium-btn-primary" href={video.url} target="_blank" rel="noreferrer" aria-label="Open video" title="Open Video">
+              <button type="button" className="compact-premium-btn compact-premium-btn-primary" disabled>
                 <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 19H5V5h7V3H5c-1.11 0-1.99.9-1.99 2H4c-1.1 0-2 .9-2 2h16c1.1 0 2-.9 2-2v-7h-2V7h2V3z"/>
+                  <path d="M8 5v14l11-7z"/>
                 </svg>
-                Open Video
-              </a>
+                Video Unavailable
+              </button>
             )}
           </div>
 

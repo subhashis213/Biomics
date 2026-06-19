@@ -14,6 +14,8 @@ import { fetchMyCourseContent } from '@/src/api/learning';
 import { fetchTestSeriesPerformance } from '@/src/api/performance';
 import ThemeToggle from '@/src/components/profile/ThemeToggle';
 import SupportSection from '@/src/components/profile/SupportSection';
+import EmojiIcon from '@/src/components/ui/EmojiIcon';
+import { AppIconKey } from '@/src/constants/appIcons';
 import { ErrorBanner, PrimaryButton, Screen, Subtitle, Title } from '@/src/components/ui';
 
 export default function ProfileScreen() {
@@ -109,15 +111,13 @@ export default function ProfileScreen() {
         <ErrorBanner message={error} />
 
         <View style={styles.statsRow}>
-          <Stat icon="lock-open-outline" label="Courses" value={String(coursesUnlocked)} colors={colors} />
-          <Stat icon="checkmark-done-outline" label="Videos done" value={String(videosCompleted)} colors={colors} />
-          <Stat icon="flame-outline" label="Streak" value={String(streak)} colors={colors} />
+          <Stat icon="courses" label="Courses" value={String(coursesUnlocked)} colors={colors} />
+          <Stat icon="video" label="Videos done" value={String(videosCompleted)} colors={colors} />
+          <Stat icon="streak" label="Streak" value={String(streak)} colors={colors} />
         </View>
 
         <Pressable style={styles.menuCard} onPress={() => router.push('/student/performance')}>
-          <View style={[styles.menuIcon, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="analytics" size={22} color={colors.accent} />
-          </View>
+          <EmojiIcon name="performance" size="md" />
           <View style={{ flex: 1 }}>
             <Text style={styles.menuTitle}>Performance</Text>
             <Text style={styles.menuSub}>
@@ -130,9 +130,7 @@ export default function ProfileScreen() {
 
         <View style={styles.menuCardPlain}>
           <Pressable style={styles.menuRow} onPress={() => router.push('/community-chat')}>
-            <View style={[styles.menuIcon, { backgroundColor: colors.accentSoft }]}>
-              <Ionicons name="chatbubbles" size={20} color={colors.accent} />
-            </View>
+            <EmojiIcon name="chat" size="md" />
             <View style={{ flex: 1 }}>
               <Text style={styles.menuTitle}>Community live chat</Text>
               <Text style={styles.menuSub}>Chat with mentors and peers</Text>
@@ -141,9 +139,7 @@ export default function ProfileScreen() {
           </Pressable>
           <View style={styles.divider} />
           <Pressable style={styles.menuRow} onPress={() => router.push('/cart')}>
-            <View style={[styles.menuIcon, { backgroundColor: colors.accentSoft }]}>
-              <Ionicons name="cart" size={20} color={colors.accent} />
-            </View>
+            <EmojiIcon name="cart" size="md" />
             <View style={{ flex: 1 }}>
               <Text style={styles.menuTitle}>My cart</Text>
               <Text style={styles.menuSub}>
@@ -180,16 +176,16 @@ function Stat({
   value,
   colors
 }: {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: AppIconKey;
   label: string;
   value: string;
   colors: ThemeColors;
 }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 12 }}>
-      <Ionicons name={icon} size={18} color={colors.accent} />
-      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 6 }}>{value}</Text>
-      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>{label}</Text>
+    <View style={{ flex: 1, backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 12, alignItems: 'center' }}>
+      <EmojiIcon name={icon} size="sm" />
+      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 8 }}>{value}</Text>
+      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'center' }}>{label}</Text>
     </View>
   );
 }

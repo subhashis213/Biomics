@@ -1,6 +1,6 @@
 /** Official BiomicsHub Telegram community group (same link as website). */
-export const TELEGRAM_GROUP_URL = 'https://t.me/+WVyK_obKmJ8BbxG6';
-export const TELEGRAM_GROUP_INVITE = 'WVyK_obKmJ8BbxG6';
+export const TELEGRAM_GROUP_URL = 'https://t.me/+kUUdTvXAZ7ExZDY1';
+export const TELEGRAM_GROUP_INVITE = 'kUUdTvXAZ7ExZDY1';
 
 export const SOCIAL_LINKS = [
   {

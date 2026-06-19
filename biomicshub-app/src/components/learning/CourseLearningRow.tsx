@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { APP_ICONS } from '@/src/constants/appIcons';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { resolveApiAssetUrl } from '@/src/api/client';
@@ -72,7 +72,7 @@ export default function CourseLearningRow({
           <Image source={{ uri: thumb }} style={styles.thumb} resizeMode="cover" />
         ) : (
           <View style={styles.thumbFallback}>
-            <Ionicons name="book-outline" size={28} color={colors.accent} />
+            <Text style={styles.fallbackEmoji}>{APP_ICONS.books.emoji}</Text>
           </View>
         )}
       </View>
@@ -135,6 +135,7 @@ function createStyles(c: ThemeColors) {
       justifyContent: 'center',
       backgroundColor: c.accentSoft
     },
+    fallbackEmoji: { fontSize: 32 },
     body: {
       flex: 1,
       minHeight: 96,

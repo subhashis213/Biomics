@@ -3198,29 +3198,6 @@ export default function AdminDashboard() {
                   >
                     {isLightTheme ? 'Use Dark Theme' : 'Use Light Theme'}
                   </button>
-                  <div
-                    className={`profile-beta-toggle-wrapper ${window.localStorage.getItem('biomics-beta') ? 'is-active' : ''}`}
-                    onClick={() => {
-                      const nextBeta = !window.localStorage.getItem('biomics-beta');
-                      if (nextBeta) {
-                        window.localStorage.setItem('biomics-beta', 'true');
-                        setAdminProfileMessage({ type: 'success', text: 'Beta version activated.' });
-                      } else {
-                        window.localStorage.removeItem('biomics-beta');
-                        setAdminProfileMessage({ type: 'success', text: 'Switched to Classic version.' });
-                      }
-                      window.dispatchEvent(new Event('storage'));
-                    }}
-                    role="switch"
-                    aria-checked={!!window.localStorage.getItem('biomics-beta')}
-                    tabIndex={0}
-                  >
-                    <div className="profile-beta-toggle-label">
-                      <span>🚀</span>
-                      <span>Beta Version</span>
-                    </div>
-                    <div className="profile-beta-toggle-switch"></div>
-                  </div>
                   <button
                     type="button"
                     className="profile-logout-btn"

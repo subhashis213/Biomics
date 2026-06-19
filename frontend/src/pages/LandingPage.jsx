@@ -6,6 +6,7 @@ import posterTestSeries from '../assets/poster-test-series.jpeg';
 import posterLifeScience from '../assets/poster-life-science.jpeg';
 import posterBatch from '../assets/poster-batch.jpeg';
 import { fetchStudentVoicesPublic } from '../api';
+import { SOCIAL_LINKS } from '../constants/socialLinks';
 import { useThemeStore } from '../stores/themeStore';
 
 const LANDING_STATS = [
@@ -760,10 +761,10 @@ export default function LandingPage() {
 
           <div className="lp-social-row">
             {[
-              { label: 'Instagram', handle: '@biomics_hub', href: 'https://www.instagram.com/biomics_hub', icon: 'instagram', color: '#e1306c' },
-              { label: 'Telegram', handle: 'Join Channel', href: 'https://t.me/+WVyK_obKmJ8BbxG6', icon: 'telegram', color: '#2aabee' },
-              { label: 'YouTube', handle: '@biomicshub5733', href: 'https://www.youtube.com/@biomicshub5733', icon: 'youtube', color: '#ff0000' },
-              { label: 'WhatsApp', handle: 'Join Group', href: 'https://chat.whatsapp.com/Fc8P3ZUDhfYDw6swMKDHOI', icon: 'whatsapp', color: '#22c55e' },
+              { label: 'Instagram', handle: '@biomics_hub', href: SOCIAL_LINKS.instagram.href, icon: 'instagram', color: '#e1306c' },
+              { label: SOCIAL_LINKS.telegram.label, handle: SOCIAL_LINKS.telegram.handle, href: SOCIAL_LINKS.telegram.href, icon: 'telegram', color: '#2aabee' },
+              { label: 'YouTube', handle: '@biomicshub5733', href: SOCIAL_LINKS.youtube.href, icon: 'youtube', color: '#ff0000' },
+              { label: 'WhatsApp', handle: 'Join Group', href: SOCIAL_LINKS.whatsapp.href, icon: 'whatsapp', color: '#22c55e' },
             ].map((s) => (
               <a
                 key={s.label}

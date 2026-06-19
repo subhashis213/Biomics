@@ -12,6 +12,7 @@ import { CartProvider } from '@/src/context/CartContext';
 import { ThemeProvider, useTheme } from '@/src/theme/ThemeContext';
 import { addNotificationListeners, initPushNotifications } from '@/src/utils/push';
 import { initForegroundPushHandler } from '@/src/utils/pushMessaging';
+import { startApiKeepAlive } from '@/src/api/client';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -25,6 +26,7 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   useEffect(() => {
+    startApiKeepAlive();
     initPushNotifications();
     const removeListeners = addNotificationListeners();
     const removeForegroundPush = initForegroundPushHandler();

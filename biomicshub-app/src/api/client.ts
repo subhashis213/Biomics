@@ -1,5 +1,17 @@
 const API_BASE = 'https://biomicshub-backend.onrender.com';
 const REQUEST_TIMEOUT_MS = 90000;
+const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000;
+
+let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Ping /health while the app is open so Render free tier does not sleep mid-session. */
+export function startApiKeepAlive() {
+  const ping = () => fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {});
+  ping();
+  if (!keepAliveTimer) {
+    keepAliveTimer = setInterval(ping, KEEP_ALIVE_INTERVAL_MS);
+  }
+}
 
 export function getApiBase() {
   return API_BASE;

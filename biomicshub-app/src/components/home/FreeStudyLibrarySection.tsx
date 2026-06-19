@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { FreeStudyCourseGroup } from '@/src/api/freeStudyResources';
+import EmojiIcon from '@/src/components/ui/EmojiIcon';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { ThemeColors } from '@/src/theme/theme';
 import { Card, Eyebrow } from '@/src/components/ui';
@@ -37,9 +38,7 @@ export default function FreeStudyLibrarySection({ courses, totalCount }: Props) 
       accessibilityLabel="Open free study library"
     >
       <Card style={styles.wrap}>
-        <View style={styles.iconWrap}>
-          <Ionicons name="library-outline" size={22} color={colors.accent} />
-        </View>
+        <EmojiIcon name="library" size="md" />
         <View style={styles.body}>
           <Eyebrow>Free library</Eyebrow>
           <Text style={styles.title}>Books & study materials</Text>

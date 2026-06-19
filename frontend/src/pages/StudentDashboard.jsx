@@ -25,6 +25,8 @@ import { useFeedback } from '../hooks/useFeedback';
 import { useQuizSession } from '../hooks/useQuizSession';
 import { useSessionStore } from '../stores/sessionStore';
 import { useThemeStore } from '../stores/themeStore';
+import { CONNECT_PLATFORMS } from '../constants/socialLinks';
+import SocialBrandIcon from '../components/SocialBrandIcon';
 
 const ALL_MODULES = 'ALL_MODULES';
 const CART_STORAGE_PREFIX = 'biomics:student-cart:';
@@ -2647,7 +2649,7 @@ export default function StudentDashboard() {
                     <span className="course-chooser-icon" aria-hidden="true">🔐</span>
                     <div className="course-chooser-intro">
                       <h3 className="course-chooser-title">Select a Course</h3>
-                      <p className="course-chooser-subtitle">Start from a compact premium card. Open it to browse all available courses and choose your track.</p>
+                      <p className="course-chooser-subtitle">Browse available courses and pick your learning track.</p>
                     </div>
                   </div>
 
@@ -2659,7 +2661,7 @@ export default function StudentDashboard() {
                         onClick={() => navigate('/student/courses')}
                       >
                         <div className="course-marketplace-launcher-copy">
-                          <span className="course-marketplace-launcher-kicker">Premium Course Entry</span>
+                          <span className="course-marketplace-launcher-kicker">Course catalog</span>
                           <strong>{selectedMarketplaceCourse ? selectedMarketplaceCourse.displayName : 'Open Course Catalog'}</strong>
                           <span>
                             {selectedMarketplaceCourse
@@ -2847,7 +2849,7 @@ export default function StudentDashboard() {
         <section id="section-test-series" className="card ts-student-entry-card premium-sync-card">
           <div className="section-header compact">
             <div>
-              <p className="eyebrow">Premium Add-on</p>
+              <p className="eyebrow">Test series</p>
               <h2>Test Series</h2>
               <p className="subtitle">Topic-wise tests and full-length mock exams — purchased separately from your course plan.</p>
             </div>
@@ -2883,7 +2885,7 @@ export default function StudentDashboard() {
               <div>
                 <p className="eyebrow">Quiz Performance</p>
                 <h2>Open your organized performance board</h2>
-                <p className="subtitle">Review module-wise and topic-wise quiz progress in a dedicated premium workspace.</p>
+                <p className="subtitle">Review module-wise and topic-wise quiz progress in a dedicated workspace.</p>
               </div>
             </div>
             <div className="student-route-entry-copy">
@@ -2924,7 +2926,7 @@ export default function StudentDashboard() {
               <div className="student-route-chip-row" aria-hidden="true">
                 <span>Topic test modules</span>
                 <span>Full mock scores</span>
-                <span>Premium layout</span>
+                <span>Score trends</span>
               </div>
               <div className="workspace-link-actions">
                 <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series-performance')}>
@@ -3165,74 +3167,36 @@ export default function StudentDashboard() {
       <section id="section-connect" className="connect-section app-shell-full-bleed">
         <div className="connect-inner">
           <div className="connect-text">
-            <p className="connect-eyebrow">Stay Connected</p>
-            <h2 className="connect-heading">Connect With Us</h2>
-            <p className="connect-sub">Follow us for daily biology tips, live class alerts, and exam prep resources.</p>
+            <p className="connect-eyebrow">Stay connected</p>
+            <h2 className="connect-heading">Connect with Biomics Hub</h2>
+            <p className="connect-sub">
+              Follow our official channels for live class alerts, free notes, and daily biology prep — all in one place.
+            </p>
           </div>
           <div className="connect-cards">
-            <a
-              href="https://www.instagram.com/biomics_hub?igsh=aGJyNzhrOWZkeWV5"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="social-card social-card--instagram"
-            >
-              <span className="social-card-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 1.366.062 2.633.334 3.608 1.31.975.975 1.247 2.242 1.31 3.608.058 1.265.07 1.645.07 4.849s-.012 3.584-.07 4.85c-.062 1.366-.334 2.633-1.31 3.608-.975.975-2.242 1.247-3.608 1.31-1.265.058-1.645.07-4.85.07s-3.584-.012-4.85-.07c-1.366-.062-2.633-.334-3.608-1.31-.975-.975-1.247-2.242-1.31-3.608C2.175 15.584 2.163 15.204 2.163 12s.012-3.584.07-4.85c.062-1.366.334-2.633 1.31-3.608.975-.975 2.242-1.247 3.608-1.31C8.416 2.175 8.796 2.163 12 2.163zm0-2.163C8.741 0 8.332.014 7.052.072 5.197.157 3.355.673 2.014 2.014.673 3.355.157 5.197.072 7.052.014 8.332 0 8.741 0 12c0 3.259.014 3.668.072 4.948.085 1.855.601 3.697 1.942 5.038 1.341 1.341 3.183 1.857 5.038 1.942C8.332 23.986 8.741 24 12 24s3.668-.014 4.948-.072c1.855-.085 3.697-.601 5.038-1.942 1.341-1.341 1.857-3.183 1.942-5.038C23.986 15.668 24 15.259 24 12s-.014-3.668-.072-4.948c-.085-1.855-.601-3.697-1.942-5.038C20.645.673 18.803.157 16.948.072 15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zm0 10.162a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
-                </svg>
-              </span>
-              <span className="social-card-label">Instagram</span>
-              <span className="social-card-handle">@biomics_hub</span>
-              <span className="social-card-arrow">↗</span>
-            </a>
-
-            <a
-              href="https://t.me/+WVyK_obKmJ8BbxG6"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="social-card social-card--telegram"
-            >
-              <span className="social-card-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                </svg>
-              </span>
-              <span className="social-card-label">Telegram</span>
-              <span className="social-card-handle">Join our channel</span>
-              <span className="social-card-arrow">↗</span>
-            </a>
-
-            <a
-              href="https://www.youtube.com/@biomicshub5733"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="social-card social-card--youtube"
-            >
-              <span className="social-card-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/>
-                </svg>
-              </span>
-              <span className="social-card-label">YouTube</span>
-              <span className="social-card-handle">@biomicshub5733</span>
-              <span className="social-card-arrow">↗</span>
-            </a>
-
-            <a
-              href="https://chat.whatsapp.com/Fc8P3ZUDhfYDw6swMKDHOI"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="social-card social-card--whatsapp"
-            >
-              <span className="social-card-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M12.04 2C6.54 2 2.08 6.45 2.08 11.95c0 1.77.46 3.5 1.34 5.03L2 22l5.17-1.35a9.9 9.9 0 0 0 4.87 1.25h.01c5.5 0 9.95-4.45 9.95-9.95A9.96 9.96 0 0 0 12.04 2zm5.81 14.02c-.24.67-1.41 1.25-1.95 1.33-.5.08-1.13.11-1.83-.11-.43-.14-.99-.32-1.7-.63-2.99-1.29-4.94-4.32-5.09-4.52-.14-.2-1.22-1.62-1.22-3.09 0-1.47.77-2.19 1.05-2.49.27-.3.6-.37.8-.37.2 0 .4 0 .57.01.19.01.44-.07.68.52.24.58.8 2.01.87 2.16.07.15.12.33.02.53-.1.2-.15.32-.3.5-.14.17-.3.39-.42.52-.14.15-.28.31-.12.6.16.3.7 1.16 1.5 1.88 1.03.92 1.89 1.21 2.19 1.35.3.14.48.12.66-.07.17-.2.75-.88.95-1.18.2-.3.4-.25.68-.15.28.1 1.77.83 2.07.98.3.15.5.22.57.35.07.12.07.72-.17 1.39z"/>
-                </svg>
-              </span>
-              <span className="social-card-label">WhatsApp</span>
-              <span className="social-card-handle">Join group</span>
-              <span className="social-card-arrow">↗</span>
-            </a>
+            {CONNECT_PLATFORMS.map((platform) => (
+              <a
+                key={platform.id}
+                href={platform.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`social-card social-card--${platform.tone}`}
+              >
+                <span className="social-card-icon">
+                  <SocialBrandIcon platform={platform.tone} />
+                </span>
+                <span className="social-card-body">
+                  <span className="social-card-label">{platform.label}</span>
+                  <span className="social-card-handle">{platform.handle}</span>
+                  <span className="social-card-blurb">{platform.blurb}</span>
+                </span>
+                <span className="social-card-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75">
+                    <path d="M5 15L15 5M15 5H7M15 5V13" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              </a>
+            ))}
           </div>
         </div>
       </section>
@@ -3389,29 +3353,6 @@ export default function StudentDashboard() {
                   >
                     {isLightTheme ? 'Use Dark Theme' : 'Use Light Theme'}
                   </button>
-                  <div
-                    className={`profile-beta-toggle-wrapper ${window.localStorage.getItem('biomics-beta') ? 'is-active' : ''}`}
-                    onClick={() => {
-                      const nextBeta = !window.localStorage.getItem('biomics-beta');
-                      if (nextBeta) {
-                        window.localStorage.setItem('biomics-beta', 'true');
-                        setProfileMessage({ type: 'success', text: 'Beta version activated.' });
-                      } else {
-                        window.localStorage.removeItem('biomics-beta');
-                        setProfileMessage({ type: 'success', text: 'Switched to Classic version.' });
-                      }
-                      window.dispatchEvent(new Event('storage'));
-                    }}
-                    role="switch"
-                    aria-checked={!!window.localStorage.getItem('biomics-beta')}
-                    tabIndex={0}
-                  >
-                    <div className="profile-beta-toggle-label">
-                      <span>🚀</span>
-                      <span>Beta Version</span>
-                    </div>
-                    <div className="profile-beta-toggle-switch"></div>
-                  </div>
                 </aside>
 
                 <form className="profile-edit-form" onSubmit={handleSaveProfile}>
@@ -3476,23 +3417,16 @@ export default function StudentDashboard() {
                   </div>
                   {profileMessage ? <p className={`inline-message ${profileMessage.type}`}>{profileMessage.text}</p> : null}
 
-                  <section className="profile-danger-zone" aria-labelledby="profile-danger-zone-title">
-                    <div className="profile-danger-zone-head">
-                      <span className="profile-danger-zone-icon" aria-hidden="true">⚠</span>
-                      <div>
-                        <h3 id="profile-danger-zone-title">Danger zone</h3>
-                        <p>Permanently remove your account, subscriptions, progress, and personal data from Biomics Hub.</p>
-                      </div>
-                    </div>
+                  <div className="profile-delete-account-row">
                     <button
                       type="button"
-                      className="profile-delete-account-btn"
+                      className="profile-delete-account-link"
                       onClick={openDeleteAccountDialog}
                       disabled={isDeletingAccount}
                     >
-                      Delete Account
+                      Delete account
                     </button>
-                  </section>
+                  </div>
                 </form>
               </div>
             )}

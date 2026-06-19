@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/theme/ThemeContext';
@@ -8,6 +7,7 @@ import { ThemeColors } from '@/src/theme/theme';
 import { CalendarEntry, fetchStudentLiveWorkspace, LiveClass } from '@/src/api/live';
 import { isVisibleCalendarEntry, isVisibleLiveClass } from '@/src/utils/liveClass';
 import { Badge, Card, ErrorBanner, Eyebrow, LoadingBlock, PrimaryButton, Screen, Subtitle, Title } from '@/src/components/ui';
+import { APP_ICONS } from '@/src/constants/appIcons';
 
 const LIVE_REFRESH_MS = 15000;
 
@@ -90,7 +90,7 @@ export default function StudentLive() {
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.accent} />}
       >
-        <Eyebrow>Live classes</Eyebrow>
+        <Eyebrow>🎥 Live classes</Eyebrow>
         <Title>Live & schedule</Title>
         <Subtitle>Join live sessions and see your upcoming class calendar.</Subtitle>
         <View style={{ height: 12 }} />
@@ -111,7 +111,7 @@ export default function StudentLive() {
         ) : !loading ? (
           <Card>
             <View style={styles.emptyLive}>
-              <Ionicons name="videocam-off-outline" size={28} color={colors.muted} />
+              <Text style={styles.emptyEmoji}>{APP_ICONS.live.emoji}</Text>
               <Text style={styles.empty}>No class is live right now.</Text>
             </View>
           </Card>
@@ -124,7 +124,7 @@ export default function StudentLive() {
               <Card key={c._id}>
                 <View style={styles.row}>
                   <View style={styles.iconWrap}>
-                    <Ionicons name="calendar-outline" size={20} color={colors.accent} />
+                    <Text style={styles.calEmoji}>{APP_ICONS.calendar.emoji}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.upTitle}>{c.title}</Text>
@@ -158,13 +158,13 @@ export default function StudentLive() {
                       </Text>
                     </View>
                     {e.kind === 'blocked-slot' ? (
-                      <Ionicons name="lock-closed" size={16} color={colors.warn} />
+                      <Text style={styles.rowEmoji}>{APP_ICONS.lock.emoji}</Text>
                     ) : e.liveClassId && (activeClass?._id === e.liveClassId || e.status === 'live') ? (
                       <Pressable onPress={() => join(e.liveClassId!)}>
-                        <Ionicons name="videocam" size={16} color={colors.accent} />
+                        <Text style={styles.rowEmoji}>{APP_ICONS.live.emoji}</Text>
                       </Pressable>
                     ) : (
-                      <Ionicons name="videocam-outline" size={16} color={colors.muted} />
+                      <Text style={[styles.rowEmoji, { opacity: 0.45 }]}>{APP_ICONS.live.emoji}</Text>
                     )}
                   </View>
                 ))}
@@ -187,7 +187,10 @@ function createStyles(c: ThemeColors) {
     liveTitle: { color: c.text, fontSize: 18, fontWeight: '800' },
     liveMeta: { color: c.muted, marginTop: 4 },
     emptyLive: { alignItems: 'center', gap: 8, paddingVertical: 8 },
+    emptyEmoji: { fontSize: 40 },
     empty: { color: c.muted },
+    calEmoji: { fontSize: 20 },
+    rowEmoji: { fontSize: 18 },
     section: { color: c.text, fontWeight: '800', fontSize: 16, marginTop: 8, marginBottom: 10 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     iconWrap: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' },
