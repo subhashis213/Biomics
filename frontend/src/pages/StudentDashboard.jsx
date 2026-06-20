@@ -27,6 +27,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useThemeStore } from '../stores/themeStore';
 import { CONNECT_PLATFORMS } from '../constants/socialLinks';
 import SocialBrandIcon from '../components/SocialBrandIcon';
+import { BarChart3, Target } from 'lucide-react';
 
 const ALL_MODULES = 'ALL_MODULES';
 const CART_STORAGE_PREFIX = 'biomics:student-cart:';
@@ -2221,6 +2222,7 @@ export default function StudentDashboard() {
     let launcherTitle = 'Open Live Classes';
     let launcherMeta = 'Calendar ready · Course-wise filters';
     let ctaLabel = 'Open Live Section';
+    let ctaLabelShort = 'Open';
     let showLiveBadge = false;
     let showUpcomingBadge = false;
     let liveBadgePulsing = false;
@@ -2232,6 +2234,7 @@ export default function StudentDashboard() {
       launcherTitle = visibleLiveClass.title;
       launcherMeta = `Started ${new Date(visibleLiveClass.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${visibleLiveClass.course ? ` · ${visibleLiveClass.course}` : ''}`;
       ctaLabel = 'Join Live Class';
+      ctaLabelShort = 'Join';
       showLiveBadge = true;
       liveBadgePulsing = true;
     } else if (visibleUpcomingClass) {
@@ -2241,6 +2244,7 @@ export default function StudentDashboard() {
       launcherTitle = visibleUpcomingClass.title;
       launcherMeta = `${upcomingCountdown || 'Starting soon'} · ${new Date(visibleUpcomingClass.scheduledAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`;
       ctaLabel = 'Open Live Section';
+      ctaLabelShort = 'Open';
       showUpcomingBadge = true;
     }
 
@@ -2273,7 +2277,8 @@ export default function StudentDashboard() {
                 <span>{launcherMeta}</span>
               </div>
               <span className="student-learning-live-launcher-cta">
-                {ctaLabel}
+                <span className="launcher-cta-label launcher-cta-label--full">{ctaLabel}</span>
+                <span className="launcher-cta-label launcher-cta-label--short">{ctaLabelShort}</span>
                 <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
                 </svg>
@@ -2672,7 +2677,8 @@ export default function StudentDashboard() {
                           </span>
                         </div>
                         <span className="course-marketplace-launcher-cta">
-                          Select Course
+                          <span className="launcher-cta-label launcher-cta-label--full">Select Course</span>
+                          <span className="launcher-cta-label launcher-cta-label--short">Select</span>
                           <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
                           </svg>
@@ -2870,7 +2876,7 @@ export default function StudentDashboard() {
         <div className="student-performance-spotlight-grid">
           <section
             id="section-quiz-performance"
-            className="card student-route-entry-card quiz-performance-entry-card premium-sync-card"
+            className="card student-route-entry-card student-route-entry-card--compact quiz-performance-entry-card premium-sync-card"
             role="button"
             tabIndex={0}
             onClick={() => navigate('/student/quiz-performance')}
@@ -2881,30 +2887,27 @@ export default function StudentDashboard() {
               }
             }}
           >
-            <div className="section-header compact">
-              <div>
-                <p className="eyebrow">Quiz Performance</p>
-                <h2>Open your organized performance board</h2>
-                <p className="subtitle">Review module-wise and topic-wise quiz progress in a dedicated workspace.</p>
+            <div className="student-performance-entry-main">
+              <span className="student-performance-entry-icon student-performance-entry-icon--quiz" aria-hidden="true">
+                <BarChart3 />
+              </span>
+              <div className="section-header compact">
+                <div>
+                  <p className="eyebrow">Quiz Performance</p>
+                  <h2>Your quiz scores</h2>
+                </div>
               </div>
             </div>
-            <div className="student-route-entry-copy">
-              <div className="student-route-chip-row" aria-hidden="true">
-                <span>Module trends</span>
-                <span>Topic breakdown</span>
-                <span>Recent attempts</span>
-              </div>
-              <div className="workspace-link-actions">
-                <button type="button" className="primary-btn" onClick={() => navigate('/student/quiz-performance')}>
-                  Open Quiz Performance →
-                </button>
-              </div>
+            <div className="workspace-link-actions">
+              <button type="button" className="primary-btn student-performance-entry-btn" onClick={() => navigate('/student/quiz-performance')}>
+                Open →
+              </button>
             </div>
           </section>
 
           <section
             id="section-test-series-performance"
-            className="card student-route-entry-card test-series-performance-entry-card premium-sync-card"
+            className="card student-route-entry-card student-route-entry-card--compact test-series-performance-entry-card premium-sync-card"
             role="button"
             tabIndex={0}
             onClick={() => navigate('/student/test-series-performance')}
@@ -2915,24 +2918,21 @@ export default function StudentDashboard() {
               }
             }}
           >
-            <div className="section-header compact">
-              <div>
-                <p className="eyebrow">Test Series Performance</p>
-                <h2>Track topic tests and full mocks separately</h2>
-                <p className="subtitle">Dive into module-wise topic test results and a dedicated full mock performance board with clearer spacing and cleaner visuals.</p>
+            <div className="student-performance-entry-main">
+              <span className="student-performance-entry-icon student-performance-entry-icon--series" aria-hidden="true">
+                <Target />
+              </span>
+              <div className="section-header compact">
+                <div>
+                  <p className="eyebrow">Series Performance</p>
+                  <h2>Tests & mock scores</h2>
+                </div>
               </div>
             </div>
-            <div className="student-route-entry-copy">
-              <div className="student-route-chip-row" aria-hidden="true">
-                <span>Topic test modules</span>
-                <span>Full mock scores</span>
-                <span>Score trends</span>
-              </div>
-              <div className="workspace-link-actions">
-                <button type="button" className="primary-btn" onClick={() => navigate('/student/test-series-performance')}>
-                  Open Series Performance →
-                </button>
-              </div>
+            <div className="workspace-link-actions">
+              <button type="button" className="primary-btn student-performance-entry-btn" onClick={() => navigate('/student/test-series-performance')}>
+                Open →
+              </button>
             </div>
           </section>
         </div>
