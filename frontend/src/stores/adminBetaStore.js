@@ -2,12 +2,18 @@ import { create } from 'zustand';
 
 const BETA_KEY = 'biomics_admin_beta';
 
+function readAdminBetaEnabled() {
+  if (typeof localStorage === 'undefined') return true;
+  const stored = localStorage.getItem(BETA_KEY);
+  if (stored === null) return true;
+  return stored === 'on';
+}
+
 function applyAdminBetaAttr(enabled) {
   document.documentElement.setAttribute('data-admin-beta', enabled ? 'on' : 'off');
 }
 
-const initialEnabled = typeof localStorage !== 'undefined'
-  && localStorage.getItem(BETA_KEY) === 'on';
+const initialEnabled = readAdminBetaEnabled();
 
 applyAdminBetaAttr(initialEnabled);
 
