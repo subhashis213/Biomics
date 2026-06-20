@@ -22024,9 +22024,13 @@ html[data-theme='light'] .empty-note {
 }
 
 .cpv-thumb-wrap .video-thumb {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  max-height: none;
   object-fit: cover;
+  object-position: center;
   display: block;
   transition: transform 0.35s ease, filter 0.35s ease;
 }
@@ -22698,12 +22702,13 @@ html[data-theme='light'] .compact-premium-mini-tool.has-tooltip::after {
   background: #000;
 }
 
-/* Full frame — no crop; clicks blocked via shield overlay */
+/* Full frame — clip native YouTube bottom chrome via overflow on parent */
 .compact-premium-player-frame iframe {
   position: absolute !important;
-  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
   width: 100% !important;
-  height: 100% !important;
+  height: calc(100% + 72px) !important;
   transform: none !important;
   border: 0 !important;
   pointer-events: none !important;
@@ -22727,9 +22732,9 @@ html[data-theme='light'] .compact-premium-mini-tool.has-tooltip::after {
 }
 
 .vp-brand-mask-bottom {
-  bottom: 68px;
-  height: 28px;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55) 0%, transparent 100%);
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.92) 0%, transparent 100%);
 }
 
 .vp-click-shield {
@@ -22737,7 +22742,7 @@ html[data-theme='light'] .compact-premium-mini-tool.has-tooltip::after {
   top: 0;
   left: 0;
   right: 0;
-  bottom: 68px;
+  bottom: 0;
   z-index: 5;
   border: none;
   padding: 0;
@@ -22751,7 +22756,7 @@ html[data-theme='light'] .compact-premium-mini-tool.has-tooltip::after {
 }
 
 .compact-premium-video-player--fullscreen .vp-click-shield {
-  bottom: 72px;
+  bottom: 0;
 }
 
 .compact-premium-video-player--fullscreen {
@@ -22835,7 +22840,7 @@ html[data-theme='light'] .compact-premium-mini-tool.has-tooltip::after {
   flex-direction: column;
   gap: 4px;
   transition: opacity 0.28s ease, transform 0.28s ease;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0;
   z-index: 10;
 }
 
@@ -23416,7 +23421,7 @@ html[data-theme='light'] .compact-premium-btn-material-toggle {
 }
 
 html[data-theme='light'] .cpv-thumb-wrap {
-  background: #e8eaf0;
+  background: #0a0d14;
 }
 
 /* Responsive design */

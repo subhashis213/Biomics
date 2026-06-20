@@ -98,8 +98,8 @@ android {
         applicationId 'com.biomicshub.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 35
-        versionName "1.0.37"
+        versionCode 36
+        versionName "1.0.38"
     }
     signingConfigs {
         debug {

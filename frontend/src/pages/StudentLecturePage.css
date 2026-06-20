@@ -104,8 +104,8 @@ html:not([data-theme='light']) .lecture-workspace-page .lecture-page-hero-left .
 }
 
 .lecture-workspace-page .compact-premium-video-grid--single .cpv-thumb-wrap .video-thumb {
-  object-fit: contain;
-  background: #0a0d14;
+  object-fit: cover;
+  object-position: center;
 }
 
 .lecture-workspace-page .compact-premium-video-grid--single .compact-premium-video-content {
@@ -154,8 +154,9 @@ html:not([data-theme='light']) .lecture-workspace-page .lecture-page-hero-left .
 .lecture-workspace-page .compact-premium-mini-toolbar {
   gap: 8px;
   padding: 10px 12px 12px;
-  border-top: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  background: color-mix(in srgb, var(--bg-card-soft) 60%, var(--bg-card));
+  margin: 0;
+  border-top: none;
+  background: transparent;
 }
 
 .lecture-workspace-page .compact-premium-mini-tool {
