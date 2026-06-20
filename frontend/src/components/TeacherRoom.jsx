@@ -509,7 +509,7 @@ function TeacherPollConsole({ onError }) {
   );
 }
 
-export default function TeacherRoom({ classSession, onSessionStarted, onSessionEnded, autoStart = false }) {
+export default function TeacherRoom({ classSession, onSessionStarted, onSessionEnded, autoStart = false, embeddedInStudioPage = false }) {
   const [serverStatus, setServerStatus] = useState(null);
   const [connectionInfo, setConnectionInfo] = useState(null);
   const [countdown, setCountdown] = useState(0);
@@ -914,16 +914,57 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
   const normalizedConnectionState = String(connectionState || 'idle').toLowerCase();
   const accessLabel = String(classSession?.course ? `${classSession.course} course access` : 'Course-based access').trim();
 
-  return (
-    <div className="livekit-room-shell teacher-room-shell">
-      <section className="card livekit-room-toolbar">
+  const studioFeatureCards = (
+    <div className="livekit-studio-toolbar-grid" aria-label="Teacher studio quick overview">
+      <article className="livekit-studio-toolbar-card">
+        <span className="livekit-studio-toolbar-icon" aria-hidden="true">🎬</span>
         <div>
-          <p className="eyebrow">Teacher Studio</p>
-          <h3>{classSession?.title || 'Live class studio'}</h3>
-          <p className="subtitle">A dedicated studio for camera, microphone, live poll control, and course-based classroom access. Eligible students can discover the live session from their dashboard and join when the class goes live.</p>
+          <strong>Broadcast Stage</strong>
+          <p>Run camera, mic, and screen share from one focused studio room.</p>
         </div>
+      </article>
+      <article className="livekit-studio-toolbar-card">
+        <span className="livekit-studio-toolbar-icon" aria-hidden="true">🛰️</span>
+        <div>
+          <strong>Connection Chain</strong>
+          <p>EC2 boot, teacher token, and LiveKit room status stay visible while you teach.</p>
+        </div>
+      </article>
+      <article className="livekit-studio-toolbar-card">
+        <span className="livekit-studio-toolbar-icon" aria-hidden="true">🗳️</span>
+        <div>
+          <strong>Live Poll Control</strong>
+          <p>Launch MCQ polls instantly and review responses in the command deck placed directly below the teaching stage.</p>
+        </div>
+      </article>
+    </div>
+  );
 
-        <div className="livekit-room-toolbar-actions">
+  const studioAlerts = (
+    <>
+      {errorMessage ? <p className="banner error livekit-studio-alert">{errorMessage}</p> : null}
+      {disconnectMessage ? <p className="banner warning livekit-studio-alert">{disconnectMessage}</p> : null}
+    </>
+  );
+
+  return (
+    <div className={`livekit-room-shell teacher-room-shell${embeddedInStudioPage ? ' teacher-room-shell--embedded' : ''}`}>
+      <section className={`card livekit-room-toolbar${embeddedInStudioPage ? ' livekit-room-toolbar--compact' : ''}`}>
+        {!embeddedInStudioPage ? (
+          <div className="livekit-room-toolbar-intro">
+            <p className="eyebrow">Teacher Studio</p>
+            <h3>{classSession?.title || 'Live class studio'}</h3>
+            <p className="subtitle">A dedicated studio for camera, microphone, live poll control, and course-based classroom access. Eligible students can discover the live session from their dashboard and join when the class goes live.</p>
+          </div>
+        ) : (
+          <div className="livekit-room-toolbar-compact-head">
+            <p className="eyebrow">Class Controls</p>
+            <p className="livekit-room-toolbar-compact-title">{classSession?.title || 'Live class studio'}</p>
+          </div>
+        )}
+
+        <div className="livekit-room-command-deck">
+          <div className="livekit-room-toolbar-actions">
           <button type="button" className="primary-btn" onClick={handleStartClass} disabled={isBooting || isShuttingDown || !classSession?._id}>
             {isBooting ? `Booting ${formatCountdown(countdown)}` : 'Start Class'}
           </button>
@@ -936,44 +977,27 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
           <button type="button" className="danger-btn" onClick={handleEndClass} disabled={isShuttingDown || !classSession?._id}>
             {isShuttingDown ? 'Ending...' : 'End Class'}
           </button>
+          </div>
+
+          <div className="livekit-server-status-strip" aria-label="Server and room status">
+            <span className={`livekit-server-pill state-${String(serverStatus?.state || 'unknown').toLowerCase()}`}>{serverStatus?.state || 'unknown'}</span>
+            <span className={`livekit-server-pill connection-${normalizedConnectionState}`}>{connectionState}</span>
+            <span className={`livekit-server-pill ${livekitServiceReady ? 'connection-connected' : 'connection-connecting'}`}>Signal {livekitServiceReady ? 'ready' : 'booting'}</span>
+            <span className="livekit-status-meta-chip">EC2: {serverStatus?.instanceId || 'Not configured'}</span>
+            <span className="livekit-status-meta-chip">Room: {classSession?.roomName || 'Not assigned'}</span>
+            <span className="livekit-status-meta-chip">{accessLabel}</span>
+          </div>
         </div>
 
-        <div className="livekit-server-status-strip">
-          <span className={`livekit-server-pill state-${String(serverStatus?.state || 'unknown').toLowerCase()}`}>{serverStatus?.state || 'unknown'}</span>
-          <span className={`livekit-server-pill connection-${normalizedConnectionState}`}>{connectionState}</span>
-          <span className={`livekit-server-pill ${livekitServiceReady ? 'connection-connected' : 'connection-connecting'}`}>Signal {livekitServiceReady ? 'ready' : 'booting'}</span>
-          <span>EC2: {serverStatus?.instanceId || 'Not configured'}</span>
-          <span>Room: {classSession?.roomName || 'Not assigned'}</span>
-          <span>{accessLabel}</span>
-        </div>
-
-        <div className="livekit-studio-toolbar-grid" aria-label="Teacher studio quick overview">
-          <article className="livekit-studio-toolbar-card">
-            <span className="livekit-studio-toolbar-icon" aria-hidden="true">🎬</span>
-            <div>
-              <strong>Broadcast Stage</strong>
-              <p>Run camera, mic, and screen share from one focused studio room.</p>
-            </div>
-          </article>
-          <article className="livekit-studio-toolbar-card">
-            <span className="livekit-studio-toolbar-icon" aria-hidden="true">🛰️</span>
-            <div>
-              <strong>Connection Chain</strong>
-              <p>EC2 boot, teacher token, and LiveKit room status stay visible while you teach.</p>
-            </div>
-          </article>
-          <article className="livekit-studio-toolbar-card">
-            <span className="livekit-studio-toolbar-icon" aria-hidden="true">🗳️</span>
-            <div>
-              <strong>Live Poll Control</strong>
-              <p>Launch MCQ polls instantly and review responses in the command deck placed directly below the teaching stage.</p>
-            </div>
-          </article>
-        </div>
-
-        {errorMessage ? <p className="banner error">{errorMessage}</p> : null}
-        {disconnectMessage ? <p className="banner warning">{disconnectMessage}</p> : null}
+        {!embeddedInStudioPage ? studioFeatureCards : null}
+        {studioAlerts}
       </section>
+
+      {embeddedInStudioPage ? (
+        <section className="card livekit-studio-features-panel">
+          {studioFeatureCards}
+        </section>
+      ) : null}
 
       {isBooting ? (
         <section className="card livekit-boot-card">
@@ -1080,8 +1104,9 @@ export default function TeacherRoom({ classSession, onSessionStarted, onSessionE
         </LiveKitRoom>
       ) : (
         <section className="card livekit-empty-room-card">
+          <span className="livekit-empty-room-icon" aria-hidden="true">📡</span>
           <strong>Teacher room not connected yet</strong>
-          <p>Press Start Class to boot the EC2 instance, activate the scheduled live class, fetch the teacher token, and open the dedicated studio layout.</p>
+          <p>Press <strong>Start Class</strong> to boot the EC2 instance, activate the scheduled live class, fetch the teacher token, and open the studio layout.</p>
         </section>
       )}
     </div>

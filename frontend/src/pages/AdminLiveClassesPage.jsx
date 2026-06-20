@@ -643,10 +643,11 @@ export default function AdminLiveClassesPage() {
             </div>
           </section>
 
-          <section className="livekit-studio-layout">
+          <div className="livekit-studio-workspace">
             <div id="section-livekit-studio" className="livekit-studio-shell">
               <TeacherRoom
                 classSession={selectedClass}
+                embeddedInStudioPage
                 autoStart={Boolean(location.state?.autoStartClass)}
                 onSessionStarted={(nextClass) => {
                   if (nextClass?._id) {
@@ -657,7 +658,7 @@ export default function AdminLiveClassesPage() {
                 onSessionEnded={() => loadWorkspace()}
               />
             </div>
-          </section>
+          </div>
         </main>
       </AppShell>
     );

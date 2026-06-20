@@ -43,6 +43,9 @@ import StatCard from '../components/StatCard';
 import VideoCard from '../components/VideoCard';
 import ModuleManager from '../components/ModuleManager';
 import { useThemeStore } from '../stores/themeStore';
+import { useAdminBetaStore } from '../stores/adminBetaStore';
+import AdminBetaToggle from '../components/AdminBetaToggle';
+import './AdminDashboard.css';
 
 const COURSE_CATEGORIES = [
   '11th',
@@ -115,6 +118,7 @@ export default function AdminDashboard() {
 
   const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeStore();
+  const { adminBetaEnabled } = useAdminBetaStore();
   const isLightTheme = theme === 'light';
   const [videos, setVideos] = useState([]);
   const [students, setStudents] = useState([]);
@@ -2430,6 +2434,7 @@ export default function AdminDashboard() {
             >
               {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
             </button>
+            <AdminBetaToggle compact />
             <button
               type="button"
               className="profile-theme-btn profile-quick-logout-btn"
@@ -2443,11 +2448,25 @@ export default function AdminDashboard() {
     >
       {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
+      <div className="admin-dashboard-root">
       <section className="dashboard-grid admin-grid">
         {/* ── Live Class Section ──────────────────────────── */}
-        <section id="section-live-class" className="card live-class-admin-card">
-          <div className="live-class-header">
-            <h2>🔴 Live Class</h2>
+        <section
+          id="section-live-class"
+          className={`card live-class-admin-card${adminBetaEnabled ? ' admin-beta-live-card' : ''}${liveClass ? ' is-live' : ''}`}
+        >
+          <div className={`live-class-header${adminBetaEnabled ? ' admin-beta-live-header' : ''}`}>
+            {adminBetaEnabled ? (
+              <div className="admin-beta-live-title-wrap">
+                <span className="admin-beta-live-icon" aria-hidden="true">📡</span>
+                <div>
+                  <p className="eyebrow">Live streaming</p>
+                  <h2>Live Class</h2>
+                </div>
+              </div>
+            ) : (
+              <h2>🔴 Live Class</h2>
+            )}
             {liveClass ? (
               <span className="live-badge pulsing">LIVE NOW</span>
             ) : (
@@ -2488,7 +2507,7 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        <section id="section-free-library" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card">
+        <section id="section-free-library" className={`card quiz-builder-panel quiz-builder-section admin-workspace-link-card${adminBetaEnabled ? ' admin-beta-free-library' : ''}`}>
           <div className="section-header compact quiz-builder-heading-row">
             <div>
               <p className="eyebrow">Free library</p>
@@ -2647,6 +2666,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
+      <div className={adminBetaEnabled ? 'admin-beta-tools-grid' : 'admin-tools-stack'}>
       <section id="section-quiz-builder" className="card quiz-builder-panel quiz-builder-section admin-workspace-link-card quiz-link-card">
         <div className="section-header compact quiz-builder-heading-row">
           <div>
@@ -2732,6 +2752,7 @@ export default function AdminDashboard() {
           </button>
         </div>
       </section>
+      </div>
 
       <section id="section-payment-settings" className="card payment-settings-panel">
         <div className="section-header">
@@ -2884,6 +2905,7 @@ export default function AdminDashboard() {
           <p className="empty-state">No feedback submitted yet.</p>
         )}
       </section>
+      </div>
 
       {courseModalOpen ? createPortal(
         <div className="course-modal-backdrop" role="presentation" onClick={(event) => {
@@ -3198,6 +3220,7 @@ export default function AdminDashboard() {
                   >
                     {isLightTheme ? 'Use Dark Theme' : 'Use Light Theme'}
                   </button>
+                  <AdminBetaToggle />
                   <button
                     type="button"
                     className="profile-logout-btn"
