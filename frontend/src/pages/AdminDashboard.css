@@ -113,10 +113,6 @@ html[data-theme='dark'] .admin-beta-toggle-thumb {
   font-size: 0.78rem;
 }
 
-.profile-hover-card .admin-beta-toggle--compact {
-  margin-top: 4px;
-}
-
 /* ── Grid & layout ───────────────────────────────────────── */
 html[data-admin-beta='on'] .admin-dashboard-root .dashboard-grid.admin-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -638,6 +634,22 @@ html[data-admin-beta='on'] .admin-dashboard-root #section-announcements .workspa
 /* ── Profile modal spacing ─────────────────────────────────── */
 .profile-summary-card .admin-beta-toggle {
   margin-top: 4px;
+}
+
+html[data-admin-beta='on'] .profile-edit-actions .primary-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.22);
+}
+
+html[data-admin-beta='on'] .profile-edit-actions .primary-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%);
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.28);
+}
+
+html[data-admin-beta='on'] .profile-edit-actions .secondary-btn {
+  border-radius: 12px;
+  min-height: 42px;
 }
 
 /* ── Responsive ────────────────────────────────────────────── */

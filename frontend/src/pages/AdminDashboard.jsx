@@ -2409,41 +2409,19 @@ export default function AdminDashboard() {
       navItems={adminNavItems}
       onNavItemClick={handleAdminNavItemClick}
       actions={(
-        <div className="profile-trigger-wrap">
-          <button
-            type="button"
-            className="profile-icon-btn"
-            onClick={() => setAdminProfileOpen(true)}
-            aria-label="Open admin profile settings"
-            title="Admin profile settings"
-          >
-            {adminAvatarUrl ? (
-              <img src={adminAvatarUrl} alt="Admin profile" className="profile-icon-image" />
-            ) : (
-              <span className="profile-icon-fallback">{adminInitial}</span>
-            )}
-          </button>
-          <div className="profile-hover-card" aria-hidden="true">
-            <strong>{adminProfile?.username || 'Admin'}</strong>
-            <span>Administrator</span>
-            <button
-              type="button"
-              className="profile-theme-btn"
-              onClick={toggleTheme}
-              aria-label={`Switch to ${isLightTheme ? 'Dark' : 'Light'} theme`}
-            >
-              {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
-            </button>
-            <AdminBetaToggle compact />
-            <button
-              type="button"
-              className="profile-theme-btn profile-quick-logout-btn"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          className="profile-icon-btn"
+          onClick={() => setAdminProfileOpen(true)}
+          aria-label="Open admin profile settings"
+          title="Admin profile settings"
+        >
+          {adminAvatarUrl ? (
+            <img src={adminAvatarUrl} alt="Admin profile" className="profile-icon-image" />
+          ) : (
+            <span className="profile-icon-fallback">{adminInitial}</span>
+          )}
+        </button>
       )}
     >
       {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}

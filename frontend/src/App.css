@@ -3637,6 +3637,16 @@ html:not([data-theme='light']) .social-card:hover {
   display: inline-flex;
 }
 
+/* Invisible bridge so the card stays open while moving the pointer down */
+.profile-trigger-wrap::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: 100%;
+  height: 14px;
+}
+
 .profile-icon-btn {
   width: 42px;
   height: 42px;
@@ -3667,29 +3677,36 @@ html:not([data-theme='light']) .social-card:hover {
 
 .profile-hover-card {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 6px);
   right: 0;
   min-width: 220px;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--line-strong);
   background: linear-gradient(150deg, var(--surface-start), var(--surface-end));
-  box-shadow: var(--shadow-md);
-  padding: 10px 12px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transform: translateY(6px);
-  transition: opacity 160ms ease, transform 160ms ease;
-  z-index: 40;
+  transform: translateY(4px) scale(0.98);
+  transform-origin: top right;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 0s linear 180ms;
+  z-index: 4000;
 }
 
 .profile-trigger-wrap:hover .profile-hover-card,
 .profile-trigger-wrap:focus-within .profile-hover-card {
   opacity: 1;
-  transform: translateY(0);
+  visibility: visible;
+  transform: translateY(0) scale(1);
   pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .profile-hover-card strong {
@@ -6949,6 +6966,7 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: 18px;
+  align-items: stretch;
 }
 
 .profile-summary-card,
@@ -7048,23 +7066,69 @@ html[data-theme='dark'] .course-manager-card .course-tile {
 }
 
 .profile-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+}
+
+.profile-edit-form label {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+
+.profile-edit-form label input {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+}
+
+.profile-edit-form .inline-message {
+  margin: 0;
 }
 
 .profile-edit-actions {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
 }
 
 .profile-edit-actions .secondary-btn,
 .profile-edit-actions .primary-btn {
-  min-width: 96px;
-  min-height: 30px;
-  padding: 5px 9px;
-  font-size: 0.76rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: auto;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.profile-edit-actions .secondary-btn {
+  border: 1px solid var(--line);
+  background: var(--secondary-bg);
+  color: var(--secondary-fg);
+}
+
+.profile-edit-actions .primary-btn {
+  min-width: 128px;
+  background: linear-gradient(135deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--btn-primary-start) 24%, transparent);
 }
 
 /* ── Profile modal logout button ──────────────────── */
@@ -20745,7 +20809,8 @@ html[data-theme='light'] .empty-note {
   .profile-edit-form {
     border-radius: 16px;
     padding: 14px;
-    gap: 10px;
+    gap: 12px;
+    min-height: 0;
   }
 
   .video-thumb {
@@ -21030,12 +21095,20 @@ html[data-theme='light'] .empty-note {
     font-size: 0.85rem;
   }
 
+  .profile-edit-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 10px;
+    padding-top: 16px;
+  }
+
   .profile-edit-actions .primary-btn,
   .profile-edit-actions .secondary-btn,
   .profile-logout-btn,
   .profile-photo-upload span,
   .profile-delete-photo-btn {
     width: 100%;
+    min-width: 0;
   }
 }
 
