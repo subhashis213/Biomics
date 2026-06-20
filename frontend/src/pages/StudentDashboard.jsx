@@ -33,6 +33,13 @@ const CART_STORAGE_PREFIX = 'biomics:student-cart:';
 const BIOMICS_MISSION_COPY = `At Biomics Hub, we deliver an exceptional learning experience through comprehensive video tutorials that cover every aspect of Biology. Our content is carefully structured to support students across a wide range of academic and competitive pathways, including core science studies as well as specialized examinations such as IIT JAM, CSIR NET, GAT-B, TIFR, CUET, DBT, ICMR, ICAR, and GATE. Our curriculum is designed to meet the needs of learners at all stages, beginning with foundational concepts and gradually advancing to more complex and in-depth topics, ensuring a strong and progressive understanding of the subject.`;
 const BIOMICS_FOOTER_COPY = `Biomics Hub offers structured video learning for core science and top competitive exams like IIT JAM, CSIR NET, GAT-B, TIFR, CUET, DBT, ICMR, ICAR, and GATE. Learn from fundamentals to advanced concepts with a clear, progressive path.`;
 
+function getTimeBasedGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return { text: 'Good morning', emoji: '☀️' };
+  if (hour < 17) return { text: 'Good afternoon', emoji: '🌤️' };
+  return { text: 'Good evening', emoji: '🌙' };
+}
+
 export default function StudentDashboard() {
   const androidAppUrl = String(import.meta.env.VITE_ANDROID_APP_URL || '').trim() || 'https://play.google.com/store';
   const iosAppUrl = String(import.meta.env.VITE_IOS_APP_URL || '').trim() || 'https://www.apple.com/app-store/';
@@ -236,6 +243,7 @@ export default function StudentDashboard() {
     ? Math.max(0, Math.min(100, Math.round((completedVideoCount / safeVideoTotal) * 100)))
     : 0;
   const dashboardDisplayName = String(profile?.username || session?.username || 'Student').trim() || 'Student';
+  const timeGreeting = getTimeBasedGreeting();
 
   const profilePasswordHint =
     profileForm.password.length > 0 && profileForm.password.length < 8
@@ -2204,86 +2212,76 @@ export default function StudentDashboard() {
   }
 
   function renderLearningLiveCard() {
-    // Keep locked-course alerts silent, but preserve the dashboard 2-card layout.
     const visibleLiveClass = liveClass && hasPurchasedCourseAccess(liveClass.course) ? liveClass : null;
-    if (visibleLiveClass) {
-      return (
-        <section className="card student-learning-live-card student-learning-live-card--live premium-sync-card">
-          <div className="student-learning-live-header">
-            <div className="student-learning-live-topline">
-              <span className="live-badge pulsing">LIVE NOW</span>
-              <span className="student-learning-live-kicker">Classroom Active</span>
-            </div>
-            <div className="student-learning-live-copy-block">
-              <strong className="student-learning-live-title">{visibleLiveClass.title}</strong>
-              <p className="student-learning-live-copy">Teacher is already inside the classroom. Join now or open the full live class section.</p>
-            </div>
-            <div className="student-learning-live-meta">
-              <span className="student-learning-live-pill">Started {new Date(visibleLiveClass.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              {visibleLiveClass.course ? <span className="student-learning-live-pill">{visibleLiveClass.course}</span> : null}
-            </div>
-          </div>
-          <div className="student-learning-live-actions">
-            <button type="button" className="primary-btn" onClick={() => navigate('/student/live-classes')}>
-              Join Live Class
-            </button>
-            <button type="button" className="secondary-btn" onClick={() => navigate('/student/live-classes')}>
-              Open Live Section
-            </button>
-          </div>
-        </section>
-      );
-    }
-
     const visibleUpcomingClass = upcomingClass && hasPurchasedCourseAccess(upcomingClass.course) ? upcomingClass : null;
-    if (visibleUpcomingClass) {
-      return (
-        <section className="card student-learning-live-card student-learning-live-card--upcoming premium-sync-card">
-          <div className="student-learning-live-header">
-            <div className="student-learning-live-topline">
-              <span className="live-badge">UPCOMING</span>
-              <span className="student-learning-live-kicker">Next Live Session</span>
-            </div>
-            <div className="student-learning-live-copy-block">
-              <strong className="student-learning-live-title">{visibleUpcomingClass.title}</strong>
-              <p className="student-learning-live-copy">Your next live class is scheduled soon. Open the live section to view details and calendar timing.</p>
-            </div>
-            <div className="student-learning-live-meta">
-              <span className="student-learning-live-pill">{upcomingCountdown || 'Starting soon'}</span>
-              <span className="student-learning-live-pill">{new Date(visibleUpcomingClass.scheduledAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-            </div>
-          </div>
-          <div className="student-learning-live-actions">
-            <button type="button" className="primary-btn" onClick={() => navigate('/student/live-classes')}>
-              Open Live Section
-            </button>
-          </div>
-        </section>
-      );
+
+    let cardModifier = 'student-learning-live-card--default';
+    let launcherModifier = 'student-learning-live-launcher--default';
+    let launcherKicker = 'Live section';
+    let launcherTitle = 'Open Live Classes';
+    let launcherMeta = 'Calendar ready · Course-wise filters';
+    let ctaLabel = 'Open Live Section';
+    let showLiveBadge = false;
+    let showUpcomingBadge = false;
+    let liveBadgePulsing = false;
+
+    if (visibleLiveClass) {
+      cardModifier = 'student-learning-live-card--live';
+      launcherModifier = 'student-learning-live-launcher--live';
+      launcherKicker = 'Classroom active';
+      launcherTitle = visibleLiveClass.title;
+      launcherMeta = `Started ${new Date(visibleLiveClass.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${visibleLiveClass.course ? ` · ${visibleLiveClass.course}` : ''}`;
+      ctaLabel = 'Join Live Class';
+      showLiveBadge = true;
+      liveBadgePulsing = true;
+    } else if (visibleUpcomingClass) {
+      cardModifier = 'student-learning-live-card--upcoming';
+      launcherModifier = 'student-learning-live-launcher--upcoming';
+      launcherKicker = 'Next live session';
+      launcherTitle = visibleUpcomingClass.title;
+      launcherMeta = `${upcomingCountdown || 'Starting soon'} · ${new Date(visibleUpcomingClass.scheduledAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`;
+      ctaLabel = 'Open Live Section';
+      showUpcomingBadge = true;
     }
 
     return (
-      <section className="card student-learning-live-card student-learning-live-card--default premium-sync-card">
-        <div className="student-learning-live-header">
-          <div className="student-learning-live-topline">
-            <span className="live-badge">LIVE</span>
-            <span className="student-learning-live-kicker">Course Live Classes</span>
+      <div className="student-learning-live-wrap">
+        <section className={`card student-learning-live-card ${cardModifier} premium-sync-card`}>
+          <div className="student-learning-live-content">
+            <div className="student-learning-live-top">
+              <span className="student-learning-live-icon" aria-hidden="true">🎥</span>
+              <div className="student-learning-live-intro">
+                <h3 className="student-learning-live-heading">Live Classes</h3>
+                <p className="student-learning-live-subtitle">Join active sessions and track your scheduled live classes.</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className={`student-learning-live-launcher ${launcherModifier}`}
+              onClick={() => navigate('/student/live-classes')}
+            >
+              <div className="student-learning-live-launcher-copy">
+                {showLiveBadge ? (
+                  <span className={`live-badge student-learning-live-launcher-badge${liveBadgePulsing ? ' pulsing' : ''}`}>LIVE NOW</span>
+                ) : null}
+                {showUpcomingBadge ? (
+                  <span className="live-badge student-learning-live-launcher-badge">UPCOMING</span>
+                ) : null}
+                <span className="student-learning-live-launcher-kicker">{launcherKicker}</span>
+                <strong>{launcherTitle}</strong>
+                <span>{launcherMeta}</span>
+              </div>
+              <span className="student-learning-live-launcher-cta">
+                {ctaLabel}
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                </svg>
+              </span>
+            </button>
           </div>
-          <div className="student-learning-live-copy-block">
-            <strong className="student-learning-live-title">Live Class Section</strong>
-            <p className="student-learning-live-copy">Track live classes and blocked slots from one section. Course-level visibility stays filtered by your access.</p>
-          </div>
-          <div className="student-learning-live-meta">
-            <span className="student-learning-live-pill">Calendar ready</span>
-            <span className="student-learning-live-pill">Course-wise filters</span>
-          </div>
-        </div>
-        <div className="student-learning-live-actions">
-          <button type="button" className="primary-btn" onClick={() => navigate('/student/live-classes')}>
-            Open Live Section
-          </button>
-        </div>
-      </section>
+        </section>
+      </div>
     );
   }
 
@@ -2361,16 +2359,20 @@ export default function StudentDashboard() {
 
         {!selectedModule ? (
           <section className="card student-premium-hero premium-sync-card">
-            <div className="student-premium-hero-copy">
-              <h2>Welcome back, {dashboardDisplayName}</h2>
-              <p className="subtitle">Track progress, jump into classes, and continue your preparation with focused daily actions.</p>
-            </div>
-            <div className="student-premium-hero-meta">
-              <div className={`student-premium-kpi-chip ${testSeriesStreakDays > 0 ? 'is-positive' : ''}`}>
-                <span>🔥 Streak</span>
-                <strong>{testSeriesStreakDays} day{testSeriesStreakDays === 1 ? '' : 's'}</strong>
-              </div>
-            </div>
+            <h2 className="student-premium-hero-greeting">
+              {timeGreeting.text}, {dashboardDisplayName}{' '}
+              <span className="student-premium-hero-emoji" aria-hidden="true">{timeGreeting.emoji}</span>
+            </h2>
+            <span
+              className={`student-premium-streak-badge${testSeriesStreakDays > 0 ? ' is-active' : ''}`}
+              title={`${testSeriesStreakDays} day${testSeriesStreakDays === 1 ? '' : 's'} streak`}
+              aria-label={`${testSeriesStreakDays} day${testSeriesStreakDays === 1 ? '' : 's'} streak`}
+            >
+              <span className="student-premium-streak-icon" aria-hidden="true">🔥</span>
+              {testSeriesStreakDays > 0 ? (
+                <span className="student-premium-streak-count">{testSeriesStreakDays}</span>
+              ) : null}
+            </span>
           </section>
         ) : null}
 
@@ -2645,16 +2647,16 @@ export default function StudentDashboard() {
             <div className="student-learning-spotlight-grid">
               <div className="course-chooser-wrap">
                 <div className="course-chooser-card">
-                  <div className="course-chooser-top">
-                    <span className="course-chooser-icon" aria-hidden="true">🔐</span>
-                    <div className="course-chooser-intro">
-                      <h3 className="course-chooser-title">Select a Course</h3>
-                      <p className="course-chooser-subtitle">Browse available courses and pick your learning track.</p>
+                  <div className="course-chooser-content">
+                    <div className="course-chooser-top">
+                      <span className="course-chooser-icon" aria-hidden="true">📚</span>
+                      <div className="course-chooser-intro">
+                        <h3 className="course-chooser-title">Select a Course</h3>
+                        <p className="course-chooser-subtitle">Browse available courses and pick your learning track.</p>
+                      </div>
                     </div>
-                  </div>
 
-                  {marketplaceCourses.length ? (
-                    <>
+                    {marketplaceCourses.length ? (
                       <button
                         type="button"
                         className="course-marketplace-launcher"
@@ -2669,17 +2671,19 @@ export default function StudentDashboard() {
                               : `${marketplaceCourses.length} curated exam tracks available`}
                           </span>
                         </div>
-                        <div className="course-marketplace-launcher-side">
-                          <span className="course-marketplace-launcher-badge">Select Course</span>
-                          <span className="course-marketplace-launcher-arrow" aria-hidden="true">→</span>
-                        </div>
+                        <span className="course-marketplace-launcher-cta">
+                          Select Course
+                          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                          </svg>
+                        </span>
                       </button>
-                    </>
-                  ) : (
-                    <div className="course-chooser-details">
-                      <p className="course-chooser-subtitle">No courses available yet.</p>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="course-chooser-details">
+                        <p className="course-chooser-subtitle">No courses available yet.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               {renderLearningLiveCard()}
@@ -2852,10 +2856,6 @@ export default function StudentDashboard() {
               <p className="eyebrow">Test series</p>
               <h2>Test Series</h2>
               <p className="subtitle">Topic-wise tests and full-length mock exams — purchased separately from your course plan.</p>
-            </div>
-            <div className="quiz-count-cards">
-              <StatCard label="Topic Tests" value="∞" />
-              <StatCard label="Full Mocks" value="∞" />
             </div>
           </div>
           <div className="workspace-link-actions">
