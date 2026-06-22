@@ -17,7 +17,6 @@ const User = require('../models/User');
 const Voucher = require('../models/Voucher');
 const Course = require('../models/Course');
 const { pickCanonicalCourseName, resolveStudentCourseFromRequest } = require('../utils/resolveStudentCourse');
-const { expandCourseCategories } = require('../utils/legacyCourseAliases');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -87,18 +86,6 @@ const DEFAULT_TEST_SERIES_VALIDITY_DAYS = 60;
 
 function normalizeCourse(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
-}
-
-function buildCategoryQuery(course) {
-  const categories = expandCourseCategories(normalizeCourse(course));
-  if (!categories.length) return normalizeCourse(course);
-  if (categories.length === 1) return categories[0];
-  return { $in: categories };
-}
-
-function matchesExpandedCourse(course, testCategory) {
-  const categories = expandCourseCategories(normalizeCourse(course));
-  return categories.includes(normalizeCourse(testCategory));
 }
 
 function normalizeBatch(value) {
@@ -621,9 +608,7 @@ router.get('/topic-tests/admin', authenticateToken('admin'), async (req, res) =>
   try {
     const category = normalizeCourse(req.query.category);
     const supportedCourses = await getSupportedCourses();
-    const scopedCourses = category
-      ? expandCourseCategories(category)
-      : [...new Set(supportedCourses.flatMap((courseName) => expandCourseCategories(courseName)))];
+    const scopedCourses = category ? [category] : supportedCourses;
     if (!scopedCourses.length) return res.json({ tests: [] });
 
     const activeCourseDocs = await Course.find({ name: { $in: scopedCourses } }).select({ name: 1, batches: 1 }).lean();
@@ -837,7 +822,7 @@ router.get('/topic-tests/syllabus', authenticateToken('user'), async (req, res) 
     if (!user?.class) return res.status(404).json({ error: 'Student profile not found.' });
     const course = normalizeCourse(user.class);
     const { hasTopicTest } = await resolveStudentAccess(req.user.username, course);
-    const tests = await TopicTest.find({ category: buildCategoryQuery(course) })
+    const tests = await TopicTest.find({ category: course })
       .sort({ module: 1, topic: 1 })
       .lean();
     const items = tests.map((t) => ({
@@ -959,7 +944,7 @@ router.get('/topic-tests/student', authenticateToken('user'), async (req, res) =
     const { hasTopicTest } = await resolveStudentAccess(req.user.username, course);
     if (!hasTopicTest) return res.status(403).json({ error: 'Topic Test Series not purchased for this course.' });
 
-    const tests = await TopicTest.find({ category: buildCategoryQuery(course) })
+    const tests = await TopicTest.find({ category: course })
       .sort({ module: 1, topic: 1 })
       .lean();
 
@@ -993,7 +978,7 @@ router.get('/topic-tests/student/:testId', authenticateToken('user'), async (req
     if (!hasTopicTest) return res.status(403).json({ error: 'Topic Test Series not purchased.' });
 
     const test = await TopicTest.findById(req.params.testId).lean();
-    if (!test || !matchesExpandedCourse(course, test.category)) {
+    if (!test || normalizeCourse(test.category) !== course) {
       return res.status(404).json({ error: 'Topic test not found.' });
     }
     return res.json({
@@ -1025,7 +1010,7 @@ router.post('/topic-tests/student/:testId/submit', authenticateToken('user'), as
     if (!hasTopicTest) return res.status(403).json({ error: 'Topic Test Series not purchased.' });
 
     const test = await TopicTest.findById(req.params.testId).lean();
-    if (!test || !matchesExpandedCourse(course, test.category)) {
+    if (!test || normalizeCourse(test.category) !== course) {
       return res.status(404).json({ error: 'Topic test not found.' });
     }
 
@@ -1127,7 +1112,7 @@ router.get('/full-mocks/student/:mockId', authenticateToken('user'), async (req,
     if (!hasFullMock) return res.status(403).json({ error: 'Full Mock Test Series not purchased.' });
 
     const mock = await FullMockTest.findById(req.params.mockId).lean();
-    if (!mock || !matchesExpandedCourse(course, mock.category)) {
+    if (!mock || normalizeCourse(mock.category) !== course) {
       return res.status(404).json({ error: 'Full mock test not found.' });
     }
     return res.json({
@@ -1157,7 +1142,7 @@ router.post('/full-mocks/student/:mockId/submit', authenticateToken('user'), asy
     if (!hasFullMock) return res.status(403).json({ error: 'Full Mock Test Series not purchased.' });
 
     const mock = await FullMockTest.findById(req.params.mockId).lean();
-    if (!mock || !matchesExpandedCourse(course, mock.category)) {
+    if (!mock || normalizeCourse(mock.category) !== course) {
       return res.status(404).json({ error: 'Full mock test not found.' });
     }
 
