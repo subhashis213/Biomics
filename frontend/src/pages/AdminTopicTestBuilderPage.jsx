@@ -675,6 +675,8 @@ export default function AdminTopicTestBuilderPage() {
             </div>
             <TopicTestCatalogBoard
               tests={tests}
+              category={category}
+              catalogModules={availableModules}
               mode="admin"
               title={`${category} topic tests`}
               subtitle="Published tests are grouped into separate module and topic containers for faster scanning."

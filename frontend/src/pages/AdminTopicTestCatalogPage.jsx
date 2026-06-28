@@ -113,6 +113,7 @@ export default function AdminTopicTestCatalogPage() {
           ) : (
             <TopicTestCatalogBoard
               tests={tests}
+              category={category}
               mode="admin"
               title={`${category} topic tests`}
               subtitle="Each module contains topic buckets so the publish data stays readable."

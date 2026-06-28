@@ -93,6 +93,7 @@ export default function StudentTopicTestCatalogPage() {
           ) : (
             <TopicTestCatalogBoard
               tests={tests}
+              category={course}
               mode="student"
               title={course ? `${course} topic tests` : 'Your topic tests'}
               subtitle="Module cards contain separate topic containers so you can pick the right test quickly."

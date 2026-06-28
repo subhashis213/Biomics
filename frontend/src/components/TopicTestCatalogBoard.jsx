@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { requestJson } from '../api';
 
 function normalizeText(value) {
   return String(value || '').trim();
@@ -10,7 +11,7 @@ function sortWithGeneralFirst(left, right) {
   return left.localeCompare(right);
 }
 
-function groupTopicTests(tests, searchTerm) {
+function groupTopicTests(tests, searchTerm, catalogModules = []) {
   const normalizedSearch = normalizeText(searchTerm).toLowerCase();
   const filteredTests = Array.isArray(tests)
     ? tests.filter((test) => {
@@ -21,6 +22,19 @@ function groupTopicTests(tests, searchTerm) {
     : [];
 
   const modules = new Map();
+
+  if (Array.isArray(catalogModules) && (!normalizedSearch || searchTerm === '')) {
+    catalogModules.forEach((modName) => {
+      const cleanMod = normalizeText(modName) || 'General';
+      if (!modules.has(cleanMod)) {
+        modules.set(cleanMod, {
+          name: cleanMod,
+          tests: [],
+          topics: new Map()
+        });
+      }
+    });
+  }
 
   filteredTests.forEach((test) => {
     const moduleName = normalizeText(test?.module) || 'General';
@@ -62,6 +76,8 @@ function pluralize(count, singular, plural) {
 
 export default function TopicTestCatalogBoard({
   tests,
+  category,
+  catalogModules: propCatalogModules,
   mode = 'student',
   title,
   subtitle,
@@ -74,12 +90,32 @@ export default function TopicTestCatalogBoard({
   const [localSearch, setLocalSearch] = useState('');
   const [selectedModule, setSelectedModule] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('');
+  const [fetchedModules, setFetchedModules] = useState([]);
+
   const effectiveSearch = typeof searchValue === 'string' ? searchValue : localSearch;
   const setEffectiveSearch = onSearchChange || setLocalSearch;
 
+  const effectiveCategory = category || (Array.isArray(tests) && tests[0]?.category) || '';
+
+  useEffect(() => {
+    if (propCatalogModules || !effectiveCategory) return;
+    let ignore = false;
+    requestJson(`/modules/catalog?category=${encodeURIComponent(effectiveCategory)}`)
+      .then((res) => {
+        if (!ignore && Array.isArray(res?.modules)) {
+          const names = res.modules.map((m) => m.name).filter(Boolean);
+          setFetchedModules(names);
+        }
+      })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, [effectiveCategory, propCatalogModules]);
+
+  const activeCatalogModules = propCatalogModules || fetchedModules;
+
   const groupedModules = useMemo(
-    () => groupTopicTests(tests, effectiveSearch),
-    [tests, effectiveSearch]
+    () => groupTopicTests(tests, effectiveSearch, activeCatalogModules),
+    [tests, effectiveSearch, activeCatalogModules]
   );
 
   const summary = useMemo(() => {

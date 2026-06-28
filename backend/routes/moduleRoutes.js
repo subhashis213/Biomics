@@ -29,7 +29,9 @@ async function sweepByBatchHint(Model, baseFilter, batchHint) {
 
 router.get('/catalog', authenticateToken('user'), async (req, res) => {
   try {
-    const modules = await Module.find({}, { category: 1, name: 1, _id: 0 })
+    const category = normalizeValue(req.query.category || '');
+    const filter = category ? { category: buildCategoryFilter(category) } : {};
+    const modules = await Module.find(filter, { category: 1, name: 1, _id: 0 })
       .sort({ category: 1, name: 1 })
       .lean();
     return res.json({ modules });

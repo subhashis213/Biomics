@@ -1716,6 +1716,7 @@ export default function StudentTestSeriesPage() {
                 {activeTab === 'topic' && hasTopicTest && !loadingTests && (
                   <TopicTestCatalogBoard
                     tests={filteredTopicTests}
+                    category={course}
                     mode="student"
                     title={course ? `${course} topic tests` : 'Topic tests'}
                     subtitle="Browse module containers, open the right topic bucket, and start the exact test you need."
