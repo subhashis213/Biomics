@@ -2165,7 +2165,7 @@ export default function StudentDashboard() {
       { id: 'route-student-study-materials', label: 'Study Materials', icon: '📚' },
       { id: 'route-student-free-library', label: 'Free Books & Notes', icon: '🆓' },
       { id: 'section-monthly-exam', label: 'Monthly Exam', icon: '📅' },
-      { id: 'section-test-series', label: 'Test Series', icon: '📝' },
+      { id: 'route-student-test-series', label: 'Test Series', icon: '📝' },
       { id: 'route-student-test-series-performance', label: 'Series Performance', icon: '🎯' },
       { id: 'section-exam-leaderboard', label: 'Exam Leaderboard', icon: '🥇' },
       { id: 'section-feedback', label: 'Feedback', icon: '💬' },
@@ -2174,33 +2174,9 @@ export default function StudentDashboard() {
   }, [selectedModule]);
 
   function handleStudentNavClick(id) {
-    if (id === 'route-student-insights') {
-      navigate('/student/insights');
-      return;
-    }
-
-    if (id === 'route-student-study-materials') {
-      navigate('/student/study-materials');
-      return;
-    }
-
-    if (id === 'route-student-free-library') {
-      navigate('/student/free-library');
-      return;
-    }
-
-    if (id === 'route-student-quiz-performance') {
-      navigate('/student/quiz-performance');
-      return;
-    }
-
-    if (id === 'route-student-my-courses') {
-      navigate('/student/my-courses');
-      return;
-    }
-
-    if (id === 'route-student-test-series-performance') {
-      navigate('/student/test-series-performance');
+    if (id.startsWith('route-student-')) {
+      const routePath = id.replace('route-student-', '');
+      navigate(`/student/${routePath}`);
       return;
     }
 

@@ -1,7 +1,7 @@
 {
   "name": "biomicshub-app",
   "main": "index.js",
-  "version": "1.0.38",
+  "version": "1.0.40",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",

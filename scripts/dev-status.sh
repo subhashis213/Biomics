@@ -9,7 +9,7 @@ show_port_status() {
   local label="$1"
   local port="$2"
 
-  if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+  if nc -z -w 1 127.0.0.1 "$port" >/dev/null 2>&1; then
     echo "$label: listening on port $port"
   else
     echo "$label: not listening on port $port"

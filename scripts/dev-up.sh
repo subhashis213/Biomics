@@ -25,7 +25,7 @@ fi
 
 is_port_listening() {
   local port="$1"
-  lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+  nc -z -w 1 127.0.0.1 "$port" >/dev/null 2>&1
 }
 
 wait_for_port() {

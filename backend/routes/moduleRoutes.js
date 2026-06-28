@@ -11,6 +11,13 @@ const ModulePricing = require('../models/ModulePricing');
 const { authenticateToken } = require('../middleware/auth');
 const { normalizeValue, withOptionalBatch, sameBatchStored } = require('../utils/adminBatchScope');
 const { appendModuleNameToCourseBatch, removeModuleNameFromCourseBatch } = require('../utils/batchModuleCatalog');
+const { expandCourseCategories } = require('../utils/legacyCourseAliases');
+
+function buildCategoryFilter(category) {
+  const cats = expandCourseCategories(normalizeValue(category));
+  if (!cats.length) return normalizeValue(category);
+  return cats.length === 1 ? cats[0] : { $in: cats };
+}
 
 async function sweepByBatchHint(Model, baseFilter, batchHint) {
   const docs = await Model.find(baseFilter).select('_id batch').lean();
@@ -38,7 +45,8 @@ router.get('/topics', authenticateToken('admin'), async (req, res) => {
     if (!category || !moduleName) {
       return res.status(400).json({ error: 'category and module are required' });
     }
-    const topics = await Topic.find({ category, module: moduleName }).sort({ name: 1 }).lean();
+    const filterCat = buildCategoryFilter(category);
+    const topics = await Topic.find({ category: filterCat, module: moduleName }).sort({ name: 1 }).lean();
     return res.json({ topics });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch topics' });
@@ -52,7 +60,8 @@ router.get('/topics/for-student', authenticateToken('user'), async (req, res) =>
     if (!category || !moduleName) {
       return res.status(400).json({ error: 'category and module are required' });
     }
-    const topics = await Topic.find({ category, module: moduleName }).sort({ name: 1 }).lean();
+    const filterCat = buildCategoryFilter(category);
+    const topics = await Topic.find({ category: filterCat, module: moduleName }).sort({ name: 1 }).lean();
     return res.json({ topics });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch topics' });
@@ -126,7 +135,7 @@ router.delete('/topics', authenticateToken('admin'), async (req, res) => {
 router.get('/', authenticateToken('admin'), async (req, res) => {
   try {
     const category = normalizeValue(req.query.category || '');
-    const filter = category ? { category } : {};
+    const filter = category ? { category: buildCategoryFilter(category) } : {};
     const modules = await Module.find(filter).sort({ category: 1, name: 1 }).lean();
     return res.json({ modules });
   } catch (err) {
