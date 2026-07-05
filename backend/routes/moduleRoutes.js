@@ -12,6 +12,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { normalizeValue, withOptionalBatch, sameBatchStored } = require('../utils/adminBatchScope');
 const { appendModuleNameToCourseBatch, removeModuleNameFromCourseBatch } = require('../utils/batchModuleCatalog');
 const { expandCourseCategories } = require('../utils/legacyCourseAliases');
+const { logAdminAction } = require('../utils/auditLog');
+const { archiveToRecycleBin } = require('../utils/recycleBin');
 
 function buildCategoryFilter(category) {
   const cats = expandCourseCategories(normalizeValue(category));
@@ -91,6 +93,12 @@ router.post('/topics', authenticateToken('admin'), async (req, res) => {
       createdBy: req.user?.username || ''
     });
 
+    await logAdminAction(req, {
+      action: 'topic.create',
+      targetType: 'Topic',
+      targetId: String(createdTopic._id || `${category}::${moduleName}::${name}`),
+      details: { category, module: moduleName, topic: name }
+    });
     return res.status(201).json({ topic: createdTopic.toObject() });
   } catch (err) {
     if (err?.code === 11000) {
@@ -110,6 +118,16 @@ router.delete('/topics', authenticateToken('admin'), async (req, res) => {
   }
 
   try {
+    const filter = { category, module: moduleName, topic: name };
+    await Promise.all([
+      archiveToRecycleBin(Topic, { category, module: moduleName, name }, req),
+      archiveToRecycleBin(Video, filter, req),
+      archiveToRecycleBin(Quiz, filter, req),
+      archiveToRecycleBin(TopicTest, filter, req),
+      archiveToRecycleBin(MockExam, filter, req),
+      archiveToRecycleBin(FullMockTest, filter, req)
+    ]);
+
     const [topicDeleteResult, videoDeleteResult, quizDeleteResult, topicTestDeleteResult, mockExamDeleteResult, fullMockDeleteResult] = await Promise.all([
       Topic.deleteOne({ category, module: moduleName, name }),
       Video.deleteMany({ category, module: moduleName, topic: name }),
@@ -118,16 +136,23 @@ router.delete('/topics', authenticateToken('admin'), async (req, res) => {
       MockExam.deleteMany({ category, module: moduleName, topic: name }),
       FullMockTest.deleteMany({ category, module: moduleName, topic: name })
     ]);
+    const deletedCounts = {
+      topics: Number(topicDeleteResult?.deletedCount || 0),
+      videos: Number(videoDeleteResult?.deletedCount || 0),
+      quizzes: Number(quizDeleteResult?.deletedCount || 0),
+      topicTests: Number(topicTestDeleteResult?.deletedCount || 0),
+      mockExams: Number(mockExamDeleteResult?.deletedCount || 0),
+      fullMocks: Number(fullMockDeleteResult?.deletedCount || 0)
+    };
+    await logAdminAction(req, {
+      action: 'topic.delete',
+      targetType: 'Topic',
+      targetId: `${category}::${moduleName}::${name}`,
+      details: { category, module: moduleName, topic: name, ...deletedCounts }
+    });
     return res.json({
       message: 'Topic removed',
-      deleted: {
-        topics: Number(topicDeleteResult?.deletedCount || 0),
-        videos: Number(videoDeleteResult?.deletedCount || 0),
-        quizzes: Number(quizDeleteResult?.deletedCount || 0),
-        topicTests: Number(topicTestDeleteResult?.deletedCount || 0),
-        mockExams: Number(mockExamDeleteResult?.deletedCount || 0),
-        fullMocks: Number(fullMockDeleteResult?.deletedCount || 0)
-      }
+      deleted: deletedCounts
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove topic' });
@@ -177,6 +202,13 @@ router.post('/', authenticateToken('admin'), async (req, res) => {
       console.error('[modules] appendModuleNameToCourseBatch', e?.message || e);
     }
 
+    await logAdminAction(req, {
+      action: 'module.create',
+      targetType: 'Module',
+      targetId: String(createdModule._id || `${category}::${name}`),
+      details: { category, module: name, batch }
+    });
+
     return res.status(201).json({ module: createdModule.toObject() });
   } catch (err) {
     if (err?.code === 11000) {
@@ -210,6 +242,17 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
       ? Promise.resolve({ deletedCount: 0 })
       : Topic.deleteMany({ category, module: name });
 
+    const topicFilter = hasBatchFilter ? { _id: null } : { category, module: name };
+    await Promise.all([
+      archiveToRecycleBin(Module, moduleScopedFilter, req),
+      archiveToRecycleBin(Topic, topicFilter, req),
+      archiveToRecycleBin(Video, scopedFilter, req),
+      archiveToRecycleBin(Quiz, scopedFilter, req),
+      archiveToRecycleBin(TopicTest, scopedFilter, req),
+      archiveToRecycleBin(MockExam, scopedFilter, req),
+      archiveToRecycleBin(FullMockTest, scopedFilter, req)
+    ]);
+
     const [moduleDeleteResult, topicDeleteResult, pricingDeleteResult, videoDeleteResult, quizDeleteResult, topicTestDeleteResult, mockExamDeleteResult, fullMockDeleteResult] = await Promise.all([
       Module.deleteMany(moduleScopedFilter),
       topicDeletion,
@@ -242,18 +285,26 @@ router.delete('/', authenticateToken('admin'), async (req, res) => {
       }
     }
 
+    const deletedCounts = {
+      modules: Number(moduleDeleteResult?.deletedCount || 0) + extraModules,
+      topics: Number(topicDeleteResult?.deletedCount || 0),
+      pricingRows: Number(pricingDeleteResult?.deletedCount || 0) + extraPricing,
+      videos: Number(videoDeleteResult?.deletedCount || 0) + extraVideos,
+      quizzes: Number(quizDeleteResult?.deletedCount || 0) + extraQuizzes,
+      topicTests: Number(topicTestDeleteResult?.deletedCount || 0) + extraTopicTests,
+      mockExams: Number(mockExamDeleteResult?.deletedCount || 0),
+      fullMocks: Number(fullMockDeleteResult?.deletedCount || 0)
+    };
+    await logAdminAction(req, {
+      action: 'module.delete',
+      targetType: 'Module',
+      targetId: `${category}::${name}`,
+      details: { category, module: name, batch: batch || 'all', ...deletedCounts }
+    });
+
     return res.json({
       message: 'Module removed',
-      deleted: {
-        modules: Number(moduleDeleteResult?.deletedCount || 0) + extraModules,
-        topics: Number(topicDeleteResult?.deletedCount || 0),
-        pricingRows: Number(pricingDeleteResult?.deletedCount || 0) + extraPricing,
-        videos: Number(videoDeleteResult?.deletedCount || 0) + extraVideos,
-        quizzes: Number(quizDeleteResult?.deletedCount || 0) + extraQuizzes,
-        topicTests: Number(topicTestDeleteResult?.deletedCount || 0) + extraTopicTests,
-        mockExams: Number(mockExamDeleteResult?.deletedCount || 0),
-        fullMocks: Number(fullMockDeleteResult?.deletedCount || 0)
-      }
+      deleted: deletedCounts
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove module' });
@@ -276,6 +327,12 @@ router.put('/topics/rename', authenticateToken('admin'), async (req, res) => {
 
     await Topic.updateOne({ category, module: moduleName, name: oldName }, { $set: { name: newName } });
     await Video.updateMany({ category, module: moduleName, topic: oldName }, { $set: { topic: newName } });
+    await logAdminAction(req, {
+      action: 'topic.rename',
+      targetType: 'Topic',
+      targetId: `${category}::${moduleName}::${newName}`,
+      details: { category, module: moduleName, oldName, newName }
+    });
     return res.json({ message: 'Topic renamed' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to rename topic' });
@@ -300,6 +357,12 @@ router.put('/rename', authenticateToken('admin'), async (req, res) => {
     await Topic.updateMany({ category, module: oldName }, { $set: { module: newName } });
     await Video.updateMany({ category, module: oldName }, { $set: { module: newName } });
     await ModulePricing.updateOne({ category, batch, moduleName: oldName }, { $set: { moduleName: newName } });
+    await logAdminAction(req, {
+      action: 'module.rename',
+      targetType: 'Module',
+      targetId: `${category}::${newName}`,
+      details: { category, oldName, newName, batch }
+    });
     return res.json({ message: 'Module renamed' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to rename module' });

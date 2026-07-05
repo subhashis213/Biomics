@@ -8,6 +8,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { hasCourseAccess, hasModuleAccess, normalizeCourseName } = require('../utils/courseAccess');
 const { resolveStudentCourseFromRequest } = require('../utils/resolveStudentCourse');
 const { logAdminAction } = require('../utils/auditLog');
+const { archiveToRecycleBin } = require('../utils/recycleBin');
 const { withOptionalBatch } = require('../utils/adminBatchScope');
 
 const router = express.Router();
@@ -604,6 +605,7 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
       match = withOptionalBatch({ category, ...moduleFilter }, batchFilter);
     }
     const quizzes = await Quiz.find(match);
+    await archiveToRecycleBin(Quiz, quizzes, req);
     const ids = quizzes.map(q => q._id);
     await Quiz.deleteMany({ _id: { $in: ids } });
     await QuizAttempt.deleteMany({ quizId: { $in: ids } });
@@ -617,6 +619,9 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
 // Admin: delete quiz
 router.delete('/:id', authenticateToken('admin'), async (req, res) => {
   try {
+    const quizDoc = await Quiz.findById(req.params.id);
+    if (!quizDoc) return res.status(404).json({ error: 'Quiz not found.' });
+    await archiveToRecycleBin(Quiz, [quizDoc], req);
     const deleted = await Quiz.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Quiz not found.' });
     const deletedObj = deleted.toObject();

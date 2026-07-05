@@ -1142,3 +1142,34 @@ export function verifyTestSeriesPayment(payload) {
     body: JSON.stringify(payload)
   });
 }
+
+// ─── Recycle Bin (Admin) ────────────────────────────────────────────────────
+
+export function fetchRecycleBinAdmin(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+  if (params.collection) qs.set('collection', params.collection);
+  if (params.search) qs.set('search', params.search);
+  return requestJson(`/api/admin/recycle-bin${qs.toString() ? `?${qs.toString()}` : ''}`);
+}
+
+export function restoreRecycleBinItemAdmin(id) {
+  return requestJson(`/api/admin/recycle-bin/${encodeURIComponent(id)}/restore`, {
+    method: 'POST'
+  });
+}
+
+export function deleteRecycleBinItemPermanentAdmin(id) {
+  return requestJson(`/api/admin/recycle-bin/${encodeURIComponent(id)}/permanent`, {
+    method: 'DELETE'
+  });
+}
+
+export function emptyRecycleBinAdmin(collection = '') {
+  const qs = collection && collection !== 'All' ? `?collection=${encodeURIComponent(collection)}` : '';
+  return requestJson(`/api/admin/recycle-bin/empty${qs}`, {
+    method: 'DELETE'
+  });
+}
+

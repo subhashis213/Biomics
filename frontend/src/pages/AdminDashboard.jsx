@@ -2343,6 +2343,7 @@ export default function AdminDashboard() {
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
     { id: 'section-storage-monitor', label: 'Storage', icon: '💾' },
     { id: 'section-audit-log', label: 'Audit Log', icon: '🛡️' },
+    { id: 'section-recycle-bin', label: 'Recycle Bin', icon: '🗑️' },
     { id: 'section-recovery-center', label: 'Recovery', icon: '♻️' },
     { id: 'section-feedback', label: 'Feedback', icon: '💬' }
   ];
@@ -2821,6 +2822,21 @@ export default function AdminDashboard() {
         <div className="workspace-link-actions">
           <button type="button" className="primary-btn" onClick={() => navigate('/admin/audit-log')}>
             Open Audit Log
+          </button>
+        </div>
+      </section>
+
+      <section id="section-recycle-bin" className="card analytics-card workspace-launch-card" style={{ borderLeft: '4px solid #10b981' }}>
+        <div className="section-header">
+          <div>
+            <p className="eyebrow">Data Safety & Recovery</p>
+            <h2>Open Recycle Bin</h2>
+            <p className="subtitle">Safely restore deleted modules, topics, test series, videos, and quizzes with one click.</p>
+          </div>
+        </div>
+        <div className="workspace-link-actions">
+          <button type="button" className="primary-btn" style={{ backgroundColor: '#10b981', borderColor: '#059669' }} onClick={() => navigate('/admin/recycle-bin')}>
+            Open Recycle Bin 🗑️
           </button>
         </div>
       </section>

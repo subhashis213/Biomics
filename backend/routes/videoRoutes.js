@@ -12,6 +12,7 @@ const { resolveStudentCourseFromRequest } = require('../utils/resolveStudentCour
 const { pickCanonicalCourseName } = require('../utils/resolveStudentCourse');
 const { withOptionalBatch } = require('../utils/adminBatchScope');
 const { logAdminAction } = require('../utils/auditLog');
+const { archiveToRecycleBin } = require('../utils/recycleBin');
 const { authenticateToken } = require('../middleware/auth');
 const {
   ALL_MODULES,
@@ -347,6 +348,7 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
       match = withOptionalBatch({ category, ...moduleFilter }, batchFilter);
     }
     const videos = await Video.find(match);
+    await archiveToRecycleBin(Video, videos, req);
     let deletedCount = 0;
     for (const video of videos) {
       if (video.materials && video.materials.length) {
@@ -374,6 +376,9 @@ router.delete('/module', authenticateToken('admin'), async (req, res) => {
 // Delete a video by ID — admin only
 router.delete('/:id', authenticateToken('admin'), async (req, res) => {
   try {
+    const videoDoc = await Video.findById(req.params.id);
+    if (!videoDoc) return res.status(404).json({ error: 'Video not found' });
+    await archiveToRecycleBin(Video, [videoDoc], req);
     const video = await Video.findByIdAndDelete(req.params.id);
     if (!video) return res.status(404).json({ error: 'Video not found' });
     const videoObj = video.toObject();

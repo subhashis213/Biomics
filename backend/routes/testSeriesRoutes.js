@@ -7,6 +7,7 @@ const Razorpay = require('razorpay');
 const { v2: cloudinary } = require('cloudinary');
 const { authenticateToken } = require('../middleware/auth');
 const { logAdminAction } = require('../utils/auditLog');
+const { archiveToRecycleBin } = require('../utils/recycleBin');
 const TestSeriesPricing = require('../models/TestSeriesPricing');
 const TopicTest = require('../models/TopicTest');
 const FullMockTest = require('../models/FullMockTest');
@@ -568,8 +569,12 @@ router.post('/pricing', authenticateToken('admin'), async (req, res) => {
       { upsert: true, new: true }
     ).lean();
 
-    await logAdminAction(req.user.username, 'UPDATE_TEST_SERIES_PRICING',
-      `Set ${category} topic_test=${topicTestPriceInPaise} full_mock=${fullMockPriceInPaise}`);
+    await logAdminAction(req, {
+      action: 'UPDATE_TEST_SERIES_PRICING',
+      targetType: 'TestSeriesPricing',
+      targetId: String(doc?._id || category),
+      details: { category, topicTestPriceInPaise, fullMockPriceInPaise }
+    });
     return res.json({ message: 'Test series pricing saved.', pricing: doc });
   } catch {
     return res.status(500).json({ error: 'Failed to save test series pricing.' });
@@ -743,7 +748,12 @@ router.post('/topic-tests', authenticateToken('admin'), async (req, res) => {
     } else {
       test = await TopicTest.create(payload);
     }
-    await logAdminAction(req.user.username, testId ? 'UPDATE_TOPIC_TEST' : 'CREATE_TOPIC_TEST', `${category}/${module}/${topic}: ${title}`);
+    await logAdminAction(req, {
+      action: testId ? 'UPDATE_TOPIC_TEST' : 'CREATE_TOPIC_TEST',
+      targetType: 'TopicTest',
+      targetId: String(test._id || testId),
+      details: { category, module, topic, title }
+    });
     return res.status(testId ? 200 : 201).json({ message: 'Topic test saved.', test });
   } catch {
     return res.status(500).json({ error: 'Failed to save topic test.' });
@@ -753,9 +763,17 @@ router.post('/topic-tests', authenticateToken('admin'), async (req, res) => {
 // DELETE /test-series/topic-tests/:testId
 router.delete('/topic-tests/:testId', authenticateToken('admin'), async (req, res) => {
   try {
+    const testDoc = await TopicTest.findById(req.params.testId);
+    if (!testDoc) return res.status(404).json({ error: 'Topic test not found.' });
+    await archiveToRecycleBin(TopicTest, [testDoc], req);
     const test = await TopicTest.findByIdAndDelete(req.params.testId);
     if (!test) return res.status(404).json({ error: 'Topic test not found.' });
-    await logAdminAction(req.user.username, 'DELETE_TOPIC_TEST', `Deleted topic test ${req.params.testId}`);
+    await logAdminAction(req, {
+      action: 'DELETE_TOPIC_TEST',
+      targetType: 'TopicTest',
+      targetId: String(req.params.testId),
+      details: { title: test.title, category: test.category, module: test.module, topic: test.topic }
+    });
     return res.json({ message: 'Topic test deleted.' });
   } catch {
     return res.status(500).json({ error: 'Failed to delete topic test.' });
@@ -809,7 +827,12 @@ router.post('/full-mocks', authenticateToken('admin'), async (req, res) => {
     } else {
       mock = await FullMockTest.create(payload);
     }
-    await logAdminAction(req.user.username, mockId ? 'UPDATE_FULL_MOCK' : 'CREATE_FULL_MOCK', `${category}: ${title}`);
+    await logAdminAction(req, {
+      action: mockId ? 'UPDATE_FULL_MOCK' : 'CREATE_FULL_MOCK',
+      targetType: 'FullMockTest',
+      targetId: String(mock._id || mockId),
+      details: { category, title }
+    });
     return res.status(201).json({ message: 'Full mock test saved.', mock });
   } catch {
     return res.status(500).json({ error: 'Failed to save full mock test.' });
@@ -819,9 +842,17 @@ router.post('/full-mocks', authenticateToken('admin'), async (req, res) => {
 // DELETE /test-series/full-mocks/:mockId
 router.delete('/full-mocks/:mockId', authenticateToken('admin'), async (req, res) => {
   try {
+    const mockDoc = await FullMockTest.findById(req.params.mockId);
+    if (!mockDoc) return res.status(404).json({ error: 'Full mock test not found.' });
+    await archiveToRecycleBin(FullMockTest, [mockDoc], req);
     const mock = await FullMockTest.findByIdAndDelete(req.params.mockId);
     if (!mock) return res.status(404).json({ error: 'Full mock test not found.' });
-    await logAdminAction(req.user.username, 'DELETE_FULL_MOCK', `Deleted full mock ${req.params.mockId}`);
+    await logAdminAction(req, {
+      action: 'DELETE_FULL_MOCK',
+      targetType: 'FullMockTest',
+      targetId: String(req.params.mockId),
+      details: { title: mock.title, category: mock.category }
+    });
     return res.json({ message: 'Full mock test deleted.' });
   } catch {
     return res.status(500).json({ error: 'Failed to delete full mock test.' });

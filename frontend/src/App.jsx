@@ -8,6 +8,7 @@ import AdminCourseWorkspaceLandingPage from './pages/AdminCourseWorkspaceLanding
 import AdminContentMigrationPage from './pages/AdminContentMigrationPage';
 import AdminAnnouncementsWorkspacePage from './pages/AdminAnnouncementsWorkspacePage';
 import AdminAuditLogPage from './pages/AdminAuditLogPage';
+import AdminRecycleBinPage from './pages/AdminRecycleBinPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminMockExamPage from './pages/AdminMockExamPage';
 import AdminPricingWorkspacePage from './pages/AdminPricingWorkspacePage';
@@ -236,6 +237,14 @@ export default function App() {
         element={(
           <ProtectedRoute role="admin">
             <AdminAuditLogPage />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/admin/recycle-bin"
+        element={(
+          <ProtectedRoute role="admin">
+            <AdminRecycleBinPage />
           </ProtectedRoute>
         )}
       />
