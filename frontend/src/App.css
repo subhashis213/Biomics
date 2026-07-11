@@ -24895,6 +24895,8 @@ html[data-theme='light'] .premium-materials-panel {
     .status-paid  { background: #d1fae5; color: #065f46; }
     .status-created { background: #fef3c7; color: #92400e; }
     .status-failed { background: #fee2e2; color: #991b1b; }
+    .status-course { background: #dbeafe; color: #1e40af; }
+    .status-test-series { background: #ede9fe; color: #5b21b6; }
 
     /* Action badge for audit log */
     .action-badge {

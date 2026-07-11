@@ -179,6 +179,7 @@ export default function AdminRevenueTrackingPage() {
                   <thead>
                     <tr>
                       <th>Username</th>
+                      <th>Type</th>
                       <th>Course</th>
                       <th>Module</th>
                       <th>Plan</th>
@@ -192,6 +193,7 @@ export default function AdminRevenueTrackingPage() {
                     {paymentHistory.map((entry) => (
                       <tr key={entry._id}>
                         <td><strong>{entry.username}</strong></td>
+                        <td><span className={`status-badge status-${entry.type === 'test_series' ? 'test-series' : 'course'}`}>{entry.type === 'test_series' ? 'Test Series' : 'Course'}</span></td>
                         <td>{entry.course}</td>
                         <td>{entry.moduleName || <span className="muted-text">-</span>}</td>
                         <td>{entry.planType || <span className="muted-text">-</span>}</td>

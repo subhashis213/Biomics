@@ -10,6 +10,7 @@ const ModulePricing = require('../models/ModulePricing');
 const BatchPricing = require('../models/BatchPricing');
 const Voucher = require('../models/Voucher');
 const Payment = require('../models/Payment');
+const TestSeriesPayment = require('../models/TestSeriesPayment');
 const User = require('../models/User');
 const Module = require('../models/Module');
 const Course = require('../models/Course');
@@ -1508,29 +1509,41 @@ router.get('/vouchers/student', authenticateToken('user'), async (req, res) => {
   }
 });
 
-// Admin: paginated payment history
+// Admin: paginated payment history (merged: course payments + test series payments)
 router.get('/admin/history', authenticateToken('admin'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
-    const filter = {};
-    if (req.query.course) filter.course = String(req.query.course).trim();
-    if (req.query.status) filter.status = String(req.query.status).trim();
-    if (req.query.username) filter.username = new RegExp(String(req.query.username).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const courseFilter = {};
+    const tsFilter = {};
+    if (req.query.course) {
+      courseFilter.course = String(req.query.course).trim();
+      tsFilter.course = String(req.query.course).trim();
+    }
+    if (req.query.status) {
+      courseFilter.status = String(req.query.status).trim();
+      tsFilter.status = String(req.query.status).trim();
+    }
+    if (req.query.username) {
+      const usernameRegex = new RegExp(String(req.query.username).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      courseFilter.username = usernameRegex;
+      tsFilter.username = usernameRegex;
+    }
 
-    const [payments, total] = await Promise.all([
-      Payment.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Payment.countDocuments(filter)
+    const [coursePayments, courseTotal, tsPayments, tsTotal] = await Promise.all([
+      Payment.find(courseFilter).sort({ createdAt: -1 }).lean(),
+      Payment.countDocuments(courseFilter),
+      TestSeriesPayment.find(tsFilter).sort({ createdAt: -1 }).lean(),
+      TestSeriesPayment.countDocuments(tsFilter)
     ]);
 
-    return res.json({
-      payments: payments.map((p) => ({
+    const SERIES_TYPE_LABELS = { topic_test: 'Topic Test', full_mock: 'Full Mock' };
+
+    const merged = [
+      ...coursePayments.map((p) => ({
         _id: p._id,
+        type: 'course',
         username: p.username,
         course: p.course,
         moduleName: p.moduleName || null,
@@ -1541,7 +1554,27 @@ router.get('/admin/history', authenticateToken('admin'), async (req, res) => {
         razorpayOrderId: p.razorpayOrderId || null,
         createdAt: p.createdAt
       })),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+      ...tsPayments.map((p) => ({
+        _id: p._id,
+        type: 'test_series',
+        username: p.username,
+        course: p.course,
+        moduleName: SERIES_TYPE_LABELS[p.seriesType] || p.seriesType || null,
+        planType: null,
+        status: p.status,
+        amountInPaise: p.amountInPaise || 0,
+        voucherCode: p.voucherCode || null,
+        razorpayOrderId: p.razorpayOrderId || null,
+        createdAt: p.createdAt
+      }))
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    const total = courseTotal + tsTotal;
+    const paginated = merged.slice(skip, skip + limit);
+
+    return res.json({
+      payments: paginated,
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) }
     });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch payment history.' });
