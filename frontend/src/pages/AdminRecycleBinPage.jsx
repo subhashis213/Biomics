@@ -90,9 +90,11 @@ export default function AdminRecycleBinPage() {
       title="Admin Recycle Bin"
       subtitle="Safely recover deleted modules, topics, test series, videos, and quizzes"
       badges={[{ label: 'Safe Deletion Engine', type: 'admin' }]}
-      actions={[
-        { label: 'Back to Dashboard', onClick: () => navigate('/admin'), type: 'secondary' }
-      ]}
+      actions={(
+        <button type="button" className="secondary-btn" onClick={() => navigate('/admin')}>
+          ← Back to Dashboard
+        </button>
+      )}
     >
       <div className="workspace-grid">
         <section className="card workspace-hero-card">
