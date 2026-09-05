@@ -33,7 +33,12 @@ import {
   updateAnnouncementAdmin,
   applyRecoveryActionAdmin,
   updateVoucherAdmin,
-  uploadMaterial
+  uploadMaterial,
+  fetchHomeBannersAdmin,
+  createHomeBannerAdmin,
+  updateHomeBannerAdmin,
+  deleteHomeBannerAdmin,
+  uploadHomeBannerImageAdmin
 } from '../api';
 import { MAX_MATERIAL_MB } from '../constants';
 import { fromDateTimeLocalInputValue, toDateTimeLocalInputValue } from '../utils/dateTime';
@@ -272,6 +277,160 @@ export default function AdminDashboard() {
   const [isAdminAvatarUploading, setIsAdminAvatarUploading] = useState(false);
   const [isSavingAdminProfile, setIsSavingAdminProfile] = useState(false);
 
+  // ── Home Poster Manager state ────────────────────────────────────────────────
+  const [posterList, setPosterList] = useState([]);
+  const [posterLoading, setPosterLoading] = useState(false);
+  const [posterSaving, setPosterSaving] = useState(false);
+  const [posterError, setPosterError] = useState('');
+  const [posterAddOpen, setPosterAddOpen] = useState(false);
+  const [posterEditId, setPosterEditId] = useState(null);
+  const [posterForm, setPosterForm] = useState({ title: '', imageUrl: '', linkUrl: '', sortOrder: 0 });
+  const [posterUploadFile, setPosterUploadFile] = useState(null);
+  const [posterUploadPreview, setPosterUploadPreview] = useState('');
+  const [posterUploadProgress, setPosterUploadProgress] = useState(false);
+  const [posterDeleteId, setPosterDeleteId] = useState(null);
+  const [posterDeleteConfirm, setPosterDeleteConfirm] = useState(false);
+  const [posterDeleteProcessing, setPosterDeleteProcessing] = useState(false);
+
+  // ── Poster manager helpers ───────────────────────────────────────────────────
+
+  async function loadPosters() {
+    setPosterLoading(true);
+    setPosterError('');
+    try {
+      const result = await fetchHomeBannersAdmin();
+      setPosterList(Array.isArray(result?.banners) ? result.banners : []);
+    } catch (err) {
+      setPosterError(err?.message || 'Failed to load posters.');
+    } finally {
+      setPosterLoading(false);
+    }
+  }
+
+  function openPosterAddForm() {
+    setPosterEditId(null);
+    setPosterForm({ title: '', imageUrl: '', linkUrl: '', sortOrder: posterList.length });
+    setPosterUploadFile(null);
+    setPosterUploadPreview('');
+    setPosterError('');
+    setPosterAddOpen(true);
+  }
+
+  function openPosterEditForm(poster) {
+    setPosterEditId(poster._id);
+    setPosterForm({
+      title: poster.title || '',
+      imageUrl: poster.imageUrl || '',
+      linkUrl: poster.linkUrl || '',
+      sortOrder: Number(poster.sortOrder ?? 0)
+    });
+    setPosterUploadFile(null);
+    setPosterUploadPreview(poster.imageUrl || '');
+    setPosterError('');
+    setPosterAddOpen(true);
+  }
+
+  function closePosterForm() {
+    setPosterAddOpen(false);
+    setPosterEditId(null);
+    setPosterUploadFile(null);
+    setPosterUploadPreview('');
+    setPosterError('');
+  }
+
+  function handlePosterFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPosterUploadFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setPosterUploadPreview(e.target.result);
+    reader.readAsDataURL(file);
+    setPosterForm((prev) => ({ ...prev, imageUrl: '' }));
+  }
+
+  async function handlePosterSave(event) {
+    event.preventDefault();
+    setPosterError('');
+    const title = String(posterForm.title || '').trim();
+    let imageUrl = String(posterForm.imageUrl || '').trim();
+
+    // Upload image file first if provided
+    if (posterUploadFile) {
+      setPosterUploadProgress(true);
+      try {
+        const uploadResult = await uploadHomeBannerImageAdmin(posterUploadFile);
+        imageUrl = uploadResult?.imageUrl || '';
+      } catch (err) {
+        setPosterError(err?.message || 'Image upload failed.');
+        setPosterUploadProgress(false);
+        return;
+      } finally {
+        setPosterUploadProgress(false);
+      }
+    }
+
+    if (!imageUrl) {
+      setPosterError('Please upload an image or provide an image URL.');
+      return;
+    }
+
+    setPosterSaving(true);
+    try {
+      const payload = {
+        title,
+        imageUrl,
+        linkUrl: String(posterForm.linkUrl || '').trim(),
+        sortOrder: Number.isFinite(Number(posterForm.sortOrder)) ? Number(posterForm.sortOrder) : 0
+      };
+
+      let result;
+      if (posterEditId) {
+        result = await updateHomeBannerAdmin(posterEditId, payload);
+      } else {
+        result = await createHomeBannerAdmin({ ...payload, active: true });
+      }
+      setPosterList(Array.isArray(result?.banners) ? result.banners : []);
+      closePosterForm();
+    } catch (err) {
+      setPosterError(err?.message || 'Failed to save poster.');
+    } finally {
+      setPosterSaving(false);
+    }
+  }
+
+  async function handlePosterToggleActive(poster) {
+    try {
+      const result = await updateHomeBannerAdmin(poster._id, { active: !poster.active });
+      setPosterList(Array.isArray(result?.banners) ? result.banners : []);
+    } catch (err) {
+      setBanner({ type: 'error', text: err?.message || 'Failed to update poster visibility.' });
+    }
+  }
+
+  function openPosterDeleteConfirm(id) {
+    setPosterDeleteId(id);
+    setPosterDeleteConfirm(true);
+  }
+
+  function closePosterDeleteConfirm() {
+    setPosterDeleteId(null);
+    setPosterDeleteConfirm(false);
+  }
+
+  async function handlePosterDelete() {
+    if (!posterDeleteId) return;
+    setPosterDeleteProcessing(true);
+    try {
+      const result = await deleteHomeBannerAdmin(posterDeleteId);
+      setPosterList(Array.isArray(result?.banners) ? result.banners : []);
+      closePosterDeleteConfirm();
+    } catch (err) {
+      setBanner({ type: 'error', text: err?.message || 'Failed to delete poster.' });
+    } finally {
+      setPosterDeleteProcessing(false);
+    }
+  }
+
   function clearQuizMessageTimers() {
     if (quizMessageFadeTimeoutRef.current) {
       clearTimeout(quizMessageFadeTimeoutRef.current);
@@ -408,6 +567,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     refreshData();
+  }, []);
+
+  useEffect(() => {
+    loadPosters();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -2730,6 +2894,297 @@ export default function AdminDashboard() {
             Open Announcement Workspace
           </button>
         </div>
+      </section>
+
+      {/* ── HOME POSTER MANAGER ─────────────────────────────────────── */}
+      <section id="section-home-posters" className="card poster-manager-section">
+        <div className="section-header compact quiz-builder-heading-row">
+          <div>
+            <p className="eyebrow">Landing Page</p>
+            <h2>Home Poster Manager</h2>
+            <p className="subtitle">
+              Add, edit, hide or delete the poster slides shown on the landing page. Changes reflect immediately for all visitors.
+            </p>
+          </div>
+          <div className="quiz-count-cards">
+            <StatCard label="Active" value={posterList.filter((p) => p.active !== false).length} />
+            <StatCard label="Total" value={posterList.length} />
+          </div>
+        </div>
+
+        {/* Action bar */}
+        <div className="poster-manager-action-bar">
+          <button
+            type="button"
+            className="primary-btn poster-add-btn"
+            onClick={openPosterAddForm}
+            disabled={posterSaving || posterUploadProgress}
+          >
+            <span aria-hidden="true">＋</span> Add Poster
+          </button>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={loadPosters}
+            disabled={posterLoading}
+            aria-label="Refresh poster list"
+          >
+            {posterLoading ? 'Loading…' : '↻ Refresh'}
+          </button>
+        </div>
+
+        {posterError && !posterAddOpen && (
+          <p className="inline-message error poster-error-msg">{posterError}</p>
+        )}
+
+        {/* Poster grid */}
+        {posterLoading && posterList.length === 0 ? (
+          <p className="empty-note">Loading posters…</p>
+        ) : posterList.length === 0 ? (
+          <div className="poster-empty-state">
+            <span className="poster-empty-icon" aria-hidden="true">🖼️</span>
+            <p>No posters yet. Click <strong>Add Poster</strong> to upload your first one.</p>
+            <p className="poster-empty-note">The landing page uses default images until you add posters here.</p>
+          </div>
+        ) : (
+          <div className="poster-manager-grid">
+            {posterList.map((poster) => (
+              <div
+                key={poster._id}
+                className={`poster-card${poster.active === false ? ' poster-card-hidden' : ''}`}
+              >
+                {/* Thumbnail */}
+                <div className="poster-card-thumb-wrap">
+                  <img
+                    src={poster.imageUrl}
+                    alt={poster.title || 'Poster'}
+                    className="poster-card-thumb"
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  {poster.active === false && (
+                    <div className="poster-card-hidden-badge" aria-label="Hidden from landing page">
+                      <span>Hidden</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="poster-card-info">
+                  <p className="poster-card-title">
+                    {poster.title || <em style={{ opacity: 0.45 }}>No title</em>}
+                  </p>
+                  {poster.linkUrl && (
+                    <a
+                      href={poster.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="poster-card-link"
+                      title={poster.linkUrl}
+                    >
+                      🔗 Link
+                    </a>
+                  )}
+                  <span className="poster-card-order">Order: {poster.sortOrder ?? 0}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="poster-card-actions">
+                  <button
+                    type="button"
+                    className={`poster-action-btn poster-visibility-btn${poster.active === false ? ' poster-visibility-show' : ' poster-visibility-hide'}`}
+                    onClick={() => handlePosterToggleActive(poster)}
+                    title={poster.active === false ? 'Show on landing page' : 'Hide from landing page'}
+                  >
+                    {poster.active === false ? '👁️ Show' : '🙈 Hide'}
+                  </button>
+                  <button
+                    type="button"
+                    className="poster-action-btn poster-edit-btn"
+                    onClick={() => openPosterEditForm(poster)}
+                    title="Edit poster"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="poster-action-btn poster-delete-btn"
+                    onClick={() => openPosterDeleteConfirm(poster._id)}
+                    title="Delete poster"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add / Edit Form Panel */}
+        {posterAddOpen && (
+          <div className="poster-add-form-wrap">
+            <div className="poster-add-form-header">
+              <h3>{posterEditId ? '✏️ Edit Poster' : '➕ Add New Poster'}</h3>
+              <button
+                type="button"
+                className="modal-close-x"
+                onClick={closePosterForm}
+                aria-label="Close poster form"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form className="poster-add-form" onSubmit={handlePosterSave}>
+              {/* Image upload zone */}
+              <div className="poster-upload-zone">
+                {posterUploadPreview ? (
+                  <div className="poster-upload-preview-wrap">
+                    <img
+                      src={posterUploadPreview}
+                      alt="Preview"
+                      className="poster-upload-preview-img"
+                    />
+                    <button
+                      type="button"
+                      className="poster-upload-change-btn"
+                      onClick={() => { setPosterUploadFile(null); setPosterUploadPreview(''); }}
+                    >
+                      Change Image
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    className="poster-upload-label"
+                    htmlFor={`poster-file-input-${posterEditId || 'new'}`}
+                  >
+                    <span className="poster-upload-icon" aria-hidden="true">📁</span>
+                    <span>Click to select image</span>
+                    <small>JPG / PNG / WebP · max 8 MB</small>
+                    <input
+                      id={`poster-file-input-${posterEditId || 'new'}`}
+                      type="file"
+                      accept="image/*"
+                      className="poster-file-input"
+                      onChange={handlePosterFileChange}
+                      disabled={posterSaving || posterUploadProgress}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Or paste URL */}
+              {!posterUploadFile && (
+                <label className="poster-form-label">
+                  Or paste image URL
+                  <input
+                    type="url"
+                    className="poster-form-input"
+                    placeholder="https://example.com/poster.jpg"
+                    value={posterForm.imageUrl}
+                    onChange={(e) => setPosterForm((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                    disabled={posterSaving || posterUploadProgress}
+                  />
+                </label>
+              )}
+
+              <label className="poster-form-label">
+                Title <span className="poster-form-optional">(optional)</span>
+                <input
+                  type="text"
+                  className="poster-form-input"
+                  placeholder="e.g. Batch 1.0 – CSIR NET DEC 2026"
+                  value={posterForm.title}
+                  onChange={(e) => setPosterForm((prev) => ({ ...prev, title: e.target.value }))}
+                  disabled={posterSaving || posterUploadProgress}
+                />
+              </label>
+
+              <label className="poster-form-label">
+                Link URL <span className="poster-form-optional">(optional — poster becomes clickable)</span>
+                <input
+                  type="url"
+                  className="poster-form-input"
+                  placeholder="https://biomicshub.com/enroll"
+                  value={posterForm.linkUrl}
+                  onChange={(e) => setPosterForm((prev) => ({ ...prev, linkUrl: e.target.value }))}
+                  disabled={posterSaving || posterUploadProgress}
+                />
+              </label>
+
+              <label className="poster-form-label poster-form-label-short">
+                Display Order
+                <input
+                  type="number"
+                  className="poster-form-input poster-form-input-short"
+                  min={0}
+                  value={posterForm.sortOrder}
+                  onChange={(e) => setPosterForm((prev) => ({ ...prev, sortOrder: e.target.value }))}
+                  disabled={posterSaving || posterUploadProgress}
+                />
+              </label>
+
+              {posterError && (
+                <p className="inline-message error">{posterError}</p>
+              )}
+
+              <div className="poster-form-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={closePosterForm}
+                  disabled={posterSaving || posterUploadProgress}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  disabled={posterSaving || posterUploadProgress}
+                >
+                  {posterUploadProgress
+                    ? 'Uploading image…'
+                    : posterSaving
+                      ? 'Saving…'
+                      : posterEditId
+                        ? 'Save Changes'
+                        : 'Add Poster'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Delete confirmation overlay */}
+        {posterDeleteConfirm && (
+          <div className="poster-delete-overlay" role="dialog" aria-modal="true" aria-label="Confirm deletion">
+            <div className="poster-delete-dialog">
+              <h3>Delete Poster?</h3>
+              <p>
+                This will permanently remove the poster from the landing page slideshow.
+                This action cannot be undone.
+              </p>
+              <div className="poster-delete-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={closePosterDeleteConfirm}
+                  disabled={posterDeleteProcessing}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="danger-btn"
+                  onClick={handlePosterDelete}
+                  disabled={posterDeleteProcessing}
+                >
+                  {posterDeleteProcessing ? 'Deleting…' : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
       </div>
 

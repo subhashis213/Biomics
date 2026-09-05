@@ -5,7 +5,7 @@ import logoImg from '../assets/biomics-logo.jpeg';
 import posterTestSeries from '../assets/poster-test-series.jpeg';
 import posterLifeScience from '../assets/poster-life-science.jpeg';
 import posterBatch from '../assets/poster-batch.jpeg';
-import { fetchStudentVoicesPublic } from '../api';
+import { fetchStudentVoicesPublic, fetchHomeBannersPublic } from '../api';
 import { SOCIAL_LINKS } from '../constants/socialLinks';
 import { useThemeStore } from '../stores/themeStore';
 
@@ -16,7 +16,8 @@ const LANDING_STATS = [
   { target: 1000, label: 'Students Learning', suffix: '+' },
 ];
 
-const POSTERS = [
+/* Local fallback posters — used when the API returns nothing */
+const FALLBACK_POSTERS = [
   {
     src: posterTestSeries,
     alt: 'CSIR NET 2026 Test Series – Topic Wise, Full Length, PYQ Included',
@@ -125,6 +126,7 @@ export default function LandingPage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isPaused, setIsPaused]       = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [banners, setBanners] = useState(FALLBACK_POSTERS);
   const [studentVoices, setStudentVoices] = useState(FALLBACK_STUDENT_VOICES);
   const [hoveredBrandLetter, setHoveredBrandLetter] = useState(null);
   const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
@@ -136,25 +138,25 @@ export default function LandingPage() {
   const SLIDE_INTERVAL = 3200;
 
   const goTo = useCallback((idx) => {
-    setActiveSlide(((idx % POSTERS.length) + POSTERS.length) % POSTERS.length);
-  }, []);
+    setActiveSlide(((idx % banners.length) + banners.length) % banners.length);
+  }, [banners.length]);
 
   const prev = useCallback(() => {
-    setActiveSlide((s) => ((s - 1) + POSTERS.length) % POSTERS.length);
-  }, []);
+    setActiveSlide((s) => ((s - 1) + banners.length) % banners.length);
+  }, [banners.length]);
 
   const next = useCallback(() => {
-    setActiveSlide((s) => (s + 1) % POSTERS.length);
-  }, []);
+    setActiveSlide((s) => (s + 1) % banners.length);
+  }, [banners.length]);
 
   // Auto-advance; pauses on hover
   useEffect(() => {
     if (isPaused) return;
     autoRef.current = setInterval(() => {
-      setActiveSlide((s) => (s + 1) % POSTERS.length);
+      setActiveSlide((s) => (s + 1) % banners.length);
     }, SLIDE_INTERVAL);
     return () => clearInterval(autoRef.current);
-  }, [isPaused]);
+  }, [isPaused, banners.length]);
 
   useEffect(() => {
     function handleOutsideClick(event) {
@@ -172,6 +174,28 @@ export default function LandingPage() {
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, [profileMenuOpen]);
+
+  // Load landing-page banners from API; fall back to local posters if empty
+  useEffect(() => {
+    let cancelled = false;
+    fetchHomeBannersPublic()
+      .then((response) => {
+        if (cancelled) return;
+        const apiBanners = Array.isArray(response?.banners) ? response.banners : [];
+        if (apiBanners.length) {
+          setBanners(apiBanners.map((b) => ({
+            src: b.imageUrl,
+            alt: b.title || 'Biomics Hub poster',
+            label: b.title || '',
+            tag: '',
+            linkUrl: b.linkUrl || '',
+          })));
+        }
+        // else: keep FALLBACK_POSTERS already in state
+      })
+      .catch(() => { /* silently keep fallback */ });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -489,28 +513,42 @@ export default function LandingPage() {
             {/* ── Slide track — pure CSS translateX, zero JS timing ── */}
             <div
               className="lp-slide-track"
-              style={{ transform: `translateX(-${activeSlide * (100 / POSTERS.length)}%)` }}
+              style={{ transform: `translateX(-${activeSlide * (100 / banners.length)}%)` }}
               aria-live="polite"
               aria-label="Course slideshow"
             >
-              {POSTERS.map((poster, i) => (
+              {banners.map((poster, i) => (
                 <div
-                  key={poster.label}
+                  key={poster.src + i}
                   className={`lp-slide${i === activeSlide ? ' lp-slide-active' : ''}`}
                   aria-hidden={i !== activeSlide}
                 >
                   <div className="lp-slide-inner">
-                    <img
-                      src={poster.src}
-                      alt={poster.alt}
-                      className="lp-slide-img"
-                      draggable="false"
-                      loading="eager"
-                    />
-                    <div className="lp-slide-badge">
-                      <span className="lp-slide-tag">{poster.tag}</span>
-                      <span className="lp-slide-label">{poster.label}</span>
-                    </div>
+                    {poster.linkUrl ? (
+                      <a href={poster.linkUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+                        <img
+                          src={poster.src}
+                          alt={poster.alt}
+                          className="lp-slide-img"
+                          draggable="false"
+                          loading="eager"
+                        />
+                      </a>
+                    ) : (
+                      <img
+                        src={poster.src}
+                        alt={poster.alt}
+                        className="lp-slide-img"
+                        draggable="false"
+                        loading="eager"
+                      />
+                    )}
+                    {(poster.tag || poster.label) && (
+                      <div className="lp-slide-badge">
+                        {poster.tag && <span className="lp-slide-tag">{poster.tag}</span>}
+                        {poster.label && <span className="lp-slide-label">{poster.label}</span>}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -540,13 +578,13 @@ export default function LandingPage() {
 
             {/* Dot indicators */}
             <div className="lp-slide-dots" role="tablist" aria-label="Slide selector">
-              {POSTERS.map((poster, i) => (
+              {banners.map((poster, i) => (
                 <button
-                  key={poster.label}
+                  key={poster.src + i}
                   type="button"
                   role="tab"
                   aria-selected={i === activeSlide}
-                  aria-label={`Go to slide ${i + 1}: ${poster.label}`}
+                  aria-label={`Go to slide ${i + 1}: ${poster.label || i + 1}`}
                   className={`lp-slide-dot${i === activeSlide ? ' lp-slide-dot-active' : ''}`}
                   onClick={() => goTo(i)}
                 />
