@@ -1177,17 +1177,17 @@ export function emptyRecycleBinAdmin(collection = '') {
 
 /** Public: fetch only active banners (for landing page). */
 export function fetchHomeBannersPublic() {
-  return requestJson('/home-banners');
+  return requestJson('/landing/home-banners');
 }
 
 /** Admin: fetch all banners including hidden ones. */
 export function fetchHomeBannersAdmin() {
-  return requestJson('/home-banners/admin');
+  return requestJson('/landing/home-banners/admin');
 }
 
 /** Admin: create a new banner. */
 export function createHomeBannerAdmin(data = {}) {
-  return requestJson('/home-banners/admin', {
+  return requestJson('/landing/home-banners/admin', {
     method: 'POST',
     body: JSON.stringify(data)
   });
@@ -1195,7 +1195,7 @@ export function createHomeBannerAdmin(data = {}) {
 
 /** Admin: update title, imageUrl, linkUrl, active, sortOrder. */
 export function updateHomeBannerAdmin(id, data = {}) {
-  return requestJson(`/home-banners/admin/${encodeURIComponent(id)}`, {
+  return requestJson(`/landing/home-banners/admin/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(data)
   });
@@ -1203,7 +1203,7 @@ export function updateHomeBannerAdmin(id, data = {}) {
 
 /** Admin: permanently delete a banner. */
 export function deleteHomeBannerAdmin(id) {
-  return requestJson(`/home-banners/admin/${encodeURIComponent(id)}`, {
+  return requestJson(`/landing/home-banners/admin/${encodeURIComponent(id)}`, {
     method: 'DELETE'
   });
 }
@@ -1212,7 +1212,7 @@ export function deleteHomeBannerAdmin(id) {
 export async function uploadHomeBannerImageAdmin(file) {
   const formData = new FormData();
   formData.append('banner', file);
-  return requestJson('/home-banners/admin/upload', {
+  return requestJson('/landing/home-banners/admin/upload', {
     method: 'POST',
     body: formData
   });
