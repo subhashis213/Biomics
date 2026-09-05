@@ -588,7 +588,7 @@ router.get('/admin/workspace', authenticateToken('admin'), async (req, res) => {
         liveClassAccess: 1,
         liveClassCalendarBlocks: 1,
         _id: 0
-      }).sort({ username: 1 }).lean(),
+      }).sort({ username: 1 }).limit(500).lean(),
       LiveClassCalendarBlock.find().sort({ startsAt: 1, createdAt: -1 }).lean(),
       Course.find({ active: true, archived: { $ne: true } }, { name: 1, displayName: 1, batches: 1 }).sort({ name: 1 }).lean()
     ]);
@@ -1086,7 +1086,7 @@ router.get('/access/students', authenticateToken('admin'), async (req, res) => {
       city: 1,
       liveClassAccess: 1,
       _id: 0
-    }).sort({ username: 1 }).lean();
+    }).sort({ username: 1 }).limit(500).lean();
 
     return res.json({
       students: students.map((student) => ({

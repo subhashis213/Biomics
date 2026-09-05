@@ -242,8 +242,16 @@ const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
+  // API prefixes that must NOT be caught by the SPA fallback.
+  const API_PREFIXES = [
+    '/auth', '/videos', '/uploads', '/feedback', '/quizzes',
+    '/live', '/api/', '/modules', '/mock-exams', '/announcements',
+    '/notifications', '/chat', '/payments', '/test-series', '/courses',
+    '/free-study-resources', '/landing', '/debug', '/health'
+  ];
+
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/auth') || req.path.startsWith('/videos') || req.path.startsWith('/uploads') || req.path.startsWith('/feedback') || req.path.startsWith('/quizzes') || req.path.startsWith('/live') || req.path.startsWith('/api/class') || req.path.startsWith('/api/livekit') || req.path.startsWith('/modules') || req.path.startsWith('/mock-exams') || req.path.startsWith('/announcements') || req.path.startsWith('/notifications') || req.path.startsWith('/chat') || req.path.startsWith('/payments') || req.path.startsWith('/test-series') || req.path.startsWith('/courses') || req.path.startsWith('/free-study-resources')) {
+    if (API_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
       return next();
     }
     return res.sendFile(path.join(frontendDistPath, 'index.html'));
@@ -256,7 +264,29 @@ let serverStarted = false;
 function startServer() {
   if (serverStarted) return;
   serverStarted = true;
-  app.listen(PORT, () => console.log(`✓ Server running on port ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`✓ Server running on port ${PORT}`);
+    // Self-ping every 8 min to prevent Render.com cold-start sleep.
+    // Only activate when a PUBLIC_URL env var is set (production only).
+    const publicUrl = String(process.env.PUBLIC_URL || '').trim();
+    if (publicUrl) {
+      const https = require('https');
+      const http = require('http');
+      const keepAlive = () => {
+        const url = `${publicUrl}/health`;
+        const client = url.startsWith('https') ? https : http;
+        const req = client.get(url, (r) => {
+          r.resume();
+          console.log(`[keepalive] /health → ${r.statusCode}`);
+        });
+        req.on('error', (err) => console.warn('[keepalive] ping failed:', err.message));
+        req.end();
+      };
+      // First ping after 5 min, then every 8 min.
+      setTimeout(() => { keepAlive(); setInterval(keepAlive, 8 * 60 * 1000); }, 5 * 60 * 1000);
+      console.log(`✓ Keep-alive ping enabled → ${publicUrl}/health`);
+    }
+  });
 }
 
 // Migration function to ensure all videos have a module field

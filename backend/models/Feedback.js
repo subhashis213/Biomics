@@ -6,4 +6,8 @@ const feedbackSchema = new mongoose.Schema({
   message: { type: String, required: true, trim: true, maxlength: 1000 }
 }, { timestamps: true });
 
+// ── Performance indexes ───────────────────────────────────────────────────────
+feedbackSchema.index({ createdAt: -1 });
+feedbackSchema.index({ username: 1 });
+
 module.exports = mongoose.model('Feedback', feedbackSchema);

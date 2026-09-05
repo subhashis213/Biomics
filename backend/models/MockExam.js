@@ -36,4 +36,10 @@ const mockExamSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// ── Performance indexes ───────────────────────────────────────────────────────
+// Primary query: MockExam.find({ category }).sort({ examDate })
+mockExamSchema.index({ category: 1, examDate: -1 });
+// Student filter: active, unreleased exams by category
+mockExamSchema.index({ category: 1, resultReleased: 1, noticeEnabled: 1 });
+
 module.exports = mongoose.model('MockExam', mockExamSchema);

@@ -45,8 +45,10 @@ function normalizeNameKey(value) {
 async function findCourseDocByName(courseName) {
   const normalizedKey = normalizeNameKey(courseName);
   if (!normalizedKey) return null;
-  const docs = await Course.find({}).sort({ updatedAt: -1 });
-  return docs.find((entry) => normalizeNameKey(entry?.name) === normalizedKey) || null;
+  // Direct DB query using anchored regex — avoids loading all courses into memory.
+  // The unique index on Course.name makes this O(log N) instead of O(N).
+  const escapedKey = normalizedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Course.findOne({ name: new RegExp(`^${escapedKey}$`, 'i') }).lean();
 }
 
 function collectNormalizedNames(values = []) {

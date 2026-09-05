@@ -17,4 +17,10 @@ const videoSchema = new mongoose.Schema({
   ]
 });
 
+// ── Performance indexes ───────────────────────────────────────────────────────
+// Primary query: Video.find({ category }).sort({ uploadedAt: -1 })
+videoSchema.index({ category: 1, uploadedAt: -1 });
+// Filtered sub-list: Video.find({ category, module, topic })
+videoSchema.index({ category: 1, module: 1, topic: 1 });
+
 module.exports = mongoose.model('Video', videoSchema);

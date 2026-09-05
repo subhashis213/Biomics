@@ -61,4 +61,16 @@ userSchema.pre('save', async function(next) {
 	next();
 });
 
+// ── Performance indexes ──────────────────────────────────────────────────────
+// username is the primary lookup key on every authenticated request.
+userSchema.index({ username: 1 });
+// email: used for Google OAuth login and password-reset flows.
+userSchema.index({ email: 1 }, { sparse: true });
+// phone: used for OTP login flow.
+userSchema.index({ phone: 1 }, { sparse: true });
+// googleAuth.sub: used for Google OAuth token matching.
+userSchema.index({ 'googleAuth.sub': 1 }, { sparse: true });
+// createdAt: used for admin student list sort.
+userSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('User', userSchema);

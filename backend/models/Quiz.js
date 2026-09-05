@@ -39,4 +39,10 @@ const quizSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// ── Performance indexes ───────────────────────────────────────────────────────
+// Primary query: Quiz.find({ category, module }).sort()
+quizSchema.index({ category: 1, module: 1, topic: 1 });
+// Admin quiz dashboard sort: Quiz.find({}).sort({ category, module, topic, updatedAt })
+quizSchema.index({ category: 1, module: 1, updatedAt: -1 });
+
 module.exports = mongoose.model('Quiz', quizSchema);
