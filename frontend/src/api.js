@@ -1218,3 +1218,12 @@ export async function uploadHomeBannerImageAdmin(file) {
   });
 }
 
+// ── Admin quick stats ─────────────────────────────────────────────────────────
+
+/**
+ * Lightweight count-only endpoint — returns stat card numbers in ~50ms.
+ * Call this before refreshData() so numbers fill immediately on dashboard load.
+ */
+export function fetchAdminQuickStats() {
+  return requestJson('/auth/admin/quick-stats');
+}

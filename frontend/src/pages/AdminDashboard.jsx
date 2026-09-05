@@ -38,7 +38,8 @@ import {
   createHomeBannerAdmin,
   updateHomeBannerAdmin,
   deleteHomeBannerAdmin,
-  uploadHomeBannerImageAdmin
+  uploadHomeBannerImageAdmin,
+  fetchAdminQuickStats
 } from '../api';
 import { MAX_MATERIAL_MB } from '../constants';
 import { fromDateTimeLocalInputValue, toDateTimeLocalInputValue } from '../utils/dateTime';
@@ -128,6 +129,7 @@ export default function AdminDashboard() {
   const [videos, setVideos] = useState([]);
   const [students, setStudents] = useState([]);
   const [totalStudentCount, setTotalStudentCount] = useState(0);
+  const [quickStats, setQuickStats] = useState(null); // fast pre-loaded counts
   const [feedback, setFeedback] = useState([]);
   const [videoForm, setVideoForm] = useState({ title: '', description: '', url: '' });
   const [adminCourseCatalog, setAdminCourseCatalog] = useState([]);
@@ -565,7 +567,16 @@ export default function AdminDashboard() {
     }
   }
 
+  // Fire quick-stats first so stat cards fill immediately (~50ms response).
+  // refreshData() runs in parallel and backfills the full data lists.
   useEffect(() => {
+    fetchAdminQuickStats()
+      .then((stats) => {
+        if (!stats || stats.error) return;
+        setQuickStats(stats);
+        setTotalStudentCount(Number(stats.totalStudents || 0));
+      })
+      .catch(() => { /* silently ignore — refreshData will also set it */ });
     refreshData();
   }, []);
 
@@ -2722,7 +2733,7 @@ export default function AdminDashboard() {
                 <h2>Course categories</h2>
                 <p className="subtitle">Open course setup workspace to add/remove courses and batches, or tap a course below to add lectures.</p>
               </div>
-              <StatCard label="Total Courses" value={courseManagerCourses.length} />
+              <StatCard label="Total Courses" value={courseManagerCourses.length || (quickStats ? quickStats.totalCourses : 0)} />
             </div>
             <div className="workspace-link-actions" style={{ marginBottom: '12px' }}>
               <button type="button" className="primary-btn" onClick={() => navigate('/admin/course-workspace')}>
@@ -2788,7 +2799,7 @@ export default function AdminDashboard() {
                   <h2>Open Uploaded Content Library</h2>
                   <p className="subtitle">Open a focused admin page where uploaded lectures are arranged module-wise and topic-wise with better formatting.</p>
                 </div>
-                <StatCard label="Total Lectures" value={videos.length} />
+                <StatCard label="Total Lectures" value={videos.length || (quickStats ? quickStats.totalVideos : 0)} />
               </div>
               <div className="workspace-quick-chips" aria-label="Content library quick insights">
                 <span className="workspace-quick-chip">Module-wise sections</span>

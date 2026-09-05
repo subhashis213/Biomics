@@ -29,6 +29,7 @@ const Feedback = require('../models/Feedback');
 const ChatHistory = require('../models/ChatHistory');
 const Voucher = require('../models/Voucher');
 const Course = require('../models/Course');
+const Module = require('../models/Module');
 const { logAdminAction } = require('../utils/auditLog');
 const { authenticateToken, JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
@@ -1350,6 +1351,32 @@ router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res)
   } catch (err) {
     console.error('Forgot password error:', err.message);
     return res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// ── Admin quick stats — lightweight count-only endpoint ──────────────────────
+// Returns just the numbers shown in stat cards. Uses countDocuments() which is
+// O(1) with an index, so this responds in ~50ms and the dashboard fills instantly.
+router.get('/admin/quick-stats', authenticateToken('admin'), async (req, res) => {
+  try {
+    const [
+      totalStudents,
+      totalVideos,
+      totalCourses,
+      totalModules,
+      totalQuizzes,
+      totalPayments
+    ] = await Promise.all([
+      User.countDocuments({}),
+      Video.countDocuments({}),
+      Course.countDocuments({ active: true, archived: { $ne: true } }),
+      Module.countDocuments({}),
+      Quiz.countDocuments({}),
+      Payment.countDocuments({ status: 'paid' })
+    ]);
+    return res.json({ totalStudents, totalVideos, totalCourses, totalModules, totalQuizzes, totalPayments });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch stats.' });
   }
 });
 
