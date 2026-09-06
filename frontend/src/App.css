@@ -31202,6 +31202,7 @@ html[data-theme='light'] .lp-social-card {
   background: #ffffff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
+
 html[data-theme='light'] .lp-footer {
   background:
     radial-gradient(740px 280px at 10% -20%, hsl(196 84% 62% / 0.14), transparent 66%),
@@ -31557,7 +31558,9 @@ html[data-theme='light'] .lp-brand-glow-letter.is-hovered {
   top: 0;
   left: 0;
   height: 100%;
-  width: 300%;          /* POSTERS.length × 100% */
+  /* Dynamic width driven by --slide-count set inline from JS.
+     Falls back to 3 slides if the var is not set. */
+  width: calc(var(--slide-count, 3) * 100%);
   display: flex;
   transition: transform 600ms cubic-bezier(0.77, 0, 0.175, 1);
   will-change: transform;
@@ -31566,7 +31569,8 @@ html[data-theme='light'] .lp-brand-glow-letter.is-hovered {
 
 /* ─── Individual slides ──────────────────────────────────── */
 .lp-slide {
-  flex: 0 0 calc(100% / 3);  /* 1 / POSTERS.length */
+  /* Dynamic: each slide = 1/N of the track, N set by --slide-count in JS */
+  flex: 0 0 calc(100% / var(--slide-count, 3));
   height: 100%;
   position: relative;
   overflow: hidden;

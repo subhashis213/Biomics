@@ -513,7 +513,10 @@ export default function LandingPage() {
             {/* ── Slide track — pure CSS translateX, zero JS timing ── */}
             <div
               className="lp-slide-track"
-              style={{ transform: `translateX(-${activeSlide * (100 / banners.length)}%)` }}
+              style={{
+                transform: `translateX(-${activeSlide * (100 / banners.length)}%)`,
+                '--slide-count': banners.length
+              }}
               aria-live="polite"
               aria-label="Course slideshow"
             >
