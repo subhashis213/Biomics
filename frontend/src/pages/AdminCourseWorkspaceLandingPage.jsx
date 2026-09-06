@@ -154,11 +154,11 @@ export default function AdminCourseWorkspaceLandingPage() {
           gap: 14px;
           padding: clamp(16px, 2.2vw, 20px);
           min-height: 122px;
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 250, 251, 0.98) 100%);
-          border: 1px solid color-mix(in srgb, var(--card-accent) 12%, var(--border-color, #e5e7eb));
+          background: var(--bg-card, #ffffff);
+          border: 1px solid color-mix(in srgb, var(--card-accent) 18%, var(--line, #e5e7eb));
           border-radius: 14px;
           cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
           text-align: left;
           width: 100%;
         }
@@ -181,8 +181,8 @@ export default function AdminCourseWorkspaceLandingPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: color-mix(in srgb, var(--card-accent) 12%, #ffffff);
-          border: 1px solid color-mix(in srgb, var(--card-accent) 20%, #ffffff);
+          background: color-mix(in srgb, var(--card-accent) 14%, var(--bg-card-soft, #f5f7ff));
+          border: 1px solid color-mix(in srgb, var(--card-accent) 22%, var(--line, #e5e7eb));
           border-radius: 10px;
         }
 
@@ -215,6 +215,37 @@ export default function AdminCourseWorkspaceLandingPage() {
         .workspace-landing-card:hover .workspace-landing-arrow {
           color: var(--card-accent);
           transform: translateX(4px);
+        }
+
+        /* ── Dark mode overrides ── */
+        html[data-theme='dark'] .workspace-landing-card {
+          background: var(--bg-card, #171c28);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+        }
+
+        html[data-theme='dark'] .workspace-landing-card:hover {
+          background: var(--bg-card-soft, #1d2335);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        html[data-theme='dark'] .workspace-landing-content h3 {
+          color: var(--text-primary, #f1f5f9);
+        }
+
+        html[data-theme='dark'] .workspace-landing-content p {
+          color: var(--text-secondary, #94a3b8);
+        }
+
+        html[data-theme='dark'] .workspace-landing-kicker {
+          color: var(--text-secondary, #94a3b8);
+        }
+
+        html[data-theme='dark'] .workspace-landing-header p {
+          color: var(--text-secondary, #94a3b8);
+        }
+
+        html[data-theme='dark'] .workspace-landing-arrow {
+          color: var(--text-secondary, #64748b);
         }
 
         @media (max-width: 768px) {

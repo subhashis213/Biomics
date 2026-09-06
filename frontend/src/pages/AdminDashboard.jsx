@@ -2762,7 +2762,18 @@ export default function AdminDashboard() {
                   </button>
                 );
               })}
-              {!courseManagerCourses.length ? (
+              {/* Show skeleton tiles while loading — prevents "No courses found" flash */}
+              {loading && !courseManagerCourses.length ? (
+                [0, 1, 2].map((i) => (
+                  <div key={`skel-${i}`} className="course-tile course-tile-skeleton" aria-hidden="true">
+                    <span className="course-tile-icon course-tile-skel-icon" />
+                    <span className="course-tile-body">
+                      <span className="course-tile-skel-line course-tile-skel-line--title" />
+                      <span className="course-tile-skel-line course-tile-skel-line--sub" />
+                    </span>
+                  </div>
+                ))
+              ) : !loading && !courseManagerCourses.length ? (
                 <p className="empty-note">No active courses found. Create a course in Course Setup Workspace.</p>
               ) : null}
             </div>

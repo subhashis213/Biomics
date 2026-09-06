@@ -4316,6 +4316,50 @@ html[data-theme='dark'] .course-manager-card .course-tile {
     linear-gradient(160deg, color-mix(in srgb, var(--tile-accent) 14%, var(--surface-start)) 0%, var(--surface-end) 92%);
 }
 
+/* ── Course tile skeleton loader ─────────────────────────────────────────── */
+@keyframes course-skel-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.course-tile-skeleton {
+  pointer-events: none;
+  cursor: default;
+  border-color: var(--line) !important;
+  background: var(--bg-card-soft) !important;
+  opacity: 0.7;
+}
+
+.course-tile-skel-icon {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--line) 50%, transparent) 50%, var(--line) 75%);
+  background-size: 800px 100%;
+  animation: course-skel-shimmer 1.4s ease-in-out infinite;
+}
+
+.course-tile-skel-line {
+  display: block;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--line) 50%, transparent) 50%, var(--line) 75%);
+  background-size: 800px 100%;
+  animation: course-skel-shimmer 1.4s ease-in-out infinite;
+}
+
+.course-tile-skel-line--title {
+  width: 65%;
+  height: 13px;
+  margin-bottom: 8px;
+}
+
+.course-tile-skel-line--sub {
+  width: 45%;
+  height: 11px;
+  animation-delay: 0.15s;
+}
+
 .quiz-builder-panel {
   margin-top: 8px;
   padding: 14px;
