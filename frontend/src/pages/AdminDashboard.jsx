@@ -2517,9 +2517,7 @@ export default function AdminDashboard() {
     { id: 'section-payment-settings', label: 'Payments', icon: '💳' },
     { id: 'section-payment-history', label: 'Pay History', icon: '📊' },
     { id: 'section-storage-monitor', label: 'Storage', icon: '💾' },
-    { id: 'section-audit-log', label: 'Audit Log', icon: '🛡️' },
-    { id: 'section-recycle-bin', label: 'Recycle Bin', icon: '🗑️' },
-    { id: 'section-recovery-center', label: 'Recovery', icon: '♻️' },
+    { id: 'section-data-safety', label: 'Safety & History', icon: '🛡️' },
     { id: 'section-feedback', label: 'Feedback', icon: '💬' }
   ];
 
@@ -3271,59 +3269,42 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section id="section-audit-log" className="card analytics-card workspace-launch-card workspace-launch-audit">
-        <div className="section-header">
+      {/* ── Unified Data Safety & History ────────────────────────────────── */}
+      <section id="section-data-safety" className="card analytics-card workspace-launch-card" style={{ borderLeft: '4px solid #6366f1' }}>
+        <div className="section-header" style={{ marginTop: 0 }}>
           <div>
-            <p className="eyebrow">Security & Compliance</p>
-            <h2>Open Audit Log Workspace</h2>
-            <p className="subtitle">Use the dedicated colorful page to search and inspect full audit events cleanly.</p>
-            <div className="workspace-quick-chips" aria-label="Audit quick insights">
-              <span className="workspace-quick-chip">{auditLogLoading ? 'Refreshing events' : 'Events synced'}</span>
-              <span className="workspace-quick-chip">Page {auditLogPagination.page} / {auditLogPagination.totalPages}</span>
-              <span className="workspace-quick-chip">{auditLogFilter.action || 'All actions'}</span>
+            <p className="eyebrow">Data Safety &amp; History</p>
+            <h2>Deleted Items &amp; Audit History</h2>
+            <p className="subtitle">
+              Restore anything you deleted — videos, quizzes, modules, topics, and test series — with one click.
+              View the full audit history of all admin actions for compliance and investigation.
+            </p>
+            <div className="workspace-quick-chips" aria-label="Safety quick insights">
+              <span className="workspace-quick-chip">🗑️ Recycle Bin — one-click restore</span>
+              <span className="workspace-quick-chip">
+                {auditLogLoading ? 'Refreshing…' : `${auditLogPagination.total} audit events`}
+              </span>
+              <span className="workspace-quick-chip">Videos · Quizzes · Modules · Tests</span>
             </div>
           </div>
-          <StatCard label="Total Events" value={auditLogPagination.total} />
+          <StatCard label="Total Audit Events" value={auditLogPagination.total} />
         </div>
-        <div className="workspace-link-actions">
-          <button type="button" className="primary-btn" onClick={() => navigate('/admin/audit-log')}>
-            Open Audit Log
+        <div className="workspace-link-actions" style={{ gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="primary-btn"
+            style={{ backgroundColor: '#10b981', borderColor: '#059669' }}
+            onClick={() => navigate('/admin/recycle-bin')}
+          >
+            🗑️ Open Deleted Items
           </button>
-        </div>
-      </section>
-
-      <section id="section-recycle-bin" className="card analytics-card workspace-launch-card" style={{ borderLeft: '4px solid #10b981' }}>
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Data Safety & Recovery</p>
-            <h2>Open Recycle Bin</h2>
-            <p className="subtitle">Safely restore deleted modules, topics, test series, videos, and quizzes with one click.</p>
-          </div>
-        </div>
-        <div className="workspace-link-actions">
-          <button type="button" className="primary-btn" style={{ backgroundColor: '#10b981', borderColor: '#059669' }} onClick={() => navigate('/admin/recycle-bin')}>
-            Open Recycle Bin 🗑️
-          </button>
-        </div>
-      </section>
-
-      <section id="section-recovery-center" className="card analytics-card recovery-center-card workspace-launch-card workspace-launch-recovery">
-        <div className="section-header">
-          <div>
-            <p className="eyebrow">Admin Recovery</p>
-            <h2>Open Recovery Workspace</h2>
-            <p className="subtitle">Move to the dedicated colorful page to filter recoverable actions and apply rollback safely.</p>
-            <div className="workspace-quick-chips" aria-label="Recovery quick insights">
-              <span className="workspace-quick-chip">{recoveryLoading ? 'Refreshing recoveries' : 'Recovery feed synced'}</span>
-              <span className="workspace-quick-chip">Supported: {recoveryActions.filter((item) => item?.recovery?.supported).length}</span>
-              <span className="workspace-quick-chip">Applied: {recoveryActions.filter((item) => item?.recovery?.alreadyApplied).length}</span>
-            </div>
-          </div>
-          <StatCard label="Recoverable Events" value={recoveryActions.length} />
-        </div>
-        <div className="workspace-link-actions">
-          <button type="button" className="primary-btn" onClick={() => navigate('/admin/recovery-center')}>
-            Open Recovery Center
+          <button
+            type="button"
+            className="primary-btn"
+            style={{ backgroundColor: '#6366f1', borderColor: '#4f46e5' }}
+            onClick={() => navigate('/admin/audit-log')}
+          >
+            🛡️ View Audit Log
           </button>
         </div>
       </section>
