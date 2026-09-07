@@ -10,7 +10,8 @@ function getModelMap() {
     Video: require('../models/Video'),
     Quiz: require('../models/Quiz'),
     MockExam: require('../models/MockExam'),
-    FullMockTest: require('../models/FullMockTest')
+    FullMockTest: require('../models/FullMockTest'),
+    FreeStudyResource: require('../models/FreeStudyResource')
   };
 }
 

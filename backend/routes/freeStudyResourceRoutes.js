@@ -8,6 +8,7 @@ const { v2: cloudinary } = require('cloudinary');
 const FreeStudyResource = require('../models/FreeStudyResource');
 const Course = require('../models/Course');
 const { authenticateToken } = require('../middleware/auth');
+const { archiveToRecycleBin } = require('../utils/recycleBin');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '../uploads/free-study');
@@ -691,14 +692,9 @@ router.delete('/admin/:id', authenticateToken('admin'), async (req, res) => {
     const resource = await FreeStudyResource.findById(req.params.id);
     if (!resource) return res.status(404).json({ error: 'Study resource not found.' });
 
-    const filename = path.basename(String(resource.filename || ''));
-    if (filename) {
-      const filePath = path.join(uploadsDir, filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-    await deleteFreeStudyFromCloudinary(resource.cloudinaryPublicId, resource.mimeType);
-
+    await archiveToRecycleBin(FreeStudyResource, [resource], req);
     await resource.deleteOne();
+
     return res.json({ message: 'Study resource deleted.' });
   } catch (error) {
     return res.status(500).json({ error: error?.message || 'Failed to delete study resource.' });
