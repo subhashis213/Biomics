@@ -95,7 +95,7 @@ export default function AuthPage() {
       .catch(() => { if (!cancelled) setServerReady(true); })
       .finally(() => clearTimeout(deadline));
     return () => { cancelled = true; clearTimeout(deadline); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -270,7 +270,7 @@ export default function AuthPage() {
 
   const regConfirmHint =
     registerForm.confirmPassword.length > 0 &&
-    registerForm.confirmPassword !== registerForm.password
+      registerForm.confirmPassword !== registerForm.password
       ? 'Passwords do not match.'
       : null;
 
@@ -391,10 +391,10 @@ export default function AuthPage() {
     const host = googleButtonRef.current;
     const candidates = host
       ? [
-          host.querySelector('[role="button"]'),
-          host.querySelector('button'),
-          host.querySelector('div[tabindex]')
-        ].filter(Boolean)
+        host.querySelector('[role="button"]'),
+        host.querySelector('button'),
+        host.querySelector('div[tabindex]')
+      ].filter(Boolean)
       : [];
 
     for (const candidate of candidates) {
@@ -1066,147 +1066,147 @@ export default function AuthPage() {
 
           <section className="auth-flip-face auth-flip-face-back" aria-hidden={!registerOpen}>
             <form className="card register-card auth-face-card" onSubmit={handleRegister}>
-            <h2>Student Registration</h2>
+              <h2>Student Registration</h2>
 
-            <div className="form-grid">
-              <label>
-                Phone
-                <input
-                  type="text"
-                  value={registerForm.phone}
-                  onChange={(e) => setRegisterForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="10-digit phone"
-                />
-                {regPhoneHint ? <small className="field-hint">⚠ {regPhoneHint}</small> : null}
-              </label>
-
-              <label>
-                Username
-                <input
-                  type="text"
-                  value={registerForm.username}
-                  onChange={(e) => setRegisterForm((f) => ({ ...f, username: e.target.value }))}
-                  placeholder="Choose username"
-                />
-                {regUsernameHint ? <small className="field-hint">⚠ {regUsernameHint}</small> : null}
-              </label>
-
-              <label style={{ gridColumn: '1 / -1' }}>
-                Email Address
-                <input
-                  type="email"
-                  value={registerForm.email}
-                  onChange={(e) => setRegisterForm((f) => ({ ...f, email: e.target.value }))}
-                  placeholder="e.g. yourname@gmail.com"
-                  autoComplete="email"
-                />
-                {regEmailHint ? <small className="field-hint">⚠ {regEmailHint}</small> : null}
-              </label>
-
-              <label>
-                Course
-                <select
-                  value={registerForm.class}
-                  onChange={(e) => setRegisterForm((f) => ({ ...f, class: e.target.value }))}
-                >
-                  <option value="">Select course</option>
-                  <option value="11th">11th</option>
-                  <option value="12th">12th</option>
-                  <option value="NEET">NEET</option>
-                  <option value="IIT-JAM">IIT-JAM</option>
-                  <option value="CSIR-NET Life Science">CSIR-NET Life Science</option>
-                  <option value="GATE">GATE</option>
-                </select>
-              </label>
-
-              <label>
-                City
-                <input
-                  type="text"
-                  value={registerForm.city}
-                  onChange={(e) => setRegisterForm((f) => ({ ...f, city: e.target.value }))}
-                  placeholder="Enter city"
-                />
-                {regCityHint ? <small className="field-hint">⚠ {regCityHint}</small> : null}
-              </label>
-
-              <label>
-                Security Question
-                <input type="text" value="What is your birth date?" disabled />
-              </label>
-
-              <label>
-                Answer (Birth Date)
-                <input
-                  type="date"
-                  value={registerForm.birthDate}
-                  onChange={(e) => setRegisterForm((f) => ({ ...f, birthDate: e.target.value }))}
-                />
-              </label>
-
-              <label>
-                Password
-                <div className="password-input-wrap">
+              <div className="form-grid">
+                <label>
+                  Phone
                   <input
-                    type={showRegisterPasswords ? 'text' : 'password'}
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm((f) => ({ ...f, password: e.target.value }))}
-                    placeholder="Min 8 chars, letters + numbers"
+                    type="text"
+                    value={registerForm.phone}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder="10-digit phone"
                   />
-                  <button
-                    type="button"
-                    className="toggle-password-btn"
-                    onClick={() => setShowRegisterPasswords((current) => !current)}
-                    aria-label={showRegisterPasswords ? 'Hide passwords' : 'Show passwords'}
+                  {regPhoneHint ? <small className="field-hint">⚠ {regPhoneHint}</small> : null}
+                </label>
+
+                <label>
+                  Username
+                  <input
+                    type="text"
+                    value={registerForm.username}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, username: e.target.value }))}
+                    placeholder="Choose username"
+                  />
+                  {regUsernameHint ? <small className="field-hint">⚠ {regUsernameHint}</small> : null}
+                </label>
+
+                <label style={{ gridColumn: '1 / -1' }}>
+                  Email Address
+                  <input
+                    type="email"
+                    value={registerForm.email}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="e.g. yourname@gmail.com"
+                    autoComplete="email"
+                  />
+                  {regEmailHint ? <small className="field-hint">⚠ {regEmailHint}</small> : null}
+                </label>
+
+                <label>
+                  Course
+                  <select
+                    value={registerForm.class}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, class: e.target.value }))}
                   >
-                    {showRegisterPasswords ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                {registerForm.password ? (
-                  <div className="password-strength" aria-live="polite">
-                    <div className="password-strength-track">
-                      <span className={`password-strength-fill strength-${Math.max(1, passwordScore)}`} />
-                    </div>
-                    <small>Strength: {passwordStrengthLabel}</small>
+                    <option value="">Select course</option>
+                    <option value="11th">11th</option>
+                    <option value="12th">12th</option>
+                    <option value="NEET">NEET</option>
+                    <option value="IIT-JAM">IIT-JAM</option>
+                    <option value="CSIR-NET Life Science">CSIR-NET Life Science</option>
+                    <option value="GATE">GATE</option>
+                  </select>
+                </label>
+
+                <label>
+                  City
+                  <input
+                    type="text"
+                    value={registerForm.city}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="Enter city"
+                  />
+                  {regCityHint ? <small className="field-hint">⚠ {regCityHint}</small> : null}
+                </label>
+
+                <label>
+                  Security Question
+                  <input type="text" value="What is your birth date?" disabled />
+                </label>
+
+                <label>
+                  Answer (Birth Date)
+                  <input
+                    type="date"
+                    value={registerForm.birthDate}
+                    onChange={(e) => setRegisterForm((f) => ({ ...f, birthDate: e.target.value }))}
+                  />
+                </label>
+
+                <label>
+                  Password
+                  <div className="password-input-wrap">
+                    <input
+                      type={showRegisterPasswords ? 'text' : 'password'}
+                      value={registerForm.password}
+                      onChange={(e) => setRegisterForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder="Min 8 chars, letters + numbers"
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password-btn"
+                      onClick={() => setShowRegisterPasswords((current) => !current)}
+                      aria-label={showRegisterPasswords ? 'Hide passwords' : 'Show passwords'}
+                    >
+                      {showRegisterPasswords ? 'Hide' : 'Show'}
+                    </button>
                   </div>
-                ) : null}
-                {regPasswordHint ? <small className="field-hint">⚠ {regPasswordHint}</small> : null}
-              </label>
+                  {registerForm.password ? (
+                    <div className="password-strength" aria-live="polite">
+                      <div className="password-strength-track">
+                        <span className={`password-strength-fill strength-${Math.max(1, passwordScore)}`} />
+                      </div>
+                      <small>Strength: {passwordStrengthLabel}</small>
+                    </div>
+                  ) : null}
+                  {regPasswordHint ? <small className="field-hint">⚠ {regPasswordHint}</small> : null}
+                </label>
 
-              <label>
-                Confirm Password
-                <div className="password-input-wrap">
-                  <input
-                    type={showRegisterPasswords ? 'text' : 'password'}
-                    value={registerForm.confirmPassword}
-                    onChange={(e) => setRegisterForm((f) => ({ ...f, confirmPassword: e.target.value }))}
-                    placeholder="Re-enter password"
-                  />
-                  <button
-                    type="button"
-                    className="toggle-password-btn"
-                    onClick={() => setShowRegisterPasswords((current) => !current)}
-                    aria-label={showRegisterPasswords ? 'Hide passwords' : 'Show passwords'}
-                  >
-                    {showRegisterPasswords ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                {regConfirmHint ? <small className="field-hint">⚠ {regConfirmHint}</small> : null}
-              </label>
-            </div>
+                <label>
+                  Confirm Password
+                  <div className="password-input-wrap">
+                    <input
+                      type={showRegisterPasswords ? 'text' : 'password'}
+                      value={registerForm.confirmPassword}
+                      onChange={(e) => setRegisterForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      placeholder="Re-enter password"
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password-btn"
+                      onClick={() => setShowRegisterPasswords((current) => !current)}
+                      aria-label={showRegisterPasswords ? 'Hide passwords' : 'Show passwords'}
+                    >
+                      {showRegisterPasswords ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  {regConfirmHint ? <small className="field-hint">⚠ {regConfirmHint}</small> : null}
+                </label>
+              </div>
 
-            <div className="form-actions">
-              <button
-                className="primary-btn"
-                type="submit"
-                disabled={!canRegister || isSubmittingRegister}
-              >
-                {isSubmittingRegister ? 'Registering…' : 'Register'}
-              </button>
-              {registerMessage && (
-                <p className={`inline-message ${registerMessage.type}`}>{registerMessage.text}</p>
-              )}
-            </div>
+              <div className="form-actions">
+                <button
+                  className="primary-btn"
+                  type="submit"
+                  disabled={!canRegister || isSubmittingRegister}
+                >
+                  {isSubmittingRegister ? 'Registering…' : 'Register'}
+                </button>
+                {registerMessage && (
+                  <p className={`inline-message ${registerMessage.type}`}>{registerMessage.text}</p>
+                )}
+              </div>
             </form>
 
             <div className="register-toggle">
@@ -1221,120 +1221,120 @@ export default function AuthPage() {
           </section>
         </div>
 
-      {forgotOpen ? (
-        <div className="modal-overlay forgot-password-overlay" onClick={() => setForgotOpen(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Reset Password</h3>
-              <button
-                type="button"
-                className="modal-close-btn"
-                onClick={() => setForgotOpen(false)}
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="subtitle">Security question: What is your birth date?</p>
-            {forgotMessage ? (
-              <div className={`forgot-error-banner ${forgotMessage.type === 'success' ? 'success' : 'error'}`} role="alert" aria-live="assertive">
-                {forgotMessage.text}
-              </div>
-            ) : null}
-            <form className="auth-forgot-form" onSubmit={handleForgotPassword}>
-              <label>
-                Username
-                <input
-                  type="text"
-                  value={forgotForm.username}
-                  onChange={(e) => {
-                    setForgotForm((f) => ({ ...f, username: e.target.value }));
-                    setForgotUsernameValid(null);
-                  }}
-                  onBlur={checkForgotUsername}
-                  placeholder="Enter username"
-                  autoComplete="username"
-                />
-                {isCheckingUsername ? (
-                  <small className="field-hint">Checking username...</small>
-                ) : forgotUsernameValid === false ? (
-                  <small className="field-hint error">⚠ Username not found</small>
-                ) : forgotUsernameValid === true ? (
-                  <small className="field-hint success">✓ Username found</small>
-                ) : null}
-              </label>
-              <label>
-                Birth Date
-                <input
-                  type="date"
-                  value={forgotForm.birthDate}
-                  onChange={(e) => setForgotForm((f) => ({ ...f, birthDate: e.target.value }))}
-                />
-              </label>
-              <label>
-                New Password
-                <div className="password-input-wrap">
-                  <input
-                    type={showForgotPasswords ? 'text' : 'password'}
-                    value={forgotForm.password}
-                    onChange={(e) => setForgotForm((f) => ({ ...f, password: e.target.value }))}
-                    placeholder="Min 8 chars, letters + numbers"
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    className="toggle-password-btn"
-                    onClick={() => setShowForgotPasswords((current) => !current)}
-                    aria-label={showForgotPasswords ? 'Hide password' : 'Show password'}
-                  >
-                    {showForgotPasswords ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                {forgotPasswordHint ? <small className="field-hint">⚠ {forgotPasswordHint}</small> : null}
-              </label>
-              <label>
-                Confirm New Password
-                <div className="password-input-wrap">
-                  <input
-                    type={showForgotPasswords ? 'text' : 'password'}
-                    value={forgotForm.confirmPassword}
-                    onChange={(e) => setForgotForm((f) => ({ ...f, confirmPassword: e.target.value }))}
-                    placeholder="Re-enter new password"
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    className="toggle-password-btn"
-                    onClick={() => setShowForgotPasswords((current) => !current)}
-                    aria-label={showForgotPasswords ? 'Hide password' : 'Show password'}
-                  >
-                    {showForgotPasswords ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                {forgotConfirmHint ? <small className="field-hint">⚠ {forgotConfirmHint}</small> : null}
-              </label>
-              <div className="form-actions">
-                <button className="primary-btn" type="submit" disabled={!canForgotReset || isSubmittingForgot}>
-                  {isSubmittingForgot ? 'Updating...' : 'Reset Password'}
+        {forgotOpen ? (
+          <div className="modal-overlay forgot-password-overlay" onClick={() => setForgotOpen(false)}>
+            <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Reset Password</h3>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={() => setForgotOpen(false)}
+                  aria-label="Close"
+                >
+                  ✕
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      {forgotSuccessModal ? (
-        <div className="modal-overlay success-modal-overlay">
-          <div className="modal-dialog success-modal-dialog">
-            <div className="success-icon">✓</div>
-            <h2>Password Reset Successful!</h2>
-            <p>Your password has been updated. Please sign in with your new password.</p>
-            <div className="success-progress">
-              <div className="progress-bar"></div>
+              <p className="subtitle">Security question: What is your birth date?</p>
+              {forgotMessage ? (
+                <div className={`forgot-error-banner ${forgotMessage.type === 'success' ? 'success' : 'error'}`} role="alert" aria-live="assertive">
+                  {forgotMessage.text}
+                </div>
+              ) : null}
+              <form className="auth-forgot-form" onSubmit={handleForgotPassword}>
+                <label>
+                  Username
+                  <input
+                    type="text"
+                    value={forgotForm.username}
+                    onChange={(e) => {
+                      setForgotForm((f) => ({ ...f, username: e.target.value }));
+                      setForgotUsernameValid(null);
+                    }}
+                    onBlur={checkForgotUsername}
+                    placeholder="Enter username"
+                    autoComplete="username"
+                  />
+                  {isCheckingUsername ? (
+                    <small className="field-hint">Checking username...</small>
+                  ) : forgotUsernameValid === false ? (
+                    <small className="field-hint error">⚠ Username not found</small>
+                  ) : forgotUsernameValid === true ? (
+                    <small className="field-hint success">✓ Username found</small>
+                  ) : null}
+                </label>
+                <label>
+                  Birth Date
+                  <input
+                    type="date"
+                    value={forgotForm.birthDate}
+                    onChange={(e) => setForgotForm((f) => ({ ...f, birthDate: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  New Password
+                  <div className="password-input-wrap">
+                    <input
+                      type={showForgotPasswords ? 'text' : 'password'}
+                      value={forgotForm.password}
+                      onChange={(e) => setForgotForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder="Min 8 chars, letters + numbers"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password-btn"
+                      onClick={() => setShowForgotPasswords((current) => !current)}
+                      aria-label={showForgotPasswords ? 'Hide password' : 'Show password'}
+                    >
+                      {showForgotPasswords ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  {forgotPasswordHint ? <small className="field-hint">⚠ {forgotPasswordHint}</small> : null}
+                </label>
+                <label>
+                  Confirm New Password
+                  <div className="password-input-wrap">
+                    <input
+                      type={showForgotPasswords ? 'text' : 'password'}
+                      value={forgotForm.confirmPassword}
+                      onChange={(e) => setForgotForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      placeholder="Re-enter new password"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password-btn"
+                      onClick={() => setShowForgotPasswords((current) => !current)}
+                      aria-label={showForgotPasswords ? 'Hide password' : 'Show password'}
+                    >
+                      {showForgotPasswords ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  {forgotConfirmHint ? <small className="field-hint">⚠ {forgotConfirmHint}</small> : null}
+                </label>
+                <div className="form-actions">
+                  <button className="primary-btn" type="submit" disabled={!canForgotReset || isSubmittingForgot}>
+                    {isSubmittingForgot ? 'Updating...' : 'Reset Password'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+
+        {forgotSuccessModal ? (
+          <div className="modal-overlay success-modal-overlay">
+            <div className="modal-dialog success-modal-dialog">
+              <div className="success-icon">✓</div>
+              <h2>Password Reset Successful!</h2>
+              <p>Your password has been updated. Please sign in with your new password.</p>
+              <div className="success-progress">
+                <div className="progress-bar"></div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
       </section>
     </div>

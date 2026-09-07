@@ -257,7 +257,12 @@ function fetchRemoteBuffer(url, redirectsLeft = 5) {
     }
 
     const lib = parsed.protocol === 'https:' ? https : http;
-    const request = lib.get(url, (response) => {
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+      }
+    };
+    const request = lib.get(url, options, (response) => {
       const status = Number(response.statusCode || 0);
       if (status >= 300 && status < 400 && response.headers.location && redirectsLeft > 0) {
         response.resume();
