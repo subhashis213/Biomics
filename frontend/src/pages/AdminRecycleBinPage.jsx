@@ -10,6 +10,40 @@ import AppShell from '../components/AppShell';
 import StatCard from '../components/StatCard';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage';
 
+const TABS = [
+  { id: 'All', label: 'All Items', collections: 'All' },
+  { id: 'Users', label: 'Users', collections: 'User' },
+  { id: 'TestSeries', label: 'Test Series', collections: 'TopicTest,MockExam,FullMockTest' },
+  { id: 'Videos', label: 'Videos', collections: 'Video' },
+  { id: 'Quizzes', label: 'Quizzes', collections: 'Quiz' },
+  { id: 'FreeLibrary', label: 'Free Library', collections: 'FreeStudyResource' },
+  { id: 'Structure', label: 'Modules & Topics', collections: 'Module,Topic' }
+];
+
+function getItemPath(item) {
+  if (!item?.data) return '-';
+  const d = item.data;
+  const parts = [];
+  
+  if (item.originalCollection === 'User') {
+    if (d.class) parts.push(`Class: ${d.class}`);
+    if (d.city) parts.push(`City: ${d.city}`);
+    return parts.join(' > ') || '-';
+  }
+
+  if (d.courseName || d.course) parts.push(d.courseName || d.course);
+  if (d.batchName || d.batch) parts.push(d.batchName || d.batch);
+  if (d.category) parts.push(d.category);
+  if (d.moduleName || d.module) parts.push(d.moduleName || d.module);
+  if (d.topicName || d.topic) parts.push(d.topicName || d.topic);
+  
+  if (item.originalCollection === 'FreeStudyResource' && d.resourceType) {
+    parts.push(`Type: ${d.resourceType}`);
+  }
+
+  return parts.length > 0 ? parts.join(' > ') : '-';
+}
+
 export default function AdminRecycleBinPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -113,6 +147,36 @@ export default function AdminRecycleBinPage() {
         {banner ? <p className={`banner ${banner.type}`}>{banner.text}</p> : null}
 
         <section className="card analytics-card workspace-panel">
+          <div className="analytics-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+            {TABS.map((tab) => {
+              const isActive = filter.collection === tab.collections;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    const newFilter = { ...filter, collection: tab.collections };
+                    setFilter(newFilter);
+                    loadRecycleBin(1, newFilter);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: isActive ? '#f8fafc' : 'transparent',
+                    color: isActive ? '#0284c7' : '#64748b',
+                    border: '1px solid',
+                    borderColor: isActive ? '#e0f2fe' : 'transparent',
+                    borderRadius: '8px',
+                    fontWeight: isActive ? '600' : '400',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="analytics-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
             <input
               className="analytics-filter-input"
@@ -122,21 +186,6 @@ export default function AdminRecycleBinPage() {
               onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
               style={{ flex: '1 1 220px' }}
             />
-            <select
-              className="analytics-filter-input"
-              value={filter.collection}
-              onChange={(e) => setFilter((f) => ({ ...f, collection: e.target.value }))}
-              style={{ flex: '0 1 180px' }}
-            >
-              <option value="All">All Types</option>
-              <option value="TopicTest">Topic Test</option>
-              <option value="Module">Module</option>
-              <option value="Topic">Topic</option>
-              <option value="Video">Video</option>
-              <option value="Quiz">Quiz</option>
-              <option value="FullMockTest">Full Mock Test</option>
-              <option value="MockExam">Mock Exam</option>
-            </select>
             <button
               className="primary-btn"
               type="button"
@@ -183,6 +232,7 @@ export default function AdminRecycleBinPage() {
                       <th>Deleted By</th>
                       <th>Type</th>
                       <th>Item Summary</th>
+                      <th>Location / Path</th>
                       <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
@@ -199,6 +249,11 @@ export default function AdminRecycleBinPage() {
                         <td>
                           <strong style={{ color: '#0f172a', display: 'block' }}>{item.summary}</strong>
                           <span style={{ fontSize: '12px', color: '#64748b' }}>ID: {String(item.originalId)}</span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '13px', color: '#475569', backgroundColor: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                            {getItemPath(item)}
+                          </span>
                         </td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <button

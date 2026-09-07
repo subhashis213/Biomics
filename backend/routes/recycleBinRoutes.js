@@ -12,9 +12,13 @@ router.get('/', authenticateToken('admin'), async (req, res) => {
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit || '30', 10)));
     const skip = (page - 1) * limit;
 
-    const collectionFilter = req.query.collection && req.query.collection !== 'All' 
-      ? { originalCollection: req.query.collection } 
-      : {};
+    let collectionFilter = {};
+    if (req.query.collection && req.query.collection !== 'All') {
+      const collections = String(req.query.collection).split(',').map(c => c.trim()).filter(Boolean);
+      if (collections.length > 0) {
+        collectionFilter = { originalCollection: { $in: collections } };
+      }
+    }
 
     const search = (req.query.search || '').trim();
     const searchFilter = search ? {
