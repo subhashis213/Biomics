@@ -163,19 +163,25 @@ async function uploadFreeStudyToCloudinary(localPath, mimeType = '') {
   const publicId = String(uploadResult?.public_id || '').trim();
   if (!url || !publicId) return null;
 
-  try {
-    const payload = await fetchRemoteBuffer(url);
-    if (!isValidFileBuffer(payload.buffer, mimeType)) {
-      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
-      throw new Error('Uploaded file could not be verified on cloud storage.');
-    }
-  } catch (error) {
+  // For 'raw' resource type (PDFs, EPUBs, Word docs), Cloudinary's secure_url
+  // requires a signed/authenticated request and returns 401 for anonymous fetches.
+  // Since we already validated the file locally before uploading, we can skip
+  // the remote re-verification for raw files safely.
+  if (resourceType !== 'raw') {
     try {
-      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
-    } catch {
-      // ignore cleanup failure
+      const payload = await fetchRemoteBuffer(url);
+      if (!isValidFileBuffer(payload.buffer, mimeType)) {
+        await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+        throw new Error('Uploaded file could not be verified on cloud storage.');
+      }
+    } catch (error) {
+      try {
+        await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+      } catch {
+        // ignore cleanup failure
+      }
+      throw error;
     }
-    throw error;
   }
 
   return { url, publicId, resourceType };
