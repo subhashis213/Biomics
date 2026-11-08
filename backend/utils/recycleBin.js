@@ -11,7 +11,8 @@ function getModelMap() {
     Quiz: require('../models/Quiz'),
     MockExam: require('../models/MockExam'),
     FullMockTest: require('../models/FullMockTest'),
-    FreeStudyResource: require('../models/FreeStudyResource')
+    FreeStudyResource: require('../models/FreeStudyResource'),
+    User: require('../models/User')
   };
 }
 
@@ -60,6 +61,20 @@ async function archiveToRecycleBin(Model, filterOrDocs, req, summaryFormatter) {
     });
 
     await RecycleBin.insertMany(entries, { ordered: false });
+
+    if (entries.length > 0 && typeof logAdminAction === 'function') {
+      try {
+        await logAdminAction(req, {
+          action: 'RECYCLE_BIN_ARCHIVE',
+          targetType: modelName,
+          targetId: entries.map(e => e.originalId).join(',').slice(0, 50),
+          details: { count: entries.length, summary: entries[0].summary }
+        });
+      } catch (e) {
+        console.error('[recycleBin] Error logging to audit log:', e?.message || e);
+      }
+    }
+
     return entries.length;
   } catch (err) {
     console.error('[recycleBin] Error archiving to recycle bin:', err?.message || err);

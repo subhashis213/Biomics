@@ -31,6 +31,7 @@ const Voucher = require('../models/Voucher');
 const Course = require('../models/Course');
 const Module = require('../models/Module');
 const { logAdminAction } = require('../utils/auditLog');
+const { archiveToRecycleBin } = require('../utils/recycleBin');
 const { authenticateToken, JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const router = express.Router();
@@ -2225,29 +2226,13 @@ router.delete('/users/:username', authenticateToken('admin'), async (req, res) =
   try {
     const user = await User.findOne({ username });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const deletedObj = user.toObject();
-    await purgeStudentAccount(user);
-    await logAdminAction(req, {
-      action: 'user.remove',
-      targetType: 'user',
-      targetId: deletedObj.username,
-      details: {
-        class: deletedObj.class,
-        city: deletedObj.city,
-        snapshot: {
-          phone: deletedObj.phone,
-          username: deletedObj.username,
-          class: deletedObj.class,
-          city: deletedObj.city,
-          security: deletedObj.security,
-          avatar: deletedObj.avatar,
-          favorites: deletedObj.favorites || [],
-          completedVideos: deletedObj.completedVideos || [],
-          purchasedCourses: deletedObj.purchasedCourses || []
-        }
-      }
-    });
-    return res.json({ message: 'User removed successfully' });
+    
+    // Archive user to recycle bin (soft delete) instead of full purge.
+    // We intentionally leave their test history and avatar intact so they can be restored seamlessly.
+    await archiveToRecycleBin(User, [user], req, (doc) => `Student User: ${doc.username} (${doc.phone || doc.email || 'No Contact'})`);
+    await User.findByIdAndDelete(user._id);
+
+    return res.json({ message: 'User moved to recycle bin successfully' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to remove user' });
   }

@@ -347,6 +347,11 @@ export default function AdminCourseWorkspacePage() {
         setCourseCatalog(nextCourses);
         const nextSelected = nextCourses[0]?.name || '';
         setSelectedCourse(nextSelected);
+        if (nextSelected) {
+          navigate(`/admin/course-workspace/${encodeURIComponent(nextSelected)}`, { replace: true });
+        } else {
+          navigate('/admin/course-workspace', { replace: true });
+        }
         setSelectedModule(null);
         setSelectedTopic(null);
         setModalStep('module');

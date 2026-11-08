@@ -5236,6 +5236,32 @@ html[data-theme='dark'] .course-manager-card .course-tile {
   justify-content: center;
   flex-shrink: 0;
 }
+.course-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.course-tile-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  padding: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+  transition: opacity 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+  z-index: 2;
+}
+.course-tile-delete-btn:hover {
+  opacity: 1;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  transform: scale(1.1);
+}
 .course-tile-body {
   display: flex;
   flex-direction: column;

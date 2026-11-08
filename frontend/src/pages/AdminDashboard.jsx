@@ -8,6 +8,7 @@ import {
   createAnnouncementAdmin,
   createVoucherAdmin,
   deleteQuiz,
+  deleteCourseAdmin,
   deleteAnnouncementAdmin,
   deleteVoucherAdmin,
   fetchAdminAnnouncements,
@@ -2317,6 +2318,24 @@ export default function AdminDashboard() {
     });
   }
 
+  function handleDeleteCourse(courseName) {
+    openConfirmDialog({
+      title: `Delete course "${courseName}"?`,
+      message: `Are you sure you want to remove "${courseName}"? This will archive the course and remove it from active course categories. Existing uploaded content remains safe in the database.`,
+      confirmLabel: 'Delete Course',
+      processingLabel: 'Deleting...',
+      onConfirm: async () => {
+        try {
+          await deleteCourseAdmin(courseName);
+          await refreshData();
+          setBanner({ type: 'success', text: `Course "${courseName}" removed successfully.` });
+        } catch (error) {
+          setBanner({ type: 'error', text: error?.message || 'Failed to delete course.' });
+        }
+      }
+    });
+  }
+
   useEffect(() => {
     loadAdminQuizzes(quizCategory);
   }, [quizCategory]);
@@ -2744,14 +2763,40 @@ export default function AdminDashboard() {
                 const lectureCount = videos.filter((v) => (v.category || 'General') === course).length;
                 const moduleCount = getModulesForCourse(course).length;
                 return (
-                  <button
+                  <div
                     key={course}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className="course-tile"
                     style={{ '--tile-accent': meta.color }}
                     onClick={() => navigate(`/admin/course-workspace/${encodeURIComponent(course)}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/admin/course-workspace/${encodeURIComponent(course)}`);
+                      }
+                    }}
                   >
-                    <span className="course-tile-icon">{meta.icon}</span>
+                    <div className="course-tile-top">
+                      <span className="course-tile-icon">{meta.icon}</span>
+                      <button
+                        type="button"
+                        className="course-tile-delete-btn"
+                        title={`Delete course ${course}`}
+                        aria-label={`Delete course ${course}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCourse(course);
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    </div>
                     <span className="course-tile-body">
                       <span className="course-tile-label">{course}</span>
                       <span className="course-tile-count">
@@ -2759,7 +2804,7 @@ export default function AdminDashboard() {
                       </span>
                     </span>
                     <span className="course-tile-plus" aria-hidden="true">+</span>
-                  </button>
+                  </div>
                 );
               })}
               {/* Show skeleton tiles while loading — prevents "No courses found" flash */}

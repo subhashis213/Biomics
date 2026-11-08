@@ -9,6 +9,7 @@ const FreeStudyResource = require('../models/FreeStudyResource');
 const Course = require('../models/Course');
 const { authenticateToken } = require('../middleware/auth');
 const { archiveToRecycleBin } = require('../utils/recycleBin');
+const { logAdminAction } = require('../utils/auditLog');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '../uploads/free-study');
@@ -585,6 +586,13 @@ router.post('/admin', authenticateToken('admin'), (req, res) => {
         isActive: true
       });
 
+      await logAdminAction(req, {
+        action: 'free_study.create',
+        targetType: 'free_study',
+        targetId: String(created._id),
+        details: { title: created.title, course: created.courseName, type: created.resourceType }
+      });
+
       return res.status(201).json({
         message: 'Free study resource uploaded.',
         resource: sanitizeResource(created.toObject())
@@ -645,6 +653,13 @@ router.post('/admin/:id/file', authenticateToken('admin'), (req, res) => {
       resource.fileSize = Number(req.file.size || 0);
       await resource.save();
 
+      await logAdminAction(req, {
+        action: 'free_study.replace_file',
+        targetType: 'free_study',
+        targetId: String(resource._id),
+        details: { title: resource.title, newFilename: resource.filename }
+      });
+
       if (oldPublicId) await deleteFreeStudyFromCloudinary(oldPublicId, resource.mimeType);
       if (oldFilename) {
         const oldPath = path.join(uploadsDir, oldFilename);
@@ -680,6 +695,14 @@ router.patch('/admin/:id', authenticateToken('admin'), async (req, res) => {
     if (req.body?.coverUrl !== undefined) resource.coverUrl = String(req.body.coverUrl || '').trim();
 
     await resource.save();
+
+    await logAdminAction(req, {
+      action: 'free_study.update',
+      targetType: 'free_study',
+      targetId: String(resource._id),
+      details: { title: resource.title, course: resource.courseName }
+    });
+
     return res.json({ message: 'Study resource updated.', resource: sanitizeResource(resource.toObject()) });
   } catch (error) {
     return res.status(500).json({ error: error?.message || 'Failed to update study resource.' });

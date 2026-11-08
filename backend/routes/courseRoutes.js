@@ -48,7 +48,7 @@ async function findCourseDocByName(courseName) {
   // Direct DB query using anchored regex — avoids loading all courses into memory.
   // The unique index on Course.name makes this O(log N) instead of O(N).
   const escapedKey = normalizedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return Course.findOne({ name: new RegExp(`^${escapedKey}$`, 'i') }).lean();
+  return Course.findOne({ name: new RegExp(`^${escapedKey}$`, 'i') });
 }
 
 function collectNormalizedNames(values = []) {
@@ -334,7 +334,8 @@ router.delete('/admin/:courseName', authenticateToken('admin'), async (req, res)
     const courses = await buildCoursesWithMeta({});
     return res.json({ courses });
   } catch (error) {
-    return res.status(500).json({ error: 'Failed to delete course.' });
+    console.error('Failed to delete course:', error);
+    return res.status(500).json({ error: error?.message || 'Failed to delete course.' });
   }
 });
 
